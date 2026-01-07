@@ -14,7 +14,356 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      alert_configs: {
+        Row: {
+          client_id: string
+          created_at: string
+          enabled: boolean | null
+          id: string
+          metric: string
+          operator: string
+          slack_webhook_url: string | null
+          threshold: number
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          enabled?: boolean | null
+          id?: string
+          metric: string
+          operator: string
+          slack_webhook_url?: string | null
+          threshold: number
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          enabled?: boolean | null
+          id?: string
+          metric?: string
+          operator?: string
+          slack_webhook_url?: string | null
+          threshold?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_configs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calls: {
+        Row: {
+          client_id: string
+          created_at: string
+          external_id: string
+          id: string
+          lead_id: string | null
+          outcome: string | null
+          scheduled_at: string | null
+          showed: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          external_id: string
+          id?: string
+          lead_id?: string | null
+          outcome?: string | null
+          scheduled_at?: string | null
+          showed?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          external_id?: string
+          id?: string
+          lead_id?: string | null
+          outcome?: string | null
+          scheduled_at?: string | null
+          showed?: boolean | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calls_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          created_at: string
+          ghl_api_key: string | null
+          ghl_location_id: string | null
+          id: string
+          meta_access_token: string | null
+          meta_ad_account_id: string | null
+          name: string
+          public_token: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          ghl_api_key?: string | null
+          ghl_location_id?: string | null
+          id?: string
+          meta_access_token?: string | null
+          meta_ad_account_id?: string | null
+          name: string
+          public_token?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          ghl_api_key?: string | null
+          ghl_location_id?: string | null
+          id?: string
+          meta_access_token?: string | null
+          meta_ad_account_id?: string | null
+          name?: string
+          public_token?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      daily_metrics: {
+        Row: {
+          ad_spend: number | null
+          calls: number | null
+          clicks: number | null
+          client_id: string
+          commitment_dollars: number | null
+          commitments: number | null
+          created_at: string
+          ctr: number | null
+          date: string
+          funded_dollars: number | null
+          funded_investors: number | null
+          id: string
+          impressions: number | null
+          leads: number | null
+          showed_calls: number | null
+          spam_leads: number | null
+          updated_at: string
+        }
+        Insert: {
+          ad_spend?: number | null
+          calls?: number | null
+          clicks?: number | null
+          client_id: string
+          commitment_dollars?: number | null
+          commitments?: number | null
+          created_at?: string
+          ctr?: number | null
+          date: string
+          funded_dollars?: number | null
+          funded_investors?: number | null
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          showed_calls?: number | null
+          spam_leads?: number | null
+          updated_at?: string
+        }
+        Update: {
+          ad_spend?: number | null
+          calls?: number | null
+          clicks?: number | null
+          client_id?: string
+          commitment_dollars?: number | null
+          commitments?: number | null
+          created_at?: string
+          ctr?: number | null
+          date?: string
+          funded_dollars?: number | null
+          funded_investors?: number | null
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          showed_calls?: number | null
+          spam_leads?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_metrics_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      funded_investors: {
+        Row: {
+          calls_to_fund: number | null
+          client_id: string
+          created_at: string
+          external_id: string
+          first_contact_at: string | null
+          funded_amount: number
+          funded_at: string
+          id: string
+          lead_id: string | null
+          name: string | null
+          time_to_fund_days: number | null
+        }
+        Insert: {
+          calls_to_fund?: number | null
+          client_id: string
+          created_at?: string
+          external_id: string
+          first_contact_at?: string | null
+          funded_amount?: number
+          funded_at?: string
+          id?: string
+          lead_id?: string | null
+          name?: string | null
+          time_to_fund_days?: number | null
+        }
+        Update: {
+          calls_to_fund?: number | null
+          client_id?: string
+          created_at?: string
+          external_id?: string
+          first_contact_at?: string | null
+          funded_amount?: number
+          funded_at?: string
+          id?: string
+          lead_id?: string | null
+          name?: string | null
+          time_to_fund_days?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funded_investors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funded_investors_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          client_id: string
+          created_at: string
+          email: string | null
+          external_id: string
+          id: string
+          is_spam: boolean | null
+          name: string | null
+          phone: string | null
+          source: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          email?: string | null
+          external_id: string
+          id?: string
+          is_spam?: boolean | null
+          name?: string | null
+          phone?: string | null
+          source?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          email?: string | null
+          external_id?: string
+          id?: string
+          is_spam?: boolean | null
+          name?: string | null
+          phone?: string | null
+          source?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_logs: {
+        Row: {
+          client_id: string
+          completed_at: string | null
+          error_message: string | null
+          id: string
+          records_synced: number | null
+          started_at: string
+          status: string
+          sync_type: string
+        }
+        Insert: {
+          client_id: string
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          records_synced?: number | null
+          started_at?: string
+          status?: string
+          sync_type: string
+        }
+        Update: {
+          client_id?: string
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          records_synced?: number | null
+          started_at?: string
+          status?: string
+          sync_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
