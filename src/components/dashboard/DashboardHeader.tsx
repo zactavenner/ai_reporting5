@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Moon, Sun, Settings, Zap } from 'lucide-react';
+import { Settings, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 interface DashboardHeaderProps {
   title: string;
@@ -9,13 +9,6 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ title, subtitle, onGlobalSettings }: DashboardHeaderProps) {
-  const [isDark, setIsDark] = useState(false);
-
-  const toggleTheme = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle('dark');
-  };
-
   return (
     <header className="border-b-2 border-border bg-card px-6 py-4">
       <div className="flex items-center justify-between">
@@ -31,9 +24,7 @@ export function DashboardHeader({ title, subtitle, onGlobalSettings }: Dashboard
           <Button variant="ghost" size="icon" onClick={onGlobalSettings}>
             <Settings className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={toggleTheme}>
-            {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </Button>
+          <ThemeToggle />
         </div>
       </div>
     </header>

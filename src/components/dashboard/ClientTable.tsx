@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Settings, ExternalLink, Copy } from 'lucide-react';
+import { Settings, ExternalLink, Copy, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -18,9 +18,10 @@ interface ClientTableProps {
   clients: Client[];
   metrics: Record<string, AggregatedMetrics>;
   onOpenSettings: (client: Client) => void;
+  onDeleteClient?: (client: Client) => void;
 }
 
-export function ClientTable({ clients, metrics, onOpenSettings }: ClientTableProps) {
+export function ClientTable({ clients, metrics, onOpenSettings, onDeleteClient }: ClientTableProps) {
   const navigate = useNavigate();
 
   const getStatusVariant = (status: string) => {
@@ -122,6 +123,16 @@ export function ClientTable({ clients, metrics, onOpenSettings }: ClientTablePro
                     >
                       <ExternalLink className="h-4 w-4" />
                     </Button>
+                    {onDeleteClient && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => onDeleteClient(client)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
