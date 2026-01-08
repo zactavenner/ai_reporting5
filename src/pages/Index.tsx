@@ -5,10 +5,11 @@ import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { ClientTable } from '@/components/dashboard/ClientTable';
 import { ClientSettingsModal } from '@/components/settings/ClientSettingsModal';
 import { AddClientModal } from '@/components/settings/AddClientModal';
+import { DeleteClientDialog } from '@/components/settings/DeleteClientDialog';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
 import { useSyncClientData } from '@/hooks/useSyncData';
-import { toast } from 'sonner';
+import { exportToCSV } from '@/lib/exportUtils';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 
@@ -16,6 +17,7 @@ const Index = () => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addClientOpen, setAddClientOpen] = useState(false);
+  const [deleteClient, setDeleteClient] = useState<Client | null>(null);
 
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: dailyMetrics = [], isLoading: metricsLoading } = useAllDailyMetrics();
@@ -50,11 +52,15 @@ const Index = () => {
   };
 
   const handleExportCSV = () => {
-    toast.success('Exporting CSV...');
+    exportToCSV(dailyMetrics, 'all-clients-metrics');
   };
 
   const handleAddClient = () => {
     setAddClientOpen(true);
+  };
+
+  const handleDeleteClient = (client: Client) => {
+    setDeleteClient(client);
   };
 
   const handleSync = () => {
@@ -115,6 +121,7 @@ const Index = () => {
               clients={clients}
               metrics={clientMetrics}
               onOpenSettings={handleOpenSettings}
+              onDeleteClient={handleDeleteClient}
             />
           )}
         </section>
@@ -129,6 +136,12 @@ const Index = () => {
       <AddClientModal
         open={addClientOpen}
         onOpenChange={setAddClientOpen}
+      />
+
+      <DeleteClientDialog
+        client={deleteClient}
+        open={!!deleteClient}
+        onOpenChange={(open) => !open && setDeleteClient(null)}
       />
     </div>
   );

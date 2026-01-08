@@ -1,14 +1,18 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Settings, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Settings, RefreshCw, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { ClientSettingsModal } from '@/components/settings/ClientSettingsModal';
+import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal';
+import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
+import { FundedInvestorsDrillDownModal } from '@/components/drilldown/FundedInvestorsDrillDownModal';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { useClient } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors, aggregateMetrics, DailyMetric } from '@/hooks/useMetrics';
 import { useSyncClientData } from '@/hooks/useSyncData';
+import { exportToCSV } from '@/lib/exportUtils';
 import {
   Table,
   TableBody,
@@ -23,6 +27,10 @@ export default function ClientDetail() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [leadsModalOpen, setLeadsModalOpen] = useState(false);
+  const [callsModalOpen, setCallsModalOpen] = useState(false);
+  const [showedCallsModalOpen, setShowedCallsModalOpen] = useState(false);
+  const [fundedModalOpen, setFundedModalOpen] = useState(false);
 
   const { data: client, isLoading: clientLoading } = useClient(clientId);
   const { data: dailyMetrics = [], isLoading: metricsLoading } = useDailyMetrics(clientId);
@@ -55,6 +63,10 @@ export default function ClientDetail() {
     syncMutation.mutate(clientId);
   };
 
+  const handleExportCSV = () => {
+    exportToCSV(dailyMetrics, `${client.name}-daily-metrics`);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b-2 border-border bg-card px-6 py-4">
@@ -78,6 +90,7 @@ export default function ClientDetail() {
             <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)}>
               <Settings className="h-5 w-5" />
             </Button>
+            <ThemeToggle />
           </div>
         </div>
         <div className="mt-4">
@@ -87,7 +100,7 @@ export default function ClientDetail() {
       </header>
 
       <main className="p-6 space-y-6">
-        <DateRangeFilter showAddClient={false} />
+        <DateRangeFilter showAddClient={false} onExportCSV={handleExportCSV} />
 
         <section>
           <h2 className="text-lg font-bold mb-2">Key Performance Indicators</h2>
@@ -101,23 +114,35 @@ export default function ClientDetail() {
           <h3 className="font-bold text-lg mb-1">View Detailed Records</h3>
           <p className="text-sm text-muted-foreground mb-4">Click to view individual records for each metric category</p>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <div className="border-2 border-border p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+            <div 
+              className="border-2 border-border p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => setLeadsModalOpen(true)}
+            >
               <p className="text-2xl font-bold font-mono">{aggregatedMetrics.totalLeads}</p>
               <p className="text-sm text-muted-foreground">Leads</p>
             </div>
-            <div className="border-2 border-border p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+            <div 
+              className="border-2 border-border p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => setCallsModalOpen(true)}
+            >
               <p className="text-2xl font-bold font-mono">{aggregatedMetrics.totalCalls}</p>
               <p className="text-sm text-muted-foreground">Calls</p>
             </div>
-            <div className="border-2 border-border p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+            <div 
+              className="border-2 border-border p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => setShowedCallsModalOpen(true)}
+            >
               <p className="text-2xl font-bold font-mono">{aggregatedMetrics.showedCalls}</p>
               <p className="text-sm text-muted-foreground">Showed Calls</p>
             </div>
-            <div className="border-2 border-border p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+            <div 
+              className="border-2 border-border p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => setFundedModalOpen(true)}
+            >
               <p className="text-2xl font-bold font-mono">{aggregatedMetrics.fundedInvestors}</p>
               <p className="text-sm text-muted-foreground">Funded Investors</p>
             </div>
-            <div className="border-2 border-border p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+            <div className="border-2 border-border p-4">
               <p className="text-2xl font-bold font-mono">{aggregatedMetrics.avgTimeToFund.toFixed(1)}d</p>
               <p className="text-sm text-muted-foreground">Avg Time to Fund</p>
             </div>
@@ -125,8 +150,16 @@ export default function ClientDetail() {
         </section>
 
         <section className="border-2 border-border bg-card p-4">
-          <h3 className="font-bold text-lg mb-1">Daily Performance Data</h3>
-          <p className="text-sm text-muted-foreground mb-4">Detailed metrics by date</p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-bold text-lg">Daily Performance Data</h3>
+              <p className="text-sm text-muted-foreground">Detailed metrics by date</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleExportCSV}>
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
           {dailyMetrics.length > 0 ? (
             <Table>
               <TableHeader>
@@ -197,51 +230,37 @@ export default function ClientDetail() {
             </div>
           )}
         </section>
-
-        <section className="border-2 border-border bg-card p-4">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="font-bold text-lg">Creative Approval</h3>
-              <p className="text-sm text-muted-foreground">Upload and manage creative assets for {client.name}</p>
-            </div>
-            <Button>Upload Creative</Button>
-          </div>
-          <div className="grid grid-cols-4 gap-3 mb-4">
-            <div className="bg-chart-4/20 p-4 text-center">
-              <p className="text-2xl font-bold text-chart-4">0</p>
-              <p className="text-sm">Pending</p>
-            </div>
-            <div className="bg-chart-2/20 p-4 text-center">
-              <p className="text-2xl font-bold text-chart-2">0</p>
-              <p className="text-sm">Approved</p>
-            </div>
-            <div className="bg-chart-1/20 p-4 text-center">
-              <p className="text-2xl font-bold text-chart-1">0</p>
-              <p className="text-sm">Revisions</p>
-            </div>
-            <div className="bg-destructive/20 p-4 text-center">
-              <p className="text-2xl font-bold text-destructive">0</p>
-              <p className="text-sm">Rejected</p>
-            </div>
-          </div>
-          <div className="flex gap-2 mb-4">
-            <Badge variant="outline">All (0)</Badge>
-            <Badge variant="outline">Pending</Badge>
-            <Badge variant="outline">Approved</Badge>
-            <Badge variant="outline">Revisions</Badge>
-            <Badge variant="outline">Rejected</Badge>
-          </div>
-          <div className="text-center py-8 text-muted-foreground border-2 border-dashed border-border">
-            <p>No creatives uploaded yet</p>
-            <p className="text-sm">Upload your first creative to get started</p>
-          </div>
-        </section>
       </main>
 
       <ClientSettingsModal
         client={client}
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
+      />
+
+      <LeadsDrillDownModal
+        clientId={clientId}
+        open={leadsModalOpen}
+        onOpenChange={setLeadsModalOpen}
+      />
+
+      <CallsDrillDownModal
+        clientId={clientId}
+        open={callsModalOpen}
+        onOpenChange={setCallsModalOpen}
+      />
+
+      <CallsDrillDownModal
+        clientId={clientId}
+        showedOnly
+        open={showedCallsModalOpen}
+        onOpenChange={setShowedCallsModalOpen}
+      />
+
+      <FundedInvestorsDrillDownModal
+        clientId={clientId}
+        open={fundedModalOpen}
+        onOpenChange={setFundedModalOpen}
       />
     </div>
   );
