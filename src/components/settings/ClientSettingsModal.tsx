@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Client } from '@/hooks/useClients';
+import { useClientSettings, useUpdateClientSettings, ClientSettings } from '@/hooks/useClientSettings';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,9 @@ interface ClientSettingsModalProps {
 
 export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettingsModalProps) {
   const queryClient = useQueryClient();
+  const { data: settings } = useClientSettings(client?.id);
+  const updateSettings = useUpdateClientSettings();
+  
   const [ghlLocationId, setGhlLocationId] = useState('');
   const [ghlApiKey, setGhlApiKey] = useState('');
   const [calendarIds, setCalendarIds] = useState('');
@@ -38,16 +42,45 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
   const [costPerCallThreshold, setCostPerCallThreshold] = useState('400');
   const [slackWebhook, setSlackWebhook] = useState('');
 
+  // KPI Thresholds
+  const [cplYellow, setCplYellow] = useState('50');
+  const [cplRed, setCplRed] = useState('100');
+  const [costPerCallYellow, setCostPerCallYellow] = useState('100');
+  const [costPerCallRed, setCostPerCallRed] = useState('200');
+  const [costPerShowYellow, setCostPerShowYellow] = useState('150');
+  const [costPerShowRed, setCostPerShowRed] = useState('300');
+  const [costPerInvestorYellow, setCostPerInvestorYellow] = useState('500');
+  const [costPerInvestorRed, setCostPerInvestorRed] = useState('1000');
+  const [costOfCapitalYellow, setCostOfCapitalYellow] = useState('5');
+  const [costOfCapitalRed, setCostOfCapitalRed] = useState('10');
+  const [fundedInvestorLabel, setFundedInvestorLabel] = useState('Funded Investors');
+
   // Load client data when modal opens
   useEffect(() => {
     if (client) {
       setGhlLocationId(client.ghl_location_id || '');
       setMetaAdAccountId(client.meta_ad_account_id || '');
-      // Don't show sensitive keys, just indicate if they're set
       setGhlApiKey('');
       setMetaAccessToken('');
     }
   }, [client]);
+
+  // Load settings when available
+  useEffect(() => {
+    if (settings) {
+      setCplYellow(String(settings.cpl_threshold_yellow));
+      setCplRed(String(settings.cpl_threshold_red));
+      setCostPerCallYellow(String(settings.cost_per_call_threshold_yellow));
+      setCostPerCallRed(String(settings.cost_per_call_threshold_red));
+      setCostPerShowYellow(String(settings.cost_per_show_threshold_yellow));
+      setCostPerShowRed(String(settings.cost_per_show_threshold_red));
+      setCostPerInvestorYellow(String(settings.cost_per_investor_threshold_yellow));
+      setCostPerInvestorRed(String(settings.cost_per_investor_threshold_red));
+      setCostOfCapitalYellow(String(settings.cost_of_capital_threshold_yellow));
+      setCostOfCapitalRed(String(settings.cost_of_capital_threshold_red));
+      setFundedInvestorLabel(settings.funded_investor_label);
+    }
+  }, [settings]);
 
   const handleSave = async () => {
     if (!client) return;
@@ -60,7 +93,6 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
         meta_ad_account_id: metaAdAccountId || null,
       };
       
-      // Only update keys if provided
       if (ghlApiKey) {
         updates.ghl_api_key = ghlApiKey;
       }
@@ -74,6 +106,22 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
         .eq('id', client.id);
 
       if (error) throw error;
+
+      // Save KPI thresholds
+      await updateSettings.mutateAsync({
+        client_id: client.id,
+        cpl_threshold_yellow: parseFloat(cplYellow),
+        cpl_threshold_red: parseFloat(cplRed),
+        cost_per_call_threshold_yellow: parseFloat(costPerCallYellow),
+        cost_per_call_threshold_red: parseFloat(costPerCallRed),
+        cost_per_show_threshold_yellow: parseFloat(costPerShowYellow),
+        cost_per_show_threshold_red: parseFloat(costPerShowRed),
+        cost_per_investor_threshold_yellow: parseFloat(costPerInvestorYellow),
+        cost_per_investor_threshold_red: parseFloat(costPerInvestorRed),
+        cost_of_capital_threshold_yellow: parseFloat(costOfCapitalYellow),
+        cost_of_capital_threshold_red: parseFloat(costOfCapitalRed),
+        funded_investor_label: fundedInvestorLabel,
+      });
 
       // Save alert configs if slack webhook provided
       if (slackWebhook) {
@@ -217,22 +265,136 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
           </TabsContent>
 
           <TabsContent value="thresholds" className="space-y-4 mt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="cplTarget">Target Cost Per Lead</Label>
-                <Input id="cplTarget" type="number" placeholder="150" />
+            <div className="border-2 border-border p-4 space-y-4">
+              <div>
+                <h4 className="font-medium mb-1">Custom Terminology</h4>
+                <p className="text-sm text-muted-foreground mb-3">Rename metrics to match your business terms</p>
+                <div className="space-y-2">
+                  <Label htmlFor="fundedLabel">Funded Investors Label</Label>
+                  <Input
+                    id="fundedLabel"
+                    value={fundedInvestorLabel}
+                    onChange={(e) => setFundedInvestorLabel(e.target.value)}
+                    placeholder="Funded Investors"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="cpcTarget">Target Cost Per Call</Label>
-                <Input id="cpcTarget" type="number" placeholder="400" />
+            </div>
+
+            <div className="border-2 border-border p-4 space-y-4">
+              <div>
+                <h4 className="font-medium mb-1">Color Thresholds</h4>
+                <p className="text-sm text-muted-foreground mb-3">Set yellow (warning) and red (critical) thresholds for each metric</p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="showTarget">Target Show Rate %</Label>
-                <Input id="showTarget" type="number" placeholder="35" />
+              
+              <div className="grid grid-cols-3 gap-3 items-center">
+                <Label className="text-sm font-medium">Cost Per Lead</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-yellow-600">Yellow $</span>
+                  <Input
+                    className="w-20"
+                    value={cplYellow}
+                    onChange={(e) => setCplYellow(e.target.value)}
+                    type="number"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-destructive">Red $</span>
+                  <Input
+                    className="w-20"
+                    value={cplRed}
+                    onChange={(e) => setCplRed(e.target.value)}
+                    type="number"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="cpsTarget">Target Cost Per Show</Label>
-                <Input id="cpsTarget" type="number" placeholder="800" />
+
+              <div className="grid grid-cols-3 gap-3 items-center">
+                <Label className="text-sm font-medium">Cost Per Call</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-yellow-600">Yellow $</span>
+                  <Input
+                    className="w-20"
+                    value={costPerCallYellow}
+                    onChange={(e) => setCostPerCallYellow(e.target.value)}
+                    type="number"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-destructive">Red $</span>
+                  <Input
+                    className="w-20"
+                    value={costPerCallRed}
+                    onChange={(e) => setCostPerCallRed(e.target.value)}
+                    type="number"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 items-center">
+                <Label className="text-sm font-medium">Cost Per Show</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-yellow-600">Yellow $</span>
+                  <Input
+                    className="w-20"
+                    value={costPerShowYellow}
+                    onChange={(e) => setCostPerShowYellow(e.target.value)}
+                    type="number"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-destructive">Red $</span>
+                  <Input
+                    className="w-20"
+                    value={costPerShowRed}
+                    onChange={(e) => setCostPerShowRed(e.target.value)}
+                    type="number"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 items-center">
+                <Label className="text-sm font-medium">Cost Per Investor</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-yellow-600">Yellow $</span>
+                  <Input
+                    className="w-20"
+                    value={costPerInvestorYellow}
+                    onChange={(e) => setCostPerInvestorYellow(e.target.value)}
+                    type="number"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-destructive">Red $</span>
+                  <Input
+                    className="w-20"
+                    value={costPerInvestorRed}
+                    onChange={(e) => setCostPerInvestorRed(e.target.value)}
+                    type="number"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 items-center">
+                <Label className="text-sm font-medium">Cost of Capital %</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-yellow-600">Yellow %</span>
+                  <Input
+                    className="w-20"
+                    value={costOfCapitalYellow}
+                    onChange={(e) => setCostOfCapitalYellow(e.target.value)}
+                    type="number"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-destructive">Red %</span>
+                  <Input
+                    className="w-20"
+                    value={costOfCapitalRed}
+                    onChange={(e) => setCostOfCapitalRed(e.target.value)}
+                    type="number"
+                  />
+                </div>
               </div>
             </div>
           </TabsContent>

@@ -9,9 +9,11 @@ import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal'
 import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
 import { FundedInvestorsDrillDownModal } from '@/components/drilldown/FundedInvestorsDrillDownModal';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
+import { AIAnalysisChat } from '@/components/ai/AIAnalysisChat';
 import { useClient } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors, aggregateMetrics, DailyMetric } from '@/hooks/useMetrics';
 import { useSyncClientData } from '@/hooks/useSyncData';
+import { useClientSettings, getThresholdsFromSettings } from '@/hooks/useClientSettings';
 import { exportToCSV } from '@/lib/exportUtils';
 import {
   Table,
@@ -21,7 +23,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 
 export default function ClientDetail() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -35,11 +36,16 @@ export default function ClientDetail() {
   const { data: client, isLoading: clientLoading } = useClient(clientId);
   const { data: dailyMetrics = [], isLoading: metricsLoading } = useDailyMetrics(clientId);
   const { data: fundedInvestors = [] } = useFundedInvestors(clientId);
+  const { data: settings } = useClientSettings(clientId);
   const syncMutation = useSyncClientData();
 
   const aggregatedMetrics = useMemo(() => {
     return aggregateMetrics(dailyMetrics, fundedInvestors);
   }, [dailyMetrics, fundedInvestors]);
+
+  const thresholds = useMemo(() => getThresholdsFromSettings(settings), [settings]);
+
+  const fundedInvestorLabel = settings?.funded_investor_label || 'Funded Investors';
 
   const isLoading = clientLoading || metricsLoading;
 
@@ -65,6 +71,23 @@ export default function ClientDetail() {
 
   const handleExportCSV = () => {
     exportToCSV(dailyMetrics, `${client.name}-daily-metrics`);
+  };
+
+  // Build context for AI analysis
+  const aiContext = {
+    clientName: client.name,
+    totalAdSpend: aggregatedMetrics.totalAdSpend,
+    leads: aggregatedMetrics.totalLeads,
+    calls: aggregatedMetrics.totalCalls,
+    showedCalls: aggregatedMetrics.showedCalls,
+    costPerLead: aggregatedMetrics.costPerLead,
+    costPerCall: aggregatedMetrics.costPerCall,
+    costPerShow: aggregatedMetrics.costPerShow,
+    fundedInvestors: aggregatedMetrics.fundedInvestors,
+    fundedDollars: aggregatedMetrics.fundedDollars,
+    costPerInvestor: aggregatedMetrics.costPerInvestor,
+    costOfCapital: aggregatedMetrics.costOfCapital,
+    showedPercent: aggregatedMetrics.showedPercent,
   };
 
   return (
@@ -105,9 +128,14 @@ export default function ClientDetail() {
         <section>
           <h2 className="text-lg font-bold mb-2">Key Performance Indicators</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Performance metrics with trend comparison
+            Performance metrics with trend comparison • Color-coded based on your thresholds
           </p>
-          <KPIGrid metrics={aggregatedMetrics} showFundedMetrics />
+          <KPIGrid 
+            metrics={aggregatedMetrics} 
+            showFundedMetrics 
+            thresholds={thresholds}
+            fundedInvestorLabel={fundedInvestorLabel}
+          />
         </section>
 
         <section className="border-2 border-border bg-card p-4">
@@ -140,7 +168,7 @@ export default function ClientDetail() {
               onClick={() => setFundedModalOpen(true)}
             >
               <p className="text-2xl font-bold font-mono">{aggregatedMetrics.fundedInvestors}</p>
-              <p className="text-sm text-muted-foreground">Funded Investors</p>
+              <p className="text-sm text-muted-foreground">{fundedInvestorLabel}</p>
             </div>
             <div className="border-2 border-border p-4">
               <p className="text-2xl font-bold font-mono">{aggregatedMetrics.avgTimeToFund.toFixed(1)}d</p>
@@ -194,7 +222,7 @@ export default function ClientDetail() {
         </section>
 
         <section className="border-2 border-border bg-card p-4">
-          <h3 className="font-bold text-lg mb-1">Funded Investors</h3>
+          <h3 className="font-bold text-lg mb-1">{fundedInvestorLabel}</h3>
           <p className="text-sm text-muted-foreground mb-4">Track time to fund and calls required</p>
           {fundedInvestors.length > 0 ? (
             <Table>
@@ -225,8 +253,8 @@ export default function ClientDetail() {
             </Table>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              <p>No funded investors yet</p>
-              <p className="text-sm">Funded investors will appear here once synced from GHL</p>
+              <p>No {fundedInvestorLabel.toLowerCase()} yet</p>
+              <p className="text-sm">{fundedInvestorLabel} will appear here once synced from GHL</p>
             </div>
           )}
         </section>
@@ -262,6 +290,8 @@ export default function ClientDetail() {
         open={fundedModalOpen}
         onOpenChange={setFundedModalOpen}
       />
+
+      <AIAnalysisChat context={aiContext} />
     </div>
   );
 }
