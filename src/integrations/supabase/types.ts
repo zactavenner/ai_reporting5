@@ -109,6 +109,60 @@ export type Database = {
           },
         ]
       }
+      client_settings: {
+        Row: {
+          client_id: string
+          cost_of_capital_threshold_red: number | null
+          cost_of_capital_threshold_yellow: number | null
+          cost_per_call_threshold_red: number | null
+          cost_per_call_threshold_yellow: number | null
+          cost_per_investor_threshold_red: number | null
+          cost_per_investor_threshold_yellow: number | null
+          cost_per_show_threshold_red: number | null
+          cost_per_show_threshold_yellow: number | null
+          cpl_threshold_red: number | null
+          cpl_threshold_yellow: number | null
+          created_at: string
+          funded_investor_label: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          cost_of_capital_threshold_red?: number | null
+          cost_of_capital_threshold_yellow?: number | null
+          cost_per_call_threshold_red?: number | null
+          cost_per_call_threshold_yellow?: number | null
+          cost_per_investor_threshold_red?: number | null
+          cost_per_investor_threshold_yellow?: number | null
+          cost_per_show_threshold_red?: number | null
+          cost_per_show_threshold_yellow?: number | null
+          cpl_threshold_red?: number | null
+          cpl_threshold_yellow?: number | null
+          created_at?: string
+          funded_investor_label?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          cost_of_capital_threshold_red?: number | null
+          cost_of_capital_threshold_yellow?: number | null
+          cost_per_call_threshold_red?: number | null
+          cost_per_call_threshold_yellow?: number | null
+          cost_per_investor_threshold_red?: number | null
+          cost_per_investor_threshold_yellow?: number | null
+          cost_per_show_threshold_red?: number | null
+          cost_per_show_threshold_yellow?: number | null
+          cpl_threshold_red?: number | null
+          cpl_threshold_yellow?: number | null
+          created_at?: string
+          funded_investor_label?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           created_at: string

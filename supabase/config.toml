@@ -2,3 +2,6 @@ project_id = "jgwwmtuvjlmzapwqiabu"
 
 [functions.sync-client-data]
 verify_jwt = false
+
+[functions.ai-analysis]
+verify_jwt = false

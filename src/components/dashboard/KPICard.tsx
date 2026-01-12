@@ -1,6 +1,11 @@
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
+export interface KPIThreshold {
+  yellow: number;
+  red: number;
+}
+
 interface KPICardProps {
   label: string;
   value: string | number;
@@ -9,6 +14,9 @@ interface KPICardProps {
   clickable?: boolean;
   onClick?: () => void;
   format?: 'currency' | 'percent' | 'number' | 'days';
+  threshold?: KPIThreshold;
+  /** For cost metrics, higher is worse. For percent metrics like show rate, lower is worse */
+  invertThreshold?: boolean;
 }
 
 export function KPICard({
@@ -19,6 +27,8 @@ export function KPICard({
   clickable = false,
   onClick,
   format = 'number',
+  threshold,
+  invertThreshold = false,
 }: KPICardProps) {
   const formatValue = (val: string | number): string => {
     if (typeof val === 'string') return val;
@@ -46,10 +56,29 @@ export function KPICard({
     return 'text-muted-foreground';
   };
 
+  const getThresholdColor = (): string => {
+    if (!threshold || typeof value !== 'number') return 'border-border';
+    
+    const numValue = value;
+    
+    if (invertThreshold) {
+      // For metrics where lower is worse (e.g., show rate %)
+      if (numValue <= threshold.red) return 'border-destructive bg-destructive/5';
+      if (numValue <= threshold.yellow) return 'border-yellow-500 bg-yellow-500/5';
+      return 'border-chart-2 bg-chart-2/5';
+    } else {
+      // For cost metrics where higher is worse
+      if (numValue >= threshold.red) return 'border-destructive bg-destructive/5';
+      if (numValue >= threshold.yellow) return 'border-yellow-500 bg-yellow-500/5';
+      return 'border-chart-2 bg-chart-2/5';
+    }
+  };
+
   return (
     <div
       className={cn(
-        'border-2 border-border bg-card p-4 transition-all',
+        'border-2 bg-card p-4 transition-all',
+        threshold ? getThresholdColor() : 'border-border',
         clickable && 'cursor-pointer hover:shadow-sm hover:-translate-y-0.5'
       )}
       onClick={clickable ? onClick : undefined}
