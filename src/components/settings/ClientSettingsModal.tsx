@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { WebhookSettingsTab } from './WebhookSettingsTab';
 
 interface ClientSettingsModalProps {
   client: Client | null;
@@ -166,17 +167,22 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Client Settings - {client.name}</DialogTitle>
           <DialogDescription>
-            Configure GoHighLevel API integration and KPI thresholds
+            Configure webhooks, API integration, and KPI thresholds
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="ghl" className="mt-4">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="webhooks" className="mt-4">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
             <TabsTrigger value="ghl">GHL API</TabsTrigger>
             <TabsTrigger value="meta">Meta API</TabsTrigger>
-            <TabsTrigger value="thresholds">KPI Thresholds</TabsTrigger>
+            <TabsTrigger value="thresholds">Thresholds</TabsTrigger>
             <TabsTrigger value="alerts">Alerts</TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="webhooks" className="mt-4">
+            <WebhookSettingsTab clientId={client.id} />
+          </TabsContent>
 
           <TabsContent value="ghl" className="space-y-4 mt-4">
             <div className="space-y-2">

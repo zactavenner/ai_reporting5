@@ -126,6 +126,7 @@ export type Database = {
           funded_investor_label: string | null
           id: string
           updated_at: string
+          webhook_mappings: Json | null
         }
         Insert: {
           client_id: string
@@ -143,6 +144,7 @@ export type Database = {
           funded_investor_label?: string | null
           id?: string
           updated_at?: string
+          webhook_mappings?: Json | null
         }
         Update: {
           client_id?: string
@@ -160,6 +162,7 @@ export type Database = {
           funded_investor_label?: string | null
           id?: string
           updated_at?: string
+          webhook_mappings?: Json | null
         }
         Relationships: []
       }
@@ -175,6 +178,7 @@ export type Database = {
           public_token: string | null
           status: string
           updated_at: string
+          webhook_secret: string | null
         }
         Insert: {
           created_at?: string
@@ -187,6 +191,7 @@ export type Database = {
           public_token?: string | null
           status?: string
           updated_at?: string
+          webhook_secret?: string | null
         }
         Update: {
           created_at?: string
@@ -199,6 +204,7 @@ export type Database = {
           public_token?: string | null
           status?: string
           updated_at?: string
+          webhook_secret?: string | null
         }
         Relationships: []
       }
@@ -411,6 +417,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sync_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_logs: {
+        Row: {
+          client_id: string
+          error_message: string | null
+          id: string
+          payload: Json | null
+          processed_at: string
+          status: string
+          webhook_type: string
+        }
+        Insert: {
+          client_id: string
+          error_message?: string | null
+          id?: string
+          payload?: Json | null
+          processed_at?: string
+          status?: string
+          webhook_type: string
+        }
+        Update: {
+          client_id?: string
+          error_message?: string | null
+          id?: string
+          payload?: Json | null
+          processed_at?: string
+          status?: string
+          webhook_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_logs_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
