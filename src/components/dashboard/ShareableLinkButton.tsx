@@ -93,9 +93,10 @@ export function ShareableLinkButton({ clientId, clientName, publicToken }: Share
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Share Report Link</DialogTitle>
+          <DialogTitle>Public Report Link</DialogTitle>
           <DialogDescription>
             Create a public link for {clientName} to view their performance report.
+            <strong className="block mt-1">No login required</strong> — anyone with this link can access the report.
             They will only see their own data, not the agency dashboard.
           </DialogDescription>
         </DialogHeader>
@@ -146,10 +147,11 @@ export function ShareableLinkButton({ clientId, clientName, publicToken }: Share
                 </Button>
               </div>
 
-              <p className="text-xs text-muted-foreground">
-                Anyone with this link can view this client's performance report.
-                The link can be revoked at any time.
-              </p>
+              <div className="bg-muted/50 border border-border rounded-md p-3">
+                <p className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">🌐 Public Access:</strong> Anyone with this link can view this client's performance report without logging in. Click "Revoke Access" to disable the link immediately.
+                </p>
+              </div>
             </>
           ) : (
             <div className="text-center py-6">

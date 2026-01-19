@@ -77,20 +77,21 @@ export function KPICard({
   return (
     <div
       className={cn(
-        'border-2 bg-card p-4 transition-all',
+        'border bg-card p-4 transition-all rounded-lg',
         threshold ? getThresholdColor() : 'border-border',
         clickable && 'cursor-pointer hover:shadow-sm hover:-translate-y-0.5'
       )}
       onClick={clickable ? onClick : undefined}
     >
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <p className="text-sm font-medium text-muted-foreground">
         {label}
-        {clickable && <span className="text-primary ml-1">(click to view)</span>}
+        {clickable && <span className="text-muted-foreground/70 ml-1 text-xs">(click to view)</span>}
       </p>
-      <p className="text-2xl font-bold mt-1 font-mono">{formatValue(value)}</p>
-      <div className={cn('flex items-center gap-1 mt-2 text-xs', getTrendColor())}>
+      <p className="text-3xl font-semibold mt-2 tracking-tight tabular-nums">{formatValue(value)}</p>
+      <div className={cn('flex items-center gap-1 mt-2 text-sm', getTrendColor())}>
         {getTrendIcon()}
-        <span>{Math.abs(change).toFixed(1)}% {changeLabel}</span>
+        <span className="tabular-nums">{change > 0 ? '+' : ''}{change.toFixed(1)}%</span>
+        <span className="text-muted-foreground">{changeLabel}</span>
       </div>
     </div>
   );

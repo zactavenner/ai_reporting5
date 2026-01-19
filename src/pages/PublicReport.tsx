@@ -49,25 +49,25 @@ export default function PublicReport() {
           <KPIGrid metrics={metrics} showFundedMetrics />
         </section>
 
-        <section className="border-2 border-border bg-card p-4">
-          <h3 className="font-bold text-lg mb-2">Performance Summary</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-            <div className="border-2 border-border p-4">
+        <section className="border border-border bg-card p-6 rounded-lg">
+          <h3 className="font-semibold text-lg mb-4">Performance Summary</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="border border-border p-4 rounded-lg">
               <p className="text-sm text-muted-foreground">Total Leads</p>
-              <p className="text-3xl font-bold font-mono">{metrics.totalLeads}</p>
+              <p className="text-3xl font-semibold tabular-nums mt-1">{metrics.totalLeads.toLocaleString()}</p>
             </div>
-            <div className="border-2 border-border p-4">
+            <div className="border border-border p-4 rounded-lg">
               <p className="text-sm text-muted-foreground">Funded Investors</p>
-              <p className="text-3xl font-bold font-mono">{metrics.fundedInvestors}</p>
-              <p className="text-sm text-muted-foreground">${metrics.fundedDollars.toLocaleString()}</p>
+              <p className="text-3xl font-semibold tabular-nums mt-1">{metrics.fundedInvestors}</p>
+              <p className="text-sm text-muted-foreground tabular-nums">${metrics.fundedDollars.toLocaleString()}</p>
             </div>
-            <div className="border-2 border-border p-4">
+            <div className="border border-border p-4 rounded-lg">
               <p className="text-sm text-muted-foreground">Avg Time to Fund</p>
-              <p className="text-3xl font-bold font-mono">{metrics.avgTimeToFund.toFixed(1)} days</p>
+              <p className="text-3xl font-semibold tabular-nums mt-1">{metrics.avgTimeToFund.toFixed(1)} <span className="text-lg font-normal">days</span></p>
             </div>
-            <div className="border-2 border-border p-4">
+            <div className="border border-border p-4 rounded-lg">
               <p className="text-sm text-muted-foreground">Avg Calls to Fund</p>
-              <p className="text-3xl font-bold font-mono">{metrics.avgCallsToFund.toFixed(1)}</p>
+              <p className="text-3xl font-semibold tabular-nums mt-1">{metrics.avgCallsToFund.toFixed(1)}</p>
             </div>
           </div>
         </section>
