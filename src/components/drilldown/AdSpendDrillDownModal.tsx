@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Download, Save, X, Pencil } from 'lucide-react';
+import { Download, Save, X, Pencil, Trash2, Plus } from 'lucide-react';
 import { useDailyMetrics, DailyMetric } from '@/hooks/useMetrics';
 import { supabase } from '@/integrations/supabase/client';
 import { exportToCSV } from '@/lib/exportUtils';
@@ -32,6 +32,13 @@ export function AdSpendDrillDownModal({ clientId, open, onOpenChange }: AdSpendD
   const { data: metrics = [], isLoading } = useDailyMetrics(clientId);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Partial<DailyMetric>>({});
+  const [isAdding, setIsAdding] = useState(false);
+  const [newRecord, setNewRecord] = useState({
+    date: new Date().toISOString().split('T')[0],
+    ad_spend: 0,
+    impressions: 0,
+    clicks: 0,
+  });
   const queryClient = useQueryClient();
 
   const handleExport = () => {
@@ -44,11 +51,6 @@ export function AdSpendDrillDownModal({ clientId, open, onOpenChange }: AdSpendD
       ad_spend: metric.ad_spend,
       impressions: metric.impressions,
       clicks: metric.clicks,
-      leads: metric.leads,
-      calls: metric.calls,
-      showed_calls: metric.showed_calls,
-      funded_investors: metric.funded_investors,
-      funded_dollars: metric.funded_dollars,
     });
   };
 
@@ -65,11 +67,6 @@ export function AdSpendDrillDownModal({ clientId, open, onOpenChange }: AdSpendD
           ad_spend: editValues.ad_spend,
           impressions: editValues.impressions,
           clicks: editValues.clicks,
-          leads: editValues.leads,
-          calls: editValues.calls,
-          showed_calls: editValues.showed_calls,
-          funded_investors: editValues.funded_investors,
-          funded_dollars: editValues.funded_dollars,
         })
         .eq('id', metricId);
 
@@ -84,24 +81,123 @@ export function AdSpendDrillDownModal({ clientId, open, onOpenChange }: AdSpendD
     }
   };
 
+  const deleteRecord = async (metricId: string) => {
+    if (!confirm('Are you sure you want to delete this record?')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('daily_metrics')
+        .delete()
+        .eq('id', metricId);
+
+      if (error) throw error;
+
+      toast.success('Record deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['daily-metrics', clientId] });
+    } catch (error: any) {
+      toast.error('Failed to delete record: ' + error.message);
+    }
+  };
+
+  const addRecord = async () => {
+    if (!clientId) return;
+    
+    try {
+      const { error } = await supabase
+        .from('daily_metrics')
+        .upsert({
+          client_id: clientId,
+          date: newRecord.date,
+          ad_spend: newRecord.ad_spend,
+          impressions: newRecord.impressions,
+          clicks: newRecord.clicks,
+        }, { onConflict: 'client_id,date' });
+
+      if (error) throw error;
+
+      toast.success('Record added successfully');
+      setIsAdding(false);
+      setNewRecord({
+        date: new Date().toISOString().split('T')[0],
+        ad_spend: 0,
+        impressions: 0,
+        clicks: 0,
+      });
+      queryClient.invalidateQueries({ queryKey: ['daily-metrics', clientId] });
+    } catch (error: any) {
+      toast.error('Failed to add record: ' + error.message);
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle>Ad Spend Records ({metrics.length})</DialogTitle>
-            <Button variant="outline" size="sm" onClick={handleExport}>
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Record
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExport}>
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+            </div>
           </div>
         </DialogHeader>
         
         <div className="flex-1 overflow-auto">
+          {isAdding && (
+            <div className="border border-border bg-muted/50 p-4 mb-4 rounded-lg">
+              <h4 className="font-semibold mb-3">Add New Ad Spend Record</h4>
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <label className="text-sm text-muted-foreground">Date</label>
+                  <Input
+                    type="date"
+                    value={newRecord.date}
+                    onChange={(e) => setNewRecord({ ...newRecord, date: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">Ad Spend ($)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={newRecord.ad_spend}
+                    onChange={(e) => setNewRecord({ ...newRecord, ad_spend: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">Impressions</label>
+                  <Input
+                    type="number"
+                    value={newRecord.impressions}
+                    onChange={(e) => setNewRecord({ ...newRecord, impressions: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">Clicks</label>
+                  <Input
+                    type="number"
+                    value={newRecord.clicks}
+                    onChange={(e) => setNewRecord({ ...newRecord, clicks: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" size="sm" onClick={() => setIsAdding(false)}>Cancel</Button>
+                <Button size="sm" onClick={addRecord}>Add Record</Button>
+              </div>
+            </div>
+          )}
+
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading records...</div>
           ) : metrics.length === 0 ? (
@@ -114,11 +210,6 @@ export function AdSpendDrillDownModal({ clientId, open, onOpenChange }: AdSpendD
                   <TableHead className="font-bold text-right">Ad Spend</TableHead>
                   <TableHead className="font-bold text-right">Impressions</TableHead>
                   <TableHead className="font-bold text-right">Clicks</TableHead>
-                  <TableHead className="font-bold text-right">Leads</TableHead>
-                  <TableHead className="font-bold text-right">Calls</TableHead>
-                  <TableHead className="font-bold text-right">Showed</TableHead>
-                  <TableHead className="font-bold text-right">Funded</TableHead>
-                  <TableHead className="font-bold text-right">$ Funded</TableHead>
                   <TableHead className="font-bold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -163,67 +254,6 @@ export function AdSpendDrillDownModal({ clientId, open, onOpenChange }: AdSpendD
                         <span className="font-mono">{(metric.clicks || 0).toLocaleString()}</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
-                      {editingId === metric.id ? (
-                        <Input
-                          type="number"
-                          value={editValues.leads ?? ''}
-                          onChange={(e) => setEditValues({ ...editValues, leads: parseInt(e.target.value) || 0 })}
-                          className="w-16 h-8 text-right"
-                        />
-                      ) : (
-                        <span className="font-mono">{metric.leads || 0}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {editingId === metric.id ? (
-                        <Input
-                          type="number"
-                          value={editValues.calls ?? ''}
-                          onChange={(e) => setEditValues({ ...editValues, calls: parseInt(e.target.value) || 0 })}
-                          className="w-16 h-8 text-right"
-                        />
-                      ) : (
-                        <span className="font-mono">{metric.calls || 0}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {editingId === metric.id ? (
-                        <Input
-                          type="number"
-                          value={editValues.showed_calls ?? ''}
-                          onChange={(e) => setEditValues({ ...editValues, showed_calls: parseInt(e.target.value) || 0 })}
-                          className="w-16 h-8 text-right"
-                        />
-                      ) : (
-                        <span className="font-mono">{metric.showed_calls || 0}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {editingId === metric.id ? (
-                        <Input
-                          type="number"
-                          value={editValues.funded_investors ?? ''}
-                          onChange={(e) => setEditValues({ ...editValues, funded_investors: parseInt(e.target.value) || 0 })}
-                          className="w-16 h-8 text-right"
-                        />
-                      ) : (
-                        <span className="font-mono">{metric.funded_investors || 0}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {editingId === metric.id ? (
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={editValues.funded_dollars ?? ''}
-                          onChange={(e) => setEditValues({ ...editValues, funded_dollars: parseFloat(e.target.value) || 0 })}
-                          className="w-24 h-8 text-right"
-                        />
-                      ) : (
-                        <span className="font-mono text-chart-2">{formatCurrency(metric.funded_dollars)}</span>
-                      )}
-                    </TableCell>
                     <TableCell>
                       {editingId === metric.id ? (
                         <div className="flex items-center gap-1">
@@ -235,9 +265,14 @@ export function AdSpendDrillDownModal({ clientId, open, onOpenChange }: AdSpendD
                           </Button>
                         </div>
                       ) : (
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(metric)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(metric)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => deleteRecord(metric.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
