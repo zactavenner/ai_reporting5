@@ -3,6 +3,7 @@ import { useClientByToken } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
+import { MetricChartsGrid } from '@/components/dashboard/MetricChartsGrid';
 import { useMemo } from 'react';
 
 export default function PublicReport() {
@@ -48,6 +49,8 @@ export default function PublicReport() {
           <h2 className="text-lg font-bold mb-2">Key Performance Indicators</h2>
           <KPIGrid metrics={metrics} showFundedMetrics />
         </section>
+
+        <MetricChartsGrid dailyMetrics={dailyMetrics} />
 
         <section className="border border-border bg-card p-6 rounded-lg">
           <h3 className="font-semibold text-lg mb-4">Performance Summary</h3>

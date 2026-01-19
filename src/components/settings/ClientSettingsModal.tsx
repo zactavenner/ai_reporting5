@@ -29,11 +29,6 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
   const { data: settings } = useClientSettings(client?.id);
   const updateSettings = useUpdateClientSettings();
   
-  const [ghlLocationId, setGhlLocationId] = useState('');
-  const [ghlApiKey, setGhlApiKey] = useState('');
-  const [calendarIds, setCalendarIds] = useState('');
-  const [metaAdAccountId, setMetaAdAccountId] = useState('');
-  const [metaAccessToken, setMetaAccessToken] = useState('');
   const [saving, setSaving] = useState(false);
   
   // Alert settings
@@ -55,16 +50,6 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
   const [costOfCapitalYellow, setCostOfCapitalYellow] = useState('5');
   const [costOfCapitalRed, setCostOfCapitalRed] = useState('10');
   const [fundedInvestorLabel, setFundedInvestorLabel] = useState('Funded Investors');
-
-  // Load client data when modal opens
-  useEffect(() => {
-    if (client) {
-      setGhlLocationId(client.ghl_location_id || '');
-      setMetaAdAccountId(client.meta_ad_account_id || '');
-      setGhlApiKey('');
-      setMetaAccessToken('');
-    }
-  }, [client]);
 
   // Load settings when available
   useEffect(() => {
@@ -88,25 +73,21 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
     
     setSaving(true);
     try {
-      // Update client settings
-      const updates: Record<string, string | null> = {
-        ghl_location_id: ghlLocationId || null,
-        meta_ad_account_id: metaAdAccountId || null,
-      };
-      
-      if (ghlApiKey) {
-        updates.ghl_api_key = ghlApiKey;
-      }
-      if (metaAccessToken) {
-        updates.meta_access_token = metaAccessToken;
-      }
-
-      const { error } = await supabase
-        .from('clients')
-        .update(updates)
-        .eq('id', client.id);
-
-      if (error) throw error;
+      // Save KPI thresholds
+      await updateSettings.mutateAsync({
+        client_id: client.id,
+        cpl_threshold_yellow: parseFloat(cplYellow),
+        cpl_threshold_red: parseFloat(cplRed),
+        cost_per_call_threshold_yellow: parseFloat(costPerCallYellow),
+        cost_per_call_threshold_red: parseFloat(costPerCallRed),
+        cost_per_show_threshold_yellow: parseFloat(costPerShowYellow),
+        cost_per_show_threshold_red: parseFloat(costPerShowRed),
+        cost_per_investor_threshold_yellow: parseFloat(costPerInvestorYellow),
+        cost_per_investor_threshold_red: parseFloat(costPerInvestorRed),
+        cost_of_capital_threshold_yellow: parseFloat(costOfCapitalYellow),
+        cost_of_capital_threshold_red: parseFloat(costOfCapitalRed),
+        funded_investor_label: fundedInvestorLabel,
+      });
 
       // Save KPI thresholds
       await updateSettings.mutateAsync({
@@ -163,7 +144,7 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl border-2 border-border">
+      <DialogContent className="max-w-2xl border-2 border-border max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Client Settings - {client.name}</DialogTitle>
           <DialogDescription>
@@ -172,102 +153,14 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
         </DialogHeader>
 
         <Tabs defaultValue="webhooks" className="mt-4">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
-            <TabsTrigger value="ghl">GHL API</TabsTrigger>
-            <TabsTrigger value="meta">Meta API</TabsTrigger>
             <TabsTrigger value="thresholds">Thresholds</TabsTrigger>
             <TabsTrigger value="alerts">Alerts</TabsTrigger>
           </TabsList>
           
           <TabsContent value="webhooks" className="mt-4">
             <WebhookSettingsTab clientId={client.id} />
-          </TabsContent>
-
-          <TabsContent value="ghl" className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label htmlFor="ghlLocationId">GHL Location ID</Label>
-              <Input
-                id="ghlLocationId"
-                value={ghlLocationId}
-                onChange={(e) => setGhlLocationId(e.target.value)}
-                placeholder="ROg8rJAnV4jtuQrvtxXN"
-              />
-              <p className="text-xs text-muted-foreground">Find this in your GHL account settings</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="ghlApiKey">GHL API Key</Label>
-              <Input
-                id="ghlApiKey"
-                type="password"
-                value={ghlApiKey}
-                onChange={(e) => setGhlApiKey(e.target.value)}
-                placeholder={client.ghl_api_key ? "••••••••••••••• (already set)" : "Enter API key"}
-              />
-              <p className="text-xs text-muted-foreground">Create an API key in GHL Settings → API → Private Integration</p>
-            </div>
-
-            <div className="border-2 border-border p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium">Calendar Selection</h4>
-                  <p className="text-sm text-muted-foreground">Select calendars to track appointments</p>
-                </div>
-                <Button variant="outline" size="sm">Load Calendars</Button>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="calendarIds">Calendar IDs (Manual)</Label>
-                <Input
-                  id="calendarIds"
-                  value={calendarIds}
-                  onChange={(e) => setCalendarIds(e.target.value)}
-                  placeholder="clpRwqRiL3PCDmmYr61Z, xobiSzA1laF1auAQ7ZqB"
-                />
-                <p className="text-xs text-muted-foreground">Enter comma-separated calendar IDs or click Load Calendars above.</p>
-              </div>
-            </div>
-
-            <div className="border-2 border-border p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium">Pipeline Stage Mapping</h4>
-                  <p className="text-sm text-muted-foreground">Map GHL pipeline stages to track commitments and funded investors</p>
-                </div>
-                <Button variant="outline" size="sm">Load Pipelines</Button>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="meta" className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label htmlFor="metaAdAccountId">Meta Ad Account ID</Label>
-              <Input
-                id="metaAdAccountId"
-                value={metaAdAccountId}
-                onChange={(e) => setMetaAdAccountId(e.target.value)}
-                placeholder="act_123456789"
-              />
-              <p className="text-xs text-muted-foreground">Find this in Meta Business Suite → Ad Accounts</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="metaAccessToken">Meta Access Token</Label>
-              <Input
-                id="metaAccessToken"
-                type="password"
-                value={metaAccessToken}
-                onChange={(e) => setMetaAccessToken(e.target.value)}
-                placeholder={client.meta_access_token ? "••••••••••••••• (already set)" : "Enter access token"}
-              />
-              <p className="text-xs text-muted-foreground">Generate a long-lived access token from Meta for Developers</p>
-            </div>
-
-            <div className="border-2 border-accent bg-accent/30 p-4">
-              <p className="text-sm">
-                <strong>Note:</strong> Meta API tokens refresh automatically every 15-30 minutes to ensure data accuracy.
-              </p>
-            </div>
           </TabsContent>
 
           <TabsContent value="thresholds" className="space-y-4 mt-4">

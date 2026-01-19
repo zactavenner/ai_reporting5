@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Settings, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { DailyPerformanceTable } from '@/components/dashboard/DailyPerformanceTable';
+import { MetricChartsGrid } from '@/components/dashboard/MetricChartsGrid';
 import { ClientSettingsModal } from '@/components/settings/ClientSettingsModal';
 import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal';
 import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
@@ -14,7 +15,6 @@ import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { AIAnalysisChat } from '@/components/ai/AIAnalysisChat';
 import { useClient } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
-import { useSyncClientData } from '@/hooks/useSyncData';
 import { useClientSettings, getThresholdsFromSettings } from '@/hooks/useClientSettings';
 import { exportToCSV } from '@/lib/exportUtils';
 import {
@@ -39,7 +39,6 @@ export default function ClientDetail() {
   const { data: dailyMetrics = [], isLoading: metricsLoading } = useDailyMetrics(clientId);
   const { data: fundedInvestors = [] } = useFundedInvestors(clientId);
   const { data: settings } = useClientSettings(clientId);
-  const syncMutation = useSyncClientData();
 
   const aggregatedMetrics = useMemo(() => {
     return aggregateMetrics(dailyMetrics, fundedInvestors);
@@ -66,10 +65,6 @@ export default function ClientDetail() {
       </div>
     );
   }
-
-  const handleSync = () => {
-    syncMutation.mutate(clientId);
-  };
 
   const handleExportCSV = () => {
     exportToCSV(dailyMetrics, `${client.name}-daily-metrics`);
@@ -108,15 +103,6 @@ export default function ClientDetail() {
               clientName={client.name}
               publicToken={client.public_token}
             />
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleSync}
-              disabled={syncMutation.isPending}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-              Sync
-            </Button>
             <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)}>
               <Settings className="h-5 w-5" />
             </Button>
@@ -183,6 +169,8 @@ export default function ClientDetail() {
             </div>
           </div>
         </section>
+
+        <MetricChartsGrid dailyMetrics={dailyMetrics} />
 
         <DailyPerformanceTable 
           dailyMetrics={dailyMetrics} 
