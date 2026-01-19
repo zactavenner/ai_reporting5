@@ -66,8 +66,12 @@ export type Database = {
           id: string
           lead_id: string | null
           outcome: string | null
+          quality_score: number | null
+          recording_url: string | null
           scheduled_at: string | null
           showed: boolean | null
+          summary: string | null
+          transcript: string | null
           updated_at: string
         }
         Insert: {
@@ -77,8 +81,12 @@ export type Database = {
           id?: string
           lead_id?: string | null
           outcome?: string | null
+          quality_score?: number | null
+          recording_url?: string | null
           scheduled_at?: string | null
           showed?: boolean | null
+          summary?: string | null
+          transcript?: string | null
           updated_at?: string
         }
         Update: {
@@ -88,8 +96,12 @@ export type Database = {
           id?: string
           lead_id?: string | null
           outcome?: string | null
+          quality_score?: number | null
+          recording_url?: string | null
           scheduled_at?: string | null
           showed?: boolean | null
+          summary?: string | null
+          transcript?: string | null
           updated_at?: string
         }
         Relationships: [

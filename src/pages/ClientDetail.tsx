@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Settings } from 'lucide-react';
+import { ArrowLeft, Settings, DollarSign, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
@@ -10,6 +10,8 @@ import { ClientSettingsModal } from '@/components/settings/ClientSettingsModal';
 import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal';
 import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
 import { FundedInvestorsDrillDownModal } from '@/components/drilldown/FundedInvestorsDrillDownModal';
+import { AdSpendDrillDownModal } from '@/components/drilldown/AdSpendDrillDownModal';
+import { CallRecordingsModal } from '@/components/drilldown/CallRecordingsModal';
 import { ShareableLinkButton } from '@/components/dashboard/ShareableLinkButton';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { AIAnalysisChat } from '@/components/ai/AIAnalysisChat';
@@ -17,6 +19,7 @@ import { useClient } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
 import { useClientSettings, getThresholdsFromSettings } from '@/hooks/useClientSettings';
 import { exportToCSV } from '@/lib/exportUtils';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Table,
   TableBody,
@@ -34,6 +37,9 @@ export default function ClientDetail() {
   const [callsModalOpen, setCallsModalOpen] = useState(false);
   const [showedCallsModalOpen, setShowedCallsModalOpen] = useState(false);
   const [fundedModalOpen, setFundedModalOpen] = useState(false);
+  const [adSpendModalOpen, setAdSpendModalOpen] = useState(false);
+  const [callRecordingsOpen, setCallRecordingsOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: client, isLoading: clientLoading } = useClient(clientId);
   const { data: dailyMetrics = [], isLoading: metricsLoading } = useDailyMetrics(clientId);
@@ -68,6 +74,14 @@ export default function ClientDetail() {
 
   const handleExportCSV = () => {
     exportToCSV(dailyMetrics, `${client.name}-daily-metrics`);
+  };
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['daily-metrics', clientId] });
+    queryClient.invalidateQueries({ queryKey: ['funded-investors', clientId] });
+    queryClient.invalidateQueries({ queryKey: ['call-recordings', clientId] });
+    queryClient.invalidateQueries({ queryKey: ['leads', clientId] });
+    queryClient.invalidateQueries({ queryKey: ['calls', clientId] });
   };
 
   // Build context for AI analysis
@@ -116,7 +130,7 @@ export default function ClientDetail() {
       </header>
 
       <main className="p-6 space-y-6">
-        <DateRangeFilter showAddClient={false} onExportCSV={handleExportCSV} />
+        <DateRangeFilter showAddClient={false} onExportCSV={handleExportCSV} onRefresh={handleRefresh} />
 
         <section>
           <h2 className="text-lg font-bold mb-2">Key Performance Indicators</h2>
@@ -134,7 +148,19 @@ export default function ClientDetail() {
         <section className="border-2 border-border bg-card p-4">
           <h3 className="font-bold text-lg mb-1">View Detailed Records</h3>
           <p className="text-sm text-muted-foreground mb-4">Click to view individual records for each metric category</p>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+            <div 
+              className="border-2 border-border p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => setAdSpendModalOpen(true)}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <DollarSign className="h-4 w-4 text-chart-1" />
+                <p className="text-sm text-muted-foreground">Ad Spend</p>
+              </div>
+              <p className="text-2xl font-bold font-mono text-chart-1">
+                ${aggregatedMetrics.totalAdSpend.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+            </div>
             <div 
               className="border-2 border-border p-4 cursor-pointer hover:bg-muted/50 transition-colors"
               onClick={() => setLeadsModalOpen(true)}
@@ -166,6 +192,16 @@ export default function ClientDetail() {
             <div className="border-2 border-border p-4">
               <p className="text-2xl font-bold font-mono">{aggregatedMetrics.avgTimeToFund.toFixed(1)}d</p>
               <p className="text-sm text-muted-foreground">Avg Time to Fund</p>
+            </div>
+            <div 
+              className="border-2 border-border p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => setCallRecordingsOpen(true)}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Mic className="h-4 w-4 text-chart-4" />
+                <p className="text-sm text-muted-foreground">Recordings</p>
+              </div>
+              <p className="text-2xl font-bold font-mono">View</p>
             </div>
           </div>
         </section>
@@ -246,6 +282,18 @@ export default function ClientDetail() {
         clientId={clientId}
         open={fundedModalOpen}
         onOpenChange={setFundedModalOpen}
+      />
+
+      <AdSpendDrillDownModal
+        clientId={clientId}
+        open={adSpendModalOpen}
+        onOpenChange={setAdSpendModalOpen}
+      />
+
+      <CallRecordingsModal
+        clientId={clientId}
+        open={callRecordingsOpen}
+        onOpenChange={setCallRecordingsOpen}
       />
 
       <AIAnalysisChat context={aiContext} />

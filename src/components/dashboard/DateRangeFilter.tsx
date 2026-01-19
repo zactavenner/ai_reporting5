@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Download, Plus } from 'lucide-react';
+import { Calendar as CalendarIcon, Download, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -20,10 +20,11 @@ import { cn } from '@/lib/utils';
 interface DateRangeFilterProps {
   onExportCSV?: () => void;
   onAddClient?: () => void;
+  onRefresh?: () => void;
   showAddClient?: boolean;
 }
 
-export function DateRangeFilter({ onExportCSV, onAddClient, showAddClient = true }: DateRangeFilterProps) {
+export function DateRangeFilter({ onExportCSV, onAddClient, onRefresh, showAddClient = true }: DateRangeFilterProps) {
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: new Date(2025, 11, 7),
     to: new Date(2026, 0, 6),
@@ -127,6 +128,13 @@ export function DateRangeFilter({ onExportCSV, onAddClient, showAddClient = true
             />
           </PopoverContent>
         </Popover>
+
+        {onRefresh && (
+          <Button variant="outline" onClick={onRefresh}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+        )}
 
         <Button variant="outline" onClick={onExportCSV}>
           <Download className="mr-2 h-4 w-4" />
