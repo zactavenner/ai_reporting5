@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -10,6 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { DailyMetric } from '@/hooks/useMetrics';
+import { Sparkline } from './Sparkline';
 
 interface DailyPerformanceTableProps {
   dailyMetrics: DailyMetric[];
@@ -62,6 +63,29 @@ export function DailyPerformanceTable({ dailyMetrics, onExportCSV }: DailyPerfor
     };
   };
 
+  // Calculate sparkline data for key metrics (last 14 days, chronological order)
+  const sparklineData = useMemo(() => {
+    const last14Days = sortedMetrics.slice(0, 14).reverse();
+    
+    return {
+      adSpend: last14Days.map(d => Number(d.ad_spend) || 0),
+      leads: last14Days.map(d => d.leads || 0),
+      cpl: last14Days.map(d => {
+        const adSpend = Number(d.ad_spend) || 0;
+        const leads = d.leads || 0;
+        return leads > 0 ? adSpend / leads : 0;
+      }),
+      calls: last14Days.map(d => d.calls || 0),
+      showRate: last14Days.map(d => {
+        const calls = d.calls || 0;
+        const showed = d.showed_calls || 0;
+        return calls > 0 ? (showed / calls) * 100 : 0;
+      }),
+      funded: last14Days.map(d => d.funded_investors || 0),
+      fundedDollars: last14Days.map(d => Number(d.funded_dollars) || 0),
+    };
+  }, [sortedMetrics]);
+
   if (dailyMetrics.length === 0) {
     return (
       <div className="border-2 border-border bg-card p-4">
@@ -96,6 +120,44 @@ export function DailyPerformanceTable({ dailyMetrics, onExportCSV }: DailyPerfor
           <Download className="h-4 w-4 mr-2" />
           Export CSV
         </Button>
+      </div>
+
+      {/* Sparkline Trend Row */}
+      <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
+        <div className="flex items-center gap-2 mb-3">
+          <TrendingUp className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium">14-Day Trends</span>
+        </div>
+        <div className="grid grid-cols-7 gap-4">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Ad Spend</p>
+            <Sparkline data={sparklineData.adSpend} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Leads</p>
+            <Sparkline data={sparklineData.leads} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">CPL</p>
+            <Sparkline data={sparklineData.cpl} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Calls</p>
+            <Sparkline data={sparklineData.calls} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Show Rate</p>
+            <Sparkline data={sparklineData.showRate} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Funded</p>
+            <Sparkline data={sparklineData.funded} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Funded $</p>
+            <Sparkline data={sparklineData.fundedDollars} />
+          </div>
+        </div>
       </div>
 
       <div className="overflow-x-auto">

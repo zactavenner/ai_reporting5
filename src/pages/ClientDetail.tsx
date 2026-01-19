@@ -9,6 +9,7 @@ import { ClientSettingsModal } from '@/components/settings/ClientSettingsModal';
 import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal';
 import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
 import { FundedInvestorsDrillDownModal } from '@/components/drilldown/FundedInvestorsDrillDownModal';
+import { ShareableLinkButton } from '@/components/dashboard/ShareableLinkButton';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { AIAnalysisChat } from '@/components/ai/AIAnalysisChat';
 import { useClient } from '@/hooks/useClients';
@@ -102,6 +103,11 @@ export default function ClientDetail() {
             </Button>
           </div>
           <div className="flex items-center gap-2">
+            <ShareableLinkButton 
+              clientId={client.id}
+              clientName={client.name}
+              publicToken={client.public_token}
+            />
             <Button 
               variant="outline" 
               size="sm"

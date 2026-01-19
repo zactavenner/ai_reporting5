@@ -6,8 +6,9 @@ import { ClientTable } from '@/components/dashboard/ClientTable';
 import { ClientSettingsModal } from '@/components/settings/ClientSettingsModal';
 import { AddClientModal } from '@/components/settings/AddClientModal';
 import { DeleteClientDialog } from '@/components/settings/DeleteClientDialog';
+import { AgencyAIChat } from '@/components/ai/AgencyAIChat';
 import { useClients, Client } from '@/hooks/useClients';
-import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
+import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics, AggregatedMetrics } from '@/hooks/useMetrics';
 import { useSyncClientData } from '@/hooks/useSyncData';
 import { exportToCSV } from '@/lib/exportUtils';
 import { Button } from '@/components/ui/button';
@@ -142,6 +143,12 @@ const Index = () => {
         client={deleteClient}
         open={!!deleteClient}
         onOpenChange={(open) => !open && setDeleteClient(null)}
+      />
+
+      <AgencyAIChat 
+        clients={clients}
+        clientMetrics={clientMetrics as Record<string, AggregatedMetrics>}
+        agencyMetrics={aggregatedMetrics}
       />
     </div>
   );
