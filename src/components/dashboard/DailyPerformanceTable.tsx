@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Download, TrendingUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, TrendingUp, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -9,17 +9,25 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { DailyMetric } from '@/hooks/useMetrics';
 import { Sparkline } from './Sparkline';
+import { exportToGoogleSheets } from '@/lib/exportUtils';
 
 interface DailyPerformanceTableProps {
   dailyMetrics: DailyMetric[];
   onExportCSV: () => void;
+  clientName?: string;
 }
 
 const ITEMS_PER_PAGE = 30;
 
-export function DailyPerformanceTable({ dailyMetrics, onExportCSV }: DailyPerformanceTableProps) {
+export function DailyPerformanceTable({ dailyMetrics, onExportCSV, clientName = 'Performance' }: DailyPerformanceTableProps) {
   const [currentPage, setCurrentPage] = useState(0);
 
   // Sort by date descending
@@ -61,6 +69,38 @@ export function DailyPerformanceTable({ dailyMetrics, onExportCSV }: DailyPerfor
       costPerInvestor: fundedInvestors > 0 ? adSpend / fundedInvestors : 0,
       costOfCapital: fundedDollars > 0 ? (adSpend / fundedDollars) * 100 : 0,
     };
+  };
+
+  // Build export data with computed metrics
+  const exportData = useMemo(() => {
+    return sortedMetrics.map(day => {
+      const computed = getComputedMetrics(day);
+      return {
+        Date: day.date,
+        'Ad Spend': Number(day.ad_spend).toFixed(2),
+        Impressions: day.impressions || 0,
+        Clicks: day.clicks || 0,
+        CTR: (day.ctr || 0).toFixed(2) + '%',
+        Leads: day.leads || 0,
+        'Spam Leads': day.spam_leads || 0,
+        CPL: computed.cpl.toFixed(2),
+        Calls: day.calls || 0,
+        'Cost/Call': computed.costPerCall.toFixed(2),
+        Showed: day.showed_calls || 0,
+        'Show %': computed.showRate.toFixed(1) + '%',
+        'Cost/Show': computed.costPerShow.toFixed(2),
+        Commitments: day.commitments || 0,
+        'Commit $': Number(day.commitment_dollars || 0).toFixed(2),
+        'Funded Investors': day.funded_investors || 0,
+        'Funded $': Number(day.funded_dollars || 0).toFixed(2),
+        'Cost/Investor': computed.costPerInvestor.toFixed(2),
+        'CoC %': computed.costOfCapital.toFixed(2) + '%',
+      };
+    });
+  }, [sortedMetrics]);
+
+  const handleExportGoogleSheets = () => {
+    exportToGoogleSheets(exportData, `${clientName} Daily Performance`);
   };
 
   // Calculate sparkline data for key metrics (last 14 days, chronological order)
@@ -116,10 +156,24 @@ export function DailyPerformanceTable({ dailyMetrics, onExportCSV }: DailyPerfor
             Detailed metrics by date • Showing {paginatedMetrics.length} of {sortedMetrics.length} days
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={onExportCSV}>
-          <Download className="h-4 w-4 mr-2" />
-          Export CSV
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onExportCSV}>
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportGoogleSheets}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Export to Google Sheets
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Sparkline Trend Row */}

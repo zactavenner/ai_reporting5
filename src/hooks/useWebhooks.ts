@@ -164,19 +164,27 @@ export const WEBHOOK_DEFINITIONS: WebhookDefinition[] = [
   },
   {
     id: 'ad-spend',
-    label: '6. Ad Spend Data',
+    label: '6. Ad Spend & Media Metrics',
     endpointSuffix: 'ad-spend',
-    description: 'Push daily ad spend metrics. Sync from external ad platforms.',
+    description: 'Push daily ad spend, impressions, clicks, and frequency from ad platforms.',
     samplePayload: {
       report: {
         date: "2024-01-15",
         platform: "facebook",
-        metrics: { spend: "145.50", impressions: 4500, clicks: 120 }
+        metrics: { 
+          spend: "145.50", 
+          impressions: 4500, 
+          clicks: 120,
+          frequency: 1.85
+        }
       }
     },
     mappingFields: [
       { key: 'valueField', label: 'Spend Amount', placeholder: 'report.metrics.spend', expectedType: 'number', group: 'value' },
-      { key: 'dateField', label: 'Date Field', placeholder: 'report.date', expectedType: 'date', group: 'other' }
+      { key: 'dateField', label: 'Date Field', placeholder: 'report.date', expectedType: 'date', group: 'other' },
+      { key: 'impressionsField' as any, label: 'Impressions', placeholder: 'report.metrics.impressions', expectedType: 'number', group: 'value' },
+      { key: 'clicksField' as any, label: 'Clicks', placeholder: 'report.metrics.clicks', expectedType: 'number', group: 'value' },
+      { key: 'frequencyField' as any, label: 'Frequency', placeholder: 'report.metrics.frequency', expectedType: 'number', group: 'value', helperText: 'Average times ad shown per person' }
     ]
   },
   {

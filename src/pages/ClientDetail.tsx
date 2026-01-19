@@ -186,7 +186,8 @@ export default function ClientDetail() {
 
         <DailyPerformanceTable 
           dailyMetrics={dailyMetrics} 
-          onExportCSV={handleExportCSV} 
+          onExportCSV={handleExportCSV}
+          clientName={client.name}
         />
 
         <section className="border-2 border-border bg-card p-4">

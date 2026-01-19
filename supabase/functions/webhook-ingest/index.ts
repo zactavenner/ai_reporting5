@@ -419,13 +419,17 @@ async function processFunded(supabase: any, clientId: string, payload: any, mapp
 async function processAdSpend(supabase: any, clientId: string, payload: any, mappings: any) {
   const valueField = mappings?.valueField || 'report.metrics.spend';
   const dateField = mappings?.dateField || 'report.date';
+  const impressionsField = mappings?.impressionsField || 'report.metrics.impressions';
+  const clicksField = mappings?.clicksField || 'report.metrics.clicks';
+  const frequencyField = mappings?.frequencyField || 'report.metrics.frequency';
   
   const spend = parseFloat(getValueByPath(payload, valueField)) || 0;
   const date = getValueByPath(payload, dateField) || new Date().toISOString().split('T')[0];
 
-  // Also try to extract impressions and clicks if available
-  const impressions = parseInt(getValueByPath(payload, 'report.metrics.impressions') || payload.impressions || '0');
-  const clicks = parseInt(getValueByPath(payload, 'report.metrics.clicks') || payload.clicks || '0');
+  // Extract all ad metrics using mappings or fallbacks
+  const impressions = parseInt(getValueByPath(payload, impressionsField) || payload.impressions || '0');
+  const clicks = parseInt(getValueByPath(payload, clicksField) || payload.clicks || '0');
+  const frequency = parseFloat(getValueByPath(payload, frequencyField) || payload.frequency || '0');
   const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
 
   const { data: existing } = await supabase
@@ -458,7 +462,7 @@ async function processAdSpend(supabase: any, clientId: string, payload: any, map
       ignoreDuplicates: false,
     });
 
-  return { date, spend, impressions, clicks };
+  return { date, spend, impressions, clicks, frequency, ctr };
 }
 
 async function processBadLead(supabase: any, clientId: string, payload: any, mappings: any) {

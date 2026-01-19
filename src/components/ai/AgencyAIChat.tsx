@@ -160,9 +160,45 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const audioFile = new File([audioBlob], 'voice-message.webm', { type: 'audio/webm' });
-        setAttachments(prev => [...prev, audioFile]);
         stream.getTracks().forEach(track => track.stop());
+        
+        // Convert to base64 for transcription
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          const base64Audio = reader.result as string;
+          
+          try {
+            // Call transcription endpoint
+            const response = await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                },
+                body: JSON.stringify({ audio: base64Audio }),
+              }
+            );
+            
+            if (response.ok) {
+              const { text } = await response.json();
+              if (text) {
+                setInput(prev => prev ? `${prev} ${text}` : text);
+              }
+            } else {
+              // Fallback: add as file attachment if transcription fails
+              const audioFile = new File([audioBlob], 'voice-message.webm', { type: 'audio/webm' });
+              setAttachments(prev => [...prev, audioFile]);
+            }
+          } catch (error) {
+            console.error('Transcription failed:', error);
+            // Fallback: add as file attachment
+            const audioFile = new File([audioBlob], 'voice-message.webm', { type: 'audio/webm' });
+            setAttachments(prev => [...prev, audioFile]);
+          }
+        };
       };
 
       mediaRecorder.start();
