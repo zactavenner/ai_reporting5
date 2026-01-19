@@ -34,10 +34,23 @@ export function DateRangeFilter({ onExportCSV, onAddClient, showAddClient = true
     setPreset(value);
     const today = new Date();
     let from = new Date();
+    let to = new Date();
     
     switch (value) {
+      case 'today':
+        from = new Date(today);
+        to = new Date(today);
+        break;
+      case 'yesterday':
+        from = new Date(today);
+        from.setDate(today.getDate() - 1);
+        to = new Date(from);
+        break;
       case 'last7':
         from.setDate(today.getDate() - 7);
+        break;
+      case 'last14':
+        from.setDate(today.getDate() - 14);
         break;
       case 'last30':
         from.setDate(today.getDate() - 30);
@@ -50,10 +63,11 @@ export function DateRangeFilter({ onExportCSV, onAddClient, showAddClient = true
         break;
       case 'lastMonth':
         from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        to = new Date(today.getFullYear(), today.getMonth(), 0);
         break;
     }
     
-    setDateRange({ from, to: today });
+    setDateRange({ from, to });
   };
 
   return (
@@ -67,7 +81,10 @@ export function DateRangeFilter({ onExportCSV, onAddClient, showAddClient = true
             <SelectValue placeholder="Select range" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="yesterday">Yesterday</SelectItem>
             <SelectItem value="last7">Last 7 Days</SelectItem>
+            <SelectItem value="last14">Last 14 Days</SelectItem>
             <SelectItem value="last30">Last 30 Days</SelectItem>
             <SelectItem value="last90">Last 90 Days</SelectItem>
             <SelectItem value="thisMonth">This Month</SelectItem>

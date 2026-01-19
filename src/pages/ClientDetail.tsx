@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Settings, RefreshCw, Download } from 'lucide-react';
+import { ArrowLeft, Settings, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
+import { DailyPerformanceTable } from '@/components/dashboard/DailyPerformanceTable';
 import { ClientSettingsModal } from '@/components/settings/ClientSettingsModal';
 import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal';
 import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
@@ -11,7 +12,7 @@ import { FundedInvestorsDrillDownModal } from '@/components/drilldown/FundedInve
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { AIAnalysisChat } from '@/components/ai/AIAnalysisChat';
 import { useClient } from '@/hooks/useClients';
-import { useDailyMetrics, useFundedInvestors, aggregateMetrics, DailyMetric } from '@/hooks/useMetrics';
+import { useDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
 import { useSyncClientData } from '@/hooks/useSyncData';
 import { useClientSettings, getThresholdsFromSettings } from '@/hooks/useClientSettings';
 import { exportToCSV } from '@/lib/exportUtils';
@@ -177,49 +178,10 @@ export default function ClientDetail() {
           </div>
         </section>
 
-        <section className="border-2 border-border bg-card p-4">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="font-bold text-lg">Daily Performance Data</h3>
-              <p className="text-sm text-muted-foreground">Detailed metrics by date</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={handleExportCSV}>
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
-          </div>
-          {dailyMetrics.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow className="border-b-2">
-                  <TableHead className="font-bold">Date</TableHead>
-                  <TableHead className="font-bold text-right">Ad Spend</TableHead>
-                  <TableHead className="font-bold text-right">Leads</TableHead>
-                  <TableHead className="font-bold text-right">Calls</TableHead>
-                  <TableHead className="font-bold text-right">Showed</TableHead>
-                  <TableHead className="font-bold text-right">Commitments</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dailyMetrics.map((day: DailyMetric) => (
-                  <TableRow key={day.id} className="border-b">
-                    <TableCell className="font-medium">{day.date}</TableCell>
-                    <TableCell className="text-right font-mono">${Number(day.ad_spend).toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono">{day.leads}</TableCell>
-                    <TableCell className="text-right font-mono">{day.calls}</TableCell>
-                    <TableCell className="text-right font-mono">{day.showed_calls}</TableCell>
-                    <TableCell className="text-right font-mono">{day.commitments}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>No data available yet</p>
-              <p className="text-sm">Click Sync to fetch data from Meta and GHL APIs</p>
-            </div>
-          )}
-        </section>
+        <DailyPerformanceTable 
+          dailyMetrics={dailyMetrics} 
+          onExportCSV={handleExportCSV} 
+        />
 
         <section className="border-2 border-border bg-card p-4">
           <h3 className="font-bold text-lg mb-1">{fundedInvestorLabel}</h3>
