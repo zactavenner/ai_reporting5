@@ -417,20 +417,82 @@ async function processFunded(supabase: any, clientId: string, payload: any, mapp
 }
 
 async function processAdSpend(supabase: any, clientId: string, payload: any, mappings: any) {
-  const valueField = mappings?.valueField || 'report.metrics.spend';
-  const dateField = mappings?.dateField || 'report.date';
-  const impressionsField = mappings?.impressionsField || 'report.metrics.impressions';
-  const clicksField = mappings?.clicksField || 'report.metrics.clicks';
-  const frequencyField = mappings?.frequencyField || 'report.metrics.frequency';
+  console.log('Processing ad-spend webhook with payload:', JSON.stringify(payload));
   
-  const spend = parseFloat(getValueByPath(payload, valueField)) || 0;
-  const date = getValueByPath(payload, dateField) || new Date().toISOString().split('T')[0];
+  // Smart extraction - try multiple common field names
+  const extractNumber = (value: any): number => {
+    if (value === undefined || value === null) return 0;
+    const parsed = parseFloat(String(value).replace(/[^0-9.-]/g, ''));
+    return isNaN(parsed) ? 0 : parsed;
+  };
 
-  // Extract all ad metrics using mappings or fallbacks
-  const impressions = parseInt(getValueByPath(payload, impressionsField) || payload.impressions || '0');
-  const clicks = parseInt(getValueByPath(payload, clicksField) || payload.clicks || '0');
-  const frequency = parseFloat(getValueByPath(payload, frequencyField) || payload.frequency || '0');
+  // Helper to try multiple paths and return first non-null value
+  const tryExtract = (paths: string[], directValues: any[] = []): any => {
+    // First check direct values
+    for (const val of directValues) {
+      if (val !== undefined && val !== null) return val;
+    }
+    // Then try paths
+    for (const path of paths) {
+      const val = getValueByPath(payload, path);
+      if (val !== undefined && val !== null) return val;
+    }
+    return null;
+  };
+
+  // Extract spend - check DIRECT fields first, then mapped paths
+  let spendRaw = payload.spend ?? payload.ad_spend ?? payload.amount ?? payload.cost;
+  if (spendRaw === undefined || spendRaw === null) {
+    spendRaw = mappings?.valueField ? getValueByPath(payload, mappings.valueField) : null;
+  }
+  if (spendRaw === undefined || spendRaw === null) {
+    spendRaw = tryExtract(['report.metrics.spend', 'metrics.spend', 'data.spend']);
+  }
+  const spend = extractNumber(spendRaw);
+
+  // Extract date
+  let dateRaw = payload.date ?? payload.report_date;
+  if (!dateRaw && mappings?.dateField) {
+    dateRaw = getValueByPath(payload, mappings.dateField);
+  }
+  if (!dateRaw) {
+    dateRaw = tryExtract(['report.date', 'data.date']);
+  }
+  const date = dateRaw || new Date().toISOString().split('T')[0];
+
+  // Extract impressions
+  let impressionsRaw = payload.impressions;
+  if (impressionsRaw === undefined || impressionsRaw === null) {
+    impressionsRaw = mappings?.impressionsField ? getValueByPath(payload, mappings.impressionsField) : null;
+  }
+  if (impressionsRaw === undefined || impressionsRaw === null) {
+    impressionsRaw = tryExtract(['report.metrics.impressions', 'metrics.impressions']);
+  }
+  const impressions = extractNumber(impressionsRaw);
+
+  // Extract clicks
+  let clicksRaw = payload.clicks;
+  if (clicksRaw === undefined || clicksRaw === null) {
+    clicksRaw = mappings?.clicksField ? getValueByPath(payload, mappings.clicksField) : null;
+  }
+  if (clicksRaw === undefined || clicksRaw === null) {
+    clicksRaw = tryExtract(['report.metrics.clicks', 'metrics.clicks']);
+  }
+  const clicks = extractNumber(clicksRaw);
+
+  // Extract frequency
+  let frequencyRaw = payload.frequency;
+  if (frequencyRaw === undefined || frequencyRaw === null) {
+    frequencyRaw = mappings?.frequencyField ? getValueByPath(payload, mappings.frequencyField) : null;
+  }
+  if (frequencyRaw === undefined || frequencyRaw === null) {
+    frequencyRaw = tryExtract(['report.metrics.frequency', 'metrics.frequency']);
+  }
+  const frequency = extractNumber(frequencyRaw);
+
   const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+
+  console.log('Extracted ad-spend values:', { date, spend, impressions, clicks, frequency, ctr });
 
   const { data: existing } = await supabase
     .from('daily_metrics')
@@ -439,7 +501,7 @@ async function processAdSpend(supabase: any, clientId: string, payload: any, map
     .eq('date', date)
     .maybeSingle();
 
-  await supabase
+  const { error: upsertError } = await supabase
     .from('daily_metrics')
     .upsert({
       client_id: clientId,
@@ -462,6 +524,12 @@ async function processAdSpend(supabase: any, clientId: string, payload: any, map
       ignoreDuplicates: false,
     });
 
+  if (upsertError) {
+    console.error('Error upserting ad-spend metrics:', upsertError);
+    throw upsertError;
+  }
+
+  console.log('Ad-spend metrics saved successfully');
   return { date, spend, impressions, clicks, frequency, ctr };
 }
 
