@@ -9,11 +9,8 @@ import { DeleteClientDialog } from '@/components/settings/DeleteClientDialog';
 import { AgencyAIChat } from '@/components/ai/AgencyAIChat';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics, AggregatedMetrics } from '@/hooks/useMetrics';
-import { useSyncClientData } from '@/hooks/useSyncData';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { exportToCSV } from '@/lib/exportUtils';
-import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
 const Index = () => {
@@ -27,7 +24,6 @@ const Index = () => {
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: dailyMetrics = [], isLoading: metricsLoading } = useAllDailyMetrics(startDate, endDate);
   const { data: fundedInvestors = [] } = useFundedInvestors(undefined, startDate, endDate);
-  const syncMutation = useSyncClientData();
 
   const aggregatedMetrics = useMemo(() => {
     return aggregateMetrics(dailyMetrics, fundedInvestors);
@@ -68,10 +64,6 @@ const Index = () => {
     setDeleteClient(client);
   };
 
-  const handleSync = () => {
-    syncMutation.mutate(undefined);
-  };
-
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['all-daily-metrics'] });
     queryClient.invalidateQueries({ queryKey: ['funded-investors'] });
@@ -88,21 +80,11 @@ const Index = () => {
       />
 
       <main className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <DateRangeFilter
-            onExportCSV={handleExportCSV}
-            onAddClient={handleAddClient}
-            onRefresh={handleRefresh}
-          />
-          <Button 
-            variant="outline" 
-            onClick={handleSync}
-            disabled={syncMutation.isPending}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-            Sync Now
-          </Button>
-        </div>
+        <DateRangeFilter
+          onExportCSV={handleExportCSV}
+          onAddClient={handleAddClient}
+          onRefresh={handleRefresh}
+        />
 
         <section>
           <h2 className="text-lg font-bold mb-2">Key Performance Indicators</h2>

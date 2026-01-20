@@ -89,22 +89,6 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
         funded_investor_label: fundedInvestorLabel,
       });
 
-      // Save KPI thresholds
-      await updateSettings.mutateAsync({
-        client_id: client.id,
-        cpl_threshold_yellow: parseFloat(cplYellow),
-        cpl_threshold_red: parseFloat(cplRed),
-        cost_per_call_threshold_yellow: parseFloat(costPerCallYellow),
-        cost_per_call_threshold_red: parseFloat(costPerCallRed),
-        cost_per_show_threshold_yellow: parseFloat(costPerShowYellow),
-        cost_per_show_threshold_red: parseFloat(costPerShowRed),
-        cost_per_investor_threshold_yellow: parseFloat(costPerInvestorYellow),
-        cost_per_investor_threshold_red: parseFloat(costPerInvestorRed),
-        cost_of_capital_threshold_yellow: parseFloat(costOfCapitalYellow),
-        cost_of_capital_threshold_red: parseFloat(costOfCapitalRed),
-        funded_investor_label: fundedInvestorLabel,
-      });
-
       // Save alert configs if slack webhook provided
       if (slackWebhook) {
         if (cplAlert) {
@@ -148,7 +132,7 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Client Settings - {client.name}</DialogTitle>
           <DialogDescription>
-            Configure webhooks, API integration, and KPI thresholds
+            Configure webhooks and KPI thresholds for this client
           </DialogDescription>
         </DialogHeader>
 

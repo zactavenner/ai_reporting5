@@ -5,10 +5,6 @@ export interface Client {
   id: string;
   name: string;
   status: string;
-  ghl_location_id: string | null;
-  ghl_api_key: string | null;
-  meta_ad_account_id: string | null;
-  meta_access_token: string | null;
   public_token: string | null;
   created_at: string;
   updated_at: string;
@@ -20,7 +16,7 @@ export function useClients() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('clients')
-        .select('*')
+        .select('id, name, status, public_token, created_at, updated_at')
         .order('name');
       
       if (error) throw error;
@@ -37,7 +33,7 @@ export function useClient(clientId: string | undefined) {
       
       const { data, error } = await supabase
         .from('clients')
-        .select('*')
+        .select('id, name, status, public_token, created_at, updated_at')
         .eq('id', clientId)
         .maybeSingle();
       
@@ -56,7 +52,7 @@ export function useClientByToken(token: string | undefined) {
       
       const { data, error } = await supabase
         .from('clients')
-        .select('*')
+        .select('id, name, status, public_token, created_at, updated_at')
         .eq('public_token', token)
         .maybeSingle();
       

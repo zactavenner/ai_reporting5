@@ -27,10 +27,6 @@ import { useState } from 'react';
 
 const addClientSchema = z.object({
   name: z.string().min(1, 'Client name is required').max(100, 'Name must be less than 100 characters'),
-  ghl_location_id: z.string().optional(),
-  ghl_api_key: z.string().optional(),
-  meta_ad_account_id: z.string().optional(),
-  meta_access_token: z.string().optional(),
   // KPI Thresholds
   kpi_cost_per_lead: z.coerce.number().min(0, 'Must be a positive number').optional(),
   kpi_cost_per_call: z.coerce.number().min(0, 'Must be a positive number').optional(),
@@ -54,10 +50,6 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
     resolver: zodResolver(addClientSchema),
     defaultValues: {
       name: '',
-      ghl_location_id: '',
-      ghl_api_key: '',
-      meta_ad_account_id: '',
-      meta_access_token: '',
       kpi_cost_per_lead: undefined,
       kpi_cost_per_call: undefined,
       kpi_cost_per_investor: undefined,
@@ -74,10 +66,6 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
         .from('clients')
         .insert({
           name: values.name,
-          ghl_location_id: values.ghl_location_id || null,
-          ghl_api_key: values.ghl_api_key || null,
-          meta_ad_account_id: values.meta_ad_account_id || null,
-          meta_access_token: values.meta_access_token || null,
           status: 'active',
         })
         .select()
@@ -168,7 +156,7 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Add New Client</DialogTitle>
           <DialogDescription>
-            Create a new client with API credentials and KPI thresholds
+            Create a new client to track their capital raising performance
           </DialogDescription>
         </DialogHeader>
 
@@ -184,6 +172,9 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
                   <FormControl>
                     <Input placeholder="Acme Capital" {...field} />
                   </FormControl>
+                  <FormDescription>
+                    After creating, configure webhooks in client settings to ingest data
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -191,88 +182,10 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
 
             <Separator />
 
-            {/* GHL API Settings */}
-            <div className="space-y-4">
-              <h3 className="font-semibold">GoHighLevel API</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="ghl_location_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>GHL Location ID</FormLabel>
-                      <FormControl>
-                        <Input placeholder="ROg8rJAnV4jtuQrvtxXN" {...field} />
-                      </FormControl>
-                      <FormDescription>Find in GHL account settings</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="ghl_api_key"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>GHL API Key</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="Enter API key" {...field} />
-                      </FormControl>
-                      <FormDescription>Private integration API key</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Meta API Settings */}
-            <div className="space-y-4">
-              <h3 className="font-semibold">Meta Ads API</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="meta_ad_account_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Meta Ad Account ID</FormLabel>
-                      <FormControl>
-                        <Input placeholder="act_123456789" {...field} />
-                      </FormControl>
-                      <FormDescription>Find in Meta Business Suite</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="meta_access_token"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Meta Access Token</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="Enter access token" {...field} />
-                      </FormControl>
-                      <FormDescription>Long-lived access token</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <Separator />
-
             {/* KPI Thresholds */}
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold">KPI Thresholds</h3>
+                <h3 className="font-semibold">KPI Thresholds (Optional)</h3>
                 <p className="text-sm text-muted-foreground">
                   Set alert thresholds for key performance indicators
                 </p>

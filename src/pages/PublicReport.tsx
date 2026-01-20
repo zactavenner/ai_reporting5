@@ -7,6 +7,7 @@ import { useCalls } from '@/hooks/useLeadsAndCalls';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
 import { MetricChartsGrid } from '@/components/dashboard/MetricChartsGrid';
+import { PeriodicStatsTable } from '@/components/dashboard/PeriodicStatsTable';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -116,6 +117,8 @@ export default function PublicReport() {
               <h2 className="text-lg font-bold mb-2">Key Performance Indicators</h2>
               <KPIGrid metrics={metrics} showFundedMetrics />
             </section>
+
+            <PeriodicStatsTable dailyMetrics={dailyMetrics} />
 
             <MetricChartsGrid dailyMetrics={dailyMetrics} />
 

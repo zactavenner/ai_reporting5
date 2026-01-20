@@ -141,7 +141,7 @@ export function DailyPerformanceTable({ dailyMetrics, onExportCSV, clientName = 
         </div>
         <div className="text-center py-8 text-muted-foreground">
           <p>No data available yet</p>
-          <p className="text-sm">Click Sync to fetch data from Meta and GHL APIs</p>
+          <p className="text-sm">Configure webhooks or import CSV to add data</p>
         </div>
       </div>
     );

@@ -6,6 +6,7 @@ import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { DailyPerformanceTable } from '@/components/dashboard/DailyPerformanceTable';
 import { MetricChartsGrid } from '@/components/dashboard/MetricChartsGrid';
+import { PeriodicStatsTable } from '@/components/dashboard/PeriodicStatsTable';
 import { ClientSettingsModal } from '@/components/settings/ClientSettingsModal';
 import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal';
 import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
@@ -245,6 +246,8 @@ export default function ClientDetail() {
           </div>
         </section>
 
+        <PeriodicStatsTable dailyMetrics={dailyMetrics} />
+
         <MetricChartsGrid dailyMetrics={dailyMetrics} />
 
         <DailyPerformanceTable 
@@ -286,7 +289,7 @@ export default function ClientDetail() {
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <p>No {fundedInvestorLabel.toLowerCase()} yet</p>
-              <p className="text-sm">{fundedInvestorLabel} will appear here once synced from GHL</p>
+              <p className="text-sm">Use webhooks or CSV import to add funded investor data</p>
             </div>
           )}
         </section>
