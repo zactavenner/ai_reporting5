@@ -27,9 +27,9 @@ export interface Call {
   updated_at: string;
 }
 
-export function useLeads(clientId?: string) {
+export function useLeads(clientId?: string, startDate?: string, endDate?: string) {
   return useQuery({
-    queryKey: ['leads', clientId],
+    queryKey: ['leads', clientId, startDate, endDate],
     queryFn: async () => {
       let query = supabase
         .from('leads')
@@ -39,6 +39,13 @@ export function useLeads(clientId?: string) {
       if (clientId) {
         query = query.eq('client_id', clientId);
       }
+
+      if (startDate) {
+        query = query.gte('created_at', startDate);
+      }
+      if (endDate) {
+        query = query.lte('created_at', endDate + 'T23:59:59');
+      }
       
       const { data, error } = await query;
       if (error) throw error;
@@ -47,9 +54,9 @@ export function useLeads(clientId?: string) {
   });
 }
 
-export function useCalls(clientId?: string, showedOnly?: boolean) {
+export function useCalls(clientId?: string, showedOnly?: boolean, startDate?: string, endDate?: string) {
   return useQuery({
-    queryKey: ['calls', clientId, showedOnly],
+    queryKey: ['calls', clientId, showedOnly, startDate, endDate],
     queryFn: async () => {
       let query = supabase
         .from('calls')
@@ -62,6 +69,13 @@ export function useCalls(clientId?: string, showedOnly?: boolean) {
       
       if (showedOnly) {
         query = query.eq('showed', true);
+      }
+
+      if (startDate) {
+        query = query.gte('created_at', startDate);
+      }
+      if (endDate) {
+        query = query.lte('created_at', endDate + 'T23:59:59');
       }
       
       const { data, error } = await query;
