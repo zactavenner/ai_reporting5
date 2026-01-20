@@ -59,6 +59,7 @@ export function useCreateCreative() {
       client_id: string;
       title: string;
       type?: string;
+      platform?: string;
       file_url?: string | null;
       headline?: string | null;
       body_copy?: string | null;
@@ -72,6 +73,7 @@ export function useCreateCreative() {
           client_id: creative.client_id,
           title: creative.title,
           type: creative.type || 'image',
+          platform: creative.platform || 'meta',
           file_url: creative.file_url || null,
           headline: creative.headline || null,
           body_copy: creative.body_copy || null,

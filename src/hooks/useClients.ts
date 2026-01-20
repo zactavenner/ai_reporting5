@@ -6,6 +6,7 @@ export interface Client {
   name: string;
   status: string;
   public_token: string | null;
+  business_manager_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -16,7 +17,7 @@ export function useClients() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('clients')
-        .select('id, name, status, public_token, created_at, updated_at')
+        .select('id, name, status, public_token, business_manager_url, created_at, updated_at')
         .order('name');
       
       if (error) throw error;
@@ -33,7 +34,7 @@ export function useClient(clientId: string | undefined) {
       
       const { data, error } = await supabase
         .from('clients')
-        .select('id, name, status, public_token, created_at, updated_at')
+        .select('id, name, status, public_token, business_manager_url, created_at, updated_at')
         .eq('id', clientId)
         .maybeSingle();
       
@@ -52,7 +53,7 @@ export function useClientByToken(token: string | undefined) {
       
       const { data, error } = await supabase
         .from('clients')
-        .select('id, name, status, public_token, created_at, updated_at')
+        .select('id, name, status, public_token, business_manager_url, created_at, updated_at')
         .eq('public_token', token)
         .maybeSingle();
       

@@ -50,6 +50,7 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
   const [costOfCapitalYellow, setCostOfCapitalYellow] = useState('5');
   const [costOfCapitalRed, setCostOfCapitalRed] = useState('10');
   const [fundedInvestorLabel, setFundedInvestorLabel] = useState('Funded Investors');
+  const [businessManagerUrl, setBusinessManagerUrl] = useState('');
 
   // Load settings when available
   useEffect(() => {
@@ -67,6 +68,13 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
       setFundedInvestorLabel(settings.funded_investor_label);
     }
   }, [settings]);
+
+  // Load client business manager URL
+  useEffect(() => {
+    if (client?.business_manager_url) {
+      setBusinessManagerUrl(client.business_manager_url);
+    }
+  }, [client]);
 
   const handleSave = async () => {
     if (!client) return;
@@ -113,6 +121,14 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
         }
       }
 
+      // Save business manager URL to client
+      if (businessManagerUrl !== (client.business_manager_url || '')) {
+        await supabase
+          .from('clients')
+          .update({ business_manager_url: businessManagerUrl })
+          .eq('id', client.id);
+      }
+
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       toast.success('Settings saved successfully');
       onOpenChange(false);
@@ -148,6 +164,22 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
           </TabsContent>
 
           <TabsContent value="thresholds" className="space-y-4 mt-4">
+            <div className="border-2 border-border p-4 space-y-4">
+              <div>
+                <h4 className="font-medium mb-1">Business Manager</h4>
+                <p className="text-sm text-muted-foreground mb-3">Quick access link to the client's ad account</p>
+                <div className="space-y-2">
+                  <Label htmlFor="businessManagerUrl">Business Manager URL</Label>
+                  <Input
+                    id="businessManagerUrl"
+                    value={businessManagerUrl}
+                    onChange={(e) => setBusinessManagerUrl(e.target.value)}
+                    placeholder="https://business.facebook.com/..."
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="border-2 border-border p-4 space-y-4">
               <div>
                 <h4 className="font-medium mb-1">Custom Terminology</h4>

@@ -55,6 +55,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
   const [newCreative, setNewCreative] = useState({
     title: '',
     type: 'image' as 'image' | 'video' | 'copy',
+    platform: 'meta' as 'meta' | 'tiktok' | 'youtube' | 'google',
     headline: '',
     body_copy: '',
     cta_text: '',
@@ -90,6 +91,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
         client_id: clientId,
         title: newCreative.title,
         type: newCreative.type,
+        platform: newCreative.platform,
         file_url: fileUrl,
         headline: newCreative.headline || null,
         body_copy: newCreative.body_copy || null,
@@ -102,6 +104,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
       setNewCreative({
         title: '',
         type: 'image',
+        platform: 'meta',
         headline: '',
         body_copy: '',
         cta_text: '',
@@ -208,6 +211,26 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
                       >
                         {getTypeIcon(type)}
                         <span className="ml-1 capitalize">{type}</span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Platform</label>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {(['meta', 'tiktok', 'youtube', 'google'] as const).map((platform) => (
+                      <Button
+                        key={platform}
+                        type="button"
+                        variant={newCreative.platform === platform ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setNewCreative({ ...newCreative, platform })}
+                      >
+                        {platform === 'meta' && 'Meta/IG'}
+                        {platform === 'tiktok' && 'TikTok'}
+                        {platform === 'youtube' && 'YouTube'}
+                        {platform === 'google' && 'Google PPC'}
                       </Button>
                     ))}
                   </div>

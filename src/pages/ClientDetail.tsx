@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Settings, DollarSign, Mic, Upload } from 'lucide-react';
+import { ArrowLeft, Settings, DollarSign, Mic, Upload, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
@@ -161,6 +161,14 @@ export default function ClientDetail() {
               clientName={client.name}
               publicToken={client.public_token}
             />
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate(`/client/${clientId}/records`)}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Records
+            </Button>
             <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)}>
               <Settings className="h-5 w-5" />
             </Button>
