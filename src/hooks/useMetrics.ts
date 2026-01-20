@@ -103,9 +103,9 @@ export function useAllDailyMetrics(startDate?: string, endDate?: string) {
   });
 }
 
-export function useFundedInvestors(clientId?: string) {
+export function useFundedInvestors(clientId?: string, startDate?: string, endDate?: string) {
   return useQuery({
-    queryKey: ['funded-investors', clientId],
+    queryKey: ['funded-investors', clientId, startDate, endDate],
     queryFn: async () => {
       let query = supabase
         .from('funded_investors')
@@ -114,6 +114,13 @@ export function useFundedInvestors(clientId?: string) {
       
       if (clientId) {
         query = query.eq('client_id', clientId);
+      }
+
+      if (startDate) {
+        query = query.gte('funded_at', startDate);
+      }
+      if (endDate) {
+        query = query.lte('funded_at', endDate + 'T23:59:59');
       }
       
       const { data, error } = await query;

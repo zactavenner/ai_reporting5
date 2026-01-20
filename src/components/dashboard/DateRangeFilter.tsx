@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Download, Plus, RefreshCw } from 'lucide-react';
+import { Calendar as CalendarIcon, Download, Plus, RefreshCw, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -16,19 +15,27 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { useDateFilter } from '@/contexts/DateFilterContext';
+import { useState } from 'react';
 
 interface DateRangeFilterProps {
   onExportCSV?: () => void;
   onAddClient?: () => void;
   onRefresh?: () => void;
+  onImport?: () => void;
   showAddClient?: boolean;
+  showImport?: boolean;
 }
 
-export function DateRangeFilter({ onExportCSV, onAddClient, onRefresh, showAddClient = true }: DateRangeFilterProps) {
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: new Date(2025, 11, 7),
-    to: new Date(2026, 0, 6),
-  });
+export function DateRangeFilter({ 
+  onExportCSV, 
+  onAddClient, 
+  onRefresh, 
+  onImport,
+  showAddClient = true,
+  showImport = false,
+}: DateRangeFilterProps) {
+  const { dateRange, setDateRange } = useDateFilter();
   const [preset, setPreset] = useState('last30');
 
   const handlePresetChange = (value: string) => {
@@ -140,12 +147,21 @@ export function DateRangeFilter({ onExportCSV, onAddClient, onRefresh, showAddCl
           </Button>
         )}
 
-        <Button variant="outline" onClick={onExportCSV}>
-          <Download className="mr-2 h-4 w-4" />
-          Export CSV
-        </Button>
+        {showImport && onImport && (
+          <Button variant="outline" onClick={onImport}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import CSV
+          </Button>
+        )}
 
-        {showAddClient && (
+        {onExportCSV && (
+          <Button variant="outline" onClick={onExportCSV}>
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+        )}
+
+        {showAddClient && onAddClient && (
           <Button onClick={onAddClient}>
             <Plus className="mr-2 h-4 w-4" />
             Add Client

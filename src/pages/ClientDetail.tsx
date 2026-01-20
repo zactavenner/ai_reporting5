@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Settings, DollarSign, Mic } from 'lucide-react';
+import { ArrowLeft, Settings, DollarSign, Mic, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
@@ -13,11 +13,13 @@ import { FundedInvestorsDrillDownModal } from '@/components/drilldown/FundedInve
 import { AdSpendDrillDownModal } from '@/components/drilldown/AdSpendDrillDownModal';
 import { CallRecordingsModal } from '@/components/drilldown/CallRecordingsModal';
 import { ShareableLinkButton } from '@/components/dashboard/ShareableLinkButton';
+import { CSVImportModal, ImportType } from '@/components/import/CSVImportModal';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { AIAnalysisChat } from '@/components/ai/AIAnalysisChat';
 import { useClient } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
 import { useClientSettings, getThresholdsFromSettings } from '@/hooks/useClientSettings';
+import { useDateFilter } from '@/contexts/DateFilterContext';
 import { exportToCSV } from '@/lib/exportUtils';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -28,6 +30,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function ClientDetail() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -39,11 +47,14 @@ export default function ClientDetail() {
   const [fundedModalOpen, setFundedModalOpen] = useState(false);
   const [adSpendModalOpen, setAdSpendModalOpen] = useState(false);
   const [callRecordingsOpen, setCallRecordingsOpen] = useState(false);
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [csvImportType, setCsvImportType] = useState<ImportType>('ad_spend');
   const queryClient = useQueryClient();
 
+  const { startDate, endDate } = useDateFilter();
   const { data: client, isLoading: clientLoading } = useClient(clientId);
-  const { data: dailyMetrics = [], isLoading: metricsLoading } = useDailyMetrics(clientId);
-  const { data: fundedInvestors = [] } = useFundedInvestors(clientId);
+  const { data: dailyMetrics = [], isLoading: metricsLoading } = useDailyMetrics(clientId, startDate, endDate);
+  const { data: fundedInvestors = [] } = useFundedInvestors(clientId, startDate, endDate);
   const { data: settings } = useClientSettings(clientId);
 
   const aggregatedMetrics = useMemo(() => {
@@ -84,6 +95,11 @@ export default function ClientDetail() {
     queryClient.invalidateQueries({ queryKey: ['calls', clientId] });
   };
 
+  const openCsvImport = (type: ImportType) => {
+    setCsvImportType(type);
+    setCsvImportOpen(true);
+  };
+
   // Build context for AI analysis
   const aiContext = {
     clientName: client.name,
@@ -112,6 +128,29 @@ export default function ClientDetail() {
             </Button>
           </div>
           <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import CSV
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => openCsvImport('ad_spend')}>
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Ad Spend (Meta Export)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openCsvImport('leads')}>
+                  Leads
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openCsvImport('calls')}>
+                  Calls
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openCsvImport('funded_investors')}>
+                  Funded Investors
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <ShareableLinkButton 
               clientId={client.id}
               clientName={client.name}
@@ -294,6 +333,13 @@ export default function ClientDetail() {
         clientId={clientId}
         open={callRecordingsOpen}
         onOpenChange={setCallRecordingsOpen}
+      />
+
+      <CSVImportModal
+        clientId={clientId || ''}
+        importType={csvImportType}
+        open={csvImportOpen}
+        onOpenChange={setCsvImportOpen}
       />
 
       <AIAnalysisChat context={aiContext} />

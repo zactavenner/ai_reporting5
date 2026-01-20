@@ -11,20 +11,32 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DollarSign, Users, Phone, TrendingUp } from 'lucide-react';
+import { useDateFilter } from '@/contexts/DateFilterContext';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function PublicReport() {
   const { token } = useParams<{ token: string }>();
+  const { startDate, endDate } = useDateFilter();
+  const queryClient = useQueryClient();
+  
   const { data: client, isLoading } = useClientByToken(token);
-  const { data: dailyMetrics = [] } = useDailyMetrics(client?.id);
-  const { data: fundedInvestors = [] } = useFundedInvestors(client?.id);
-  const { data: leads = [] } = useLeads(client?.id);
-  const { data: calls = [] } = useCalls(client?.id);
+  const { data: dailyMetrics = [] } = useDailyMetrics(client?.id, startDate, endDate);
+  const { data: fundedInvestors = [] } = useFundedInvestors(client?.id, startDate, endDate);
+  const { data: leads = [] } = useLeads(client?.id, startDate, endDate);
+  const { data: calls = [] } = useCalls(client?.id, false, startDate, endDate);
   
   const [activeSection, setActiveSection] = useState<'overview' | 'adspend' | 'leads' | 'calls' | 'funded'>('overview');
 
   const metrics = useMemo(() => {
     return aggregateMetrics(dailyMetrics, fundedInvestors);
   }, [dailyMetrics, fundedInvestors]);
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });
+    queryClient.invalidateQueries({ queryKey: ['funded-investors'] });
+    queryClient.invalidateQueries({ queryKey: ['leads'] });
+    queryClient.invalidateQueries({ queryKey: ['calls'] });
+  };
 
   if (isLoading) {
     return (
@@ -53,7 +65,7 @@ export default function PublicReport() {
       </header>
 
       <main className="p-6 space-y-6 max-w-7xl mx-auto">
-        <DateRangeFilter showAddClient={false} />
+        <DateRangeFilter showAddClient={false} onRefresh={handleRefresh} />
 
         {/* Section Navigation */}
         <div className="flex gap-2 flex-wrap">
