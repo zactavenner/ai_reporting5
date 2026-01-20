@@ -106,7 +106,10 @@ serve(async (req) => {
         result = await processShowedCall(supabase, clientId, payload, mappings);
         break;
       case 'reconnect':
-        result = await processReconnectCall(supabase, clientId, payload, mappings);
+        result = await processReconnectCall(supabase, clientId, payload, mappings, false);
+        break;
+      case 'reconnect-showed':
+        result = await processReconnectCall(supabase, clientId, payload, mappings, true);
         break;
       case 'committed':
         result = await processCommitment(supabase, clientId, payload, mappings);
@@ -236,18 +239,27 @@ async function processBookedCall(supabase: any, clientId: string, payload: any, 
   return { call_id: data.id, action: 'booked' };
 }
 
-async function processReconnectCall(supabase: any, clientId: string, payload: any, mappings: any) {
+async function processReconnectCall(supabase: any, clientId: string, payload: any, mappings: any, isShowedWebhook: boolean = false) {
   const externalId = tryExtractValue(payload, ['calendar.appointmentId', 'appointment.id'], ['id', 'appointmentId']) || `wh_reconnect_${Date.now()}`;
   const scheduledAt = tryExtractValue(payload, ['calendar.startTime', 'appointment.meta.start_time'], ['scheduled_at', 'startTime']) || new Date().toISOString();
-  const showed = payload.calendar?.status === 'showed' || payload.showed === true;
+  const contactId = tryExtractValue(payload, ['contact.id', 'appointment.contactId'], ['contactId', 'contact_id']);
+  
+  // Determine showed status - if called via reconnect-showed endpoint, mark as showed
+  const showed = isShowedWebhook || payload.calendar?.status === 'showed' || payload.showed === true;
+
+  let leadId = null;
+  if (contactId) {
+    const { data: lead } = await supabase.from('leads').select('id').eq('client_id', clientId).eq('external_id', String(contactId)).maybeSingle();
+    leadId = lead?.id;
+  }
 
   const { data, error } = await supabase.from('calls').upsert({
-    client_id: clientId, external_id: String(externalId),
+    client_id: clientId, external_id: String(externalId), lead_id: leadId,
     scheduled_at: scheduledAt, showed, outcome: showed ? 'reconnect_showed' : 'reconnect_booked', is_reconnect: true,
   }, { onConflict: 'client_id,external_id', ignoreDuplicates: false }).select().single();
 
   if (error) throw error;
-  return { call_id: data.id, action: 'reconnect_processed', showed };
+  return { call_id: data.id, action: isShowedWebhook ? 'reconnect_showed' : 'reconnect_booked', showed };
 }
 
 async function processShowedCall(supabase: any, clientId: string, payload: any, mappings: any) {

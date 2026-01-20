@@ -127,8 +127,36 @@ export const WEBHOOK_DEFINITIONS: WebhookDefinition[] = [
     mappingFields: []
   },
   {
+    id: 'reconnect',
+    label: '4. Reconnect Call Booked',
+    endpointSuffix: 'reconnect',
+    description: 'Trigger when a reconnect/follow-up call is scheduled.',
+    samplePayload: {
+      appointment: {
+        id: "app_reconnect_123",
+        status: "confirmed",
+        contactId: "ghl_123456",
+        meta: { start_time: "2024-01-20T14:00:00Z" }
+      }
+    },
+    mappingFields: []
+  },
+  {
+    id: 'reconnect-showed',
+    label: '5. Reconnect Call Showed',
+    endpointSuffix: 'reconnect-showed',
+    description: 'Trigger when a reconnect call is marked as Showed.',
+    samplePayload: {
+      appointment: {
+        id: "app_reconnect_123",
+        status: "showed"
+      }
+    },
+    mappingFields: []
+  },
+  {
     id: 'committed',
-    label: '4. Committed Investors + Amount',
+    label: '6. Committed Investors + Amount',
     endpointSuffix: 'committed',
     description: 'Trigger when an investor commits. Include the commitment dollar amount.',
     samplePayload: {
@@ -146,7 +174,7 @@ export const WEBHOOK_DEFINITIONS: WebhookDefinition[] = [
   },
   {
     id: 'funded',
-    label: '5. Funded Investors + Amount',
+    label: '7. Funded Investors + Amount',
     endpointSuffix: 'funded',
     description: 'Trigger when funds are received. Include the funded dollar amount.',
     samplePayload: {
@@ -164,7 +192,7 @@ export const WEBHOOK_DEFINITIONS: WebhookDefinition[] = [
   },
   {
     id: 'ad-spend',
-    label: '6. Ad Spend & Media Metrics',
+    label: '8. Ad Spend & Media Metrics',
     endpointSuffix: 'ad-spend',
     description: 'Push daily ad spend, impressions, clicks, and frequency from ad platforms.',
     samplePayload: {
@@ -189,7 +217,7 @@ export const WEBHOOK_DEFINITIONS: WebhookDefinition[] = [
   },
   {
     id: 'bad-lead',
-    label: '7. Bad Leads',
+    label: '9. Bad Leads',
     endpointSuffix: 'bad-lead',
     description: 'Trigger to mark a lead as spam or unqualified.',
     samplePayload: {
