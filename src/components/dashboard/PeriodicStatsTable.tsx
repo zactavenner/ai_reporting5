@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { format, startOfWeek, startOfMonth, endOfWeek, endOfMonth, eachWeekOfInterval, eachMonthOfInterval, isWithinInterval, parseISO } from 'date-fns';
+import { format, startOfWeek, startOfMonth, endOfWeek, endOfMonth, eachWeekOfInterval, eachMonthOfInterval, eachDayOfInterval, isWithinInterval, parseISO } from 'date-fns';
 import { DailyMetric } from '@/hooks/useMetrics';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,7 +15,7 @@ interface PeriodicStatsTableProps {
   dailyMetrics: DailyMetric[];
 }
 
-type PeriodType = 'weekly' | 'monthly';
+type PeriodType = 'daily' | 'weekly' | 'monthly';
 
 interface PeriodStats {
   period: string;
@@ -27,6 +27,8 @@ interface PeriodStats {
   costPerCall: number;
   showedCalls: number;
   showRate: number;
+  reconnectCalls: number;
+  reconnectShowed: number;
   commitments: number;
   commitmentDollars: number;
   fundedInvestors: number;
@@ -53,7 +55,14 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
 
     let periods: { start: Date; end: Date; label: string }[] = [];
 
-    if (periodType === 'weekly') {
+    if (periodType === 'daily') {
+      const days = eachDayOfInterval({ start: minDate, end: maxDate });
+      periods = days.map(day => ({
+        start: day,
+        end: day,
+        label: format(day, 'MMM d, yyyy')
+      }));
+    } else if (periodType === 'weekly') {
       const weeks = eachWeekOfInterval({ start: minDate, end: maxDate }, { weekStartsOn: 1 });
       periods = weeks.map(weekStart => ({
         start: startOfWeek(weekStart, { weekStartsOn: 1 }),
@@ -79,6 +88,8 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
         leads: acc.leads + (day.leads || 0),
         calls: acc.calls + (day.calls || 0),
         showedCalls: acc.showedCalls + (day.showed_calls || 0),
+        reconnectCalls: acc.reconnectCalls + (day.reconnect_calls || 0),
+        reconnectShowed: acc.reconnectShowed + (day.reconnect_showed || 0),
         commitments: acc.commitments + (day.commitments || 0),
         commitmentDollars: acc.commitmentDollars + Number(day.commitment_dollars || 0),
         fundedInvestors: acc.fundedInvestors + (day.funded_investors || 0),
@@ -88,6 +99,8 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
         leads: 0,
         calls: 0,
         showedCalls: 0,
+        reconnectCalls: 0,
+        reconnectShowed: 0,
         commitments: 0,
         commitmentDollars: 0,
         fundedInvestors: 0,
@@ -104,6 +117,8 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
         costPerCall: totals.calls > 0 ? totals.adSpend / totals.calls : 0,
         showedCalls: totals.showedCalls,
         showRate: totals.calls > 0 ? (totals.showedCalls / totals.calls) * 100 : 0,
+        reconnectCalls: totals.reconnectCalls,
+        reconnectShowed: totals.reconnectShowed,
         commitments: totals.commitments,
         commitmentDollars: totals.commitmentDollars,
         fundedInvestors: totals.fundedInvestors,
@@ -124,6 +139,8 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
       leads: acc.leads + p.leads,
       calls: acc.calls + p.calls,
       showedCalls: acc.showedCalls + p.showedCalls,
+      reconnectCalls: acc.reconnectCalls + p.reconnectCalls,
+      reconnectShowed: acc.reconnectShowed + p.reconnectShowed,
       commitments: acc.commitments + p.commitments,
       commitmentDollars: acc.commitmentDollars + p.commitmentDollars,
       fundedInvestors: acc.fundedInvestors + p.fundedInvestors,
@@ -133,6 +150,8 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
       leads: 0,
       calls: 0,
       showedCalls: 0,
+      reconnectCalls: 0,
+      reconnectShowed: 0,
       commitments: 0,
       commitmentDollars: 0,
       fundedInvestors: 0,
@@ -153,18 +172,31 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
     return null;
   }
 
+  const periodLabels = {
+    daily: 'Daily',
+    weekly: 'Weekly',
+    monthly: 'Monthly'
+  };
+
   return (
     <section className="border-2 border-border bg-card p-4">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-bold text-lg">
-            {periodType === 'weekly' ? 'Weekly' : 'Monthly'} Performance Summary
+            {periodLabels[periodType]} Performance Summary
           </h3>
           <p className="text-sm text-muted-foreground">
-            Aggregated metrics by {periodType === 'weekly' ? 'week' : 'month'}
+            Aggregated metrics by {periodType === 'daily' ? 'day' : periodType === 'weekly' ? 'week' : 'month'}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1">
+          <Button
+            variant={periodType === 'monthly' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setPeriodType('monthly')}
+          >
+            Monthly
+          </Button>
           <Button
             variant={periodType === 'weekly' ? 'default' : 'outline'}
             size="sm"
@@ -173,11 +205,11 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
             Weekly
           </Button>
           <Button
-            variant={periodType === 'monthly' ? 'default' : 'outline'}
+            variant={periodType === 'daily' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setPeriodType('monthly')}
+            onClick={() => setPeriodType('daily')}
           >
-            Monthly
+            Daily
           </Button>
         </div>
       </div>
@@ -186,7 +218,9 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
         <Table>
           <TableHeader>
             <TableRow className="border-b-2">
-              <TableHead className="font-bold whitespace-nowrap">{periodType === 'weekly' ? 'Week' : 'Month'}</TableHead>
+              <TableHead className="font-bold whitespace-nowrap">
+                {periodType === 'daily' ? 'Day' : periodType === 'weekly' ? 'Week' : 'Month'}
+              </TableHead>
               <TableHead className="font-bold text-right whitespace-nowrap">Ad Spend</TableHead>
               <TableHead className="font-bold text-right whitespace-nowrap">Leads</TableHead>
               <TableHead className="font-bold text-right whitespace-nowrap">CPL</TableHead>
@@ -194,6 +228,8 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
               <TableHead className="font-bold text-right whitespace-nowrap">$/Call</TableHead>
               <TableHead className="font-bold text-right whitespace-nowrap">Showed</TableHead>
               <TableHead className="font-bold text-right whitespace-nowrap">Show %</TableHead>
+              <TableHead className="font-bold text-right whitespace-nowrap">Recon</TableHead>
+              <TableHead className="font-bold text-right whitespace-nowrap">Recon Showed</TableHead>
               <TableHead className="font-bold text-right whitespace-nowrap">Commits</TableHead>
               <TableHead className="font-bold text-right whitespace-nowrap">Commit $</TableHead>
               <TableHead className="font-bold text-right whitespace-nowrap">Funded #</TableHead>
@@ -213,6 +249,8 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
               <TableCell className="text-right font-mono">${totals.costPerCall.toFixed(2)}</TableCell>
               <TableCell className="text-right font-mono">{totals.showedCalls.toLocaleString()}</TableCell>
               <TableCell className="text-right font-mono">{totals.showRate.toFixed(1)}%</TableCell>
+              <TableCell className="text-right font-mono">{totals.reconnectCalls.toLocaleString()}</TableCell>
+              <TableCell className="text-right font-mono">{totals.reconnectShowed.toLocaleString()}</TableCell>
               <TableCell className="text-right font-mono">{totals.commitments.toLocaleString()}</TableCell>
               <TableCell className="text-right font-mono">${totals.commitmentDollars.toLocaleString()}</TableCell>
               <TableCell className="text-right font-mono">{totals.fundedInvestors.toLocaleString()}</TableCell>
@@ -231,6 +269,8 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
                 <TableCell className="text-right font-mono">${period.costPerCall.toFixed(2)}</TableCell>
                 <TableCell className="text-right font-mono">{period.showedCalls}</TableCell>
                 <TableCell className="text-right font-mono">{period.showRate.toFixed(1)}%</TableCell>
+                <TableCell className="text-right font-mono">{period.reconnectCalls}</TableCell>
+                <TableCell className="text-right font-mono">{period.reconnectShowed}</TableCell>
                 <TableCell className="text-right font-mono">{period.commitments}</TableCell>
                 <TableCell className="text-right font-mono">${period.commitmentDollars.toLocaleString()}</TableCell>
                 <TableCell className="text-right font-mono">{period.fundedInvestors}</TableCell>

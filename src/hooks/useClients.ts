@@ -8,6 +8,8 @@ export interface Client {
   status: string;
   public_token: string | null;
   business_manager_url: string | null;
+  slug: string | null;
+  industry: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -18,7 +20,7 @@ export function useClients() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('clients')
-        .select('id, name, status, public_token, business_manager_url, created_at, updated_at')
+        .select('id, name, status, public_token, business_manager_url, slug, industry, created_at, updated_at')
         .order('name');
       
       if (error) throw error;
@@ -35,7 +37,7 @@ export function useClient(clientId: string | undefined) {
       
       const { data, error } = await supabase
         .from('clients')
-        .select('id, name, status, public_token, business_manager_url, created_at, updated_at')
+        .select('id, name, status, public_token, business_manager_url, slug, industry, created_at, updated_at')
         .eq('id', clientId)
         .maybeSingle();
       
@@ -52,11 +54,24 @@ export function useClientByToken(token: string | undefined) {
     queryFn: async () => {
       if (!token) return null;
       
-      const { data, error } = await supabase
+      // First try to find by slug (friendly URL)
+      let { data, error } = await supabase
         .from('clients')
-        .select('id, name, status, public_token, business_manager_url, created_at, updated_at')
-        .eq('public_token', token)
+        .select('id, name, status, public_token, business_manager_url, slug, industry, created_at, updated_at')
+        .eq('slug', token)
         .maybeSingle();
+      
+      // If not found by slug, try by public_token (legacy UUID-based URLs)
+      if (!data) {
+        const result = await supabase
+          .from('clients')
+          .select('id, name, status, public_token, business_manager_url, slug, industry, created_at, updated_at')
+          .eq('public_token', token)
+          .maybeSingle();
+        
+        data = result.data;
+        error = result.error;
+      }
       
       if (error) throw error;
       return data as Client | null;

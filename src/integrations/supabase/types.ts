@@ -221,10 +221,12 @@ export type Database = {
           ghl_api_key: string | null
           ghl_location_id: string | null
           id: string
+          industry: string | null
           meta_access_token: string | null
           meta_ad_account_id: string | null
           name: string
           public_token: string | null
+          slug: string | null
           status: string
           updated_at: string
           webhook_secret: string | null
@@ -235,10 +237,12 @@ export type Database = {
           ghl_api_key?: string | null
           ghl_location_id?: string | null
           id?: string
+          industry?: string | null
           meta_access_token?: string | null
           meta_ad_account_id?: string | null
           name: string
           public_token?: string | null
+          slug?: string | null
           status?: string
           updated_at?: string
           webhook_secret?: string | null
@@ -249,10 +253,12 @@ export type Database = {
           ghl_api_key?: string | null
           ghl_location_id?: string | null
           id?: string
+          industry?: string | null
           meta_access_token?: string | null
           meta_ad_account_id?: string | null
           name?: string
           public_token?: string | null
+          slug?: string | null
           status?: string
           updated_at?: string
           webhook_secret?: string | null
@@ -616,7 +622,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_client_slug: { Args: { client_name: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never

@@ -74,6 +74,10 @@ export function DateRangeFilter({
     const yearStart = new Date(today.getFullYear(), 0, 1);
     if (from.getTime() === yearStart.getTime() && isToday) return 'ytd';
     
+    // Check for "all" - very old start date
+    const allStartDate = new Date(2020, 0, 1);
+    if (from.getTime() <= allStartDate.getTime() && isToday) return 'all';
+    
     return 'custom';
   }, [dateRange]);
 
@@ -121,6 +125,10 @@ export function DateRangeFilter({
       case 'ytd':
         from = new Date(today.getFullYear(), 0, 1);
         break;
+      case 'all':
+        // Set to a very old date to show all data
+        from = new Date(2020, 0, 1);
+        break;
     }
     
     setDateRange({ from, to });
@@ -156,6 +164,7 @@ export function DateRangeFilter({
             <SelectItem value="thisMonth">This Month</SelectItem>
             <SelectItem value="lastMonth">Last Month</SelectItem>
             <SelectItem value="ytd">Year to Date</SelectItem>
+            <SelectItem value="all">All Time (Max)</SelectItem>
             {currentPreset === 'custom' && <SelectItem value="custom">Custom Range</SelectItem>}
           </SelectContent>
         </Select>

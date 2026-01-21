@@ -8,7 +8,6 @@ import {
   Mic, 
   MicOff,
   Paperclip,
-  Video,
   ChevronDown,
   Loader2,
   FileText,
@@ -28,6 +27,7 @@ import {
 import { useAgencyAIAnalysis } from '@/hooks/useAgencyAIAnalysis';
 import { Client } from '@/hooks/useClients';
 import { AggregatedMetrics } from '@/hooks/useMetrics';
+import ReactMarkdown from 'react-markdown';
 
 type AIModel = 'gemini' | 'openai';
 
@@ -162,14 +162,12 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         stream.getTracks().forEach(track => track.stop());
         
-        // Convert to base64 for transcription
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
           const base64Audio = reader.result as string;
           
           try {
-            // Call transcription endpoint
             const response = await fetch(
               `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`,
               {
@@ -188,13 +186,11 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
                 setInput(prev => prev ? `${prev} ${text}` : text);
               }
             } else {
-              // Fallback: add as file attachment if transcription fails
               const audioFile = new File([audioBlob], 'voice-message.webm', { type: 'audio/webm' });
               setAttachments(prev => [...prev, audioFile]);
             }
           } catch (error) {
             console.error('Transcription failed:', error);
-            // Fallback: add as file attachment
             const audioFile = new File([audioBlob], 'voice-message.webm', { type: 'audio/webm' });
             setAttachments(prev => [...prev, audioFile]);
           }
@@ -289,7 +285,7 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
           </div>
         </div>
 
-        {/* Messages */}
+        {/* Messages - iMessage style */}
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>
           {messages.length === 0 ? (
             <div className="space-y-4">
@@ -312,35 +308,50 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {messages.map((msg, i) => (
                 <div
                   key={i}
                   className={cn(
-                    'p-3 rounded-lg text-sm',
-                    msg.role === 'user'
-                      ? 'bg-primary text-primary-foreground ml-8'
-                      : 'bg-muted mr-8'
+                    'flex',
+                    msg.role === 'user' ? 'justify-end' : 'justify-start'
                   )}
                 >
-                  {msg.attachments && msg.attachments.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {msg.attachments.map((att, j) => (
-                        <span key={j} className="text-xs bg-background/50 px-2 py-0.5 rounded flex items-center gap-1">
-                          {getFileIcon(att)}
-                          {att.name.slice(0, 20)}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  <div
+                    className={cn(
+                      'max-w-[85%] px-4 py-2 rounded-2xl text-sm',
+                      msg.role === 'user'
+                        ? 'bg-blue-500 text-white rounded-br-md'
+                        : 'bg-muted text-foreground rounded-bl-md'
+                    )}
+                  >
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {msg.attachments.map((att, j) => (
+                          <span key={j} className="text-xs bg-background/20 px-2 py-0.5 rounded flex items-center gap-1">
+                            {getFileIcon(att)}
+                            {att.name.slice(0, 20)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {msg.role === 'assistant' ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                    )}
+                  </div>
                 </div>
               ))}
               {isLoading && messages[messages.length - 1]?.role === 'user' && (
-                <div className="bg-muted p-3 rounded-lg mr-8">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm text-muted-foreground">Analyzing...</span>
+                <div className="flex justify-start">
+                  <div className="bg-muted px-4 py-2 rounded-2xl rounded-bl-md">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm text-muted-foreground">Analyzing...</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -378,7 +389,7 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
               ref={fileInputRef}
               className="hidden"
               multiple
-              accept="image/*,video/*,.pdf,.doc,.docx,.txt"
+              accept="image/*,video/*,.pdf,.doc,.docx,.txt,.png"
               onChange={handleFileSelect}
             />
             <Button
@@ -386,7 +397,7 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
               size="icon"
               className="h-10 w-10 shrink-0"
               onClick={() => fileInputRef.current?.click()}
-              title="Attach files"
+              title="Attach files (PDF, PNG, TXT, etc.)"
             >
               <Paperclip className="h-4 w-4" />
             </Button>
@@ -412,7 +423,7 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
               onClick={handleSend}
               disabled={((!input.trim() && attachments.length === 0) || isLoading)}
               size="icon"
-              className="h-10 w-10 shrink-0"
+              className="h-10 w-10 shrink-0 bg-blue-500 hover:bg-blue-600"
             >
               <Send className="h-4 w-4" />
             </Button>

@@ -21,6 +21,17 @@ interface MetricsContext {
   showedPercent?: number;
 }
 
+type AIModel = 'gemini' | 'openai';
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+  });
+}
+
 export function useAIAnalysis() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,7 +39,9 @@ export function useAIAnalysis() {
   const sendMessage = useCallback(async (
     input: string, 
     context: MetricsContext,
-    existingMessages: Message[]
+    existingMessages: Message[],
+    model: AIModel = 'gemini',
+    files?: File[]
   ) => {
     const userMsg: Message = { role: 'user', content: input };
     const allMessages = [...existingMessages, userMsg];
@@ -38,6 +51,16 @@ export function useAIAnalysis() {
     let assistantContent = '';
 
     try {
+      const fileContents: { name: string; type: string; content: string }[] = [];
+      if (files && files.length > 0) {
+        for (const file of files) {
+          const content = await fileToBase64(file);
+          fileContents.push({ name: file.name, type: file.type, content });
+        }
+      }
+
+      const selectedModel = model === 'openai' ? 'openai/gpt-5' : 'google/gemini-3-flash-preview';
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analysis`,
         {
@@ -49,17 +72,15 @@ export function useAIAnalysis() {
           body: JSON.stringify({
             messages: allMessages,
             context,
+            model,
+            files: fileContents,
           }),
         }
       );
 
       if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error('Rate limit exceeded. Please try again later.');
-        }
-        if (response.status === 402) {
-          throw new Error('AI credits exhausted. Please add more credits.');
-        }
+        if (response.status === 429) throw new Error('Rate limit exceeded.');
+        if (response.status === 402) throw new Error('AI credits exhausted.');
         throw new Error('Failed to get AI response');
       }
 
@@ -74,9 +95,7 @@ export function useAIAnalysis() {
         setMessages(prev => {
           const last = prev[prev.length - 1];
           if (last?.role === 'assistant') {
-            return prev.map((m, i) => 
-              i === prev.length - 1 ? { ...m, content: assistantContent } : m
-            );
+            return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: assistantContent } : m);
           }
           return [...prev, { role: 'assistant', content: assistantContent }];
         });
@@ -85,21 +104,16 @@ export function useAIAnalysis() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         textBuffer += decoder.decode(value, { stream: true });
-
         let newlineIndex: number;
         while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
           let line = textBuffer.slice(0, newlineIndex);
           textBuffer = textBuffer.slice(newlineIndex + 1);
-
           if (line.endsWith('\r')) line = line.slice(0, -1);
           if (line.startsWith(':') || line.trim() === '') continue;
           if (!line.startsWith('data: ')) continue;
-
           const jsonStr = line.slice(6).trim();
           if (jsonStr === '[DONE]') break;
-
           try {
             const parsed = JSON.parse(jsonStr);
             const content = parsed.choices?.[0]?.delta?.content;
@@ -118,14 +132,7 @@ export function useAIAnalysis() {
     }
   }, []);
 
-  const clearMessages = useCallback(() => {
-    setMessages([]);
-  }, []);
+  const clearMessages = useCallback(() => setMessages([]), []);
 
-  return {
-    messages,
-    isLoading,
-    sendMessage,
-    clearMessages,
-  };
+  return { messages, isLoading, sendMessage, clearMessages };
 }

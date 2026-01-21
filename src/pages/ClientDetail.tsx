@@ -160,6 +160,7 @@ export default function ClientDetail() {
               clientId={client.id}
               clientName={client.name}
               publicToken={client.public_token}
+              slug={client.slug}
             />
             <Button 
               variant="outline" 

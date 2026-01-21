@@ -1,12 +1,11 @@
 import { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
-import { DailyMetric } from '@/hooks/useMetrics';
 import { format } from 'date-fns';
 
 interface MetricChartCardProps {
   title: string;
-  data: DailyMetric[];
-  metricKey: 'ad_spend' | 'leads' | 'calls' | 'showed_calls' | 'funded_investors' | 'funded_dollars';
+  data: any[];
+  metricKey: string;
   color?: string;
   prefix?: string;
   suffix?: string;
@@ -21,7 +20,6 @@ export function MetricChartCard({
   suffix = ''
 }: MetricChartCardProps) {
   const chartData = useMemo(() => {
-    // Sort by date ascending for chart display
     const sorted = [...data].sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
@@ -29,9 +27,7 @@ export function MetricChartCard({
     return sorted.map(d => ({
       date: d.date,
       formattedDate: format(new Date(d.date), 'MMM d'),
-      value: metricKey === 'ad_spend' || metricKey === 'funded_dollars' 
-        ? Number(d[metricKey]) || 0 
-        : d[metricKey] || 0
+      value: Number(d[metricKey]) || 0
     }));
   }, [data, metricKey]);
 
@@ -39,11 +35,9 @@ export function MetricChartCard({
     return chartData.reduce((sum, d) => sum + d.value, 0);
   }, [chartData]);
 
-  const latestValue = chartData.length > 0 ? chartData[chartData.length - 1].value : 0;
-
   const formatValue = (val: number) => {
     if (prefix === '$') {
-      return `$${val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+      return `$${val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     }
     return `${val.toLocaleString()}${suffix}`;
   };
@@ -98,11 +92,6 @@ export function MetricChartCard({
             />
           </LineChart>
         </ResponsiveContainer>
-      </div>
-
-      <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-        <span className="inline-block w-3 h-0.5 rounded" style={{ backgroundColor: color }}></span>
-        <span>{title}</span>
       </div>
     </div>
   );
