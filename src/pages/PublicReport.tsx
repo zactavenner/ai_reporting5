@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useClientByToken } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
 import { useLeads, useCalls } from '@/hooks/useLeadsAndCalls';
+import { useCustomTabs } from '@/hooks/useCustomTabs';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
 import { MetricChartsGrid } from '@/components/dashboard/MetricChartsGrid';
@@ -14,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
+import { ExternalLink } from 'lucide-react';
 
 export default function PublicReport() {
   const { token } = useParams<{ token: string }>();
@@ -25,8 +27,9 @@ export default function PublicReport() {
   const { data: fundedInvestors = [] } = useFundedInvestors(client?.id, startDate, endDate);
   const { data: leads = [], isLoading: leadsLoading } = useLeads(client?.id, startDate, endDate);
   const { data: calls = [] } = useCalls(client?.id, false, startDate, endDate);
+  const { data: customTabs = [] } = useCustomTabs(client?.id);
   
-  const [activeSection, setActiveSection] = useState<'overview' | 'records'>('overview');
+  const [activeSection, setActiveSection] = useState<string>('overview');
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [selectedType, setSelectedType] = useState<string>('');
 
@@ -109,6 +112,17 @@ export default function PublicReport() {
           >
             Detailed Records
           </Button>
+          {customTabs.map((tab) => (
+            <Button 
+              key={tab.id}
+              variant={activeSection === `custom-${tab.id}` ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => setActiveSection(`custom-${tab.id}`)}
+            >
+              <ExternalLink className="h-3 w-3 mr-1" />
+              {tab.name}
+            </Button>
+          ))}
         </div>
 
         {activeSection === 'overview' && (
@@ -165,6 +179,32 @@ export default function PublicReport() {
             selectedType={selectedType}
           />
         )}
+
+        {/* Custom Embed Tabs */}
+        {customTabs.map((tab) => (
+          activeSection === `custom-${tab.id}` && (
+            <div key={tab.id} className="border-2 border-border bg-card rounded-lg overflow-hidden">
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <h3 className="font-bold">{tab.name}</h3>
+                <a 
+                  href={tab.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
+                >
+                  Open in new tab
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+              <iframe
+                src={tab.url}
+                className="w-full h-[600px] border-0"
+                title={tab.name}
+                sandbox="allow-same-origin allow-scripts allow-forms"
+              />
+            </div>
+          )
+        ))}
 
         <footer className="text-center text-sm text-muted-foreground py-4">
           <p>Report generated on {new Date().toLocaleDateString()}</p>

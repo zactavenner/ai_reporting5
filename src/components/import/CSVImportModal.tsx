@@ -7,7 +7,6 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Upload, FileText, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -21,6 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { useCreateImportLog } from '@/hooks/useImportLogs';
 
 export type ImportType = 'ad_spend' | 'leads' | 'calls' | 'funded_investors';
 
@@ -46,7 +46,7 @@ const IMPORT_CONFIG = {
   },
   leads: {
     title: 'Import Leads from CSV',
-    description: 'Upload a CSV file with lead data. Required columns: name or email. Optional: phone, source, status.',
+    description: 'Upload a CSV file with lead data. At least email or phone required. Optional: name, source, status.',
     requiredFields: [],
     optionalFields: ['name', 'email', 'phone', 'source', 'status', 'created_at', 'date'],
     tableName: 'leads',
@@ -93,9 +93,10 @@ export function CSVImportModal({ clientId, importType, open, onOpenChange }: CSV
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [isImporting, setIsImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ success: number; failed: number } | null>(null);
+  const [importResult, setImportResult] = useState<{ success: number; failed: number; skipped: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
+  const createImportLog = useCreateImportLog();
 
   const config = IMPORT_CONFIG[importType];
 
@@ -117,6 +118,7 @@ export function CSVImportModal({ clientId, importType, open, onOpenChange }: CSV
     setIsImporting(true);
     let success = 0;
     let failed = 0;
+    let skipped = 0;
 
     try {
       for (const row of parsedData) {
@@ -141,6 +143,15 @@ export function CSVImportModal({ clientId, importType, open, onOpenChange }: CSV
             if (error) throw error;
             success++;
           } else if (importType === 'leads') {
+            // Skip if no email AND no phone
+            const hasEmail = row.email && row.email.trim();
+            const hasPhone = row.phone && row.phone.trim();
+            
+            if (!hasEmail && !hasPhone) {
+              skipped++;
+              continue;
+            }
+
             const { error } = await supabase
               .from('leads')
               .insert({
@@ -209,7 +220,17 @@ export function CSVImportModal({ clientId, importType, open, onOpenChange }: CSV
         }
       }
 
-      setImportResult({ success, failed });
+      setImportResult({ success, failed, skipped });
+      
+      // Log the import
+      await createImportLog.mutateAsync({
+        client_id: clientId,
+        import_type: importType,
+        file_name: file?.name,
+        records_count: parsedData.length,
+        success_count: success,
+        failed_count: failed,
+      });
       
       // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ['daily-metrics', clientId] });
@@ -220,6 +241,9 @@ export function CSVImportModal({ clientId, importType, open, onOpenChange }: CSV
 
       if (success > 0) {
         toast.success(`Successfully imported ${success} records`);
+      }
+      if (skipped > 0) {
+        toast.info(`Skipped ${skipped} records (missing email/phone)`);
       }
       if (failed > 0) {
         toast.error(`Failed to import ${failed} records`);
@@ -293,6 +317,11 @@ export function CSVImportModal({ clientId, importType, open, onOpenChange }: CSV
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       {importResult.success} imported
                     </Badge>
+                    {importResult.skipped > 0 && (
+                      <Badge variant="secondary">
+                        {importResult.skipped} skipped
+                      </Badge>
+                    )}
                     {importResult.failed > 0 && (
                       <Badge variant="destructive">
                         <AlertCircle className="h-3 w-3 mr-1" />

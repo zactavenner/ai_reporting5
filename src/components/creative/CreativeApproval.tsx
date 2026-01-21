@@ -47,11 +47,15 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
   const deleteCreative = useDeleteCreative();
   
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
   const [selectedCreative, setSelectedCreative] = useState<Creative | null>(null);
   const [commentText, setCommentText] = useState('');
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bulkFileInputRef = useRef<HTMLInputElement>(null);
+  const [bulkFiles, setBulkFiles] = useState<File[]>([]);
+  const [bulkPlatform, setBulkPlatform] = useState<'meta' | 'tiktok' | 'youtube' | 'google'>('meta');
   
   const [newCreative, setNewCreative] = useState({
     title: '',
@@ -108,6 +112,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
       });
 
       setUploadOpen(false);
+      setBulkUploadOpen(false);
       setNewCreative({
         title: '',
         type: 'image',
@@ -119,6 +124,61 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
       });
     } catch (error) {
       console.error('Upload error:', error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleBulkUpload = async () => {
+    if (bulkFiles.length === 0) {
+      toast.error('Please select files to upload');
+      return;
+    }
+
+    setUploading(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (const file of bulkFiles) {
+        try {
+          const isVideo = file.type.startsWith('video/');
+          const fileUrl = await uploadCreativeFile(file, clientId);
+          
+          // Generate dynamic title from filename
+          const fileName = file.name.replace(/\.[^/.]+$/, '');
+          const title = fileName.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+          await createCreative.mutateAsync({
+            client_id: clientId,
+            title: title,
+            type: isVideo ? 'video' : 'image',
+            platform: bulkPlatform,
+            file_url: fileUrl,
+            headline: null,
+            body_copy: null,
+            cta_text: null,
+            status: 'pending',
+            comments: [],
+          });
+          successCount++;
+        } catch (err) {
+          console.error('Failed to upload file:', file.name, err);
+          failCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Successfully uploaded ${successCount} creative${successCount !== 1 ? 's' : ''}`);
+      }
+      if (failCount > 0) {
+        toast.error(`Failed to upload ${failCount} file${failCount !== 1 ? 's' : ''}`);
+      }
+
+      setBulkUploadOpen(false);
+      setBulkFiles([]);
+    } catch (error) {
+      console.error('Bulk upload error:', error);
     } finally {
       setUploading(false);
     }
@@ -184,13 +244,102 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
             Upload and manage creative assets for {clientName}
           </p>
         </div>
-        {!isPublicView && (
-          <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+        <div className="flex gap-2">
+          {/* Bulk Upload - available for public view too */}
+          <Dialog open={bulkUploadOpen} onOpenChange={setBulkUploadOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button variant={isPublicView ? 'default' : 'outline'}>
                 <Upload className="h-4 w-4 mr-2" />
-                Upload Creative
+                {isPublicView ? 'Upload Creatives' : 'Bulk Upload'}
               </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Bulk Upload Creatives</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div>
+                  <label className="text-sm font-medium">Platform</label>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {(['meta', 'tiktok', 'youtube', 'google'] as const).map((platform) => (
+                      <Button
+                        key={platform}
+                        type="button"
+                        variant={bulkPlatform === platform ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setBulkPlatform(platform)}
+                      >
+                        {platform === 'meta' && 'Meta/IG'}
+                        {platform === 'tiktok' && 'TikTok'}
+                        {platform === 'youtube' && 'YouTube'}
+                        {platform === 'google' && 'Google PPC'}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Select Files</label>
+                  <input
+                    ref={bulkFileInputRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    multiple
+                    onChange={(e) => setBulkFiles(Array.from(e.target.files || []))}
+                    className="mt-1 w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Select multiple images or videos. Titles will be auto-generated from filenames.
+                  </p>
+                </div>
+
+                {bulkFiles.length > 0 && (
+                  <div className="bg-muted/50 p-3 rounded-lg">
+                    <p className="text-sm font-medium mb-2">{bulkFiles.length} file(s) selected:</p>
+                    <ul className="text-xs space-y-1 max-h-32 overflow-auto">
+                      {bulkFiles.map((file, i) => (
+                        <li key={i} className="flex items-center gap-2">
+                          {file.type.startsWith('video/') ? (
+                            <Video className="h-3 w-3" />
+                          ) : (
+                            <Image className="h-3 w-3" />
+                          )}
+                          {file.name}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <Button 
+                  onClick={handleBulkUpload} 
+                  className="w-full"
+                  disabled={uploading || bulkFiles.length === 0}
+                >
+                  {uploading ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload {bulkFiles.length} Creative{bulkFiles.length !== 1 ? 's' : ''}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Single Upload - agency only */}
+          {!isPublicView && (
+            <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Creative
+                </Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg">
               <DialogHeader>
@@ -308,7 +457,8 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
               </div>
             </DialogContent>
           </Dialog>
-        )}
+          )}
+        </div>
       </CardHeader>
       
       <CardContent>

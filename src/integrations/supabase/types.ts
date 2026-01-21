@@ -148,6 +148,44 @@ export type Database = {
           },
         ]
       }
+      client_custom_tabs: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_custom_tabs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_settings: {
         Row: {
           ad_spend_fee_percent: number | null
@@ -314,6 +352,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "creatives_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      csv_import_logs: {
+        Row: {
+          client_id: string
+          created_at: string
+          failed_count: number
+          file_name: string | null
+          id: string
+          import_type: string
+          records_count: number
+          success_count: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          failed_count?: number
+          file_name?: string | null
+          id?: string
+          import_type: string
+          records_count?: number
+          success_count?: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          failed_count?: number
+          file_name?: string | null
+          id?: string
+          import_type?: string
+          records_count?: number
+          success_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "csv_import_logs_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
