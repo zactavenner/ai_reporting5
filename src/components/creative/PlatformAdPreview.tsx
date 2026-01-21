@@ -1,8 +1,10 @@
+import { useState, useRef } from 'react';
 import { Creative } from '@/hooks/useCreatives';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, ThumbsUp, Share2, Play, Volume2 } from 'lucide-react';
+import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, ThumbsUp, Share2, Play, Volume2, Pause } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface PlatformAdPreviewProps {
   creative: Creative;
@@ -11,6 +13,48 @@ interface PlatformAdPreviewProps {
 }
 
 export function PlatformAdPreview({ creative, platform, clientName }: PlatformAdPreviewProps) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const videoRef1 = useRef<HTMLVideoElement>(null);
+  const videoRef2 = useRef<HTMLVideoElement>(null);
+
+  const toggleVideo = (ref: React.RefObject<HTMLVideoElement>) => {
+    if (ref.current) {
+      if (ref.current.paused) {
+        ref.current.play();
+        setIsPlaying(true);
+      } else {
+        ref.current.pause();
+        setIsPlaying(false);
+      }
+    }
+  };
+
+  const renderVideoPlayer = (ref: React.RefObject<HTMLVideoElement>, showOverlay = true) => (
+    <div className="relative w-full h-full group cursor-pointer" onClick={() => toggleVideo(ref)}>
+      <video 
+        ref={ref}
+        src={creative.file_url}
+        className="w-full h-full object-cover"
+        loop
+        playsInline
+        muted
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+      />
+      {showOverlay && (
+        <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${isPlaying ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'}`}>
+          <div className="bg-black/50 rounded-full p-4">
+            {isPlaying ? (
+              <Pause className="h-8 w-8 text-white fill-white" />
+            ) : (
+              <Play className="h-8 w-8 text-white fill-white" />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   const renderMetaPreview = () => (
     <div className="space-y-6">
       {/* Facebook Preview */}
@@ -47,17 +91,7 @@ export function PlatformAdPreview({ creative, platform, clientName }: PlatformAd
                 className="w-full h-full object-cover"
               />
             ) : creative.type === 'video' && creative.file_url ? (
-              <div className="relative w-full h-full">
-                <video 
-                  src={creative.file_url}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="bg-black/50 rounded-full p-4">
-                    <Play className="h-8 w-8 text-white fill-white" />
-                  </div>
-                </div>
-              </div>
+              renderVideoPlayer(videoRef1)
             ) : (
               <div className="w-full h-full flex items-center justify-center p-6 text-center">
                 <div>
@@ -119,20 +153,7 @@ export function PlatformAdPreview({ creative, platform, clientName }: PlatformAd
                 className="w-full h-full object-cover"
               />
             ) : creative.type === 'video' && creative.file_url ? (
-              <div className="relative w-full h-full">
-                <video 
-                  src={creative.file_url}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="bg-black/50 rounded-full p-4">
-                    <Play className="h-8 w-8 text-white fill-white" />
-                  </div>
-                </div>
-                <div className="absolute bottom-4 right-4">
-                  <Volume2 className="h-5 w-5 text-white" />
-                </div>
-              </div>
+              renderVideoPlayer(videoRef2)
             ) : (
               <div className="w-full h-full flex items-center justify-center p-6 text-center bg-gradient-to-br from-purple-500 to-pink-500">
                 <div className="text-white">

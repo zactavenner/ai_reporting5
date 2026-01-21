@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
-import { ClientTable } from '@/components/dashboard/ClientTable';
+import { DraggableClientTable } from '@/components/dashboard/DraggableClientTable';
+import { AgencyStatsBar } from '@/components/dashboard/AgencyStatsBar';
 import { ClientSettingsModal } from '@/components/settings/ClientSettingsModal';
 import { AddClientModal } from '@/components/settings/AddClientModal';
 import { DeleteClientDialog } from '@/components/settings/DeleteClientDialog';
@@ -12,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Database } from 'lucide-react';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics, AggregatedMetrics } from '@/hooks/useMetrics';
+import { useAllClientSettings } from '@/hooks/useAllClientSettings';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { exportToCSV } from '@/lib/exportUtils';
 import { useQueryClient } from '@tanstack/react-query';
@@ -22,12 +24,18 @@ const Index = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addClientOpen, setAddClientOpen] = useState(false);
   const [deleteClient, setDeleteClient] = useState<Client | null>(null);
+  const [clientOrder, setClientOrder] = useState<string[]>([]);
+  // MRR per client - in production this would come from the database
+  const [clientMRR] = useState<Record<string, number>>({});
   const queryClient = useQueryClient();
 
   const { startDate, endDate } = useDateFilter();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: dailyMetrics = [], isLoading: metricsLoading } = useAllDailyMetrics(startDate, endDate);
   const { data: fundedInvestors = [] } = useFundedInvestors(undefined, startDate, endDate);
+  
+  const clientIds = useMemo(() => clients.map(c => c.id), [clients]);
+  const { data: clientThresholds = {} } = useAllClientSettings(clientIds);
 
   const aggregatedMetrics = useMemo(() => {
     return aggregateMetrics(dailyMetrics, fundedInvestors);
@@ -72,7 +80,26 @@ const Index = () => {
     queryClient.invalidateQueries({ queryKey: ['all-daily-metrics'] });
     queryClient.invalidateQueries({ queryKey: ['funded-investors'] });
     queryClient.invalidateQueries({ queryKey: ['clients'] });
+    queryClient.invalidateQueries({ queryKey: ['all-client-settings'] });
   };
+
+  const handleReorder = (orderedIds: string[]) => {
+    setClientOrder(orderedIds);
+    // In production, persist this order to user preferences or database
+  };
+
+  // Order clients based on drag-drop order
+  const orderedClients = useMemo(() => {
+    if (clientOrder.length === 0) return clients;
+    return [...clients].sort((a, b) => {
+      const aIndex = clientOrder.indexOf(a.id);
+      const bIndex = clientOrder.indexOf(b.id);
+      if (aIndex === -1 && bIndex === -1) return 0;
+      if (aIndex === -1) return 1;
+      if (bIndex === -1) return -1;
+      return aIndex - bIndex;
+    });
+  }, [clients, clientOrder]);
 
   const isLoading = clientsLoading || metricsLoading;
 
@@ -121,12 +148,22 @@ const Index = () => {
               <p className="text-sm text-muted-foreground">Add a client to start tracking metrics</p>
             </div>
           ) : (
-            <ClientTable
-              clients={clients}
-              metrics={clientMetrics}
-              onOpenSettings={handleOpenSettings}
-              onDeleteClient={handleDeleteClient}
-            />
+            <>
+              <AgencyStatsBar 
+                clients={orderedClients}
+                clientMRR={clientMRR}
+                adSpendFeeThreshold={50000}
+                adSpendFeePercent={10}
+              />
+              <DraggableClientTable
+                clients={orderedClients}
+                metrics={clientMetrics}
+                thresholds={clientThresholds}
+                onOpenSettings={handleOpenSettings}
+                onDeleteClient={handleDeleteClient}
+                onReorder={handleReorder}
+              />
+            </>
           )}
         </section>
       </main>
