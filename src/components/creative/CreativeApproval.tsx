@@ -67,6 +67,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
     all: creatives.length,
     pending: creatives.filter(c => c.status === 'pending').length,
     approved: creatives.filter(c => c.status === 'approved').length,
+    launched: creatives.filter(c => c.status === 'launched').length,
     revisions: creatives.filter(c => c.status === 'revisions').length,
     rejected: creatives.filter(c => c.status === 'rejected').length,
   };
@@ -74,6 +75,11 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
   const filteredCreatives = activeTab === 'all' 
     ? creatives 
     : creatives.filter(c => c.status === activeTab);
+
+  const handleLaunch = (creative: Creative) => {
+    updateStatus.mutate({ id: creative.id, status: 'launched' as any, clientId });
+    toast.success('Creative launched!');
+  };
 
   const handleUpload = async () => {
     if (!newCreative.title) {
@@ -140,6 +146,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
     switch (status) {
       case 'pending': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400';
       case 'approved': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+      case 'launched': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
       case 'revisions': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
       case 'rejected': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
       default: return 'bg-muted text-muted-foreground';
@@ -331,6 +338,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
             <TabsTrigger value="all">All ({statusCounts.all})</TabsTrigger>
             <TabsTrigger value="pending">Pending</TabsTrigger>
             <TabsTrigger value="approved">Approved</TabsTrigger>
+            <TabsTrigger value="launched">Launched</TabsTrigger>
             <TabsTrigger value="revisions">Revisions</TabsTrigger>
             <TabsTrigger value="rejected">Rejected</TabsTrigger>
           </TabsList>
@@ -454,32 +462,43 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
                       )}
 
                       {/* Action Buttons */}
-                      <div className="flex gap-2 mt-4">
-                        <Button
-                          variant="outline"
-                          className="flex-1 border-green-500 text-green-600 hover:bg-green-50"
-                          onClick={() => handleStatusChange(selectedCreative, 'approved')}
-                        >
-                          <Check className="h-4 w-4 mr-1" />
-                          Approve
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="flex-1 border-orange-500 text-orange-600 hover:bg-orange-50"
-                          onClick={() => handleStatusChange(selectedCreative, 'revisions')}
-                        >
-                          <RefreshCw className="h-4 w-4 mr-1" />
-                          Revisions
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="flex-1 border-red-500 text-red-600 hover:bg-red-50"
-                          onClick={() => handleStatusChange(selectedCreative, 'rejected')}
-                        >
-                          <X className="h-4 w-4 mr-1" />
-                          Reject
-                        </Button>
-                      </div>
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        {selectedCreative.status === 'approved' && !isPublicView && (
+                          <Button
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                            onClick={() => handleLaunch(selectedCreative)}
+                          >
+                            🚀 Launch
+                          </Button>
+                        )}
+                        {selectedCreative.status !== 'launched' && (
+                          <>
+                            <Button
+                              variant="outline"
+                              className="flex-1 border-green-500 text-green-600 hover:bg-green-50"
+                              onClick={() => handleStatusChange(selectedCreative, 'approved')}
+                            >
+                              <Check className="h-4 w-4 mr-1" />
+                              Approve
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="flex-1 border-orange-500 text-orange-600 hover:bg-orange-50"
+                              onClick={() => handleStatusChange(selectedCreative, 'revisions')}
+                            >
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                              Revisions
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="flex-1 border-red-500 text-red-600 hover:bg-red-50"
+                              onClick={() => handleStatusChange(selectedCreative, 'rejected')}
+                            >
+                              <X className="h-4 w-4 mr-1" />
+                              Reject
+                            </Button>
+                          </>
+                        )}
 
                       {!isPublicView && (
                         <Button

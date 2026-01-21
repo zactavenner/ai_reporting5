@@ -1,25 +1,40 @@
 import { Client } from '@/hooks/useClients';
+import { ClientMRRSettings, calculateClientRevenue } from '@/hooks/useClientMRR';
 import { Card, CardContent } from '@/components/ui/card';
 import { Users, UserCheck, Pause, DollarSign, TrendingUp } from 'lucide-react';
 
 interface AgencyStatsBarProps {
   clients: Client[];
-  clientMRR: Record<string, number>;
-  adSpendFeeThreshold: number;
-  adSpendFeePercent: number;
+  clientMRRSettings: Record<string, ClientMRRSettings>;
+  clientAdSpends: Record<string, number>;
 }
 
 export function AgencyStatsBar({ 
   clients, 
-  clientMRR, 
-  adSpendFeeThreshold,
-  adSpendFeePercent 
+  clientMRRSettings,
+  clientAdSpends,
 }: AgencyStatsBarProps) {
   const activeClients = clients.filter(c => c.status === 'active').length;
   const onboardingClients = clients.filter(c => c.status === 'onboarding').length;
   const pausedClients = clients.filter(c => c.status === 'paused' || c.status === 'on_hold').length;
   
-  const totalMRR = Object.values(clientMRR).reduce((sum, mrr) => sum + mrr, 0);
+  // Calculate total MRR with ad spend fees
+  let totalMRR = 0;
+  for (const client of clients) {
+    const settings = clientMRRSettings[client.id] || {
+      mrr: 0,
+      ad_spend_fee_threshold: 30000,
+      ad_spend_fee_percent: 10,
+    };
+    const adSpend = clientAdSpends[client.id] || 0;
+    totalMRR += calculateClientRevenue(
+      settings.mrr,
+      adSpend,
+      settings.ad_spend_fee_threshold,
+      settings.ad_spend_fee_percent
+    );
+  }
+  
   const projectedAnnual = totalMRR * 12;
 
   const formatCurrency = (val: number) =>
@@ -36,13 +51,13 @@ export function AgencyStatsBar({
       label: 'Onboarding',
       value: onboardingClients,
       icon: Users,
-      color: 'text-blue-500',
+      color: 'text-primary',
     },
     {
       label: 'On Hold / Paused',
       value: pausedClients,
       icon: Pause,
-      color: 'text-yellow-500',
+      color: 'text-muted-foreground',
     },
     {
       label: 'Monthly MRR',
@@ -65,7 +80,7 @@ export function AgencyStatsBar({
           <CardContent className="p-4 flex items-center gap-3">
             <stat.icon className={`h-8 w-8 ${stat.color}`} />
             <div>
-              <p className="text-2xl font-bold">{stat.value}</p>
+              <p className="text-2xl font-bold tabular-nums">{stat.value}</p>
               <p className="text-xs text-muted-foreground">{stat.label}</p>
             </div>
           </CardContent>

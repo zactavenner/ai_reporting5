@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export interface Client {
   id: string;
@@ -61,5 +62,26 @@ export function useClientByToken(token: string | undefined) {
       return data as Client | null;
     },
     enabled: !!token,
+  });
+}
+
+export function useUpdateClient() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string } & Partial<Omit<Client, 'id' | 'created_at' | 'updated_at'>>) => {
+      const { data, error } = await supabase
+        .from('clients')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+    },
   });
 }

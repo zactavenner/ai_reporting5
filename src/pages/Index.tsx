@@ -6,14 +6,16 @@ import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { DraggableClientTable } from '@/components/dashboard/DraggableClientTable';
 import { AgencyStatsBar } from '@/components/dashboard/AgencyStatsBar';
 import { ClientSettingsModal } from '@/components/settings/ClientSettingsModal';
+import { AgencySettingsModal } from '@/components/settings/AgencySettingsModal';
 import { AddClientModal } from '@/components/settings/AddClientModal';
 import { DeleteClientDialog } from '@/components/settings/DeleteClientDialog';
 import { AgencyAIChat } from '@/components/ai/AgencyAIChat';
 import { Button } from '@/components/ui/button';
-import { Database } from 'lucide-react';
+import { Database, Settings2 } from 'lucide-react';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics, AggregatedMetrics } from '@/hooks/useMetrics';
 import { useAllClientSettings } from '@/hooks/useAllClientSettings';
+import { useAllClientMRR } from '@/hooks/useClientMRR';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { exportToCSV } from '@/lib/exportUtils';
 import { useQueryClient } from '@tanstack/react-query';
@@ -22,11 +24,10 @@ const Index = () => {
   const navigate = useNavigate();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [agencySettingsOpen, setAgencySettingsOpen] = useState(false);
   const [addClientOpen, setAddClientOpen] = useState(false);
   const [deleteClient, setDeleteClient] = useState<Client | null>(null);
   const [clientOrder, setClientOrder] = useState<string[]>([]);
-  // MRR per client - in production this would come from the database
-  const [clientMRR] = useState<Record<string, number>>({});
   const queryClient = useQueryClient();
 
   const { startDate, endDate } = useDateFilter();
@@ -36,6 +37,7 @@ const Index = () => {
   
   const clientIds = useMemo(() => clients.map(c => c.id), [clients]);
   const { data: clientThresholds = {} } = useAllClientSettings(clientIds);
+  const { data: clientMRRSettings = {} } = useAllClientMRR(clientIds);
 
   const aggregatedMetrics = useMemo(() => {
     return aggregateMetrics(dailyMetrics, fundedInvestors);
@@ -58,6 +60,15 @@ const Index = () => {
     }
     return result;
   }, [dailyMetrics, fundedInvestors]);
+
+  // Extract ad spends for MRR calculation
+  const clientAdSpends = useMemo(() => {
+    const spends: Record<string, number> = {};
+    for (const [clientId, m] of Object.entries(clientMetrics)) {
+      spends[clientId] = m.totalAdSpend || 0;
+    }
+    return spends;
+  }, [clientMetrics]);
 
   const handleOpenSettings = (client: Client) => {
     setSelectedClient(client);
@@ -117,10 +128,16 @@ const Index = () => {
             onAddClient={handleAddClient}
             onRefresh={handleRefresh}
           />
-          <Button variant="outline" onClick={() => navigate('/database')}>
-            <Database className="h-4 w-4 mr-2" />
-            Database
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setAgencySettingsOpen(true)}>
+              <Settings2 className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/database')}>
+              <Database className="h-4 w-4 mr-2" />
+              Database
+            </Button>
+          </div>
         </div>
 
         <section>
@@ -151,9 +168,8 @@ const Index = () => {
             <>
               <AgencyStatsBar 
                 clients={orderedClients}
-                clientMRR={clientMRR}
-                adSpendFeeThreshold={50000}
-                adSpendFeePercent={10}
+                clientMRRSettings={clientMRRSettings}
+                clientAdSpends={clientAdSpends}
               />
               <DraggableClientTable
                 clients={orderedClients}
@@ -172,6 +188,11 @@ const Index = () => {
         client={selectedClient}
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
+      />
+
+      <AgencySettingsModal
+        open={agencySettingsOpen}
+        onOpenChange={setAgencySettingsOpen}
       />
 
       <AddClientModal
