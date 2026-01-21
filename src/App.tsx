@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { DateFilterProvider } from "@/contexts/DateFilterContext";
+import { PasswordGate } from "@/components/auth/PasswordGate";
 import Index from "./pages/Index";
 import ClientDetail from "./pages/ClientDetail";
 import ClientRecords from "./pages/ClientRecords";
@@ -21,11 +22,15 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/client/:clientId" element={<ClientDetail />} />
-            <Route path="/client/:clientId/records" element={<ClientRecords />} />
-            <Route path="/database" element={<DatabaseView />} />
+            {/* Protected routes - require password */}
+            <Route path="/" element={<PasswordGate><Index /></PasswordGate>} />
+            <Route path="/client/:clientId" element={<PasswordGate><ClientDetail /></PasswordGate>} />
+            <Route path="/client/:clientId/records" element={<PasswordGate><ClientRecords /></PasswordGate>} />
+            <Route path="/database" element={<PasswordGate><DatabaseView /></PasswordGate>} />
+            
+            {/* Public routes - no password required */}
             <Route path="/public/:token" element={<PublicReport />} />
+            
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

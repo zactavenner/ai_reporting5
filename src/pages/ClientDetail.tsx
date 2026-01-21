@@ -194,6 +194,25 @@ export default function ClientDetail() {
             showFundedMetrics 
             thresholds={thresholds}
             fundedInvestorLabel={fundedInvestorLabel}
+            onMetricClick={(metric) => {
+              switch (metric) {
+                case 'leads':
+                  setLeadsModalOpen(true);
+                  break;
+                case 'calls':
+                  setCallsModalOpen(true);
+                  break;
+                case 'showedCalls':
+                  setShowedCallsModalOpen(true);
+                  break;
+                case 'fundedInvestors':
+                  setFundedModalOpen(true);
+                  break;
+                case 'commitments':
+                  setFundedModalOpen(true);
+                  break;
+              }
+            }}
           />
         </section>
 

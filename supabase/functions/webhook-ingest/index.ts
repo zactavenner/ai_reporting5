@@ -196,10 +196,52 @@ async function processLead(supabase: any, clientId: string, payload: any, mappin
   const utm_term = mappings?.utmTermField ? getValueByPath(payload, mappings.utmTermField) 
     : tryExtractValue(payload, ['contact.attribution.utm_term'], ['utm_term']);
 
-  // Pipeline value from opportunity
-  const pipelineValue = mappings?.pipelineValueField 
+  // Pipeline value from opportunity - check for "Capital to deploy" question answer
+  let pipelineValue = mappings?.pipelineValueField 
     ? parseFloat(getValueByPath(payload, mappings.pipelineValueField)) || 0
     : parseFloat(tryExtractValue(payload, ['lead_value', 'opportunity.monetary_value'], ['lead_value', 'pipeline_value'])) || 0;
+  
+  // Try to extract from custom fields / questions like "Capital to deploy"
+  if (!pipelineValue) {
+    const customFields = payload.customFields || payload.contact?.customFields || payload.custom_fields || {};
+    for (const [key, value] of Object.entries(customFields)) {
+      const keyLower = String(key).toLowerCase();
+      if (keyLower.includes('capital') || keyLower.includes('deploy') || keyLower.includes('invest')) {
+        const numValue = parseFloat(String(value).replace(/[^0-9.-]/g, ''));
+        if (!isNaN(numValue) && numValue > 0) {
+          pipelineValue = numValue;
+          break;
+        }
+      }
+    }
+  }
+
+  // Store all custom fields from the payload
+  const customFields: Record<string, any> = {};
+  
+  // Collect custom fields from various possible locations in the payload
+  const rawCustomFields = payload.customFields || payload.contact?.customFields || payload.custom_fields || {};
+  for (const [key, value] of Object.entries(rawCustomFields)) {
+    if (value !== null && value !== undefined && value !== '') {
+      customFields[key] = value;
+    }
+  }
+  
+  // Also capture opportunity/deal information
+  if (payload.opportunity) {
+    customFields['opportunity_name'] = payload.opportunity.name;
+    customFields['opportunity_stage'] = payload.opportunity.pipelineStageId || payload.opportunity.stage;
+    customFields['opportunity_value'] = payload.opportunity.monetary_value;
+  }
+  
+  // Capture additional contact fields that might be useful
+  const additionalFields = ['company', 'address', 'city', 'state', 'country', 'postalCode', 'website', 'tags', 'dnd'];
+  for (const field of additionalFields) {
+    const value = payload[field] || payload.contact?.[field];
+    if (value !== null && value !== undefined && value !== '') {
+      customFields[field] = value;
+    }
+  }
 
   const { data, error } = await supabase
     .from('leads')
@@ -212,6 +254,7 @@ async function processLead(supabase: any, clientId: string, payload: any, mappin
       assigned_user: assignedUser,
       status: 'new',
       is_spam: false,
+      custom_fields: Object.keys(customFields).length > 0 ? customFields : null,
     }, { onConflict: 'client_id,external_id,source', ignoreDuplicates: false })
     .select().single();
 

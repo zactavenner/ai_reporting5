@@ -7,7 +7,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Calendar, Phone, CheckCircle2, DollarSign, User, MapPin, Tag, Clock, Mail, Globe } from 'lucide-react';
+import { Calendar, Phone, CheckCircle2, DollarSign, User, MapPin, Tag, Clock, Mail, Globe, Building, FileText } from 'lucide-react';
 
 interface ActivityEvent {
   date: string;
@@ -110,9 +110,36 @@ export function RecordActivityModal({
     info: 'bg-muted',
   };
 
+  // Parse custom_fields if they exist
+  const customFields = leadRecord?.custom_fields || {};
+  const hasCustomFields = Object.keys(customFields).length > 0;
+
+  // Format custom field key for display
+  const formatFieldKey = (key: string): string => {
+    return key
+      .replace(/_/g, ' ')
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .trim();
+  };
+
+  // Format custom field value for display
+  const formatFieldValue = (value: any): string => {
+    if (value === null || value === undefined) return '-';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (typeof value === 'number') {
+      // Check if it looks like a currency value
+      if (value > 100) return `$${value.toLocaleString()}`;
+      return value.toString();
+    }
+    if (Array.isArray(value)) return value.join(', ');
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="text-xl">📊</span>
@@ -120,103 +147,132 @@ export function RecordActivityModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-6 flex-1 overflow-hidden">
-          {/* Record Details */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-              Record Information
-            </h3>
-            <div className="space-y-3">
-              {(leadRecord || record) && (
+        <ScrollArea className="flex-1 pr-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Record Details */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                Contact Information
+              </h3>
+              <div className="space-y-3">
+                {(leadRecord || record) && (
+                  <>
+                    {(leadRecord?.name || record?.name) && (
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{leadRecord?.name || record?.name}</span>
+                      </div>
+                    )}
+                    {(leadRecord?.email || record?.email) && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <span>{leadRecord?.email || record?.email}</span>
+                      </div>
+                    )}
+                    {(leadRecord?.phone || record?.phone) && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <span>{leadRecord?.phone || record?.phone}</span>
+                      </div>
+                    )}
+                    {leadRecord?.source && (
+                      <div className="flex items-center gap-2">
+                        <Globe className="h-4 w-4 text-muted-foreground" />
+                        <Badge variant="outline">{leadRecord.source}</Badge>
+                      </div>
+                    )}
+                    {leadRecord?.assigned_user && (
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">Assigned: {leadRecord.assigned_user}</span>
+                      </div>
+                    )}
+                    {leadRecord?.pipeline_value > 0 && (
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium text-chart-2">
+                          Pipeline: ${Number(leadRecord.pipeline_value).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* UTM Parameters */}
+              {leadRecord && (leadRecord.utm_source || leadRecord.utm_medium || leadRecord.utm_campaign) && (
                 <>
-                  {(leadRecord?.name || record?.name) && (
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">{leadRecord?.name || record?.name}</span>
-                    </div>
-                  )}
-                  {(leadRecord?.email || record?.email) && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span>{leadRecord?.email || record?.email}</span>
-                    </div>
-                  )}
-                  {(leadRecord?.phone || record?.phone) && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <span>{leadRecord?.phone || record?.phone}</span>
-                    </div>
-                  )}
-                  {leadRecord?.source && (
-                    <div className="flex items-center gap-2">
-                      <Globe className="h-4 w-4 text-muted-foreground" />
-                      <Badge variant="outline">{leadRecord.source}</Badge>
-                    </div>
-                  )}
-                  {leadRecord?.assigned_user && (
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">Assigned: {leadRecord.assigned_user}</span>
-                    </div>
-                  )}
+                  <Separator />
+                  <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                    UTM Parameters
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    {leadRecord.utm_source && (
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">Source:</span>
+                        <Badge variant="secondary" className="text-xs">{leadRecord.utm_source}</Badge>
+                      </div>
+                    )}
+                    {leadRecord.utm_medium && (
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">Medium:</span>
+                        <Badge variant="secondary" className="text-xs">{leadRecord.utm_medium}</Badge>
+                      </div>
+                    )}
+                    {leadRecord.utm_campaign && (
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">Campaign:</span>
+                        <Badge variant="secondary" className="text-xs">{leadRecord.utm_campaign}</Badge>
+                      </div>
+                    )}
+                    {leadRecord.utm_content && (
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">Content:</span>
+                        <Badge variant="secondary" className="text-xs">{leadRecord.utm_content}</Badge>
+                      </div>
+                    )}
+                    {leadRecord.utm_term && (
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">Term:</span>
+                        <Badge variant="secondary" className="text-xs">{leadRecord.utm_term}</Badge>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Custom Fields from Webhook */}
+              {hasCustomFields && (
+                <>
+                  <Separator />
+                  <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                    Additional Information
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    {Object.entries(customFields).map(([key, value]) => (
+                      <div key={key} className="flex items-start gap-2">
+                        <FileText className="h-3 w-3 text-muted-foreground mt-1" />
+                        <div className="flex-1">
+                          <span className="text-muted-foreground">{formatFieldKey(key)}:</span>
+                          <span className="ml-2 font-medium">{formatFieldValue(value)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </>
               )}
             </div>
 
-            {/* UTM Parameters */}
-            {leadRecord && (leadRecord.utm_source || leadRecord.utm_medium || leadRecord.utm_campaign) && (
-              <>
-                <Separator />
-                <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-                  UTM Parameters
-                </h3>
-                <div className="space-y-2 text-sm">
-                  {leadRecord.utm_source && (
-                    <div className="flex items-center gap-2">
-                      <Tag className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">Source:</span>
-                      <Badge variant="secondary" className="text-xs">{leadRecord.utm_source}</Badge>
-                    </div>
-                  )}
-                  {leadRecord.utm_medium && (
-                    <div className="flex items-center gap-2">
-                      <Tag className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">Medium:</span>
-                      <Badge variant="secondary" className="text-xs">{leadRecord.utm_medium}</Badge>
-                    </div>
-                  )}
-                  {leadRecord.utm_campaign && (
-                    <div className="flex items-center gap-2">
-                      <Tag className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">Campaign:</span>
-                      <Badge variant="secondary" className="text-xs">{leadRecord.utm_campaign}</Badge>
-                    </div>
-                  )}
-                  {leadRecord.utm_content && (
-                    <div className="flex items-center gap-2">
-                      <Tag className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">Content:</span>
-                      <Badge variant="secondary" className="text-xs">{leadRecord.utm_content}</Badge>
-                    </div>
-                  )}
-                  {leadRecord.utm_term && (
-                    <div className="flex items-center gap-2">
-                      <Tag className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">Term:</span>
-                      <Badge variant="secondary" className="text-xs">{leadRecord.utm_term}</Badge>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Activity Timeline */}
-          <div className="overflow-hidden flex flex-col">
-            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-4">
-              Activity Timeline
-            </h3>
-            <ScrollArea className="flex-1">
+            {/* Activity Timeline */}
+            <div className="overflow-hidden flex flex-col">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-4">
+                Activity Timeline
+              </h3>
               {activities.length === 0 ? (
                 <p className="text-muted-foreground text-sm">No activity recorded</p>
               ) : (
@@ -244,9 +300,9 @@ export function RecordActivityModal({
                   ))}
                 </div>
               )}
-            </ScrollArea>
+            </div>
           </div>
-        </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );

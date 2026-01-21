@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useDateFilter } from '@/contexts/DateFilterContext';
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 interface DateRangeFilterProps {
   onExportCSV?: () => void;
@@ -37,20 +37,65 @@ export function DateRangeFilter({
 }: DateRangeFilterProps) {
   const { dateRange, setDateRange } = useDateFilter();
   const [preset, setPreset] = useState('last30');
+  const [calendarOpen, setCalendarOpen] = useState(false);
+
+  // Determine current preset based on actual date range
+  const currentPreset = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const from = new Date(dateRange.from);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(dateRange.to);
+    to.setHours(0, 0, 0, 0);
+    
+    // Check each preset
+    const daysDiff = Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+    const isToday = to.getTime() === today.getTime();
+    
+    if (isToday && from.getTime() === today.getTime()) return 'today';
+    
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (from.getTime() === yesterday.getTime() && to.getTime() === yesterday.getTime()) return 'yesterday';
+    
+    if (isToday && daysDiff === 7) return 'last7';
+    if (isToday && daysDiff === 14) return 'last14';
+    if (isToday && daysDiff === 30) return 'last30';
+    if (isToday && daysDiff === 90) return 'last90';
+    
+    const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    if (from.getTime() === thisMonthStart.getTime() && isToday) return 'thisMonth';
+    
+    const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+    if (from.getTime() === lastMonthStart.getTime() && to.getTime() === lastMonthEnd.getTime()) return 'lastMonth';
+    
+    const yearStart = new Date(today.getFullYear(), 0, 1);
+    if (from.getTime() === yearStart.getTime() && isToday) return 'ytd';
+    
+    return 'custom';
+  }, [dateRange]);
+
+  // Keep preset state in sync with actual computed preset
+  useEffect(() => {
+    if (currentPreset !== 'custom') {
+      setPreset(currentPreset);
+    }
+  }, [currentPreset]);
 
   const handlePresetChange = (value: string) => {
     setPreset(value);
     const today = new Date();
-    let from = new Date();
-    let to = new Date();
+    today.setHours(0, 0, 0, 0);
+    let from = new Date(today);
+    let to = new Date(today);
     
     switch (value) {
       case 'today':
-        from = new Date(today);
-        to = new Date(today);
+        // from and to already set to today
         break;
       case 'yesterday':
-        from = new Date(today);
         from.setDate(today.getDate() - 1);
         to = new Date(from);
         break;
@@ -81,14 +126,24 @@ export function DateRangeFilter({
     setDateRange({ from, to });
   };
 
+  const handleCalendarSelect = (range: { from?: Date; to?: Date } | undefined) => {
+    if (range?.from && range?.to) {
+      setPreset('custom');
+      setDateRange({ from: range.from, to: range.to });
+      setCalendarOpen(false);
+    } else if (range?.from) {
+      // Partial selection - wait for complete range
+    }
+  };
+
   return (
     <div className="border-2 border-border bg-card p-4">
       <h2 className="font-bold text-lg mb-1">Filters & Actions</h2>
       <p className="text-sm text-muted-foreground mb-4">Select date range and export data</p>
       
       <div className="flex flex-wrap items-center gap-3">
-        <Select value={preset} onValueChange={handlePresetChange}>
-          <SelectTrigger className="w-36">
+        <Select value={currentPreset === 'custom' ? 'custom' : preset} onValueChange={handlePresetChange}>
+          <SelectTrigger className="w-40">
             <SelectValue placeholder="Select range" />
           </SelectTrigger>
           <SelectContent>
@@ -101,10 +156,11 @@ export function DateRangeFilter({
             <SelectItem value="thisMonth">This Month</SelectItem>
             <SelectItem value="lastMonth">Last Month</SelectItem>
             <SelectItem value="ytd">Year to Date</SelectItem>
+            {currentPreset === 'custom' && <SelectItem value="custom">Custom Range</SelectItem>}
           </SelectContent>
         </Select>
 
-        <Popover>
+        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
@@ -134,7 +190,7 @@ export function DateRangeFilter({
               mode="range"
               defaultMonth={dateRange?.from}
               selected={dateRange}
-              onSelect={(range) => range && setDateRange(range as { from: Date; to: Date })}
+              onSelect={handleCalendarSelect}
               numberOfMonths={2}
             />
           </PopoverContent>

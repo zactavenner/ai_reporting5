@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
+import { PlatformAdPreview } from './PlatformAdPreview';
 import { 
   Upload, 
   Check, 
@@ -417,27 +418,20 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
                 
                 <div className="flex-1 overflow-auto">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Preview */}
+                    {/* Platform-specific Preview */}
                     <div>
-                      <div className="aspect-video bg-muted rounded-lg overflow-hidden mb-4">
-                        {selectedCreative.type === 'image' && selectedCreative.file_url ? (
-                          <img 
-                            src={selectedCreative.file_url} 
-                            alt={selectedCreative.title}
-                            className="w-full h-full object-contain"
-                          />
-                        ) : selectedCreative.type === 'video' && selectedCreative.file_url ? (
-                          <video 
-                            src={selectedCreative.file_url}
-                            controls
-                            className="w-full h-full object-contain"
-                          />
-                        ) : (
-                          <div className="flex items-center justify-center h-full">
-                            <FileText className="h-12 w-12 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
+                      <h4 className="font-medium mb-3 text-sm text-muted-foreground">
+                        {selectedCreative.platform === 'meta' && 'Meta/Facebook Preview'}
+                        {selectedCreative.platform === 'tiktok' && 'TikTok Preview'}
+                        {selectedCreative.platform === 'youtube' && 'YouTube Preview'}
+                        {selectedCreative.platform === 'google' && 'Google Ads Preview'}
+                        {!selectedCreative.platform && 'Ad Preview'}
+                      </h4>
+                      <PlatformAdPreview 
+                        creative={selectedCreative} 
+                        platform={selectedCreative.platform || 'meta'} 
+                        clientName={clientName} 
+                      />
 
                       {/* Copy details */}
                       {selectedCreative.headline && (
