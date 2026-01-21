@@ -11,7 +11,7 @@ import { AddClientModal } from '@/components/settings/AddClientModal';
 import { DeleteClientDialog } from '@/components/settings/DeleteClientDialog';
 import { AgencyAIChat } from '@/components/ai/AgencyAIChat';
 import { Button } from '@/components/ui/button';
-import { Database, Settings2 } from 'lucide-react';
+import { Database, Settings2, Shield } from 'lucide-react';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics, AggregatedMetrics } from '@/hooks/useMetrics';
 import { useAllClientSettings } from '@/hooks/useAllClientSettings';
@@ -132,6 +132,10 @@ const Index = () => {
             <Button variant="outline" onClick={() => setAgencySettingsOpen(true)}>
               <Settings2 className="h-4 w-4 mr-2" />
               Settings
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/spam-blacklist')}>
+              <Shield className="h-4 w-4 mr-2" />
+              Spam
             </Button>
             <Button variant="outline" onClick={() => navigate('/database')}>
               <Database className="h-4 w-4 mr-2" />

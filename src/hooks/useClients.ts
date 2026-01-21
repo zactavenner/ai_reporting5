@@ -95,8 +95,13 @@ export function useUpdateClient() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['client', data.id] });
+    },
+    onError: (error) => {
+      console.error('Failed to update client:', error);
+      toast.error('Failed to update client');
     },
   });
 }

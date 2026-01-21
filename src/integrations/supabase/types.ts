@@ -617,6 +617,33 @@ export type Database = {
           },
         ]
       }
+      spam_blacklist: {
+        Row: {
+          created_at: string
+          id: string
+          ip_address: string | null
+          reason: string | null
+          type: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          reason?: string | null
+          type?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          reason?: string | null
+          type?: string
+          value?: string
+        }
+        Relationships: []
+      }
       sync_logs: {
         Row: {
           client_id: string
