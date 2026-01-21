@@ -196,6 +196,11 @@ async function processLead(supabase: any, clientId: string, payload: any, mappin
   const utm_term = mappings?.utmTermField ? getValueByPath(payload, mappings.utmTermField) 
     : tryExtractValue(payload, ['contact.attribution.utm_term'], ['utm_term']);
 
+  // Campaign attribution fields from Meta/GHL
+  const campaign_name = tryExtractValue(payload, ['campaign.name', 'adCampaign.name', 'attribution.campaignName'], ['campaign_name', 'campaignName']);
+  const ad_set_name = tryExtractValue(payload, ['adSet.name', 'adGroup.name', 'attribution.adSetName'], ['ad_set_name', 'adSetName', 'adGroupName']);
+  const ad_id = tryExtractValue(payload, ['ad.id', 'adId', 'attribution.adId'], ['ad_id', 'adId']);
+
   // Pipeline value from opportunity - check for "Capital to deploy" question answer
   let pipelineValue = mappings?.pipelineValueField 
     ? parseFloat(getValueByPath(payload, mappings.pipelineValueField)) || 0
@@ -298,6 +303,7 @@ async function processLead(supabase: any, clientId: string, payload: any, mappin
       external_id: String(externalId),
       source: 'webhook',
       name, email, phone, utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+      campaign_name, ad_set_name, ad_id,
       pipeline_value: pipelineValue,
       assigned_user: assignedUser,
       status: 'new',
@@ -307,7 +313,7 @@ async function processLead(supabase: any, clientId: string, payload: any, mappin
     .select().single();
 
   if (error) throw error;
-  return { lead_id: data.id, action: 'upserted', name, email, phone };
+  return { lead_id: data.id, action: 'upserted', name, email, phone, campaign_name, ad_set_name, ad_id };
 }
 
 async function processBookedCall(supabase: any, clientId: string, payload: any, mappings: any) {

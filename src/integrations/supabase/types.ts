@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      agency_settings: {
+        Row: {
+          ai_prompt_agency: string | null
+          ai_prompt_client: string | null
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          ai_prompt_agency?: string | null
+          ai_prompt_client?: string | null
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          ai_prompt_agency?: string | null
+          ai_prompt_client?: string | null
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       alert_configs: {
         Row: {
           client_id: string
@@ -126,6 +150,8 @@ export type Database = {
       }
       client_settings: {
         Row: {
+          ad_spend_fee_percent: number | null
+          ad_spend_fee_threshold: number | null
           client_id: string
           cost_of_capital_threshold_red: number | null
           cost_of_capital_threshold_yellow: number | null
@@ -140,10 +166,13 @@ export type Database = {
           created_at: string
           funded_investor_label: string | null
           id: string
+          mrr: number | null
           updated_at: string
           webhook_mappings: Json | null
         }
         Insert: {
+          ad_spend_fee_percent?: number | null
+          ad_spend_fee_threshold?: number | null
           client_id: string
           cost_of_capital_threshold_red?: number | null
           cost_of_capital_threshold_yellow?: number | null
@@ -158,10 +187,13 @@ export type Database = {
           created_at?: string
           funded_investor_label?: string | null
           id?: string
+          mrr?: number | null
           updated_at?: string
           webhook_mappings?: Json | null
         }
         Update: {
+          ad_spend_fee_percent?: number | null
+          ad_spend_fee_threshold?: number | null
           client_id?: string
           cost_of_capital_threshold_red?: number | null
           cost_of_capital_threshold_yellow?: number | null
@@ -176,6 +208,7 @@ export type Database = {
           created_at?: string
           funded_investor_label?: string | null
           id?: string
+          mrr?: number | null
           updated_at?: string
           webhook_mappings?: Json | null
         }
@@ -418,7 +451,10 @@ export type Database = {
       }
       leads: {
         Row: {
+          ad_id: string | null
+          ad_set_name: string | null
           assigned_user: string | null
+          campaign_name: string | null
           client_id: string
           created_at: string
           custom_fields: Json | null
@@ -439,7 +475,10 @@ export type Database = {
           utm_term: string | null
         }
         Insert: {
+          ad_id?: string | null
+          ad_set_name?: string | null
           assigned_user?: string | null
+          campaign_name?: string | null
           client_id: string
           created_at?: string
           custom_fields?: Json | null
@@ -460,7 +499,10 @@ export type Database = {
           utm_term?: string | null
         }
         Update: {
+          ad_id?: string | null
+          ad_set_name?: string | null
           assigned_user?: string | null
+          campaign_name?: string | null
           client_id?: string
           created_at?: string
           custom_fields?: Json | null

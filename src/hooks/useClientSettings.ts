@@ -15,6 +15,9 @@ export interface ClientSettings {
   cost_of_capital_threshold_yellow: number;
   cost_of_capital_threshold_red: number;
   funded_investor_label: string;
+  mrr: number;
+  ad_spend_fee_threshold: number;
+  ad_spend_fee_percent: number;
 }
 
 export interface KPIThresholds {
@@ -37,6 +40,9 @@ const defaultSettings: Omit<ClientSettings, 'id' | 'client_id'> = {
   cost_of_capital_threshold_yellow: 5,
   cost_of_capital_threshold_red: 10,
   funded_investor_label: 'Funded Investors',
+  mrr: 0,
+  ad_spend_fee_threshold: 30000,
+  ad_spend_fee_percent: 10,
 };
 
 export function useClientSettings(clientId: string | undefined) {

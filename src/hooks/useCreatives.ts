@@ -20,7 +20,7 @@ export interface Creative {
   headline: string | null;
   body_copy: string | null;
   cta_text: string | null;
-  status: 'pending' | 'approved' | 'revisions' | 'rejected';
+  status: 'pending' | 'approved' | 'revisions' | 'rejected' | 'launched';
   comments: CreativeComment[];
   created_at: string;
   updated_at: string;

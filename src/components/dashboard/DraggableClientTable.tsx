@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Client } from '@/hooks/useClients';
+import { Client, useUpdateClient } from '@/hooks/useClients';
 import { AggregatedMetrics } from '@/hooks/useMetrics';
 import { KPIThresholds } from '@/hooks/useClientSettings';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -26,6 +33,14 @@ interface DraggableClientTableProps {
   onReorder?: (orderedClientIds: string[]) => void;
 }
 
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'onboarding', label: 'Onboarding' },
+  { value: 'paused', label: 'Paused' },
+  { value: 'on_hold', label: 'On Hold' },
+  { value: 'inactive', label: 'Inactive' },
+];
+
 export function DraggableClientTable({ 
   clients, 
   metrics, 
@@ -37,6 +52,7 @@ export function DraggableClientTable({
   const navigate = useNavigate();
   const [orderedClients, setOrderedClients] = useState(clients);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const updateClient = useUpdateClient();
 
   useEffect(() => {
     setOrderedClients(clients);
@@ -121,24 +137,33 @@ export function DraggableClientTable({
     }
   };
 
+  const handleStatusChange = async (clientId: string, newStatus: string) => {
+    try {
+      await updateClient.mutateAsync({ id: clientId, status: newStatus as any });
+      toast.success('Status updated');
+    } catch (error) {
+      toast.error('Failed to update status');
+    }
+  };
+
   return (
     <div className="border-2 border-border bg-card">
       <Table>
         <TableHeader>
           <TableRow className="border-b-2">
             <TableHead className="w-8"></TableHead>
-            <TableHead className="font-bold">Client Name</TableHead>
-            <TableHead className="font-bold">Status</TableHead>
-            <TableHead className="font-bold text-right">Ad Spend</TableHead>
-            <TableHead className="font-bold text-right">Leads</TableHead>
-            <TableHead className="font-bold text-right">Booking %</TableHead>
-            <TableHead className="font-bold text-right">Calls</TableHead>
-            <TableHead className="font-bold text-right">Showed</TableHead>
-            <TableHead className="font-bold text-right">Investors</TableHead>
-            <TableHead className="font-bold text-right">Funded $</TableHead>
-            <TableHead className="font-bold text-right">Avg CPL</TableHead>
-            <TableHead className="font-bold text-right">CoC %</TableHead>
-            <TableHead className="font-bold">Actions</TableHead>
+            <TableHead className="font-bold text-base">Client Name</TableHead>
+            <TableHead className="font-bold text-base">Status</TableHead>
+            <TableHead className="font-bold text-base text-right">Ad Spend</TableHead>
+            <TableHead className="font-bold text-base text-right">Leads</TableHead>
+            <TableHead className="font-bold text-base text-right">Booking %</TableHead>
+            <TableHead className="font-bold text-base text-right">Calls</TableHead>
+            <TableHead className="font-bold text-base text-right">Showed</TableHead>
+            <TableHead className="font-bold text-base text-right">Investors</TableHead>
+            <TableHead className="font-bold text-base text-right">Funded $</TableHead>
+            <TableHead className="font-bold text-base text-right">Avg CPL</TableHead>
+            <TableHead className="font-bold text-base text-right">CoC %</TableHead>
+            <TableHead className="font-bold text-base">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -165,27 +190,45 @@ export function DraggableClientTable({
                 <TableCell className="cursor-grab" onClick={(e) => e.stopPropagation()}>
                   <GripVertical className="h-4 w-4 text-muted-foreground" />
                 </TableCell>
-                <TableCell className="font-medium">{client.name}</TableCell>
+                <TableCell className="font-semibold text-base">{client.name}</TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
-                  <Badge variant={getStatusVariant(client.status)}>
-                    {client.status.charAt(0).toUpperCase() + client.status.slice(1).replace('_', ' ')}
-                  </Badge>
+                  <Select
+                    value={client.status}
+                    onValueChange={(value) => handleStatusChange(client.id, value)}
+                  >
+                    <SelectTrigger className="w-[120px] h-8">
+                      <SelectValue>
+                        <Badge variant={getStatusVariant(client.status)} className="text-xs">
+                          {STATUS_OPTIONS.find(s => s.value === client.status)?.label || client.status}
+                        </Badge>
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          <Badge variant={getStatusVariant(option.value)} className="text-xs">
+                            {option.label}
+                          </Badge>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </TableCell>
-                <TableCell className="text-right font-mono tabular-nums">{formatCurrency(m.totalAdSpend || 0)}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums">{m.totalLeads || 0}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums">{formatPercent(bookingPercent)}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums">{m.totalCalls || 0}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums">{m.showedCalls || 0}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums">{m.fundedInvestors || 0}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums text-chart-2">{formatCurrency(m.fundedDollars || 0)}</TableCell>
+                <TableCell className="text-right font-mono tabular-nums text-base">{formatCurrency(m.totalAdSpend || 0)}</TableCell>
+                <TableCell className="text-right font-mono tabular-nums text-base">{m.totalLeads || 0}</TableCell>
+                <TableCell className="text-right font-mono tabular-nums text-base">{formatPercent(bookingPercent)}</TableCell>
+                <TableCell className="text-right font-mono tabular-nums text-base">{m.totalCalls || 0}</TableCell>
+                <TableCell className="text-right font-mono tabular-nums text-base">{m.showedCalls || 0}</TableCell>
+                <TableCell className="text-right font-mono tabular-nums text-base">{m.fundedInvestors || 0}</TableCell>
+                <TableCell className="text-right font-mono tabular-nums text-base text-chart-2">{formatCurrency(m.fundedDollars || 0)}</TableCell>
                 <TableCell className={cn(
-                  "text-right font-mono tabular-nums",
+                  "text-right font-mono tabular-nums text-base",
                   getThresholdColor(m.costPerLead || 0, t.costPerLead)
                 )}>
                   {formatCurrency(m.costPerLead || 0)}
                 </TableCell>
                 <TableCell className={cn(
-                  "text-right font-mono tabular-nums",
+                  "text-right font-mono tabular-nums text-base",
                   getCostOfCapitalColor(costOfCapital, t.costOfCapital)
                 )}>
                   {formatPercent(costOfCapital)}
