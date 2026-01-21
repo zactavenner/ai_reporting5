@@ -136,28 +136,6 @@ export default function PublicReport() {
 
             <MetricChartsGrid dailyMetrics={dailyMetrics} />
 
-            <section className="border border-border bg-card p-6 rounded-lg">
-              <h3 className="font-semibold text-lg mb-4">Performance Summary</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="border border-border p-4 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Total Leads</p>
-                  <p className="text-3xl font-semibold tabular-nums mt-1">{metrics.totalLeads.toLocaleString()}</p>
-                </div>
-                <div className="border border-border p-4 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Funded Investors</p>
-                  <p className="text-3xl font-semibold tabular-nums mt-1">{metrics.fundedInvestors}</p>
-                  <p className="text-sm text-muted-foreground tabular-nums">${metrics.fundedDollars.toLocaleString()}</p>
-                </div>
-                <div className="border border-border p-4 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Avg Time to Fund</p>
-                  <p className="text-3xl font-semibold tabular-nums mt-1">{metrics.avgTimeToFund.toFixed(1)} <span className="text-lg font-normal">days</span></p>
-                </div>
-                <div className="border border-border p-4 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Pipeline Value</p>
-                  <p className="text-3xl font-semibold tabular-nums mt-1 text-chart-2">${metrics.pipelineValue.toLocaleString()}</p>
-                </div>
-              </div>
-            </section>
 
             <CreativeApproval 
               clientId={client.id} 

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
-import { DailyPerformanceTable } from '@/components/dashboard/DailyPerformanceTable';
+
 import { MetricChartsGrid } from '@/components/dashboard/MetricChartsGrid';
 import { PeriodicStatsTable } from '@/components/dashboard/PeriodicStatsTable';
 import { InlineRecordsView } from '@/components/dashboard/InlineRecordsView';
@@ -277,11 +277,6 @@ export default function ClientDetail() {
 
             <MetricChartsGrid dailyMetrics={dailyMetrics} />
 
-            <DailyPerformanceTable 
-              dailyMetrics={dailyMetrics} 
-              onExportCSV={handleExportCSV}
-              clientName={client.name}
-            />
 
             <CreativeApproval 
               clientId={client.id} 

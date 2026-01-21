@@ -296,6 +296,25 @@ async function processLead(supabase: any, clientId: string, payload: any, mappin
     }
   }
 
+  // Check if email domain is blacklisted
+  let is_spam = false;
+  if (email) {
+    const emailDomain = email.split('@')[1]?.toLowerCase();
+    if (emailDomain) {
+      const { data: blacklisted } = await supabase
+        .from('spam_blacklist')
+        .select('id')
+        .eq('type', 'email_domain')
+        .eq('value', emailDomain)
+        .maybeSingle();
+      
+      if (blacklisted) {
+        is_spam = true;
+        console.log(`Lead marked as spam - blacklisted domain: ${emailDomain}`);
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from('leads')
     .upsert({
@@ -307,13 +326,13 @@ async function processLead(supabase: any, clientId: string, payload: any, mappin
       pipeline_value: pipelineValue,
       assigned_user: assignedUser,
       status: 'new',
-      is_spam: false,
+      is_spam,
       custom_fields: Object.keys(customFields).length > 0 ? customFields : null,
     }, { onConflict: 'client_id,external_id,source', ignoreDuplicates: false })
     .select().single();
 
   if (error) throw error;
-  return { lead_id: data.id, action: 'upserted', name, email, phone, campaign_name, ad_set_name, ad_id };
+  return { lead_id: data.id, action: 'upserted', name, email, phone, campaign_name, ad_set_name, ad_id, is_spam };
 }
 
 async function processBookedCall(supabase: any, clientId: string, payload: any, mappings: any) {

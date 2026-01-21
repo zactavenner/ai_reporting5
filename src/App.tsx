@@ -10,6 +10,7 @@ import ClientDetail from "./pages/ClientDetail";
 import ClientRecords from "./pages/ClientRecords";
 import DatabaseView from "./pages/DatabaseView";
 import PublicReport from "./pages/PublicReport";
+import SpamBlacklist from "./pages/SpamBlacklist";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/client/:clientId" element={<PasswordGate><ClientDetail /></PasswordGate>} />
             <Route path="/client/:clientId/records" element={<PasswordGate><ClientRecords /></PasswordGate>} />
             <Route path="/database" element={<PasswordGate><DatabaseView /></PasswordGate>} />
+            <Route path="/spam-blacklist" element={<PasswordGate><SpamBlacklist /></PasswordGate>} />
             
             {/* Public routes - no password required */}
             <Route path="/public/:token" element={<PublicReport />} />
