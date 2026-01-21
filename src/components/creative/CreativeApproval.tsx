@@ -499,6 +499,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
                             </Button>
                           </>
                         )}
+                      </div>
 
                       {!isPublicView && (
                         <Button
