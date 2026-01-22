@@ -306,6 +306,7 @@ export default function ClientDetail() {
             onRecordSelect={handleRecordSelect}
             selectedRecord={selectedRecord}
             selectedType={selectedType}
+            clientId={clientId}
           />
         )}
 
