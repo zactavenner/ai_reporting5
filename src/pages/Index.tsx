@@ -10,8 +10,14 @@ import { AgencySettingsModal } from '@/components/settings/AgencySettingsModal';
 import { AddClientModal } from '@/components/settings/AddClientModal';
 import { DeleteClientDialog } from '@/components/settings/DeleteClientDialog';
 import { AgencyAIChat } from '@/components/ai/AgencyAIChat';
+import { AgencyTaskSummary } from '@/components/tasks/AgencyTaskSummary';
+import { MetricsCustomizeModal } from '@/components/dashboard/MetricsCustomizeModal';
+import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal';
+import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
+import { FundedInvestorsDrillDownModal } from '@/components/drilldown/FundedInvestorsDrillDownModal';
+import { AdSpendDrillDownModal } from '@/components/drilldown/AdSpendDrillDownModal';
 import { Button } from '@/components/ui/button';
-import { Database, Settings2, Shield } from 'lucide-react';
+import { Database, Settings2, Shield, Sliders } from 'lucide-react';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics, AggregatedMetrics } from '@/hooks/useMetrics';
 import { useAllClientSettings } from '@/hooks/useAllClientSettings';
@@ -28,6 +34,8 @@ const Index = () => {
   const [addClientOpen, setAddClientOpen] = useState(false);
   const [deleteClient, setDeleteClient] = useState<Client | null>(null);
   const [clientOrder, setClientOrder] = useState<string[]>([]);
+  const [metricsCustomizeOpen, setMetricsCustomizeOpen] = useState(false);
+  const [drillDownModal, setDrillDownModal] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { startDate, endDate } = useDateFilter();
@@ -145,14 +153,26 @@ const Index = () => {
         </div>
 
         <section>
-          <h2 className="text-lg font-bold mb-2">Key Performance Indicators</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Agency-wide performance metrics with trend comparison
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h2 className="text-lg font-bold">Key Performance Indicators</h2>
+              <p className="text-sm text-muted-foreground">
+                Agency-wide performance metrics with trend comparison
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setMetricsCustomizeOpen(true)}>
+              <Sliders className="h-4 w-4 mr-2" />
+              Customize
+            </Button>
+          </div>
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading metrics...</div>
           ) : (
-            <KPIGrid metrics={aggregatedMetrics} showFundedMetrics />
+            <KPIGrid 
+              metrics={aggregatedMetrics} 
+              showFundedMetrics 
+              onMetricClick={(metric) => setDrillDownModal(metric)}
+            />
           )}
         </section>
 
@@ -186,6 +206,11 @@ const Index = () => {
             </>
           )}
         </section>
+
+        {/* Task Overview */}
+        <section>
+          <AgencyTaskSummary />
+        </section>
       </main>
 
       <ClientSettingsModal
@@ -214,6 +239,37 @@ const Index = () => {
         clients={clients}
         clientMetrics={clientMetrics as Record<string, AggregatedMetrics>}
         agencyMetrics={aggregatedMetrics}
+      />
+
+      <MetricsCustomizeModal
+        open={metricsCustomizeOpen}
+        onOpenChange={setMetricsCustomizeOpen}
+      />
+
+      <LeadsDrillDownModal
+        open={drillDownModal === 'leads'}
+        onOpenChange={(open) => !open && setDrillDownModal(null)}
+      />
+
+      <CallsDrillDownModal
+        open={drillDownModal === 'calls'}
+        onOpenChange={(open) => !open && setDrillDownModal(null)}
+      />
+
+      <CallsDrillDownModal
+        showedOnly
+        open={drillDownModal === 'showedCalls'}
+        onOpenChange={(open) => !open && setDrillDownModal(null)}
+      />
+
+      <FundedInvestorsDrillDownModal
+        open={drillDownModal === 'fundedInvestors'}
+        onOpenChange={(open) => !open && setDrillDownModal(null)}
+      />
+
+      <AdSpendDrillDownModal
+        open={drillDownModal === 'totalAdSpend'}
+        onOpenChange={(open) => !open && setDrillDownModal(null)}
       />
     </div>
   );
