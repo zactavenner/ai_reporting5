@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Client, useUpdateClient } from '@/hooks/useClients';
 import { AggregatedMetrics } from '@/hooks/useMetrics';
-import { KPIThresholds } from '@/hooks/useClientSettings';
+import { KPIThresholds, ClientSettings, getEffectiveDailyTarget, getEffectiveMonthlyTarget } from '@/hooks/useClientSettings';
+import { calculateClientRevenue } from '@/hooks/useClientMRR';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3 } from 'lucide-react';
+import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -28,6 +29,7 @@ interface DraggableClientTableProps {
   clients: Client[];
   metrics: Record<string, AggregatedMetrics>;
   thresholds: Record<string, KPIThresholds>;
+  fullSettings?: Record<string, ClientSettings>;
   onOpenSettings: (client: Client) => void;
   onDeleteClient?: (client: Client) => void;
   onReorder?: (orderedClientIds: string[]) => void;
@@ -45,6 +47,7 @@ export function DraggableClientTable({
   clients, 
   metrics, 
   thresholds,
+  fullSettings = {},
   onOpenSettings, 
   onDeleteClient,
   onReorder,
@@ -160,6 +163,39 @@ export function DraggableClientTable({
     return '';
   };
 
+  // Calculate pacing status (comparing daily spend vs target)
+  const getPacingStatus = (
+    dailySpend: number, 
+    settings: ClientSettings | undefined
+  ): { status: 'on-track' | 'over' | 'under' | 'none'; color: string; icon: typeof TrendingUp } => {
+    if (!settings) return { status: 'none', color: '', icon: Minus };
+    
+    const dailyTarget = getEffectiveDailyTarget(settings);
+    if (dailyTarget <= 0) return { status: 'none', color: '', icon: Minus };
+    
+    const variance = (dailySpend - dailyTarget) / dailyTarget;
+    
+    if (Math.abs(variance) <= 0.1) {
+      return { status: 'on-track', color: 'text-chart-2', icon: Minus };
+    } else if (variance > 0.1) {
+      return { status: 'over', color: 'text-destructive', icon: TrendingUp };
+    } else {
+      return { status: 'under', color: 'text-yellow-600 dark:text-yellow-500', icon: TrendingDown };
+    }
+  };
+
+  // Calculate estimated monthly revenue for a client
+  const getEstimatedRevenue = (settings: ClientSettings | undefined): number => {
+    if (!settings) return 0;
+    const monthlyTarget = getEffectiveMonthlyTarget(settings);
+    return calculateClientRevenue(
+      settings.mrr || 0,
+      monthlyTarget,
+      settings.ad_spend_fee_threshold || 30000,
+      settings.ad_spend_fee_percent || 10
+    );
+  };
+
   return (
     <div className="border-2 border-border bg-card overflow-x-auto">
       <Table>
@@ -169,6 +205,7 @@ export function DraggableClientTable({
             <TableHead className="font-bold text-sm">Client</TableHead>
             <TableHead className="font-bold text-sm">Status</TableHead>
             <TableHead className="font-bold text-sm text-right">Ad Spend</TableHead>
+            <TableHead className="font-bold text-sm text-center">Pacing</TableHead>
             <TableHead className="font-bold text-sm text-right">CTR</TableHead>
             <TableHead className="font-bold text-sm text-right">Leads</TableHead>
             <TableHead className="font-bold text-sm text-right">Spam/Bad</TableHead>
@@ -184,6 +221,7 @@ export function DraggableClientTable({
             <TableHead className="font-bold text-sm text-right">Funded $</TableHead>
             <TableHead className="font-bold text-sm text-right">Cost/Inv</TableHead>
             <TableHead className="font-bold text-sm text-right">CoC %</TableHead>
+            <TableHead className="font-bold text-sm text-right">Est. Rev</TableHead>
             <TableHead className="font-bold text-sm">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -191,9 +229,13 @@ export function DraggableClientTable({
           {orderedClients.map((client) => {
             const m = metrics[client.id] || {} as AggregatedMetrics;
             const t = thresholds[client.id] || {};
+            const s = fullSettings[client.id];
             const showedPercent = (m.totalCalls || 0) > 0 ? ((m.showedCalls || 0) / (m.totalCalls || 1) * 100) : 0;
             const costOfCapital = m.fundedDollars > 0 ? ((m.totalAdSpend || 0) / m.fundedDollars * 100) : 0;
             const costPerInvestor = m.fundedInvestors > 0 ? (m.totalAdSpend || 0) / m.fundedInvestors : 0;
+            const pacing = getPacingStatus(m.totalAdSpend || 0, s);
+            const estRevenue = getEstimatedRevenue(s);
+            const PacingIcon = pacing.icon;
             
             return (
               <TableRow
@@ -237,6 +279,16 @@ export function DraggableClientTable({
                   </Select>
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums text-sm">{formatCurrency(m.totalAdSpend || 0)}</TableCell>
+                <TableCell className="text-center">
+                  {pacing.status !== 'none' ? (
+                    <div className={cn("flex items-center justify-center gap-1", pacing.color)}>
+                      <PacingIcon className="h-4 w-4" />
+                      <span className="text-xs capitalize">{pacing.status === 'on-track' ? 'On Track' : pacing.status}</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">-</span>
+                  )}
+                </TableCell>
                 <TableCell className="text-right font-mono tabular-nums text-sm">{formatPercent(m.ctr || 0)}</TableCell>
                 <TableCell className="text-right font-mono tabular-nums text-sm">{m.totalLeads || 0}</TableCell>
                 <TableCell className="text-right font-mono tabular-nums text-sm">{m.spamLeads || 0}</TableCell>
@@ -286,6 +338,9 @@ export function DraggableClientTable({
                   getCostOfCapitalColor(costOfCapital, t.costOfCapital)
                 )}>
                   {formatPercent(costOfCapital)}
+                </TableCell>
+                <TableCell className="text-right font-mono tabular-nums text-sm text-chart-2 font-semibold">
+                  {estRevenue > 0 ? formatCurrency(estRevenue) : '-'}
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1">

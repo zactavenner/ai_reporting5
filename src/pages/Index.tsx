@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Sliders } from 'lucide-react';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics, AggregatedMetrics } from '@/hooks/useMetrics';
-import { useAllClientSettings } from '@/hooks/useAllClientSettings';
+import { useAllClientSettings, useAllClientFullSettings } from '@/hooks/useAllClientSettings';
 import { useAllClientMRR } from '@/hooks/useClientMRR';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { exportToCSV } from '@/lib/exportUtils';
@@ -46,6 +46,7 @@ const Index = () => {
   
   const clientIds = useMemo(() => clients.map(c => c.id), [clients]);
   const { data: clientThresholds = {} } = useAllClientSettings(clientIds);
+  const { data: clientFullSettings = {} } = useAllClientFullSettings(clientIds);
   const { data: clientMRRSettings = {} } = useAllClientMRR(clientIds);
 
   const aggregatedMetrics = useMemo(() => {
@@ -182,11 +183,13 @@ const Index = () => {
                 clients={orderedClients}
                 clientMRRSettings={clientMRRSettings}
                 clientAdSpends={clientAdSpends}
+                clientFullSettings={clientFullSettings}
               />
               <DraggableClientTable
                 clients={orderedClients}
                 metrics={clientMetrics}
                 thresholds={clientThresholds}
+                fullSettings={clientFullSettings}
                 onOpenSettings={handleOpenSettings}
                 onDeleteClient={handleDeleteClient}
                 onReorder={handleReorder}

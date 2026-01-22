@@ -57,8 +57,10 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
   const [mrr, setMrr] = useState('0');
   const [adSpendFeeThreshold, setAdSpendFeeThreshold] = useState('30000');
   const [adSpendFeePercent, setAdSpendFeePercent] = useState('10');
-  const [monthlyAdSpendTarget, setMonthlyAdSpendTarget] = useState('0');
+  const [monthlyAdSpendTarget, setMonthlyAdSpendTarget] = useState('');
+  const [dailyAdSpendTarget, setDailyAdSpendTarget] = useState('');
   const [totalRaiseAmount, setTotalRaiseAmount] = useState('0');
+  const [adSpendInputMode, setAdSpendInputMode] = useState<'monthly' | 'daily'>('monthly');
 
   // Load settings when available
   useEffect(() => {
@@ -77,8 +79,18 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
       setMrr(String(settings.mrr || 0));
       setAdSpendFeeThreshold(String(settings.ad_spend_fee_threshold || 30000));
       setAdSpendFeePercent(String(settings.ad_spend_fee_percent || 10));
-      setMonthlyAdSpendTarget(String(settings.monthly_ad_spend_target || 0));
       setTotalRaiseAmount(String(settings.total_raise_amount || 0));
+      
+      // Determine which mode was used based on which value is set
+      if (settings.daily_ad_spend_target && settings.daily_ad_spend_target > 0) {
+        setAdSpendInputMode('daily');
+        setDailyAdSpendTarget(String(settings.daily_ad_spend_target));
+        setMonthlyAdSpendTarget('');
+      } else {
+        setAdSpendInputMode('monthly');
+        setMonthlyAdSpendTarget(String(settings.monthly_ad_spend_target || 0));
+        setDailyAdSpendTarget('');
+      }
     }
   }, [settings]);
 
@@ -91,6 +103,33 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
 
   // Calculate projected annual revenue
   const projectedAnnual = parseFloat(mrr) * 12;
+  
+  // Calculate the auto-filled value based on input mode
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  
+  const calculatedMonthly = adSpendInputMode === 'daily' && dailyAdSpendTarget 
+    ? parseFloat(dailyAdSpendTarget) * daysInMonth 
+    : 0;
+  const calculatedDaily = adSpendInputMode === 'monthly' && monthlyAdSpendTarget 
+    ? parseFloat(monthlyAdSpendTarget) / daysInMonth 
+    : 0;
+  
+  // Get effective monthly target for revenue estimate
+  const effectiveMonthlyTarget = adSpendInputMode === 'daily' 
+    ? calculatedMonthly 
+    : parseFloat(monthlyAdSpendTarget) || 0;
+  
+  // Calculate estimated revenue for the month
+  const estimatedMonthlyRevenue = (() => {
+    let total = parseFloat(mrr) || 0;
+    const threshold = parseFloat(adSpendFeeThreshold) || 30000;
+    const percent = parseFloat(adSpendFeePercent) || 10;
+    if (effectiveMonthlyTarget > threshold) {
+      total += (effectiveMonthlyTarget - threshold) * (percent / 100);
+    }
+    return total;
+  })();
 
   const handleSave = async () => {
     if (!client) return;
@@ -114,7 +153,9 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
         mrr: parseFloat(mrr) || 0,
         ad_spend_fee_threshold: parseFloat(adSpendFeeThreshold) || 30000,
         ad_spend_fee_percent: parseFloat(adSpendFeePercent) || 10,
-        monthly_ad_spend_target: parseFloat(monthlyAdSpendTarget) || 0,
+        // Store whichever mode the user selected
+        monthly_ad_spend_target: adSpendInputMode === 'monthly' ? (parseFloat(monthlyAdSpendTarget) || 0) : 0,
+        daily_ad_spend_target: adSpendInputMode === 'daily' ? (parseFloat(dailyAdSpendTarget) || null) : null,
         total_raise_amount: parseFloat(totalRaiseAmount) || 0,
       });
 
@@ -247,27 +288,89 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
                   Ad Spend Targets
                 </h4>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Track daily pacing against monthly targets
+                  Enter either daily or monthly target - the other will auto-calculate
                 </p>
               </div>
               
+              <div className="flex gap-2 mb-4">
+                <Button
+                  type="button"
+                  variant={adSpendInputMode === 'monthly' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => {
+                    setAdSpendInputMode('monthly');
+                    setDailyAdSpendTarget('');
+                  }}
+                >
+                  Monthly Target
+                </Button>
+                <Button
+                  type="button"
+                  variant={adSpendInputMode === 'daily' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => {
+                    setAdSpendInputMode('daily');
+                    setMonthlyAdSpendTarget('');
+                  }}
+                >
+                  Daily Target
+                </Button>
+              </div>
+              
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="monthlyAdSpendTarget">Monthly Ad Spend Target ($)</Label>
-                  <Input
-                    id="monthlyAdSpendTarget"
-                    type="number"
-                    value={monthlyAdSpendTarget}
-                    onChange={(e) => setMonthlyAdSpendTarget(e.target.value)}
-                    placeholder="0"
-                  />
+                {adSpendInputMode === 'monthly' ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="monthlyAdSpendTarget">Monthly Ad Spend Target ($)</Label>
+                      <Input
+                        id="monthlyAdSpendTarget"
+                        type="number"
+                        value={monthlyAdSpendTarget}
+                        onChange={(e) => setMonthlyAdSpendTarget(e.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Daily Target (auto-calculated)</Label>
+                      <div className="h-10 flex items-center px-3 border-2 border-border bg-muted/50 font-mono">
+                        ${calculatedDaily.toFixed(2)}/day
+                      </div>
+                      <p className="text-xs text-muted-foreground">{daysInMonth} days this month</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="dailyAdSpendTarget">Daily Ad Spend Target ($)</Label>
+                      <Input
+                        id="dailyAdSpendTarget"
+                        type="number"
+                        value={dailyAdSpendTarget}
+                        onChange={(e) => setDailyAdSpendTarget(e.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Monthly Target (auto-calculated)</Label>
+                      <div className="h-10 flex items-center px-3 border-2 border-border bg-muted/50 font-mono">
+                        ${calculatedMonthly.toLocaleString()}/month
+                      </div>
+                      <p className="text-xs text-muted-foreground">{daysInMonth} days this month</p>
+                    </div>
+                  </>
+                )}
+              </div>
+              
+              <div className="mt-4 p-3 border-2 border-border bg-muted/30">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Est. Monthly Revenue</span>
+                  <span className="text-lg font-bold text-chart-2">
+                    ${estimatedMonthlyRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
                 </div>
-                <div className="space-y-2">
-                  <Label>Daily Target (pacing)</Label>
-                  <div className="h-10 flex items-center px-3 border-2 border-border bg-muted/50 font-mono">
-                    ${(parseFloat(monthlyAdSpendTarget) / 30).toFixed(2)}/day
-                  </div>
-                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  MRR + ad spend fee (if above ${parseFloat(adSpendFeeThreshold).toLocaleString()} threshold)
+                </p>
               </div>
             </div>
 
@@ -275,10 +378,10 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
               <div>
                 <h4 className="font-medium mb-1 flex items-center gap-2">
                   <Target className="h-4 w-4" />
-                  Fundraising Goal
+                  Fundraising Goal (All-Time)
                 </h4>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Total capital raise target for this client
+                  Total capital raise target - not affected by date range
                 </p>
               </div>
               

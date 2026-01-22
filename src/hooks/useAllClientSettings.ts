@@ -18,6 +18,7 @@ const defaultSettings: Omit<ClientSettings, 'id' | 'client_id'> = {
   ad_spend_fee_threshold: 30000,
   ad_spend_fee_percent: 10,
   monthly_ad_spend_target: 0,
+  daily_ad_spend_target: null,
   total_raise_amount: 0,
 };
 
@@ -45,6 +46,41 @@ export function useAllClientSettings(clientIds: string[]) {
             client_id: clientId,
             ...defaultSettings,
           } as ClientSettings);
+        }
+      }
+      
+      return result;
+    },
+    enabled: clientIds.length > 0,
+  });
+}
+
+// New hook to get full settings for revenue calculations
+export function useAllClientFullSettings(clientIds: string[]) {
+  return useQuery({
+    queryKey: ['all-client-full-settings', clientIds],
+    queryFn: async () => {
+      if (clientIds.length === 0) return {};
+      
+      const { data, error } = await supabase
+        .from('client_settings')
+        .select('*')
+        .in('client_id', clientIds);
+      
+      if (error) throw error;
+      
+      const result: Record<string, ClientSettings> = {};
+      
+      for (const clientId of clientIds) {
+        const settings = data?.find(s => s.client_id === clientId);
+        if (settings) {
+          result[clientId] = settings as ClientSettings;
+        } else {
+          result[clientId] = {
+            id: '',
+            client_id: clientId,
+            ...defaultSettings,
+          };
         }
       }
       

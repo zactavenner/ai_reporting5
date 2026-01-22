@@ -1,24 +1,27 @@
 import { Client } from '@/hooks/useClients';
 import { ClientMRRSettings, calculateClientRevenue } from '@/hooks/useClientMRR';
+import { ClientSettings, getEffectiveMonthlyTarget } from '@/hooks/useClientSettings';
 import { Card, CardContent } from '@/components/ui/card';
-import { Users, UserCheck, Pause, DollarSign, TrendingUp } from 'lucide-react';
+import { Users, UserCheck, Pause, DollarSign, TrendingUp, Target } from 'lucide-react';
 
 interface AgencyStatsBarProps {
   clients: Client[];
   clientMRRSettings: Record<string, ClientMRRSettings>;
   clientAdSpends: Record<string, number>;
+  clientFullSettings?: Record<string, ClientSettings>;
 }
 
 export function AgencyStatsBar({ 
   clients, 
   clientMRRSettings,
   clientAdSpends,
+  clientFullSettings = {},
 }: AgencyStatsBarProps) {
   const activeClients = clients.filter(c => c.status === 'active').length;
   const onboardingClients = clients.filter(c => c.status === 'onboarding').length;
   const pausedClients = clients.filter(c => c.status === 'paused' || c.status === 'on_hold').length;
   
-  // Calculate total MRR with ad spend fees
+  // Calculate total MRR with actual ad spend fees (current performance)
   let totalMRR = 0;
   for (const client of clients) {
     const settings = clientMRRSettings[client.id] || {
@@ -35,7 +38,22 @@ export function AgencyStatsBar({
     );
   }
   
-  const projectedAnnual = totalMRR * 12;
+  // Calculate estimated monthly revenue based on targets
+  let estimatedMonthlyRevenue = 0;
+  for (const client of clients) {
+    const fullSettings = clientFullSettings[client.id];
+    if (fullSettings) {
+      const monthlyTarget = getEffectiveMonthlyTarget(fullSettings);
+      estimatedMonthlyRevenue += calculateClientRevenue(
+        fullSettings.mrr || 0,
+        monthlyTarget,
+        fullSettings.ad_spend_fee_threshold || 30000,
+        fullSettings.ad_spend_fee_percent || 10
+      );
+    }
+  }
+  
+  const projectedAnnual = estimatedMonthlyRevenue * 12;
 
   const formatCurrency = (val: number) =>
     `$${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -60,21 +78,27 @@ export function AgencyStatsBar({
       color: 'text-muted-foreground',
     },
     {
-      label: 'Monthly MRR',
+      label: 'Current MRR',
       value: formatCurrency(totalMRR),
       icon: DollarSign,
       color: 'text-chart-2',
     },
     {
+      label: 'Est. Monthly Rev',
+      value: formatCurrency(estimatedMonthlyRevenue),
+      icon: Target,
+      color: 'text-primary',
+    },
+    {
       label: 'Projected Annual',
       value: formatCurrency(projectedAnnual),
       icon: TrendingUp,
-      color: 'text-primary',
+      color: 'text-chart-2',
     },
   ];
 
   return (
-    <div className="grid grid-cols-5 gap-4 mb-4">
+    <div className="grid grid-cols-6 gap-4 mb-4">
       {stats.map((stat) => (
         <Card key={stat.label} className="border-2">
           <CardContent className="p-4 flex items-center gap-3">

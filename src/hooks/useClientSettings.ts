@@ -19,6 +19,7 @@ export interface ClientSettings {
   ad_spend_fee_threshold: number;
   ad_spend_fee_percent: number;
   monthly_ad_spend_target: number;
+  daily_ad_spend_target: number | null;
   total_raise_amount: number;
 }
 
@@ -46,6 +47,7 @@ const defaultSettings: Omit<ClientSettings, 'id' | 'client_id'> = {
   ad_spend_fee_threshold: 30000,
   ad_spend_fee_percent: 10,
   monthly_ad_spend_target: 0,
+  daily_ad_spend_target: null,
   total_raise_amount: 0,
 };
 
@@ -93,6 +95,8 @@ export function useUpdateClientSettings() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['client-settings', data.client_id] });
+      queryClient.invalidateQueries({ queryKey: ['all-client-settings'] });
+      queryClient.invalidateQueries({ queryKey: ['all-client-mrr'] });
     },
   });
 }
@@ -122,4 +126,28 @@ export function getThresholdsFromSettings(settings: ClientSettings | null | unde
       red: settings.cost_of_capital_threshold_red,
     },
   };
+}
+
+// Helper to get effective daily target (either from daily input or calculated from monthly)
+export function getEffectiveDailyTarget(settings: ClientSettings | null | undefined): number {
+  if (!settings) return 0;
+  if (settings.daily_ad_spend_target && settings.daily_ad_spend_target > 0) {
+    return settings.daily_ad_spend_target;
+  }
+  // Calculate from monthly (use current month's days)
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  return (settings.monthly_ad_spend_target || 0) / daysInMonth;
+}
+
+// Helper to get effective monthly target (either from monthly input or calculated from daily)
+export function getEffectiveMonthlyTarget(settings: ClientSettings | null | undefined): number {
+  if (!settings) return 0;
+  if (settings.monthly_ad_spend_target && settings.monthly_ad_spend_target > 0) {
+    return settings.monthly_ad_spend_target;
+  }
+  // Calculate from daily (use current month's days)
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  return (settings.daily_ad_spend_target || 0) * daysInMonth;
 }

@@ -308,6 +308,7 @@ export type Database = {
           cpl_threshold_red: number | null
           cpl_threshold_yellow: number | null
           created_at: string
+          daily_ad_spend_target: number | null
           funded_investor_label: string | null
           id: string
           monthly_ad_spend_target: number | null
@@ -331,6 +332,7 @@ export type Database = {
           cpl_threshold_red?: number | null
           cpl_threshold_yellow?: number | null
           created_at?: string
+          daily_ad_spend_target?: number | null
           funded_investor_label?: string | null
           id?: string
           monthly_ad_spend_target?: number | null
@@ -354,6 +356,7 @@ export type Database = {
           cpl_threshold_red?: number | null
           cpl_threshold_yellow?: number | null
           created_at?: string
+          daily_ad_spend_target?: number | null
           funded_investor_label?: string | null
           id?: string
           monthly_ad_spend_target?: number | null
