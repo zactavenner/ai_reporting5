@@ -113,6 +113,7 @@ export type Database = {
         Row: {
           client_id: string
           created_at: string
+          direction: string | null
           external_id: string
           id: string
           is_reconnect: boolean | null
@@ -129,6 +130,7 @@ export type Database = {
         Insert: {
           client_id: string
           created_at?: string
+          direction?: string | null
           external_id: string
           id?: string
           is_reconnect?: boolean | null
@@ -145,6 +147,7 @@ export type Database = {
         Update: {
           client_id?: string
           created_at?: string
+          direction?: string | null
           external_id?: string
           id?: string
           is_reconnect?: boolean | null
@@ -685,6 +688,7 @@ export type Database = {
           name: string | null
           phone: string | null
           pipeline_value: number | null
+          questions: Json | null
           source: string
           status: string | null
           updated_at: string
@@ -709,6 +713,7 @@ export type Database = {
           name?: string | null
           phone?: string | null
           pipeline_value?: number | null
+          questions?: Json | null
           source?: string
           status?: string | null
           updated_at?: string
@@ -733,6 +738,7 @@ export type Database = {
           name?: string | null
           phone?: string | null
           pipeline_value?: number | null
+          questions?: Json | null
           source?: string
           status?: string | null
           updated_at?: string

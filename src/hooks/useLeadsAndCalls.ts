@@ -1,6 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface LeadQuestion {
+  question: string;
+  answer: any;
+  source: string;
+}
+
 export interface Lead {
   id: string;
   client_id: string;
@@ -20,6 +26,8 @@ export interface Lead {
   utm_term?: string | null;
   assigned_user?: string | null;
   pipeline_value?: number | null;
+  custom_fields?: Record<string, any> | null;
+  questions?: any[] | null;
 }
 
 export interface Call {
@@ -37,6 +45,7 @@ export interface Call {
   summary?: string | null;
   quality_score?: number | null;
   transcript?: string | null;
+  direction?: 'inbound' | 'outbound' | null;
 }
 
 export function useLeads(clientId?: string, startDate?: string, endDate?: string) {

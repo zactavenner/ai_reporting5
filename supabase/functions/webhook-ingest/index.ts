@@ -37,6 +37,127 @@ function tryExtractValue(payload: any, paths: string[], directKeys: string[] = [
   return null;
 }
 
+// Find existing lead by contact ID, phone, or email (priority: ID > phone > email)
+async function findExistingLead(supabase: any, clientId: string, externalId: string | null, phone: string | null, email: string | null) {
+  // Try by external_id first
+  if (externalId) {
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('id, external_id, created_at')
+      .eq('client_id', clientId)
+      .eq('external_id', String(externalId))
+      .maybeSingle();
+    if (lead) return lead;
+  }
+  
+  // Try by phone
+  if (phone) {
+    const normalizedPhone = phone.replace(/\D/g, '');
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('id, external_id, created_at')
+      .eq('client_id', clientId)
+      .or(`phone.eq.${phone},phone.ilike.%${normalizedPhone}%`)
+      .limit(1)
+      .maybeSingle();
+    if (lead) return lead;
+  }
+  
+  // Try by email
+  if (email) {
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('id, external_id, created_at')
+      .eq('client_id', clientId)
+      .ilike('email', email)
+      .maybeSingle();
+    if (lead) return lead;
+  }
+  
+  return null;
+}
+
+// Extract all questions/form responses from payload
+function extractQuestions(payload: any): any[] {
+  const questions: any[] = [];
+  
+  // Extract from customFields
+  const customFields = payload.customFields || payload.contact?.customFields || payload.custom_fields || {};
+  for (const [key, value] of Object.entries(customFields)) {
+    if (value !== null && value !== undefined && value !== '') {
+      questions.push({
+        question: key,
+        answer: value,
+        source: 'customFields'
+      });
+    }
+  }
+  
+  // Extract from formSubmission/form
+  if (payload.formSubmission || payload.form) {
+    const form = payload.formSubmission || payload.form;
+    if (form.responses || form.fields) {
+      const responses = form.responses || form.fields;
+      for (const [key, value] of Object.entries(responses)) {
+        if (value !== null && value !== undefined && value !== '') {
+          questions.push({
+            question: key,
+            answer: value,
+            source: 'form'
+          });
+        }
+      }
+    }
+    // Handle questions array format
+    if (form.questions && Array.isArray(form.questions)) {
+      form.questions.forEach((q: any) => {
+        questions.push({
+          question: q.label || q.question || q.name || 'Unknown Question',
+          answer: q.answer || q.value || q.response || '',
+          source: 'form'
+        });
+      });
+    }
+  }
+  
+  // Extract from opportunity custom fields
+  if (payload.opportunity?.customFields) {
+    for (const [key, value] of Object.entries(payload.opportunity.customFields)) {
+      if (value !== null && value !== undefined && value !== '') {
+        questions.push({
+          question: key,
+          answer: value,
+          source: 'opportunity'
+        });
+      }
+    }
+  }
+  
+  // Extract from contact.questions array (GHL format)
+  if (payload.contact?.questions && Array.isArray(payload.contact.questions)) {
+    payload.contact.questions.forEach((q: any) => {
+      questions.push({
+        question: q.label || q.question || q.name || 'Unknown Question',
+        answer: q.answer || q.value || q.response || '',
+        source: 'contact'
+      });
+    });
+  }
+  
+  // Extract from root level questions array
+  if (payload.questions && Array.isArray(payload.questions)) {
+    payload.questions.forEach((q: any) => {
+      questions.push({
+        question: q.label || q.question || q.name || 'Unknown Question',
+        answer: q.answer || q.value || q.response || '',
+        source: 'root'
+      });
+    });
+  }
+  
+  return questions;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -123,6 +244,9 @@ serve(async (req) => {
       case 'bad-lead':
         result = await processBadLead(supabase, clientId, payload, mappings);
         break;
+      case 'call':
+        result = await processCall(supabase, clientId, payload, mappings);
+        break;
       default:
         await logWebhook(supabase, clientId, webhookType, 'error', payload, `Unknown webhook type: ${webhookType}`);
         return new Response(
@@ -207,9 +331,9 @@ async function processLead(supabase: any, clientId: string, payload: any, mappin
     : parseFloat(tryExtractValue(payload, ['lead_value', 'opportunity.monetary_value'], ['lead_value', 'pipeline_value'])) || 0;
   
   // Try to extract from custom fields / questions like "Capital to deploy"
+  const customFieldsRaw = payload.customFields || payload.contact?.customFields || payload.custom_fields || {};
   if (!pipelineValue) {
-    const customFields = payload.customFields || payload.contact?.customFields || payload.custom_fields || {};
-    for (const [key, value] of Object.entries(customFields)) {
+    for (const [key, value] of Object.entries(customFieldsRaw)) {
       const keyLower = String(key).toLowerCase();
       if (keyLower.includes('capital') || keyLower.includes('deploy') || keyLower.includes('invest')) {
         const numValue = parseFloat(String(value).replace(/[^0-9.-]/g, ''));
@@ -221,12 +345,14 @@ async function processLead(supabase: any, clientId: string, payload: any, mappin
     }
   }
 
+  // Extract all questions from the payload
+  const questions = extractQuestions(payload);
+
   // Store all custom fields from the payload
   const customFields: Record<string, any> = {};
   
   // Collect custom fields from various possible locations in the payload
-  const rawCustomFields = payload.customFields || payload.contact?.customFields || payload.custom_fields || {};
-  for (const [key, value] of Object.entries(rawCustomFields)) {
+  for (const [key, value] of Object.entries(customFieldsRaw)) {
     if (value !== null && value !== undefined && value !== '') {
       customFields[key] = value;
     }
@@ -315,67 +441,111 @@ async function processLead(supabase: any, clientId: string, payload: any, mappin
     }
   }
 
+  // Check for existing lead by ID, phone, or email
+  const existingLead = await findExistingLead(supabase, clientId, externalId, phone, email);
+
+  const leadData = {
+    client_id: clientId,
+    external_id: existingLead?.external_id || String(externalId),
+    source: 'webhook',
+    name, email, phone, utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+    campaign_name, ad_set_name, ad_id,
+    pipeline_value: pipelineValue,
+    assigned_user: assignedUser,
+    status: 'new',
+    is_spam,
+    custom_fields: Object.keys(customFields).length > 0 ? customFields : null,
+    questions: questions.length > 0 ? questions : null,
+  };
+
   const { data, error } = await supabase
     .from('leads')
-    .upsert({
-      client_id: clientId,
-      external_id: String(externalId),
-      source: 'webhook',
-      name, email, phone, utm_source, utm_medium, utm_campaign, utm_content, utm_term,
-      campaign_name, ad_set_name, ad_id,
-      pipeline_value: pipelineValue,
-      assigned_user: assignedUser,
-      status: 'new',
-      is_spam,
-      custom_fields: Object.keys(customFields).length > 0 ? customFields : null,
-    }, { onConflict: 'client_id,external_id,source', ignoreDuplicates: false })
+    .upsert(leadData, { onConflict: 'client_id,external_id,source', ignoreDuplicates: false })
     .select().single();
 
   if (error) throw error;
-  return { lead_id: data.id, action: 'upserted', name, email, phone, campaign_name, ad_set_name, ad_id, is_spam };
+  return { lead_id: data.id, action: existingLead ? 'updated' : 'created', name, email, phone, campaign_name, ad_set_name, ad_id, is_spam, questions_count: questions.length };
+}
+
+// New webhook type for inbound/outbound calls
+async function processCall(supabase: any, clientId: string, payload: any, mappings: any) {
+  const externalId = tryExtractValue(payload, ['call.id', 'id', 'callId'], ['id', 'callId']) || `wh_call_${Date.now()}`;
+  const contactId = tryExtractValue(payload, ['contact.id', 'contactId', 'call.contactId'], ['contactId', 'contact_id']);
+  const phone = tryExtractValue(payload, ['phone', 'contact.phone', 'call.to', 'call.from'], ['phone']);
+  const email = tryExtractValue(payload, ['email', 'contact.email'], ['email']);
+  
+  // Determine call direction
+  const direction = tryExtractValue(payload, ['call.direction', 'direction', 'type'], ['direction']) || 
+    (payload.call?.type === 'inbound' || payload.type === 'inbound' ? 'inbound' : 'outbound');
+  
+  const recordingUrl = tryExtractValue(payload, ['call.recordingUrl', 'recording_url', 'recordingUrl'], ['recording_url', 'recordingUrl']);
+  const duration = tryExtractValue(payload, ['call.duration', 'duration'], ['duration']);
+  const outcome = tryExtractValue(payload, ['call.status', 'status', 'outcome'], ['outcome', 'status']) || 'completed';
+  
+  // Find existing lead by contact ID, phone, or email
+  const existingLead = await findExistingLead(supabase, clientId, contactId, phone, email);
+  
+  const callData = {
+    client_id: clientId,
+    external_id: String(externalId),
+    lead_id: existingLead?.id || null,
+    scheduled_at: new Date().toISOString(),
+    showed: true,
+    outcome,
+    is_reconnect: false,
+    direction,
+    recording_url: recordingUrl || null,
+    summary: duration ? `Duration: ${duration}s` : null,
+  };
+
+  const { data, error } = await supabase
+    .from('calls')
+    .upsert(callData, { onConflict: 'client_id,external_id', ignoreDuplicates: false })
+    .select().single();
+
+  if (error) throw error;
+  return { call_id: data.id, action: 'created', direction, lead_matched: !!existingLead };
 }
 
 async function processBookedCall(supabase: any, clientId: string, payload: any, mappings: any) {
   const externalId = tryExtractValue(payload, ['calendar.appointmentId', 'appointment.id'], ['id', 'appointmentId']) || `wh_call_${Date.now()}`;
   const scheduledAt = tryExtractValue(payload, ['calendar.startTime', 'appointment.meta.start_time'], ['scheduled_at', 'startTime']) || new Date().toISOString();
   const contactId = tryExtractValue(payload, ['contact.id', 'appointment.contactId'], ['contactId', 'contact_id']);
+  const phone = tryExtractValue(payload, ['phone', 'contact.phone'], ['phone']);
+  const email = tryExtractValue(payload, ['email', 'contact.email'], ['email']);
 
-  let leadId = null;
-  if (contactId) {
-    const { data: lead } = await supabase.from('leads').select('id').eq('client_id', clientId).eq('external_id', String(contactId)).maybeSingle();
-    leadId = lead?.id;
-  }
+  // Find existing lead by contact ID, phone, or email
+  const existingLead = await findExistingLead(supabase, clientId, contactId, phone, email);
 
   const { data, error } = await supabase.from('calls').upsert({
-    client_id: clientId, external_id: String(externalId), lead_id: leadId,
-    scheduled_at: scheduledAt, showed: false, outcome: 'booked', is_reconnect: false,
+    client_id: clientId, external_id: String(externalId), lead_id: existingLead?.id || null,
+    scheduled_at: scheduledAt, showed: false, outcome: 'booked', is_reconnect: false, direction: 'outbound',
   }, { onConflict: 'client_id,external_id', ignoreDuplicates: false }).select().single();
 
   if (error) throw error;
-  return { call_id: data.id, action: 'booked' };
+  return { call_id: data.id, action: 'booked', lead_matched: !!existingLead };
 }
 
 async function processReconnectCall(supabase: any, clientId: string, payload: any, mappings: any, isShowedWebhook: boolean = false) {
   const externalId = tryExtractValue(payload, ['calendar.appointmentId', 'appointment.id'], ['id', 'appointmentId']) || `wh_reconnect_${Date.now()}`;
   const scheduledAt = tryExtractValue(payload, ['calendar.startTime', 'appointment.meta.start_time'], ['scheduled_at', 'startTime']) || new Date().toISOString();
   const contactId = tryExtractValue(payload, ['contact.id', 'appointment.contactId'], ['contactId', 'contact_id']);
+  const phone = tryExtractValue(payload, ['phone', 'contact.phone'], ['phone']);
+  const email = tryExtractValue(payload, ['email', 'contact.email'], ['email']);
   
   // Determine showed status - if called via reconnect-showed endpoint, mark as showed
   const showed = isShowedWebhook || payload.calendar?.status === 'showed' || payload.showed === true;
 
-  let leadId = null;
-  if (contactId) {
-    const { data: lead } = await supabase.from('leads').select('id').eq('client_id', clientId).eq('external_id', String(contactId)).maybeSingle();
-    leadId = lead?.id;
-  }
+  // Find existing lead by contact ID, phone, or email
+  const existingLead = await findExistingLead(supabase, clientId, contactId, phone, email);
 
   const { data, error } = await supabase.from('calls').upsert({
-    client_id: clientId, external_id: String(externalId), lead_id: leadId,
-    scheduled_at: scheduledAt, showed, outcome: showed ? 'reconnect_showed' : 'reconnect_booked', is_reconnect: true,
+    client_id: clientId, external_id: String(externalId), lead_id: existingLead?.id || null,
+    scheduled_at: scheduledAt, showed, outcome: showed ? 'reconnect_showed' : 'reconnect_booked', is_reconnect: true, direction: 'outbound',
   }, { onConflict: 'client_id,external_id', ignoreDuplicates: false }).select().single();
 
   if (error) throw error;
-  return { call_id: data.id, action: isShowedWebhook ? 'reconnect_showed' : 'reconnect_booked', showed };
+  return { call_id: data.id, action: isShowedWebhook ? 'reconnect_showed' : 'reconnect_booked', showed, lead_matched: !!existingLead };
 }
 
 async function processShowedCall(supabase: any, clientId: string, payload: any, mappings: any) {
@@ -387,7 +557,7 @@ async function processShowedCall(supabase: any, clientId: string, payload: any, 
 
   if (!data) {
     const { data: newCall, error } = await supabase.from('calls').insert({
-      client_id: clientId, external_id: String(externalId), showed: true, outcome: 'showed', scheduled_at: new Date().toISOString(),
+      client_id: clientId, external_id: String(externalId), showed: true, outcome: 'showed', scheduled_at: new Date().toISOString(), direction: 'outbound',
     }).select().single();
     if (error) throw error;
     return { call_id: newCall.id, action: 'created_as_showed' };
@@ -417,14 +587,14 @@ async function processFunded(supabase: any, clientId: string, payload: any, mapp
   const valueField = mappings?.valueField || 'lead_value';
   const amount = parseFloat(getValueByPath(payload, valueField)) || parseFloat(payload.lead_value) || 0;
   const contactId = tryExtractValue(payload, ['contact.id', 'opportunity.contactId'], ['contactId']);
+  const phone = tryExtractValue(payload, ['phone', 'contact.phone'], ['phone']);
+  const email = tryExtractValue(payload, ['email', 'contact.email'], ['email']);
   const investorName = tryExtractValue(payload, ['full_name', 'opportunity.name', 'name'], ['name']);
 
-  let leadId = null, firstContactAt = null;
-  if (contactId) {
-    const { data: lead } = await supabase.from('leads').select('id, created_at').eq('client_id', clientId).eq('external_id', String(contactId)).maybeSingle();
-    leadId = lead?.id;
-    firstContactAt = lead?.created_at;
-  }
+  // Find existing lead by contact ID, phone, or email
+  const existingLead = await findExistingLead(supabase, clientId, contactId, phone, email);
+  const leadId = existingLead?.id || null;
+  const firstContactAt = existingLead?.created_at || null;
 
   let timeToFundDays = null;
   if (firstContactAt) {
@@ -444,7 +614,7 @@ async function processFunded(supabase: any, clientId: string, payload: any, mapp
   }, { onConflict: 'client_id,external_id', ignoreDuplicates: false }).select().single();
 
   if (error) throw error;
-  return { funded_investor_id: data.id, amount, name: investorName };
+  return { funded_investor_id: data.id, amount, name: investorName, lead_matched: !!existingLead };
 }
 
 async function processAdSpend(supabase: any, clientId: string, payload: any, mappings: any) {
@@ -482,12 +652,17 @@ async function processAdSpend(supabase: any, clientId: string, payload: any, map
 
 async function processBadLead(supabase: any, clientId: string, payload: any, mappings: any) {
   const contactId = tryExtractValue(payload, ['contact.id', 'event.contact_id'], ['contact_id', 'id', 'contactId']);
-  if (!contactId) throw new Error('Missing contact_id');
+  const phone = tryExtractValue(payload, ['phone', 'contact.phone'], ['phone']);
+  const email = tryExtractValue(payload, ['email', 'contact.email'], ['email']);
+  
+  // Find existing lead by contact ID, phone, or email
+  const existingLead = await findExistingLead(supabase, clientId, contactId, phone, email);
+  
+  if (!existingLead) throw new Error(`Lead not found with provided identifiers`);
 
   const { data, error } = await supabase.from('leads').update({ is_spam: true, status: 'bad_lead' })
-    .eq('client_id', clientId).eq('external_id', String(contactId)).select().maybeSingle();
+    .eq('id', existingLead.id).select().maybeSingle();
 
-  if (!data) throw new Error(`Lead not found with external_id: ${contactId}`);
   if (error) throw error;
   return { lead_id: data.id, action: 'marked_bad' };
 }

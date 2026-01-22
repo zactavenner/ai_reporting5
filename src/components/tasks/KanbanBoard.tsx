@@ -59,17 +59,17 @@ interface KanbanBoardProps {
 }
 
 const STAGES = [
-  { id: 'backlog', label: 'Backlog', color: 'bg-muted' },
   { id: 'todo', label: 'To-Do', color: 'bg-blue-500/20' },
-  { id: 'in_progress', label: 'In Progress', color: 'bg-amber-500/20' },
+  { id: 'stuck', label: 'Stuck', color: 'bg-destructive/20' },
   { id: 'review', label: 'Review', color: 'bg-purple-500/20' },
-  { id: 'done', label: 'Done', color: 'bg-green-500/20' },
+  { id: 'revisions', label: 'Revisions', color: 'bg-amber-500/20' },
+  { id: 'done', label: 'Completed', color: 'bg-green-500/20' },
 ];
 
 export function KanbanBoard({ tasks, clients, clientId }: KanbanBoardProps) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showCreateTask, setShowCreateTask] = useState(false);
-  const [createTaskStage, setCreateTaskStage] = useState('backlog');
+  const [createTaskStage, setCreateTaskStage] = useState('todo');
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCompleted, setShowCompleted] = useState(false);
@@ -244,7 +244,7 @@ export function KanbanBoard({ tasks, clients, clientId }: KanbanBoardProps) {
                 </>
               )}
             </Button>
-            <Button size="sm" onClick={() => handleAddTask('backlog')}>
+            <Button size="sm" onClick={() => handleAddTask('todo')}>
               <Plus className="h-4 w-4 mr-2" />
               Add Task
             </Button>
