@@ -11,11 +11,12 @@ import { PeriodicStatsTable } from '@/components/dashboard/PeriodicStatsTable';
 import { InlineRecordsView } from '@/components/dashboard/InlineRecordsView';
 import { CreativeApproval } from '@/components/creative/CreativeApproval';
 import { AIAnalysisChat } from '@/components/ai/AIAnalysisChat';
+import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import { Button } from '@/components/ui/button';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, ClipboardList } from 'lucide-react';
 
 export default function PublicReport() {
   const { token } = useParams<{ token: string }>();
@@ -112,6 +113,14 @@ export default function PublicReport() {
           >
             Detailed Records
           </Button>
+          <Button 
+            variant={activeSection === 'tasks' ? 'default' : 'outline'} 
+            size="sm"
+            onClick={() => setActiveSection('tasks')}
+          >
+            <ClipboardList className="h-4 w-4 mr-1" />
+            Tasks
+          </Button>
           {customTabs.map((tab) => (
             <Button 
               key={tab.id}
@@ -156,6 +165,11 @@ export default function PublicReport() {
             selectedRecord={selectedRecord}
             selectedType={selectedType}
           />
+        )}
+
+        {/* Tasks Section */}
+        {activeSection === 'tasks' && client && (
+          <TaskBoardView clientId={client.id} />
         )}
 
         {/* Custom Embed Tabs */}

@@ -162,6 +162,22 @@ export function useAgencyMembers() {
   });
 }
 
+// Send task notification via edge function
+async function sendTaskNotification(taskId: string, action: 'assigned' | 'updated' | 'due_reminder' | 'completed', clientId?: string | null) {
+  try {
+    const { data, error } = await supabase.functions.invoke('send-task-notification', {
+      body: { taskId, action, clientId },
+    });
+    if (error) {
+      console.error('Task notification error:', error);
+    } else {
+      console.log('Task notification sent:', data);
+    }
+  } catch (err) {
+    console.error('Failed to send task notification:', err);
+  }
+}
+
 // Create task mutation
 export function useCreateTask() {
   const queryClient = useQueryClient();
@@ -183,6 +199,11 @@ export function useCreateTask() {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
       toast.success('Task created successfully');
+      
+      // Send notification if task is assigned
+      if (data.assigned_to) {
+        sendTaskNotification(data.id, 'assigned', data.client_id);
+      }
     },
     onError: (error: Error) => {
       toast.error('Failed to create task: ' + error.message);
@@ -209,6 +230,11 @@ export function useUpdateTask() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      
+      // Send notification for completion
+      if (data.status === 'completed') {
+        sendTaskNotification(data.id, 'completed', data.client_id);
+      }
     },
     onError: (error: Error) => {
       toast.error('Failed to update task: ' + error.message);

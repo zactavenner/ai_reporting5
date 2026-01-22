@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Settings, DollarSign, Mic, Upload, History, Plus, ExternalLink, X } from 'lucide-react';
+import { ArrowLeft, Settings, DollarSign, Mic, Upload, History, Plus, ExternalLink, X, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
@@ -18,6 +18,7 @@ import { CreativeApproval } from '@/components/creative/CreativeApproval';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { AIAnalysisChat } from '@/components/ai/AIAnalysisChat';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
+import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import { useClient } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
 import { useLeads, useCalls } from '@/hooks/useLeadsAndCalls';
@@ -207,6 +208,14 @@ export default function ClientDetail() {
           >
             Detailed Records
           </Button>
+          <Button 
+            variant={activeTab === 'tasks' ? 'default' : 'outline'} 
+            size="sm"
+            onClick={() => setActiveTab('tasks')}
+          >
+            <ClipboardList className="h-4 w-4 mr-1" />
+            Tasks
+          </Button>
           {customTabs.map((tab) => (
             <div key={tab.id} className="relative group">
               <Button 
@@ -300,7 +309,10 @@ export default function ClientDetail() {
           />
         )}
 
-        {/* Custom Embed Tabs */}
+        {/* Tasks Tab */}
+        {activeTab === 'tasks' && (
+          <TaskBoardView clientId={clientId} />
+        )}
         {customTabs.map((tab) => (
           activeTab === `custom-${tab.id}` && (
             <div key={tab.id} className="border-2 border-border bg-card rounded-lg overflow-hidden">

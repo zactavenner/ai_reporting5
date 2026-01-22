@@ -15,6 +15,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { 
   Plus, 
   MoreHorizontal, 
@@ -27,6 +34,8 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  Building2,
+  Users,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -64,6 +73,8 @@ export function KanbanBoard({ tasks, clients, clientId }: KanbanBoardProps) {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCompleted, setShowCompleted] = useState(false);
+  const [filterClientId, setFilterClientId] = useState<string>('');
+  const [filterAssigneeId, setFilterAssigneeId] = useState<string>('');
   
   const updateTask = useUpdateTask();
   const { data: agencyMembers = [] } = useAgencyMembers();
@@ -80,9 +91,15 @@ export function KanbanBoard({ tasks, clients, clientId }: KanbanBoardProps) {
   const filteredTasks = useMemo(() => {
     let filtered = tasks;
     
-    // Filter by client if specified
-    if (clientId) {
-      filtered = filtered.filter(t => t.client_id === clientId);
+    // Filter by client - use prop clientId if provided, otherwise use filter dropdown
+    const effectiveClientId = clientId || (filterClientId && filterClientId !== 'all' ? filterClientId : '');
+    if (effectiveClientId) {
+      filtered = filtered.filter(t => t.client_id === effectiveClientId);
+    }
+    
+    // Filter by assignee
+    if (filterAssigneeId && filterAssigneeId !== 'all') {
+      filtered = filtered.filter(t => t.assigned_to === filterAssigneeId);
     }
     
     // Filter by search
@@ -100,7 +117,7 @@ export function KanbanBoard({ tasks, clients, clientId }: KanbanBoardProps) {
     }
     
     return filtered;
-  }, [tasks, clientId, searchQuery, showCompleted]);
+  }, [tasks, clientId, filterClientId, filterAssigneeId, searchQuery, showCompleted]);
 
   // Group by stage
   const tasksByStage = useMemo(() => {
@@ -162,17 +179,51 @@ export function KanbanBoard({ tasks, clients, clientId }: KanbanBoardProps) {
     <>
       <div className="space-y-4">
         {/* Toolbar */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search tasks..."
-                className="pl-9 w-64"
+                className="pl-9 w-48 md:w-64"
               />
             </div>
+            
+            {/* Client Filter - only show if not already filtered by clientId prop */}
+            {!clientId && (
+              <Select value={filterClientId} onValueChange={setFilterClientId}>
+                <SelectTrigger className="w-40">
+                  <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="All Clients" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Clients</SelectItem>
+                  {clients.map(client => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            
+            {/* Assignee Filter */}
+            <Select value={filterAssigneeId} onValueChange={setFilterAssigneeId}>
+              <SelectTrigger className="w-40">
+                <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="All Assignees" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Assignees</SelectItem>
+                {agencyMembers.map(member => (
+                  <SelectItem key={member.id} value={member.id}>
+                    {member.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           
           <div className="flex items-center gap-2">

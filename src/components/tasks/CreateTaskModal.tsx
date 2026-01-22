@@ -115,12 +115,12 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId }
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Client</Label>
-              <Select value={clientId} onValueChange={setClientId}>
+              <Select value={clientId || 'none'} onValueChange={(v) => setClientId(v === 'none' ? '' : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select client" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No client</SelectItem>
+                  <SelectItem value="none">No client</SelectItem>
                   {clients.map(client => (
                     <SelectItem key={client.id} value={client.id}>
                       {client.name}
@@ -205,12 +205,12 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId }
           <div>
             <Label>Assign To</Label>
             <div className="space-y-2">
-              <Select value={assignedTo} onValueChange={(v) => { setAssignedTo(v); setAssignedClientName(''); }}>
+              <Select value={assignedTo || 'none'} onValueChange={(v) => { setAssignedTo(v === 'none' ? '' : v); setAssignedClientName(''); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select agency member..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Unassigned</SelectItem>
+                  <SelectItem value="none">Unassigned</SelectItem>
                   {agencyMembers.map(member => (
                     <SelectItem key={member.id} value={member.id}>
                       <div className="flex items-center gap-2">
