@@ -164,6 +164,8 @@ export default function PublicReport() {
             onRecordSelect={handleRecordSelect}
             selectedRecord={selectedRecord}
             selectedType={selectedType}
+            clientId={client?.id}
+            isPublicView={true}
           />
         )}
 
