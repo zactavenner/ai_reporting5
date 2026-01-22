@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -47,6 +47,7 @@ import {
   useTaskHistory,
   useAddTaskComment,
   useUploadTaskFile,
+  useAgencyMembers,
 } from '@/hooks/useTasks';
 
 interface TaskDetailModalProps {
@@ -62,6 +63,7 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName }: TaskDe
   const { data: comments = [] } = useTaskComments(task?.id);
   const { data: files = [] } = useTaskFiles(task?.id);
   const { data: history = [] } = useTaskHistory(task?.id);
+  const { data: agencyMembers = [] } = useAgencyMembers();
   const addComment = useAddTaskComment();
   const uploadFile = useUploadTaskFile();
   
@@ -69,22 +71,26 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName }: TaskDe
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
   const [status, setStatus] = useState('todo');
+  const [stage, setStage] = useState('backlog');
   const [dueDate, setDueDate] = useState<Date>();
+  const [assignedTo, setAssignedTo] = useState('');
   const [newComment, setNewComment] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Initialize form when task changes
-  useState(() => {
+  useEffect(() => {
     if (task) {
       setTitle(task.title);
       setDescription(task.description || '');
       setPriority(task.priority);
       setStatus(task.status);
+      setStage(task.stage);
       setDueDate(task.due_date ? new Date(task.due_date) : undefined);
+      setAssignedTo(task.assigned_to || '');
     }
-  });
+  }, [task]);
   
   if (!task) return null;
   
@@ -95,6 +101,8 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName }: TaskDe
       description: description || null,
       priority,
       status,
+      stage,
+      assigned_to: assignedTo || null,
       due_date: dueDate ? format(dueDate, 'yyyy-MM-dd') : null,
       completed_at: status === 'completed' ? new Date().toISOString() : null,
     });

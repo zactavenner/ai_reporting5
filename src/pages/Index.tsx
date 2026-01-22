@@ -10,7 +10,8 @@ import { AgencySettingsModal } from '@/components/settings/AgencySettingsModal';
 import { AddClientModal } from '@/components/settings/AddClientModal';
 import { DeleteClientDialog } from '@/components/settings/DeleteClientDialog';
 import { AgencyAIChat } from '@/components/ai/AgencyAIChat';
-import { AgencyTaskSummary } from '@/components/tasks/AgencyTaskSummary';
+import { AgencyChatInterface } from '@/components/chat/AgencyChatInterface';
+import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import { MetricsCustomizeModal } from '@/components/dashboard/MetricsCustomizeModal';
 import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal';
 import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
@@ -207,9 +208,22 @@ const Index = () => {
           )}
         </section>
 
-        {/* Task Overview */}
+        {/* AI Chat Interface */}
         <section>
-          <AgencyTaskSummary />
+          <h2 className="text-lg font-bold mb-2">AI Assistant</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Chat with AI about clients, metrics, and tasks. Create tasks with AI assistance.
+          </p>
+          <AgencyChatInterface
+            clients={clients}
+            clientMetrics={clientMetrics as Record<string, AggregatedMetrics>}
+            agencyMetrics={aggregatedMetrics}
+          />
+        </section>
+
+        {/* Project Management */}
+        <section>
+          <TaskBoardView />
         </section>
       </main>
 
