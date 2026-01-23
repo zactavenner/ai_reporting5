@@ -135,6 +135,20 @@ export function InlineRecordsView({
   // Filter showed calls from all calls
   const showedCalls = useMemo(() => calls.filter(c => c.showed), [calls]);
 
+  // Create a map of lead IDs to lead names for call display
+  const leadNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    leads.forEach(lead => {
+      map[lead.id] = lead.name || lead.email || lead.phone || 'Unknown';
+    });
+    return map;
+  }, [leads]);
+
+  const getLeadName = (leadId: string | null) => {
+    if (!leadId) return '-';
+    return leadNameMap[leadId] || '-';
+  };
+
   // Reset page when tab changes
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -851,8 +865,12 @@ export function InlineRecordsView({
                         <TableHead>Email</TableHead>
                         <TableHead>Phone</TableHead>
                         <TableHead>Source</TableHead>
+                        <TableHead>Campaign</TableHead>
+                        <TableHead>Ad Set</TableHead>
+                        <TableHead>Ad ID</TableHead>
                         <TableHead>Rep</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Questions</TableHead>
                         {clientId && <TableHead className="text-right">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
@@ -874,6 +892,15 @@ export function InlineRecordsView({
                           <TableCell>{lead.email || '-'}</TableCell>
                           <TableCell>{lead.phone || '-'}</TableCell>
                           <TableCell><Badge variant="outline">{lead.source}</Badge></TableCell>
+                          <TableCell className="max-w-[120px] truncate text-xs" title={lead.campaign_name || ''}>
+                            {lead.campaign_name || '-'}
+                          </TableCell>
+                          <TableCell className="max-w-[120px] truncate text-xs" title={lead.ad_set_name || ''}>
+                            {lead.ad_set_name || '-'}
+                          </TableCell>
+                          <TableCell className="max-w-[80px] truncate text-xs" title={lead.ad_id || ''}>
+                            {lead.ad_id || '-'}
+                          </TableCell>
                           <TableCell>{lead.assigned_user || '-'}</TableCell>
                           <TableCell>
                             {lead.is_spam ? (
@@ -881,6 +908,13 @@ export function InlineRecordsView({
                             ) : (
                               <Badge className="bg-green-600">{lead.status || 'new'}</Badge>
                             )}
+                          </TableCell>
+                          <TableCell>
+                            {lead.questions && Array.isArray(lead.questions) && lead.questions.length > 0 ? (
+                              <Badge variant="secondary" className="text-xs">
+                                {lead.questions.length} Q&A
+                              </Badge>
+                            ) : '-'}
                           </TableCell>
                           {clientId && (
                             <TableCell className="text-right">
@@ -936,6 +970,7 @@ export function InlineRecordsView({
                     <TableHeader>
                       <TableRow className="border-b-2">
                         <TableHead>Scheduled</TableHead>
+                        <TableHead>Contact</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Outcome</TableHead>
                         <TableHead>Type</TableHead>
@@ -959,6 +994,7 @@ export function InlineRecordsView({
                               ? new Date(call.scheduled_at).toLocaleString()
                               : '-'}
                           </TableCell>
+                          <TableCell className="font-medium">{getLeadName(call.lead_id)}</TableCell>
                           <TableCell>
                             {call.showed ? (
                               <Badge className="bg-green-600">Showed</Badge>
@@ -1031,6 +1067,7 @@ export function InlineRecordsView({
                     <TableHeader>
                       <TableRow className="border-b-2">
                         <TableHead>Scheduled</TableHead>
+                        <TableHead>Contact</TableHead>
                         <TableHead>Outcome</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead>Quality</TableHead>
@@ -1054,6 +1091,7 @@ export function InlineRecordsView({
                               ? new Date(call.scheduled_at).toLocaleString()
                               : '-'}
                           </TableCell>
+                          <TableCell className="font-medium">{getLeadName(call.lead_id)}</TableCell>
                           <TableCell>{call.outcome || '-'}</TableCell>
                           <TableCell>
                             {call.is_reconnect ? (

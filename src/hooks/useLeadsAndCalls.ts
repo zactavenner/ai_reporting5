@@ -28,6 +28,9 @@ export interface Lead {
   pipeline_value?: number | null;
   custom_fields?: Record<string, any> | null;
   questions?: any[] | null;
+  campaign_name?: string | null;
+  ad_set_name?: string | null;
+  ad_id?: string | null;
 }
 
 export interface Call {

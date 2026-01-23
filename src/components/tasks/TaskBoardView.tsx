@@ -17,13 +17,22 @@ import { CreateTaskModal } from './CreateTaskModal';
 interface TaskBoardViewProps {
   clientId?: string;
   onClose?: () => void;
+  isPublicView?: boolean;
 }
 
-export function TaskBoardView({ clientId, onClose }: TaskBoardViewProps) {
-  const { data: tasks = [] } = useAllTasks();
+export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskBoardViewProps) {
+  const { data: allTasks = [] } = useAllTasks();
   const { data: clients = [] } = useClients();
   const [view, setView] = useState<'kanban' | 'summary'>('kanban');
   const [showCreateTask, setShowCreateTask] = useState(false);
+
+  // In public view, only show tasks for the specific client
+  const tasks = clientId ? allTasks.filter(t => t.client_id === clientId) : allTasks;
+  
+  // In public view, only show this client in the clients list
+  const filteredClients = isPublicView && clientId 
+    ? clients.filter(c => c.id === clientId) 
+    : clients;
 
   return (
     <Card className="border-2 border-border">
@@ -34,18 +43,20 @@ export function TaskBoardView({ clientId, onClose }: TaskBoardViewProps) {
             Project Management
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Tabs value={view} onValueChange={(v) => setView(v as any)}>
-              <TabsList className="h-8">
-                <TabsTrigger value="summary" className="text-xs px-3 h-7">
-                  <List className="h-3 w-3 mr-1" />
-                  Summary
-                </TabsTrigger>
-                <TabsTrigger value="kanban" className="text-xs px-3 h-7">
-                  <LayoutGrid className="h-3 w-3 mr-1" />
-                  Kanban
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            {!isPublicView && (
+              <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+                <TabsList className="h-8">
+                  <TabsTrigger value="summary" className="text-xs px-3 h-7">
+                    <List className="h-3 w-3 mr-1" />
+                    Summary
+                  </TabsTrigger>
+                  <TabsTrigger value="kanban" className="text-xs px-3 h-7">
+                    <LayoutGrid className="h-3 w-3 mr-1" />
+                    Kanban
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            )}
             <Button size="sm" onClick={() => setShowCreateTask(true)}>
               <Plus className="h-4 w-4 mr-1" />
               Add Task
@@ -54,8 +65,8 @@ export function TaskBoardView({ clientId, onClose }: TaskBoardViewProps) {
         </div>
       </CardHeader>
       <CardContent>
-        {view === 'kanban' ? (
-          <KanbanBoard tasks={tasks} clients={clients} clientId={clientId} />
+        {view === 'kanban' || isPublicView ? (
+          <KanbanBoard tasks={tasks} clients={filteredClients} clientId={clientId} isPublicView={isPublicView} />
         ) : (
           <AgencyTaskSummary />
         )}
@@ -64,7 +75,7 @@ export function TaskBoardView({ clientId, onClose }: TaskBoardViewProps) {
       <CreateTaskModal
         open={showCreateTask}
         onOpenChange={setShowCreateTask}
-        clients={clients}
+        clients={filteredClients}
         defaultClientId={clientId}
       />
     </Card>

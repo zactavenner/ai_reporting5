@@ -171,7 +171,7 @@ export default function PublicReport() {
 
         {/* Tasks Section */}
         {activeSection === 'tasks' && client && (
-          <TaskBoardView clientId={client.id} />
+          <TaskBoardView clientId={client.id} isPublicView={true} />
         )}
 
         {/* Custom Embed Tabs */}

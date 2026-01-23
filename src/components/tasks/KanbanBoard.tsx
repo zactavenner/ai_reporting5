@@ -56,6 +56,7 @@ interface KanbanBoardProps {
   tasks: Task[];
   clients: Client[];
   clientId?: string;
+  isPublicView?: boolean;
 }
 
 const STAGES = [
@@ -66,7 +67,7 @@ const STAGES = [
   { id: 'done', label: 'Completed', color: 'bg-green-500/20' },
 ];
 
-export function KanbanBoard({ tasks, clients, clientId }: KanbanBoardProps) {
+export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: KanbanBoardProps) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [createTaskStage, setCreateTaskStage] = useState('todo');
@@ -191,8 +192,8 @@ export function KanbanBoard({ tasks, clients, clientId }: KanbanBoardProps) {
               />
             </div>
             
-            {/* Client Filter - only show if not already filtered by clientId prop */}
-            {!clientId && (
+            {/* Client Filter - only show if not in public view and not already filtered by clientId prop */}
+            {!clientId && !isPublicView && (
               <Select value={filterClientId} onValueChange={setFilterClientId}>
                 <SelectTrigger className="w-40">
                   <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -209,21 +210,23 @@ export function KanbanBoard({ tasks, clients, clientId }: KanbanBoardProps) {
               </Select>
             )}
             
-            {/* Assignee Filter */}
-            <Select value={filterAssigneeId} onValueChange={setFilterAssigneeId}>
-              <SelectTrigger className="w-40">
-                <Users className="h-4 w-4 mr-2 text-muted-foreground" />
-                <SelectValue placeholder="All Assignees" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Assignees</SelectItem>
-                {agencyMembers.map(member => (
-                  <SelectItem key={member.id} value={member.id}>
-                    {member.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Assignee Filter - hide in public view */}
+            {!isPublicView && (
+              <Select value={filterAssigneeId} onValueChange={setFilterAssigneeId}>
+                <SelectTrigger className="w-40">
+                  <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="All Assignees" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Assignees</SelectItem>
+                  {agencyMembers.map(member => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           
           <div className="flex items-center gap-2">
