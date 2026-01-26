@@ -14,6 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      agency_meetings: {
+        Row: {
+          action_items: Json | null
+          client_id: string | null
+          created_at: string
+          duration_minutes: number | null
+          id: string
+          meetgeek_url: string | null
+          meeting_date: string | null
+          meeting_id: string
+          participants: Json | null
+          recording_url: string | null
+          summary: string | null
+          title: string
+          transcript: string | null
+        }
+        Insert: {
+          action_items?: Json | null
+          client_id?: string | null
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          meetgeek_url?: string | null
+          meeting_date?: string | null
+          meeting_id: string
+          participants?: Json | null
+          recording_url?: string | null
+          summary?: string | null
+          title: string
+          transcript?: string | null
+        }
+        Update: {
+          action_items?: Json | null
+          client_id?: string | null
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          meetgeek_url?: string | null
+          meeting_date?: string | null
+          meeting_id?: string
+          participants?: Json | null
+          recording_url?: string | null
+          summary?: string | null
+          title?: string
+          transcript?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_meetings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agency_members: {
         Row: {
           created_at: string
@@ -49,6 +105,8 @@ export type Database = {
           created_at: string
           gemini_api_key: string | null
           id: string
+          meetgeek_api_key: string | null
+          meetgeek_webhook_secret: string | null
           openai_api_key: string | null
           updated_at: string
         }
@@ -59,6 +117,8 @@ export type Database = {
           created_at?: string
           gemini_api_key?: string | null
           id?: string
+          meetgeek_api_key?: string | null
+          meetgeek_webhook_secret?: string | null
           openai_api_key?: string | null
           updated_at?: string
         }
@@ -69,6 +129,8 @@ export type Database = {
           created_at?: string
           gemini_api_key?: string | null
           id?: string
+          meetgeek_api_key?: string | null
+          meetgeek_webhook_secret?: string | null
           openai_api_key?: string | null
           updated_at?: string
         }
@@ -871,6 +933,70 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pending_meeting_tasks: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          client_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          meeting_id: string
+          priority: string
+          status: string
+          task_id: string | null
+          title: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          client_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          meeting_id: string
+          priority?: string
+          status?: string
+          task_id?: string | null
+          title: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          client_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          meeting_id?: string
+          priority?: string
+          status?: string
+          task_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_meeting_tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_meeting_tasks_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "agency_meetings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_meeting_tasks_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]

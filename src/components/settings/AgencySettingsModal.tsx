@@ -13,7 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useAgencySettings, useUpdateAgencySettings } from '@/hooks/useAgencySettings';
-import { Brain, Settings2, Key, DollarSign, Eye, EyeOff } from 'lucide-react';
+import { useSyncMeetings } from '@/hooks/useMeetings';
+import { Brain, Settings2, Key, DollarSign, Eye, EyeOff, Video, Copy, RefreshCw } from 'lucide-react';
 
 interface AgencySettingsModalProps {
   open: boolean;
@@ -34,6 +35,13 @@ export function AgencySettingsModal({ open, onOpenChange }: AgencySettingsModalP
   const [apiUsageLimit, setApiUsageLimit] = useState('100');
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
   const [showGeminiKey, setShowGeminiKey] = useState(false);
+  
+  // MeetGeek Integration
+  const [meetgeekApiKey, setMeetgeekApiKey] = useState('');
+  const [showMeetgeekKey, setShowMeetgeekKey] = useState(false);
+  const syncMeetings = useSyncMeetings();
+  
+  const webhookUrl = `https://jgwwmtuvjlmzapwqiabu.supabase.co/functions/v1/meetgeek-webhook`;
 
   useEffect(() => {
     if (settings) {
@@ -42,6 +50,7 @@ export function AgencySettingsModal({ open, onOpenChange }: AgencySettingsModalP
       setOpenaiKey(settings.openai_api_key || '');
       setGeminiKey(settings.gemini_api_key || '');
       setApiUsageLimit(String(settings.api_usage_limit || 100));
+      setMeetgeekApiKey((settings as any).meetgeek_api_key || '');
     }
   }, [settings]);
 
@@ -54,7 +63,8 @@ export function AgencySettingsModal({ open, onOpenChange }: AgencySettingsModalP
         openai_api_key: openaiKey || null,
         gemini_api_key: geminiKey || null,
         api_usage_limit: parseFloat(apiUsageLimit) || 100,
-      });
+        meetgeek_api_key: meetgeekApiKey || null,
+      } as any);
       toast.success('Agency settings saved');
       onOpenChange(false);
     } catch (error) {
@@ -88,7 +98,7 @@ export function AgencySettingsModal({ open, onOpenChange }: AgencySettingsModalP
         </DialogHeader>
 
         <Tabs defaultValue="ai-prompts" className="mt-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="ai-prompts" className="flex items-center gap-2">
               <Brain className="h-4 w-4" />
               AI Prompts
@@ -96,6 +106,10 @@ export function AgencySettingsModal({ open, onOpenChange }: AgencySettingsModalP
             <TabsTrigger value="api-keys" className="flex items-center gap-2">
               <Key className="h-4 w-4" />
               API Keys
+            </TabsTrigger>
+            <TabsTrigger value="integrations" className="flex items-center gap-2">
+              <Video className="h-4 w-4" />
+              Integrations
             </TabsTrigger>
           </TabsList>
           
@@ -256,6 +270,90 @@ export function AgencySettingsModal({ open, onOpenChange }: AgencySettingsModalP
                 <li>OpenAI GPT-4: ~${(parseFloat(apiUsageLimit) * 0.7).toFixed(0)} allocated</li>
                 <li>Gemini Pro: ~${(parseFloat(apiUsageLimit) * 0.3).toFixed(0)} allocated</li>
               </ul>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="integrations" className="space-y-6 mt-4">
+            <div className="border-2 border-border p-4 space-y-4">
+              <div>
+                <h4 className="font-medium mb-1 flex items-center gap-2">
+                  <Video className="h-4 w-4" />
+                  MeetGeek.ai Integration
+                </h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Sync meeting recordings, transcripts, and action items automatically.
+                  Get your API key from{' '}
+                  <a 
+                    href="https://meetgeek.ai/settings/integrations" 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="text-primary underline"
+                  >
+                    MeetGeek Settings → Integrations → Public API
+                  </a>
+                </p>
+                
+                <Label htmlFor="meetgeekKey">API Key</Label>
+                <div className="relative mt-1">
+                  <Input
+                    id="meetgeekKey"
+                    type={showMeetgeekKey ? 'text' : 'password'}
+                    value={meetgeekApiKey}
+                    onChange={(e) => setMeetgeekApiKey(e.target.value)}
+                    placeholder="Your MeetGeek API key..."
+                    className="font-mono pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full"
+                    onClick={() => setShowMeetgeekKey(!showMeetgeekKey)}
+                  >
+                    {showMeetgeekKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="pt-2">
+                <Label>Webhook URL</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Copy this URL to MeetGeek under Settings → Integrations → Webhooks
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    value={webhookUrl}
+                    readOnly
+                    className="font-mono text-xs"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      navigator.clipboard.writeText(webhookUrl);
+                      toast.success('Webhook URL copied');
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => syncMeetings.mutate()}
+                  disabled={syncMeetings.isPending || !meetgeekApiKey}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${syncMeetings.isPending ? 'animate-spin' : ''}`} />
+                  {syncMeetings.isPending ? 'Syncing...' : 'Sync Recent Meetings'}
+                </Button>
+                {!meetgeekApiKey && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Enter your API key and save settings first
+                  </p>
+                )}
+              </div>
             </div>
           </TabsContent>
         </Tabs>
