@@ -8,6 +8,8 @@ export interface AgencySettings {
   openai_api_key: string | null;
   gemini_api_key: string | null;
   api_usage_limit: number;
+  meetgeek_api_key: string | null;
+  meetgeek_webhook_secret: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -32,6 +34,8 @@ export function useAgencySettings() {
           openai_api_key: null,
           gemini_api_key: null,
           api_usage_limit: 100,
+          meetgeek_api_key: null,
+          meetgeek_webhook_secret: null,
         } as AgencySettings;
       }
       

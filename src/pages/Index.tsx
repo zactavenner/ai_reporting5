@@ -17,12 +17,15 @@ import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal'
 import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
 import { FundedInvestorsDrillDownModal } from '@/components/drilldown/FundedInvestorsDrillDownModal';
 import { AdSpendDrillDownModal } from '@/components/drilldown/AdSpendDrillDownModal';
+import { MeetingsList } from '@/components/meetings/MeetingsList';
+import { PendingTasksReview } from '@/components/meetings/PendingTasksReview';
 import { Button } from '@/components/ui/button';
-import { Sliders } from 'lucide-react';
+import { Sliders, Video, CheckCircle, RefreshCw } from 'lucide-react';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics, AggregatedMetrics } from '@/hooks/useMetrics';
 import { useAllClientSettings, useAllClientFullSettings } from '@/hooks/useAllClientSettings';
 import { useAllClientMRR } from '@/hooks/useClientMRR';
+import { useMeetings, usePendingMeetingTasks, useSyncMeetings } from '@/hooks/useMeetings';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { exportToCSV } from '@/lib/exportUtils';
 import { useQueryClient } from '@tanstack/react-query';
@@ -37,6 +40,7 @@ const Index = () => {
   const [clientOrder, setClientOrder] = useState<string[]>([]);
   const [metricsCustomizeOpen, setMetricsCustomizeOpen] = useState(false);
   const [drillDownModal, setDrillDownModal] = useState<string | null>(null);
+  const [pendingTasksOpen, setPendingTasksOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { startDate, endDate } = useDateFilter();
@@ -48,6 +52,11 @@ const Index = () => {
   const { data: clientThresholds = {} } = useAllClientSettings(clientIds);
   const { data: clientFullSettings = {} } = useAllClientFullSettings(clientIds);
   const { data: clientMRRSettings = {} } = useAllClientMRR(clientIds);
+  
+  // Meetings data
+  const { data: meetings = [] } = useMeetings();
+  const { data: pendingTasks = [] } = usePendingMeetingTasks();
+  const syncMeetings = useSyncMeetings();
 
   const aggregatedMetrics = useMemo(() => {
     return aggregateMetrics(dailyMetrics, fundedInvestors);
@@ -214,6 +223,36 @@ const Index = () => {
           />
         </section>
 
+        {/* Meetings Section */}
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h2 className="text-lg font-bold">Recent Meetings</h2>
+              <p className="text-sm text-muted-foreground">
+                Synced from MeetGeek with action items
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {pendingTasks.length > 0 && (
+                <Button variant="outline" size="sm" onClick={() => setPendingTasksOpen(true)}>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  {pendingTasks.length} Pending Tasks
+                </Button>
+              )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => syncMeetings.mutate()}
+                disabled={syncMeetings.isPending}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${syncMeetings.isPending ? 'animate-spin' : ''}`} />
+                Sync
+              </Button>
+            </div>
+          </div>
+          <MeetingsList meetings={meetings} clients={clients} />
+        </section>
+
         {/* Project Management */}
         <section>
           <TaskBoardView />
@@ -277,6 +316,13 @@ const Index = () => {
       <AdSpendDrillDownModal
         open={drillDownModal === 'totalAdSpend'}
         onOpenChange={(open) => !open && setDrillDownModal(null)}
+      />
+
+      <PendingTasksReview
+        tasks={pendingTasks}
+        clients={clients}
+        open={pendingTasksOpen}
+        onOpenChange={setPendingTasksOpen}
       />
     </div>
   );

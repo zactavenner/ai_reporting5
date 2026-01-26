@@ -14,6 +14,7 @@ import {
   Video,
   FileText,
   Filter,
+  CheckSquare,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -30,7 +31,7 @@ interface ActivityFeedProps {
   creatives: Creative[];
 }
 
-type ActivityType = 'task_created' | 'task_completed' | 'creative_uploaded' | 'creative_approved' | 'creative_launched';
+type ActivityType = 'task_created' | 'task_completed' | 'creative_uploaded' | 'creative_approved' | 'creative_launched' | 'meeting_synced' | 'meeting_task_created';
 
 interface Activity {
   id: string;
@@ -50,6 +51,8 @@ const ACTIVITY_CONFIG: Record<ActivityType, { icon: typeof CheckCircle2; label: 
   creative_uploaded: { icon: Upload, label: 'Creative Uploaded', color: 'text-purple-500' },
   creative_approved: { icon: ThumbsUp, label: 'Creative Approved', color: 'text-emerald-500' },
   creative_launched: { icon: Rocket, label: 'Creative Launched', color: 'text-orange-500' },
+  meeting_synced: { icon: Video, label: 'Meeting Synced', color: 'text-indigo-500' },
+  meeting_task_created: { icon: CheckSquare, label: 'Task from Meeting', color: 'text-cyan-500' },
 };
 
 export function ActivityFeed({ tasks, creatives }: ActivityFeedProps) {
