@@ -12,6 +12,7 @@ import { InlineRecordsView } from '@/components/dashboard/InlineRecordsView';
 import { CreativeApproval } from '@/components/creative/CreativeApproval';
 import { AIAnalysisChat } from '@/components/ai/AIAnalysisChat';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
+import { AttributionDashboard } from '@/components/dashboard/AttributionDashboard';
 import { Button } from '@/components/ui/button';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { useQueryClient } from '@tanstack/react-query';
@@ -142,6 +143,12 @@ export default function PublicReport() {
             </section>
 
             <PeriodicStatsTable dailyMetrics={dailyMetrics} />
+
+            <AttributionDashboard 
+              leads={leads} 
+              calls={calls} 
+              fundedInvestors={fundedInvestors} 
+            />
 
             <MetricChartsGrid dailyMetrics={dailyMetrics} />
 

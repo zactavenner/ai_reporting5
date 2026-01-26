@@ -6,13 +6,15 @@ import {
   LayoutGrid, 
   List, 
   Plus,
-  ChevronRight,
+  Activity,
 } from 'lucide-react';
 import { useAllTasks, Task } from '@/hooks/useTasks';
 import { useClients, Client } from '@/hooks/useClients';
+import { useCreatives } from '@/hooks/useCreatives';
 import { KanbanBoard } from './KanbanBoard';
 import { AgencyTaskSummary } from './AgencyTaskSummary';
 import { CreateTaskModal } from './CreateTaskModal';
+import { ActivityFeed } from './ActivityFeed';
 
 interface TaskBoardViewProps {
   clientId?: string;
@@ -23,7 +25,8 @@ interface TaskBoardViewProps {
 export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskBoardViewProps) {
   const { data: allTasks = [] } = useAllTasks();
   const { data: clients = [] } = useClients();
-  const [view, setView] = useState<'kanban' | 'summary'>('kanban');
+  const { data: creatives = [] } = useCreatives(clientId);
+  const [view, setView] = useState<'kanban' | 'summary' | 'activity'>('kanban');
   const [showCreateTask, setShowCreateTask] = useState(false);
 
   // In public view, only show tasks for the specific client
@@ -43,20 +46,24 @@ export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskB
             Project Management
           </CardTitle>
           <div className="flex items-center gap-2">
-            {!isPublicView && (
-              <Tabs value={view} onValueChange={(v) => setView(v as any)}>
-                <TabsList className="h-8">
+            <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+              <TabsList className="h-8">
+                {!isPublicView && (
                   <TabsTrigger value="summary" className="text-xs px-3 h-7">
                     <List className="h-3 w-3 mr-1" />
                     Summary
                   </TabsTrigger>
-                  <TabsTrigger value="kanban" className="text-xs px-3 h-7">
-                    <LayoutGrid className="h-3 w-3 mr-1" />
-                    Kanban
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            )}
+                )}
+                <TabsTrigger value="kanban" className="text-xs px-3 h-7">
+                  <LayoutGrid className="h-3 w-3 mr-1" />
+                  Kanban
+                </TabsTrigger>
+                <TabsTrigger value="activity" className="text-xs px-3 h-7">
+                  <Activity className="h-3 w-3 mr-1" />
+                  Activity
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
             <Button size="sm" onClick={() => setShowCreateTask(true)}>
               <Plus className="h-4 w-4 mr-1" />
               Add Task
@@ -65,8 +72,10 @@ export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskB
         </div>
       </CardHeader>
       <CardContent>
-        {view === 'kanban' || isPublicView ? (
+        {view === 'kanban' ? (
           <KanbanBoard tasks={tasks} clients={filteredClients} clientId={clientId} isPublicView={isPublicView} />
+        ) : view === 'activity' ? (
+          <ActivityFeed tasks={tasks} creatives={creatives} />
         ) : (
           <AgencyTaskSummary />
         )}

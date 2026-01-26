@@ -9,6 +9,7 @@ import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { MetricChartsGrid } from '@/components/dashboard/MetricChartsGrid';
 import { PeriodicStatsTable } from '@/components/dashboard/PeriodicStatsTable';
 import { InlineRecordsView } from '@/components/dashboard/InlineRecordsView';
+import { AttributionDashboard } from '@/components/dashboard/AttributionDashboard';
 import { ClientSettingsModal } from '@/components/settings/ClientSettingsModal';
 import { ShareableLinkButton } from '@/components/dashboard/ShareableLinkButton';
 import { CSVImportModal, ImportType } from '@/components/import/CSVImportModal';
@@ -283,6 +284,12 @@ export default function ClientDetail() {
             </section>
 
             <PeriodicStatsTable dailyMetrics={dailyMetrics} />
+
+            <AttributionDashboard 
+              leads={leads} 
+              calls={calls} 
+              fundedInvestors={fundedInvestors} 
+            />
 
             <MetricChartsGrid dailyMetrics={dailyMetrics} />
 

@@ -247,10 +247,6 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
                 </>
               )}
             </Button>
-            <Button size="sm" onClick={() => handleAddTask('todo')}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Task
-            </Button>
           </div>
         </div>
 
