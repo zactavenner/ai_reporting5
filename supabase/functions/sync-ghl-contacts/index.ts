@@ -100,8 +100,15 @@ function parseCustomFields(customFields: any[] | undefined): Record<string, any>
 
 function extractQuestionsFromCustomFields(customFields: Record<string, any>): any[] {
   const questions: any[] = [];
+  // Skip these fields as they're not actual questions
+  const skipFields = new Set([
+    'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
+    'campaign_name', 'ad_set_name', 'ad_id', 'assigned_user', 'source',
+    'Campaign Tracker', 'UTM Source', 'UTM Medium', 'UTM Campaign', 'UTM Content', 'UTM Term'
+  ]);
+  
   for (const [key, value] of Object.entries(customFields)) {
-    if (value !== null && value !== undefined && value !== '') {
+    if (value !== null && value !== undefined && value !== '' && !skipFields.has(key)) {
       questions.push({
         question: key,
         answer: value,
@@ -110,6 +117,50 @@ function extractQuestionsFromCustomFields(customFields: Record<string, any>): an
     }
   }
   return questions;
+}
+
+function extractCampaignAttribution(contact: GHLContact, customFields: Record<string, any>): {
+  campaign_name: string | null;
+  ad_set_name: string | null;
+  ad_id: string | null;
+} {
+  // Try multiple field names for campaign
+  const campaignFields = ['Campaign Tracker', 'campaign', 'campaign_name', 'utm_campaign'];
+  const adSetFields = ['Ad Set', 'ad_set', 'ad_set_name', 'adset_name'];
+  const adIdFields = ['Ad ID', 'ad_id', 'adId'];
+  
+  let campaign_name: string | null = null;
+  let ad_set_name: string | null = null;
+  let ad_id: string | null = null;
+  
+  // Check custom fields first
+  for (const field of campaignFields) {
+    if (customFields[field]) {
+      campaign_name = String(customFields[field]);
+      break;
+    }
+  }
+  
+  for (const field of adSetFields) {
+    if (customFields[field]) {
+      ad_set_name = String(customFields[field]);
+      break;
+    }
+  }
+  
+  for (const field of adIdFields) {
+    if (customFields[field]) {
+      ad_id = String(customFields[field]);
+      break;
+    }
+  }
+  
+  // Fallback to UTM campaign from attribution source
+  if (!campaign_name && contact.attributionSource?.utm_campaign) {
+    campaign_name = contact.attributionSource.utm_campaign;
+  }
+  
+  return { campaign_name, ad_set_name, ad_id };
 }
 
 async function syncContactToDatabase(
@@ -124,6 +175,7 @@ async function syncContactToDatabase(
   
   const customFields = parseCustomFields(contact.customFields);
   const questions = extractQuestionsFromCustomFields(customFields);
+  const campaignAttribution = extractCampaignAttribution(contact, customFields);
   
   // Extract UTMs from attribution
   const attribution = contact.attributionSource || {};
@@ -150,6 +202,9 @@ async function syncContactToDatabase(
     utm_campaign: attribution.utm_campaign || null,
     utm_content: attribution.utm_content || null,
     utm_term: attribution.utm_term || null,
+    campaign_name: campaignAttribution.campaign_name,
+    ad_set_name: campaignAttribution.ad_set_name,
+    ad_id: campaignAttribution.ad_id,
     updated_at: new Date().toISOString(),
   };
 
