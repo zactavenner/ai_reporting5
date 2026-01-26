@@ -64,11 +64,18 @@ export function useLeads(clientId?: string, startDate?: string, endDate?: string
         query = query.eq('client_id', clientId);
       }
 
+      // Use full timestamp with timezone to ensure proper filtering
+      // startDate at local midnight = startDate + 'T00:00:00' in local time
+      // We append local timezone offset to ensure correct UTC conversion
       if (startDate) {
-        query = query.gte('created_at', startDate);
+        // Create date at start of local day and convert to ISO string
+        const startLocal = new Date(startDate + 'T00:00:00');
+        query = query.gte('created_at', startLocal.toISOString());
       }
       if (endDate) {
-        query = query.lte('created_at', endDate + 'T23:59:59');
+        // Create date at end of local day (23:59:59.999) and convert to ISO string
+        const endLocal = new Date(endDate + 'T23:59:59.999');
+        query = query.lte('created_at', endLocal.toISOString());
       }
       
       const { data, error } = await query;
@@ -95,11 +102,14 @@ export function useCalls(clientId?: string, showedOnly?: boolean, startDate?: st
         query = query.eq('showed', true);
       }
 
+      // Use full timestamp with timezone to ensure proper filtering
       if (startDate) {
-        query = query.gte('created_at', startDate);
+        const startLocal = new Date(startDate + 'T00:00:00');
+        query = query.gte('created_at', startLocal.toISOString());
       }
       if (endDate) {
-        query = query.lte('created_at', endDate + 'T23:59:59');
+        const endLocal = new Date(endDate + 'T23:59:59.999');
+        query = query.lte('created_at', endLocal.toISOString());
       }
       
       const { data, error } = await query;
