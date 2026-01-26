@@ -315,6 +315,7 @@ export default function ClientDetail() {
             selectedRecord={selectedRecord}
             selectedType={selectedType}
             clientId={clientId}
+            ghlLocationId={client.ghl_location_id}
           />
         )}
 

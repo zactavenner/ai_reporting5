@@ -42,6 +42,7 @@ import {
   CheckCircle,
   RefreshCw,
   Handshake,
+  ExternalLink,
 } from 'lucide-react';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
 import { exportToCSV } from '@/lib/exportUtils';
@@ -95,7 +96,13 @@ interface InlineRecordsViewProps {
   selectedType?: string;
   clientId?: string;
   isPublicView?: boolean;
+  ghlLocationId?: string | null;
 }
+
+// GHL contact link URL builder
+const getGHLContactUrl = (locationId: string, contactId: string) => {
+  return `https://app.gohighlevel.com/location/${locationId}/contacts/detail/${contactId}`;
+};
 
 const PAGE_SIZE = 150;
 
@@ -112,6 +119,7 @@ export function InlineRecordsView({
   selectedType,
   clientId,
   isPublicView = false,
+  ghlLocationId,
 }: InlineRecordsViewProps) {
   const [activeTab, setActiveTab] = useState<TabType>('adspend');
   const [searchQuery, setSearchQuery] = useState('');
@@ -901,7 +909,7 @@ export function InlineRecordsView({
       </TableCell>
       <TableCell>
         {call.showed ? (
-          <Badge className="bg-green-600">Showed</Badge>
+          <Badge className="bg-chart-2 text-chart-2-foreground">Showed</Badge>
         ) : (
           <Badge variant="secondary">No Show</Badge>
         )}
@@ -910,6 +918,21 @@ export function InlineRecordsView({
       <TableCell className="font-mono text-sm">
         {new Date(call.created_at).toLocaleDateString()}
       </TableCell>
+      {ghlLocationId && (
+        <TableCell>
+          {call.external_id && !call.external_id.startsWith('wh_') && !call.external_id.startsWith('manual-') ? (
+            <a 
+              href={getGHLContactUrl(ghlLocationId, call.external_id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline flex items-center gap-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          ) : '-'}
+        </TableCell>
+      )}
       {clientId && (
         <TableCell className="text-right">
           <div className="flex justify-end gap-1">
@@ -965,6 +988,7 @@ export function InlineRecordsView({
             <TableHead>Showed</TableHead>
             <TableHead>Outcome</TableHead>
             <TableHead>Created</TableHead>
+            {ghlLocationId && <TableHead>GHL</TableHead>}
             {clientId && <TableHead className="text-right">Actions</TableHead>}
           </TableRow>
         </TableHeader>
@@ -1176,6 +1200,7 @@ export function InlineRecordsView({
                         <TableHead>Rep</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Questions</TableHead>
+                        {ghlLocationId && <TableHead>GHL</TableHead>}
                         {clientId && <TableHead className="text-right">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
@@ -1211,7 +1236,7 @@ export function InlineRecordsView({
                             {lead.is_spam ? (
                               <Badge variant="destructive">Spam</Badge>
                             ) : (
-                              <Badge className="bg-green-600">{lead.status || 'new'}</Badge>
+                              <Badge className="bg-chart-2 text-chart-2-foreground">{lead.status || 'new'}</Badge>
                             )}
                           </TableCell>
                           <TableCell>
@@ -1221,6 +1246,21 @@ export function InlineRecordsView({
                               </Badge>
                             ) : '-'}
                           </TableCell>
+                          {ghlLocationId && (
+                            <TableCell>
+                              {lead.external_id && !lead.external_id.startsWith('wh_') && !lead.external_id.startsWith('manual-') ? (
+                                <a 
+                                  href={getGHLContactUrl(ghlLocationId, lead.external_id)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline flex items-center gap-1"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ) : '-'}
+                            </TableCell>
+                          )}
                           {clientId && (
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
@@ -1299,6 +1339,7 @@ export function InlineRecordsView({
                         <TableHead>Date</TableHead>
                         <TableHead className="text-right">Time to Commit</TableHead>
                         <TableHead className="text-right">Calls</TableHead>
+                        {ghlLocationId && <TableHead>GHL</TableHead>}
                         {clientId && <TableHead className="text-right">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
@@ -1324,6 +1365,21 @@ export function InlineRecordsView({
                             {investor.time_to_fund_days !== null ? `${investor.time_to_fund_days}d` : '-'}
                           </TableCell>
                           <TableCell className="text-right font-mono">{investor.calls_to_fund || 0}</TableCell>
+                          {ghlLocationId && (
+                            <TableCell>
+                              {investor.external_id && !investor.external_id.startsWith('wh_') && !investor.external_id.startsWith('manual-') ? (
+                                <a 
+                                  href={getGHLContactUrl(ghlLocationId, investor.external_id)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline flex items-center gap-1"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ) : '-'}
+                            </TableCell>
+                          )}
                           {clientId && (
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
@@ -1382,6 +1438,7 @@ export function InlineRecordsView({
                         <TableHead>Funded Date</TableHead>
                         <TableHead className="text-right">Time to Fund</TableHead>
                         <TableHead className="text-right">Calls</TableHead>
+                        {ghlLocationId && <TableHead>GHL</TableHead>}
                         {clientId && <TableHead className="text-right">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
@@ -1407,6 +1464,21 @@ export function InlineRecordsView({
                             {investor.time_to_fund_days !== null ? `${investor.time_to_fund_days}d` : '-'}
                           </TableCell>
                           <TableCell className="text-right font-mono">{investor.calls_to_fund || 0}</TableCell>
+                          {ghlLocationId && (
+                            <TableCell>
+                              {investor.external_id && !investor.external_id.startsWith('wh_') && !investor.external_id.startsWith('manual-') ? (
+                                <a 
+                                  href={getGHLContactUrl(ghlLocationId, investor.external_id)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline flex items-center gap-1"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ) : '-'}
+                            </TableCell>
+                          )}
                           {clientId && (
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">

@@ -29,6 +29,9 @@ interface KPIMetrics {
   reconnectShowed?: number;
   closeRate?: number;
   pipelineValue?: number;
+  // Additional cost metrics
+  costPerReconnectCall?: number;
+  costPerReconnectShowed?: number;
 }
 
 export interface KPIThresholds {
@@ -68,7 +71,9 @@ export function KPIGrid({
     { key: 'showedPercent', label: 'Show Rate', value: metrics.showedPercent ?? 0, format: 'percent' as const, change: 0 },
     { key: 'costPerShow', label: 'Cost Per Show', value: metrics.costPerShow ?? 0, format: 'currency' as const, change: 0, threshold: thresholds?.costPerShow },
     { key: 'reconnectCalls', label: 'Reconnect Calls', value: metrics.reconnectCalls ?? 0, format: 'number' as const, change: 0 },
+    { key: 'costPerReconnectCall', label: '$/Reconnect', value: metrics.costPerReconnectCall ?? 0, format: 'currency' as const, change: 0 },
     { key: 'reconnectShowed', label: 'Reconnect Showed', value: metrics.reconnectShowed ?? 0, format: 'number' as const, change: 0 },
+    { key: 'costPerReconnectShowed', label: '$/Recon Showed', value: metrics.costPerReconnectShowed ?? 0, format: 'currency' as const, change: 0 },
     { key: 'closeRate', label: 'Close Rate', value: metrics.closeRate ?? 0, format: 'percent' as const, change: 0 },
     { key: 'commitments', label: 'Commitments', value: metrics.commitments ?? metrics.totalCommitments ?? 0, format: 'number' as const, change: 0, clickable: true },
     { key: 'commitmentDollars', label: 'Commitment $', value: metrics.commitmentDollars ?? 0, format: 'currency' as const, change: 0 },

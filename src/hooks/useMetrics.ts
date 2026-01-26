@@ -59,6 +59,9 @@ export interface AggregatedMetrics {
   reconnectShowed: number;
   closeRate: number;
   pipelineValue: number;
+  // Additional cost metrics
+  costPerReconnectCall: number;
+  costPerReconnectShowed: number;
 }
 
 export function useDailyMetrics(clientId: string | undefined, startDate?: string, endDate?: string) {
@@ -220,5 +223,8 @@ export function aggregateMetrics(dailyMetrics: DailyMetric[], fundedInvestors: F
     reconnectShowed: totals.reconnectShowed,
     closeRate,
     pipelineValue,
+    // Additional cost metrics
+    costPerReconnectCall: totals.reconnectCalls > 0 ? totals.totalAdSpend / totals.reconnectCalls : 0,
+    costPerReconnectShowed: totals.reconnectShowed > 0 ? totals.totalAdSpend / totals.reconnectShowed : 0,
   };
 }

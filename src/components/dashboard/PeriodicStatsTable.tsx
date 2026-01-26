@@ -27,8 +27,11 @@ interface PeriodStats {
   costPerCall: number;
   showedCalls: number;
   showRate: number;
+  costPerShow: number;
   reconnectCalls: number;
+  costPerReconnect: number;
   reconnectShowed: number;
+  costPerReconnectShowed: number;
   commitments: number;
   commitmentDollars: number;
   fundedInvestors: number;
@@ -117,8 +120,11 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
         costPerCall: totals.calls > 0 ? totals.adSpend / totals.calls : 0,
         showedCalls: totals.showedCalls,
         showRate: totals.calls > 0 ? (totals.showedCalls / totals.calls) * 100 : 0,
+        costPerShow: totals.showedCalls > 0 ? totals.adSpend / totals.showedCalls : 0,
         reconnectCalls: totals.reconnectCalls,
+        costPerReconnect: totals.reconnectCalls > 0 ? totals.adSpend / totals.reconnectCalls : 0,
         reconnectShowed: totals.reconnectShowed,
+        costPerReconnectShowed: totals.reconnectShowed > 0 ? totals.adSpend / totals.reconnectShowed : 0,
         commitments: totals.commitments,
         commitmentDollars: totals.commitmentDollars,
         fundedInvestors: totals.fundedInvestors,
@@ -163,6 +169,9 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
       cpl: t.leads > 0 ? t.adSpend / t.leads : 0,
       costPerCall: t.calls > 0 ? t.adSpend / t.calls : 0,
       showRate: t.calls > 0 ? (t.showedCalls / t.calls) * 100 : 0,
+      costPerShow: t.showedCalls > 0 ? t.adSpend / t.showedCalls : 0,
+      costPerReconnect: t.reconnectCalls > 0 ? t.adSpend / t.reconnectCalls : 0,
+      costPerReconnectShowed: t.reconnectShowed > 0 ? t.adSpend / t.reconnectShowed : 0,
       costPerInvestor: t.fundedInvestors > 0 ? t.adSpend / t.fundedInvestors : 0,
       costOfCapital: t.fundedDollars > 0 ? (t.adSpend / t.fundedDollars) * 100 : 0,
     };
@@ -228,8 +237,11 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
               <TableHead className="font-bold text-right whitespace-nowrap">$/Call</TableHead>
               <TableHead className="font-bold text-right whitespace-nowrap">Showed</TableHead>
               <TableHead className="font-bold text-right whitespace-nowrap">Show %</TableHead>
+              <TableHead className="font-bold text-right whitespace-nowrap">$/Show</TableHead>
               <TableHead className="font-bold text-right whitespace-nowrap">Recon</TableHead>
-              <TableHead className="font-bold text-right whitespace-nowrap">Recon Showed</TableHead>
+              <TableHead className="font-bold text-right whitespace-nowrap">$/Recon</TableHead>
+              <TableHead className="font-bold text-right whitespace-nowrap">Recon Shwd</TableHead>
+              <TableHead className="font-bold text-right whitespace-nowrap">$/R.Shwd</TableHead>
               <TableHead className="font-bold text-right whitespace-nowrap">Commits</TableHead>
               <TableHead className="font-bold text-right whitespace-nowrap">Commit $</TableHead>
               <TableHead className="font-bold text-right whitespace-nowrap">Funded #</TableHead>
@@ -249,8 +261,11 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
               <TableCell className="text-right font-mono">${totals.costPerCall.toFixed(2)}</TableCell>
               <TableCell className="text-right font-mono">{totals.showedCalls.toLocaleString()}</TableCell>
               <TableCell className="text-right font-mono">{totals.showRate.toFixed(1)}%</TableCell>
+              <TableCell className="text-right font-mono">${totals.costPerShow.toFixed(2)}</TableCell>
               <TableCell className="text-right font-mono">{totals.reconnectCalls.toLocaleString()}</TableCell>
+              <TableCell className="text-right font-mono">${totals.costPerReconnect.toFixed(2)}</TableCell>
               <TableCell className="text-right font-mono">{totals.reconnectShowed.toLocaleString()}</TableCell>
+              <TableCell className="text-right font-mono">${totals.costPerReconnectShowed.toFixed(2)}</TableCell>
               <TableCell className="text-right font-mono">{totals.commitments.toLocaleString()}</TableCell>
               <TableCell className="text-right font-mono">${totals.commitmentDollars.toLocaleString()}</TableCell>
               <TableCell className="text-right font-mono">{totals.fundedInvestors.toLocaleString()}</TableCell>
@@ -269,8 +284,11 @@ export function PeriodicStatsTable({ dailyMetrics }: PeriodicStatsTableProps) {
                 <TableCell className="text-right font-mono">${period.costPerCall.toFixed(2)}</TableCell>
                 <TableCell className="text-right font-mono">{period.showedCalls}</TableCell>
                 <TableCell className="text-right font-mono">{period.showRate.toFixed(1)}%</TableCell>
+                <TableCell className="text-right font-mono">${period.costPerShow.toFixed(2)}</TableCell>
                 <TableCell className="text-right font-mono">{period.reconnectCalls}</TableCell>
+                <TableCell className="text-right font-mono">${period.costPerReconnect.toFixed(2)}</TableCell>
                 <TableCell className="text-right font-mono">{period.reconnectShowed}</TableCell>
+                <TableCell className="text-right font-mono">${period.costPerReconnectShowed.toFixed(2)}</TableCell>
                 <TableCell className="text-right font-mono">{period.commitments}</TableCell>
                 <TableCell className="text-right font-mono">${period.commitmentDollars.toLocaleString()}</TableCell>
                 <TableCell className="text-right font-mono">{period.fundedInvestors}</TableCell>
