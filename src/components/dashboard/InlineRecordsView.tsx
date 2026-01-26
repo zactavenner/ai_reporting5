@@ -40,6 +40,8 @@ import {
   PhoneIncoming,
   PhoneOutgoing,
   CheckCircle,
+  RefreshCw,
+  Handshake,
 } from 'lucide-react';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
 import { exportToCSV } from '@/lib/exportUtils';
@@ -79,6 +81,7 @@ interface FundedInvestor {
   lead_id: string | null;
   client_id?: string;
   external_id?: string;
+  commitment_amount?: number | null;
 }
 
 interface InlineRecordsViewProps {
@@ -96,6 +99,8 @@ interface InlineRecordsViewProps {
 
 const PAGE_SIZE = 150;
 
+type TabType = 'adspend' | 'leads' | 'booked' | 'showed' | 'reconnect' | 'reconnect-showed' | 'commitments' | 'funded';
+
 export function InlineRecordsView({
   dailyMetrics,
   leads,
@@ -108,11 +113,10 @@ export function InlineRecordsView({
   clientId,
   isPublicView = false,
 }: InlineRecordsViewProps) {
-  const [activeTab, setActiveTab] = useState('leads');
+  const [activeTab, setActiveTab] = useState<TabType>('adspend');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [repFilter, setRepFilter] = useState<string>('all');
-  const [callTypeFilter, setCallTypeFilter] = useState<string>('all');
   const queryClient = useQueryClient();
 
   // Modal states
@@ -132,8 +136,23 @@ export function InlineRecordsView({
     return Array.from(reps);
   }, [leads]);
 
-  // Filter showed calls from all calls
-  const showedCalls = useMemo(() => calls.filter(c => c.showed), [calls]);
+  // Separate call types into distinct arrays
+  const bookedCalls = useMemo(() => 
+    calls.filter(c => !c.is_reconnect), [calls]);
+
+  const showedCalls = useMemo(() => 
+    bookedCalls.filter(c => c.showed), [bookedCalls]);
+
+  const reconnectCalls = useMemo(() => 
+    calls.filter(c => c.is_reconnect && !c.showed), [calls]);
+
+  const reconnectShowedCalls = useMemo(() => 
+    calls.filter(c => c.is_reconnect && c.showed), [calls]);
+
+  // Commitments from funded_investors with commitment_amount > 0
+  const commitments = useMemo(() => 
+    fundedInvestors.filter(f => f.commitment_amount && f.commitment_amount > 0), 
+    [fundedInvestors]);
 
   // Create a map of lead IDs to lead names for call display
   const leadNameMap = useMemo(() => {
@@ -151,11 +170,10 @@ export function InlineRecordsView({
 
   // Reset page when tab changes
   const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
+    setActiveTab(tab as TabType);
     setCurrentPage(1);
     setSearchQuery('');
     setRepFilter('all');
-    setCallTypeFilter('all');
   };
 
   // Filter data based on search and filters
@@ -176,8 +194,8 @@ export function InlineRecordsView({
     return result;
   }, [leads, searchQuery, repFilter]);
 
-  const filteredCalls = useMemo(() => {
-    let result = calls;
+  const filteredBookedCalls = useMemo(() => {
+    let result = bookedCalls;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter((call) =>
@@ -185,13 +203,8 @@ export function InlineRecordsView({
         (call.scheduled_at?.includes(query))
       );
     }
-    if (callTypeFilter === 'reconnect') {
-      result = result.filter(c => c.is_reconnect);
-    } else if (callTypeFilter === 'initial') {
-      result = result.filter(c => !c.is_reconnect);
-    }
     return result;
-  }, [calls, searchQuery, callTypeFilter]);
+  }, [bookedCalls, searchQuery]);
 
   const filteredShowedCalls = useMemo(() => {
     let result = showedCalls;
@@ -202,13 +215,32 @@ export function InlineRecordsView({
         (call.scheduled_at?.includes(query))
       );
     }
-    if (callTypeFilter === 'reconnect') {
-      result = result.filter(c => c.is_reconnect);
-    } else if (callTypeFilter === 'initial') {
-      result = result.filter(c => !c.is_reconnect);
+    return result;
+  }, [showedCalls, searchQuery]);
+
+  const filteredReconnectCalls = useMemo(() => {
+    let result = reconnectCalls;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((call) =>
+        (call.outcome?.toLowerCase().includes(query)) ||
+        (call.scheduled_at?.includes(query))
+      );
     }
     return result;
-  }, [showedCalls, searchQuery, callTypeFilter]);
+  }, [reconnectCalls, searchQuery]);
+
+  const filteredReconnectShowedCalls = useMemo(() => {
+    let result = reconnectShowedCalls;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((call) =>
+        (call.outcome?.toLowerCase().includes(query)) ||
+        (call.scheduled_at?.includes(query))
+      );
+    }
+    return result;
+  }, [reconnectShowedCalls, searchQuery]);
 
   const filteredAdSpend = useMemo(() => {
     if (!searchQuery) return dailyMetrics;
@@ -217,6 +249,14 @@ export function InlineRecordsView({
       m.date.includes(query)
     );
   }, [dailyMetrics, searchQuery]);
+
+  const filteredCommitments = useMemo(() => {
+    if (!searchQuery) return commitments;
+    const query = searchQuery.toLowerCase();
+    return commitments.filter((f) =>
+      (f.name?.toLowerCase().includes(query))
+    );
+  }, [commitments, searchQuery]);
 
   const filteredFunded = useMemo(() => {
     if (!searchQuery) return fundedInvestors;
@@ -229,29 +269,38 @@ export function InlineRecordsView({
   // Get current data length based on tab
   const currentDataLength = useMemo(() => {
     switch (activeTab) {
-      case 'leads': return filteredLeads.length;
-      case 'calls': return filteredCalls.length;
-      case 'showed': return filteredShowedCalls.length;
       case 'adspend': return filteredAdSpend.length;
+      case 'leads': return filteredLeads.length;
+      case 'booked': return filteredBookedCalls.length;
+      case 'showed': return filteredShowedCalls.length;
+      case 'reconnect': return filteredReconnectCalls.length;
+      case 'reconnect-showed': return filteredReconnectShowedCalls.length;
+      case 'commitments': return filteredCommitments.length;
       case 'funded': return filteredFunded.length;
       default: return 0;
     }
-  }, [activeTab, filteredLeads.length, filteredCalls.length, filteredShowedCalls.length, filteredAdSpend.length, filteredFunded.length]);
+  }, [activeTab, filteredAdSpend.length, filteredLeads.length, filteredBookedCalls.length, filteredShowedCalls.length, filteredReconnectCalls.length, filteredReconnectShowedCalls.length, filteredCommitments.length, filteredFunded.length]);
 
   const totalPages = Math.ceil(currentDataLength / PAGE_SIZE);
   
   // Paginate each dataset separately
+  const paginatedAdSpend = useMemo(() => {
+    if (activeTab !== 'adspend') return [];
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredAdSpend.slice(start, start + PAGE_SIZE);
+  }, [filteredAdSpend, currentPage, activeTab]);
+
   const paginatedLeads = useMemo(() => {
     if (activeTab !== 'leads') return [];
     const start = (currentPage - 1) * PAGE_SIZE;
     return filteredLeads.slice(start, start + PAGE_SIZE);
   }, [filteredLeads, currentPage, activeTab]);
 
-  const paginatedCalls = useMemo(() => {
-    if (activeTab !== 'calls') return [];
+  const paginatedBookedCalls = useMemo(() => {
+    if (activeTab !== 'booked') return [];
     const start = (currentPage - 1) * PAGE_SIZE;
-    return filteredCalls.slice(start, start + PAGE_SIZE);
-  }, [filteredCalls, currentPage, activeTab]);
+    return filteredBookedCalls.slice(start, start + PAGE_SIZE);
+  }, [filteredBookedCalls, currentPage, activeTab]);
 
   const paginatedShowedCalls = useMemo(() => {
     if (activeTab !== 'showed') return [];
@@ -259,11 +308,23 @@ export function InlineRecordsView({
     return filteredShowedCalls.slice(start, start + PAGE_SIZE);
   }, [filteredShowedCalls, currentPage, activeTab]);
 
-  const paginatedAdSpend = useMemo(() => {
-    if (activeTab !== 'adspend') return [];
+  const paginatedReconnectCalls = useMemo(() => {
+    if (activeTab !== 'reconnect') return [];
     const start = (currentPage - 1) * PAGE_SIZE;
-    return filteredAdSpend.slice(start, start + PAGE_SIZE);
-  }, [filteredAdSpend, currentPage, activeTab]);
+    return filteredReconnectCalls.slice(start, start + PAGE_SIZE);
+  }, [filteredReconnectCalls, currentPage, activeTab]);
+
+  const paginatedReconnectShowedCalls = useMemo(() => {
+    if (activeTab !== 'reconnect-showed') return [];
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredReconnectShowedCalls.slice(start, start + PAGE_SIZE);
+  }, [filteredReconnectShowedCalls, currentPage, activeTab]);
+
+  const paginatedCommitments = useMemo(() => {
+    if (activeTab !== 'commitments') return [];
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredCommitments.slice(start, start + PAGE_SIZE);
+  }, [filteredCommitments, currentPage, activeTab]);
 
   const paginatedFunded = useMemo(() => {
     if (activeTab !== 'funded') return [];
@@ -273,22 +334,28 @@ export function InlineRecordsView({
 
   const paginatedDataLength = useMemo(() => {
     switch (activeTab) {
-      case 'leads': return paginatedLeads.length;
-      case 'calls': return paginatedCalls.length;
-      case 'showed': return paginatedShowedCalls.length;
       case 'adspend': return paginatedAdSpend.length;
+      case 'leads': return paginatedLeads.length;
+      case 'booked': return paginatedBookedCalls.length;
+      case 'showed': return paginatedShowedCalls.length;
+      case 'reconnect': return paginatedReconnectCalls.length;
+      case 'reconnect-showed': return paginatedReconnectShowedCalls.length;
+      case 'commitments': return paginatedCommitments.length;
       case 'funded': return paginatedFunded.length;
       default: return 0;
     }
-  }, [activeTab, paginatedLeads.length, paginatedCalls.length, paginatedShowedCalls.length, paginatedAdSpend.length, paginatedFunded.length]);
+  }, [activeTab, paginatedAdSpend.length, paginatedLeads.length, paginatedBookedCalls.length, paginatedShowedCalls.length, paginatedReconnectCalls.length, paginatedReconnectShowedCalls.length, paginatedCommitments.length, paginatedFunded.length]);
 
   const handleExport = (exportAll: boolean) => {
     let data: any[] = [];
     switch (activeTab) {
-      case 'leads': data = exportAll ? filteredLeads : paginatedLeads; break;
-      case 'calls': data = exportAll ? filteredCalls : paginatedCalls; break;
-      case 'showed': data = exportAll ? filteredShowedCalls : paginatedShowedCalls; break;
       case 'adspend': data = exportAll ? filteredAdSpend : paginatedAdSpend; break;
+      case 'leads': data = exportAll ? filteredLeads : paginatedLeads; break;
+      case 'booked': data = exportAll ? filteredBookedCalls : paginatedBookedCalls; break;
+      case 'showed': data = exportAll ? filteredShowedCalls : paginatedShowedCalls; break;
+      case 'reconnect': data = exportAll ? filteredReconnectCalls : paginatedReconnectCalls; break;
+      case 'reconnect-showed': data = exportAll ? filteredReconnectShowedCalls : paginatedReconnectShowedCalls; break;
+      case 'commitments': data = exportAll ? filteredCommitments : paginatedCommitments; break;
       case 'funded': data = exportAll ? filteredFunded : paginatedFunded; break;
     }
     exportToCSV(data, `${activeTab}-${exportAll ? 'all' : 'filtered'}`);
@@ -319,15 +386,19 @@ export function InlineRecordsView({
           queryClient.invalidateQueries({ queryKey: ['leads'] });
           break;
         }
-        case 'calls':
-        case 'showed': {
+        case 'booked':
+        case 'showed':
+        case 'reconnect':
+        case 'reconnect-showed': {
+          const isReconnect = activeTab === 'reconnect' || activeTab === 'reconnect-showed';
+          const showed = activeTab === 'showed' || activeTab === 'reconnect-showed';
           const { error } = await supabase.from('calls').insert({
             client_id: clientId,
             external_id: `manual-${Date.now()}`,
             scheduled_at: formData.scheduled_at || null,
-            showed: formData.showed === 'true' || formData.showed === true,
+            showed: formData.showed === 'true' || formData.showed === true || showed,
             outcome: formData.outcome || null,
-            is_reconnect: formData.is_reconnect === 'true' || formData.is_reconnect === true,
+            is_reconnect: formData.is_reconnect === 'true' || formData.is_reconnect === true || isReconnect,
           });
           if (error) throw error;
           queryClient.invalidateQueries({ queryKey: ['calls'] });
@@ -348,12 +419,14 @@ export function InlineRecordsView({
           queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });
           break;
         }
+        case 'commitments':
         case 'funded': {
           const { error } = await supabase.from('funded_investors').insert({
             client_id: clientId,
             external_id: `manual-${Date.now()}`,
             name: formData.name || null,
             funded_amount: Number(formData.funded_amount) || 0,
+            commitment_amount: Number(formData.commitment_amount) || 0,
             funded_at: formData.funded_at || new Date().toISOString(),
           });
           if (error) throw error;
@@ -388,8 +461,10 @@ export function InlineRecordsView({
           queryClient.invalidateQueries({ queryKey: ['leads'] });
           break;
         }
-        case 'calls':
-        case 'showed': {
+        case 'booked':
+        case 'showed':
+        case 'reconnect':
+        case 'reconnect-showed': {
           const { error } = await supabase.from('calls').update({
             scheduled_at: formData.scheduled_at || null,
             showed: formData.showed === 'true' || formData.showed === true,
@@ -413,10 +488,12 @@ export function InlineRecordsView({
           queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });
           break;
         }
+        case 'commitments':
         case 'funded': {
           const { error } = await supabase.from('funded_investors').update({
             name: formData.name || null,
             funded_amount: Number(formData.funded_amount) || 0,
+            commitment_amount: Number(formData.commitment_amount) || 0,
             funded_at: formData.funded_at || new Date().toISOString(),
           }).eq('id', editingRecord.id);
           if (error) throw error;
@@ -447,7 +524,10 @@ export function InlineRecordsView({
         }
         case 'call':
         case 'calls':
-        case 'showed': {
+        case 'booked':
+        case 'showed':
+        case 'reconnect':
+        case 'reconnect-showed': {
           const { error } = await supabase.from('calls').delete().eq('id', record.id);
           if (error) throw error;
           queryKey = ['calls'];
@@ -459,6 +539,7 @@ export function InlineRecordsView({
           queryKey = ['daily-metrics'];
           break;
         }
+        case 'commitments':
         case 'funded': {
           const { error } = await supabase.from('funded_investors').delete().eq('id', record.id);
           if (error) throw error;
@@ -490,8 +571,10 @@ export function InlineRecordsView({
           pipeline_value: record.pipeline_value || '',
         });
         break;
-      case 'calls':
+      case 'booked':
       case 'showed':
+      case 'reconnect':
+      case 'reconnect-showed':
         setFormData({
           scheduled_at: record.scheduled_at?.slice(0, 16) || '',
           showed: record.showed ? 'true' : 'false',
@@ -507,10 +590,12 @@ export function InlineRecordsView({
           clicks: record.clicks || '',
         });
         break;
+      case 'commitments':
       case 'funded':
         setFormData({
           name: record.name || '',
           funded_amount: record.funded_amount || '',
+          commitment_amount: record.commitment_amount || '',
           funded_at: record.funded_at?.slice(0, 10) || '',
         });
         break;
@@ -614,8 +699,10 @@ export function InlineRecordsView({
             </div>
           </>
         );
-      case 'calls':
+      case 'booked':
       case 'showed':
+      case 'reconnect':
+      case 'reconnect-showed':
         return (
           <>
             <div className="space-y-2">
@@ -705,6 +792,38 @@ export function InlineRecordsView({
             </div>
           </>
         );
+      case 'commitments':
+        return (
+          <>
+            <div className="space-y-2">
+              <Label>Investor Name</Label>
+              <Input 
+                value={formData.name || ''} 
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Investor name"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Commitment Amount ($)</Label>
+                <Input 
+                  type="number"
+                  value={formData.commitment_amount || ''} 
+                  onChange={(e) => setFormData({ ...formData, commitment_amount: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Commitment Date</Label>
+                <Input 
+                  type="date"
+                  value={formData.funded_at || ''} 
+                  onChange={(e) => setFormData({ ...formData, funded_at: e.target.value })}
+                />
+              </div>
+            </div>
+          </>
+        );
       case 'funded':
         return (
           <>
@@ -744,14 +863,117 @@ export function InlineRecordsView({
 
   const getTabLabel = () => {
     switch (activeTab) {
-      case 'leads': return 'Lead';
-      case 'calls': return 'Call';
-      case 'showed': return 'Showed Call';
       case 'adspend': return 'Ad Spend';
+      case 'leads': return 'Lead';
+      case 'booked': return 'Booked Call';
+      case 'showed': return 'Showed Call';
+      case 'reconnect': return 'Reconnect Call';
+      case 'reconnect-showed': return 'Reconnect Showed';
+      case 'commitments': return 'Commitment';
       case 'funded': return 'Funded Investor';
       default: return 'Record';
     }
   };
+
+  // Render call table row (reused across multiple tabs)
+  const renderCallRow = (call: Call, tabType: string) => (
+    <TableRow
+      key={call.id}
+      className={`cursor-pointer hover:bg-muted/50 ${
+        selectedRecord?.id === call.id && selectedType === 'call'
+          ? 'bg-primary/10'
+          : ''
+      }`}
+      onClick={() => onRecordSelect?.(call, 'call')}
+    >
+      <TableCell className="font-mono text-sm">
+        {call.scheduled_at
+          ? new Date(call.scheduled_at).toLocaleString()
+          : '-'}
+      </TableCell>
+      <TableCell className="font-medium">{getLeadName(call.lead_id)}</TableCell>
+      <TableCell>
+        {call.direction === 'inbound' ? (
+          <PhoneIncoming className="h-4 w-4 text-chart-2" />
+        ) : (
+          <PhoneOutgoing className="h-4 w-4 text-chart-1" />
+        )}
+      </TableCell>
+      <TableCell>
+        {call.showed ? (
+          <Badge className="bg-green-600">Showed</Badge>
+        ) : (
+          <Badge variant="secondary">No Show</Badge>
+        )}
+      </TableCell>
+      <TableCell>{call.outcome || '-'}</TableCell>
+      <TableCell className="font-mono text-sm">
+        {new Date(call.created_at).toLocaleDateString()}
+      </TableCell>
+      {clientId && (
+        <TableCell className="text-right">
+          <div className="flex justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={(e) => { e.stopPropagation(); openEditModal(call); }}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Call?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete this call record.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handleDeleteRecord(call, tabType)}>
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </TableCell>
+      )}
+    </TableRow>
+  );
+
+  // Render call table (reused across multiple tabs)
+  const renderCallTable = (callData: Call[], tabType: string) => (
+    <ScrollArea className="h-[400px]">
+      <Table>
+        <TableHeader>
+          <TableRow className="border-b-2">
+            <TableHead>Scheduled</TableHead>
+            <TableHead>Contact</TableHead>
+            <TableHead>Dir</TableHead>
+            <TableHead>Showed</TableHead>
+            <TableHead>Outcome</TableHead>
+            <TableHead>Created</TableHead>
+            {clientId && <TableHead className="text-right">Actions</TableHead>}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {callData.map((call) => renderCallRow(call, tabType))}
+        </TableBody>
+      </Table>
+    </ScrollArea>
+  );
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -784,22 +1006,34 @@ export function InlineRecordsView({
           <CardContent>
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={handleTabChange}>
-              <TabsList className="mb-4">
+              <TabsList className="mb-4 flex flex-wrap h-auto gap-1">
+                <TabsTrigger value="adspend" className="flex items-center gap-1">
+                  <DollarSign className="h-4 w-4" />
+                  Ad Spend ({dailyMetrics.length})
+                </TabsTrigger>
                 <TabsTrigger value="leads" className="flex items-center gap-1">
                   <Users className="h-4 w-4" />
                   Leads ({leads.length})
                 </TabsTrigger>
-                <TabsTrigger value="calls" className="flex items-center gap-1">
+                <TabsTrigger value="booked" className="flex items-center gap-1">
                   <Phone className="h-4 w-4" />
-                  Calls ({calls.length})
+                  Booked ({bookedCalls.length})
                 </TabsTrigger>
                 <TabsTrigger value="showed" className="flex items-center gap-1">
                   <CheckCircle className="h-4 w-4" />
                   Showed ({showedCalls.length})
                 </TabsTrigger>
-                <TabsTrigger value="adspend" className="flex items-center gap-1">
-                  <DollarSign className="h-4 w-4" />
-                  Ad Spend ({dailyMetrics.length})
+                <TabsTrigger value="reconnect" className="flex items-center gap-1">
+                  <RefreshCw className="h-4 w-4" />
+                  Reconnect ({reconnectCalls.length})
+                </TabsTrigger>
+                <TabsTrigger value="reconnect-showed" className="flex items-center gap-1">
+                  <CheckCircle className="h-4 w-4" />
+                  Rec. Showed ({reconnectShowedCalls.length})
+                </TabsTrigger>
+                <TabsTrigger value="commitments" className="flex items-center gap-1">
+                  <Handshake className="h-4 w-4" />
+                  Commitments ({commitments.length})
                 </TabsTrigger>
                 <TabsTrigger value="funded" className="flex items-center gap-1">
                   <TrendingUp className="h-4 w-4" />
@@ -834,25 +1068,96 @@ export function InlineRecordsView({
                     </SelectContent>
                   </Select>
                 )}
-
-                {/* Call Type Filter */}
-                {(activeTab === 'calls' || activeTab === 'showed') && (
-                  <Select value={callTypeFilter} onValueChange={setCallTypeFilter}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Call Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="initial">Initial</SelectItem>
-                      <SelectItem value="reconnect">Reconnect</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
                 
                 <span className="text-sm text-muted-foreground">
                   Showing {paginatedDataLength} of {currentDataLength}
                 </span>
               </div>
+
+              {/* Ad Spend Tab */}
+              <TabsContent value="adspend" className="mt-0">
+                <ScrollArea className="h-[400px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-b-2">
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Ad Spend</TableHead>
+                        <TableHead className="text-right">Impressions</TableHead>
+                        <TableHead className="text-right">Clicks</TableHead>
+                        <TableHead className="text-right">CTR</TableHead>
+                        {clientId && <TableHead className="text-right">Actions</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedAdSpend.map((metric) => (
+                        <TableRow
+                          key={metric.id}
+                          className={`cursor-pointer hover:bg-muted/50 ${
+                            selectedRecord?.id === metric.id && selectedType === 'adspend'
+                              ? 'bg-primary/10'
+                              : ''
+                          }`}
+                          onClick={() => onRecordSelect?.(metric, 'adspend')}
+                        >
+                          <TableCell className="font-mono">{metric.date}</TableCell>
+                          <TableCell className="text-right font-mono text-chart-1">
+                            ${Number(metric.ad_spend || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {(metric.impressions || 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {(metric.clicks || 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {(metric.ctr || 0).toFixed(2)}%
+                          </TableCell>
+                          {clientId && (
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={(e) => { e.stopPropagation(); openEditModal(metric); }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-destructive"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Ad Spend Record?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will permanently delete this ad spend record.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteRecord(metric, 'adspend')}>
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </TabsContent>
 
               {/* Leads Tab */}
               <TabsContent value="leads" className="mt-0">
@@ -942,7 +1247,7 @@ export function InlineRecordsView({
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Delete Lead?</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        This will permanently delete this lead record.
+                                        This will permanently delete this lead and all associated data.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -963,238 +1268,62 @@ export function InlineRecordsView({
                 </ScrollArea>
               </TabsContent>
 
-              {/* Calls Tab */}
-              <TabsContent value="calls" className="mt-0">
-                <ScrollArea className="h-[400px]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-b-2">
-                        <TableHead>Scheduled</TableHead>
-                        <TableHead>Contact</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Outcome</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Created</TableHead>
-                        {clientId && <TableHead className="text-right">Actions</TableHead>}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paginatedCalls.map((call) => (
-                        <TableRow
-                          key={call.id}
-                          className={`cursor-pointer hover:bg-muted/50 ${
-                            selectedRecord?.id === call.id && selectedType === 'call'
-                              ? 'bg-primary/10'
-                              : ''
-                          }`}
-                          onClick={() => onRecordSelect?.(call, 'call')}
-                        >
-                          <TableCell className="font-mono text-sm">
-                            {call.scheduled_at
-                              ? new Date(call.scheduled_at).toLocaleString()
-                              : '-'}
-                          </TableCell>
-                          <TableCell className="font-medium">{getLeadName(call.lead_id)}</TableCell>
-                          <TableCell>
-                            {call.showed ? (
-                              <Badge className="bg-green-600">Showed</Badge>
-                            ) : (
-                              <Badge variant="secondary">No Show</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>{call.outcome || '-'}</TableCell>
-                          <TableCell>
-                            {call.is_reconnect ? (
-                              <Badge variant="outline">Reconnect</Badge>
-                            ) : (
-                              <Badge variant="outline">Initial</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {new Date(call.created_at).toLocaleDateString()}
-                          </TableCell>
-                          {clientId && (
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={(e) => { e.stopPropagation(); openEditModal(call); }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-destructive"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Call?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        This will permanently delete this call record.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDeleteRecord(call, 'calls')}>
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
+              {/* Booked Calls Tab */}
+              <TabsContent value="booked" className="mt-0">
+                {renderCallTable(paginatedBookedCalls, 'booked')}
               </TabsContent>
 
               {/* Showed Calls Tab */}
               <TabsContent value="showed" className="mt-0">
-                <ScrollArea className="h-[400px]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-b-2">
-                        <TableHead>Scheduled</TableHead>
-                        <TableHead>Contact</TableHead>
-                        <TableHead>Outcome</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Quality</TableHead>
-                        <TableHead>Created</TableHead>
-                        {clientId && <TableHead className="text-right">Actions</TableHead>}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paginatedShowedCalls.map((call) => (
-                        <TableRow
-                          key={call.id}
-                          className={`cursor-pointer hover:bg-muted/50 ${
-                            selectedRecord?.id === call.id && selectedType === 'call'
-                              ? 'bg-primary/10'
-                              : ''
-                          }`}
-                          onClick={() => onRecordSelect?.(call, 'call')}
-                        >
-                          <TableCell className="font-mono text-sm">
-                            {call.scheduled_at
-                              ? new Date(call.scheduled_at).toLocaleString()
-                              : '-'}
-                          </TableCell>
-                          <TableCell className="font-medium">{getLeadName(call.lead_id)}</TableCell>
-                          <TableCell>{call.outcome || '-'}</TableCell>
-                          <TableCell>
-                            {call.is_reconnect ? (
-                              <Badge variant="outline">Reconnect</Badge>
-                            ) : (
-                              <Badge variant="outline">Initial</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {call.quality_score ? (
-                              <Badge variant={call.quality_score >= 7 ? 'default' : call.quality_score >= 4 ? 'secondary' : 'destructive'}>
-                                {call.quality_score}/10
-                              </Badge>
-                            ) : '-'}
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {new Date(call.created_at).toLocaleDateString()}
-                          </TableCell>
-                          {clientId && (
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={(e) => { e.stopPropagation(); openEditModal(call); }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-destructive"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Call?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        This will permanently delete this call record.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDeleteRecord(call, 'calls')}>
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
+                {renderCallTable(paginatedShowedCalls, 'showed')}
               </TabsContent>
 
-              {/* Ad Spend Tab */}
-              <TabsContent value="adspend" className="mt-0">
+              {/* Reconnect Calls Tab */}
+              <TabsContent value="reconnect" className="mt-0">
+                {renderCallTable(paginatedReconnectCalls, 'reconnect')}
+              </TabsContent>
+
+              {/* Reconnect Showed Tab */}
+              <TabsContent value="reconnect-showed" className="mt-0">
+                {renderCallTable(paginatedReconnectShowedCalls, 'reconnect-showed')}
+              </TabsContent>
+
+              {/* Commitments Tab */}
+              <TabsContent value="commitments" className="mt-0">
                 <ScrollArea className="h-[400px]">
                   <Table>
                     <TableHeader>
                       <TableRow className="border-b-2">
+                        <TableHead>Name</TableHead>
+                        <TableHead className="text-right">Commitment</TableHead>
                         <TableHead>Date</TableHead>
-                        <TableHead className="text-right">Ad Spend</TableHead>
-                        <TableHead className="text-right">Impressions</TableHead>
-                        <TableHead className="text-right">Clicks</TableHead>
-                        <TableHead className="text-right">CTR</TableHead>
+                        <TableHead className="text-right">Time to Commit</TableHead>
+                        <TableHead className="text-right">Calls</TableHead>
                         {clientId && <TableHead className="text-right">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginatedAdSpend.map((metric) => (
+                      {paginatedCommitments.map((investor) => (
                         <TableRow
-                          key={metric.id}
+                          key={investor.id}
                           className={`cursor-pointer hover:bg-muted/50 ${
-                            selectedRecord?.id === metric.id && selectedType === 'adspend'
+                            selectedRecord?.id === investor.id && selectedType === 'commitment'
                               ? 'bg-primary/10'
                               : ''
                           }`}
-                          onClick={() => onRecordSelect?.(metric, 'adspend')}
+                          onClick={() => onRecordSelect?.(investor, 'commitment')}
                         >
-                          <TableCell className="font-mono">{metric.date}</TableCell>
-                          <TableCell className="text-right font-mono text-chart-1">
-                            ${Number(metric.ad_spend || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          <TableCell className="font-medium">{investor.name || 'Unknown'}</TableCell>
+                          <TableCell className="text-right font-mono text-chart-4">
+                            ${Number(investor.commitment_amount || 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {new Date(investor.funded_at).toLocaleDateString()}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {(metric.impressions || 0).toLocaleString()}
+                            {investor.time_to_fund_days !== null ? `${investor.time_to_fund_days}d` : '-'}
                           </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {(metric.clicks || 0).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {(metric.ctr || 0).toFixed(2)}%
-                          </TableCell>
+                          <TableCell className="text-right font-mono">{investor.calls_to_fund || 0}</TableCell>
                           {clientId && (
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
@@ -1202,7 +1331,7 @@ export function InlineRecordsView({
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8"
-                                  onClick={(e) => { e.stopPropagation(); openEditModal(metric); }}
+                                  onClick={(e) => { e.stopPropagation(); openEditModal(investor); }}
                                 >
                                   <Edit className="h-4 w-4" />
                                 </Button>
@@ -1219,14 +1348,14 @@ export function InlineRecordsView({
                                   </AlertDialogTrigger>
                                   <AlertDialogContent onClick={(e) => e.stopPropagation()}>
                                     <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Ad Spend Record?</AlertDialogTitle>
+                                      <AlertDialogTitle>Delete Commitment?</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        This will permanently delete this ad spend record.
+                                        This will permanently delete this commitment record.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDeleteRecord(metric, 'adspend')}>
+                                      <AlertDialogAction onClick={() => handleDeleteRecord(investor, 'commitments')}>
                                         Delete
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
@@ -1328,53 +1457,272 @@ export function InlineRecordsView({
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between pt-4 border-t mt-4">
+              <div className="flex items-center justify-between mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
                 <span className="text-sm text-muted-foreground">
                   Page {currentPage} of {totalPages}
                 </span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Activity Panel */}
+      {/* Record Details Panel */}
       <div className="lg:col-span-1">
         <Card className="border-2 border-border sticky top-4">
-          <CardHeader>
-            <CardTitle className="text-lg">Record Activity</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Record Details</CardTitle>
           </CardHeader>
           <CardContent>
             {selectedRecord ? (
-              <RecordActivityPanel 
-                record={selectedRecord} 
-                type={selectedType || ''} 
-              />
+              <div className="space-y-4">
+                {/* Timeline */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Timeline
+                  </h4>
+                  <div className="pl-6 border-l-2 border-border space-y-2">
+                    {selectedType === 'lead' && (
+                      <>
+                        <div className="relative">
+                          <div className="absolute -left-[25px] w-3 h-3 rounded-full bg-chart-1" />
+                          <p className="text-sm">
+                            <span className="text-muted-foreground">Created:</span>{' '}
+                            {new Date(selectedRecord.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="relative">
+                          <div className="absolute -left-[25px] w-3 h-3 rounded-full bg-chart-2" />
+                          <p className="text-sm">
+                            <span className="text-muted-foreground">Updated:</span>{' '}
+                            {new Date(selectedRecord.updated_at).toLocaleString()}
+                          </p>
+                        </div>
+                      </>
+                    )}
+                    {selectedType === 'call' && (
+                      <>
+                        {selectedRecord.scheduled_at && (
+                          <div className="relative">
+                            <div className="absolute -left-[25px] w-3 h-3 rounded-full bg-chart-1" />
+                            <p className="text-sm">
+                              <span className="text-muted-foreground">Scheduled:</span>{' '}
+                              {new Date(selectedRecord.scheduled_at).toLocaleString()}
+                            </p>
+                          </div>
+                        )}
+                        <div className="relative">
+                          <div className="absolute -left-[25px] w-3 h-3 rounded-full bg-chart-2" />
+                          <p className="text-sm">
+                            <span className="text-muted-foreground">Created:</span>{' '}
+                            {new Date(selectedRecord.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      </>
+                    )}
+                    {(selectedType === 'funded' || selectedType === 'commitment') && (
+                      <>
+                        {selectedRecord.first_contact_at && (
+                          <div className="relative">
+                            <div className="absolute -left-[25px] w-3 h-3 rounded-full bg-chart-1" />
+                            <p className="text-sm">
+                              <span className="text-muted-foreground">First Contact:</span>{' '}
+                              {new Date(selectedRecord.first_contact_at).toLocaleString()}
+                            </p>
+                          </div>
+                        )}
+                        <div className="relative">
+                          <div className="absolute -left-[25px] w-3 h-3 rounded-full bg-chart-2" />
+                          <p className="text-sm">
+                            <span className="text-muted-foreground">Funded:</span>{' '}
+                            {new Date(selectedRecord.funded_at).toLocaleString()}
+                          </p>
+                        </div>
+                      </>
+                    )}
+                    {selectedType === 'adspend' && (
+                      <div className="relative">
+                        <div className="absolute -left-[25px] w-3 h-3 rounded-full bg-chart-1" />
+                        <p className="text-sm">
+                          <span className="text-muted-foreground">Date:</span>{' '}
+                          {selectedRecord.date}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Contact Info for Leads */}
+                {selectedType === 'lead' && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Contact Info
+                    </h4>
+                    <div className="space-y-1 text-sm">
+                      {selectedRecord.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-3 w-3 text-muted-foreground" />
+                          <a href={`mailto:${selectedRecord.email}`} className="text-primary hover:underline">
+                            {selectedRecord.email}
+                          </a>
+                        </div>
+                      )}
+                      {selectedRecord.phone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-3 w-3 text-muted-foreground" />
+                          <a href={`tel:${selectedRecord.phone}`} className="text-primary hover:underline">
+                            {selectedRecord.phone}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* UTM Parameters for Leads */}
+                {selectedType === 'lead' && (selectedRecord.utm_source || selectedRecord.utm_campaign) && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium flex items-center gap-2">
+                      <Globe className="h-4 w-4" />
+                      UTM Parameters
+                    </h4>
+                    <div className="space-y-1 text-sm">
+                      {selectedRecord.utm_source && (
+                        <p><span className="text-muted-foreground">Source:</span> {selectedRecord.utm_source}</p>
+                      )}
+                      {selectedRecord.utm_medium && (
+                        <p><span className="text-muted-foreground">Medium:</span> {selectedRecord.utm_medium}</p>
+                      )}
+                      {selectedRecord.utm_campaign && (
+                        <p><span className="text-muted-foreground">Campaign:</span> {selectedRecord.utm_campaign}</p>
+                      )}
+                      {selectedRecord.utm_content && (
+                        <p><span className="text-muted-foreground">Content:</span> {selectedRecord.utm_content}</p>
+                      )}
+                      {selectedRecord.utm_term && (
+                        <p><span className="text-muted-foreground">Term:</span> {selectedRecord.utm_term}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Questions for Leads */}
+                {selectedType === 'lead' && selectedRecord.questions && Array.isArray(selectedRecord.questions) && selectedRecord.questions.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Form Questions</h4>
+                    <div className="space-y-2 text-sm">
+                      {selectedRecord.questions.map((q: any, idx: number) => (
+                        <div key={idx} className="bg-muted/50 p-2 rounded">
+                          <p className="text-muted-foreground text-xs">{q.question}</p>
+                          <p className="font-medium">{String(q.answer)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Call Details */}
+                {selectedType === 'call' && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Call Details</h4>
+                    <div className="space-y-1 text-sm">
+                      <p><span className="text-muted-foreground">Showed:</span> {selectedRecord.showed ? 'Yes' : 'No'}</p>
+                      <p><span className="text-muted-foreground">Type:</span> {selectedRecord.is_reconnect ? 'Reconnect' : 'Initial'}</p>
+                      {selectedRecord.outcome && (
+                        <p><span className="text-muted-foreground">Outcome:</span> {selectedRecord.outcome}</p>
+                      )}
+                      {selectedRecord.quality_score && (
+                        <p><span className="text-muted-foreground">Quality:</span> {selectedRecord.quality_score}/10</p>
+                      )}
+                      {selectedRecord.summary && (
+                        <div className="mt-2">
+                          <p className="text-muted-foreground mb-1">Summary:</p>
+                          <p className="bg-muted/50 p-2 rounded text-xs">{selectedRecord.summary}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Ad Spend Details */}
+                {selectedType === 'adspend' && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Metrics</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-muted-foreground text-xs">Ad Spend</p>
+                        <p className="font-mono font-medium">${Number(selectedRecord.ad_spend || 0).toLocaleString()}</p>
+                      </div>
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-muted-foreground text-xs">Impressions</p>
+                        <p className="font-mono font-medium">{(selectedRecord.impressions || 0).toLocaleString()}</p>
+                      </div>
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-muted-foreground text-xs">Clicks</p>
+                        <p className="font-mono font-medium">{(selectedRecord.clicks || 0).toLocaleString()}</p>
+                      </div>
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-muted-foreground text-xs">CTR</p>
+                        <p className="font-mono font-medium">{(selectedRecord.ctr || 0).toFixed(2)}%</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Funded/Commitment Details */}
+                {(selectedType === 'funded' || selectedType === 'commitment') && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Investment Details</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      {selectedRecord.commitment_amount > 0 && (
+                        <div className="bg-muted/50 p-2 rounded">
+                          <p className="text-muted-foreground text-xs">Commitment</p>
+                          <p className="font-mono font-medium">${Number(selectedRecord.commitment_amount).toLocaleString()}</p>
+                        </div>
+                      )}
+                      {selectedRecord.funded_amount > 0 && (
+                        <div className="bg-muted/50 p-2 rounded">
+                          <p className="text-muted-foreground text-xs">Funded</p>
+                          <p className="font-mono font-medium">${Number(selectedRecord.funded_amount).toLocaleString()}</p>
+                        </div>
+                      )}
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-muted-foreground text-xs">Time to Fund</p>
+                        <p className="font-mono font-medium">
+                          {selectedRecord.time_to_fund_days !== null ? `${selectedRecord.time_to_fund_days} days` : '-'}
+                        </p>
+                      </div>
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-muted-foreground text-xs">Calls to Fund</p>
+                        <p className="font-mono font-medium">{selectedRecord.calls_to_fund || 0}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Select a record to view activity</p>
-                <p className="text-sm">Click on any row to see details</p>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Select a record to view details</p>
               </div>
             )}
           </CardContent>
@@ -1391,8 +1739,12 @@ export function InlineRecordsView({
             {renderFormFields()}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddRecord}>Add {getTabLabel()}</Button>
+            <Button variant="outline" onClick={() => setAddModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddRecord}>
+              Add Record
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1407,184 +1759,15 @@ export function InlineRecordsView({
             {renderFormFields()}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleEditRecord}>Save Changes</Button>
+            <Button variant="outline" onClick={() => setEditModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditRecord}>
+              Save Changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-// Activity panel component
-function RecordActivityPanel({ record, type }: { record: any; type: string }) {
-  const getTimeline = () => {
-    const events: { date: string; label: string; icon: React.ReactNode }[] = [];
-
-    if (type === 'lead') {
-      events.push({
-        date: record.created_at,
-        label: 'Lead Created',
-        icon: <User className="h-4 w-4" />,
-      });
-      if (record.status && record.status !== 'new') {
-        events.push({
-          date: record.updated_at,
-          label: `Status: ${record.status}`,
-          icon: <Clock className="h-4 w-4" />,
-        });
-      }
-    } else if (type === 'call') {
-      events.push({
-        date: record.created_at,
-        label: 'Call Booked',
-        icon: <Phone className="h-4 w-4" />,
-      });
-      if (record.scheduled_at) {
-        events.push({
-          date: record.scheduled_at,
-          label: record.showed ? 'Showed' : 'No Show',
-          icon: <Calendar className="h-4 w-4" />,
-        });
-      }
-    } else if (type === 'funded') {
-      if (record.first_contact_at) {
-        events.push({
-          date: record.first_contact_at,
-          label: 'First Contact',
-          icon: <User className="h-4 w-4" />,
-        });
-      }
-      events.push({
-        date: record.funded_at,
-        label: `Funded: $${Number(record.funded_amount).toLocaleString()}`,
-        icon: <TrendingUp className="h-4 w-4" />,
-      });
-    } else if (type === 'adspend') {
-      events.push({
-        date: record.date,
-        label: `Ad Spend: $${Number(record.ad_spend || 0).toFixed(2)}`,
-        icon: <DollarSign className="h-4 w-4" />,
-      });
-    }
-
-    return events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  };
-
-  const timeline = getTimeline();
-
-  return (
-    <div className="space-y-6">
-      {/* Contact Info for Lead */}
-      {type === 'lead' && (
-        <div className="space-y-3">
-          <h4 className="font-medium text-sm text-muted-foreground uppercase">Contact Info</h4>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">{record.name || 'Unknown'}</span>
-            </div>
-            {record.email && (
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">{record.email}</span>
-              </div>
-            )}
-            {record.phone && (
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">{record.phone}</span>
-              </div>
-            )}
-            {record.source && (
-              <div className="flex items-center gap-2">
-                <Globe className="h-4 w-4 text-muted-foreground" />
-                <Badge variant="outline">{record.source}</Badge>
-              </div>
-            )}
-            {record.assigned_user && (
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Rep: {record.assigned_user}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* UTM Info */}
-      {type === 'lead' && (record.utm_source || record.utm_campaign || record.utm_medium) && (
-        <div className="space-y-2">
-          <h4 className="font-medium text-sm text-muted-foreground uppercase">UTM Data</h4>
-          <div className="text-sm space-y-1">
-            {record.utm_source && <p><span className="text-muted-foreground">Source:</span> {record.utm_source}</p>}
-            {record.utm_medium && <p><span className="text-muted-foreground">Medium:</span> {record.utm_medium}</p>}
-            {record.utm_campaign && <p><span className="text-muted-foreground">Campaign:</span> {record.utm_campaign}</p>}
-            {record.utm_content && <p><span className="text-muted-foreground">Content:</span> {record.utm_content}</p>}
-            {record.utm_term && <p><span className="text-muted-foreground">Term:</span> {record.utm_term}</p>}
-          </div>
-        </div>
-      )}
-
-      {/* Pipeline Value for Lead */}
-      {type === 'lead' && record.pipeline_value > 0 && (
-        <div className="space-y-2">
-          <h4 className="font-medium text-sm text-muted-foreground uppercase">Pipeline Value</h4>
-          <p className="text-2xl font-bold text-chart-2">${Number(record.pipeline_value).toLocaleString()}</p>
-        </div>
-      )}
-
-      {/* Call Details */}
-      {type === 'call' && (
-        <div className="space-y-3">
-          <h4 className="font-medium text-sm text-muted-foreground uppercase">Call Details</h4>
-          <div className="space-y-2">
-            {record.recording_url && (
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <a href={record.recording_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline">
-                  Listen to Recording
-                </a>
-              </div>
-            )}
-            {record.summary && (
-              <div className="space-y-1">
-                <span className="text-sm text-muted-foreground">Summary:</span>
-                <p className="text-sm">{record.summary}</p>
-              </div>
-            )}
-            {record.quality_score && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Quality:</span>
-                <Badge variant={record.quality_score >= 7 ? 'default' : record.quality_score >= 4 ? 'secondary' : 'destructive'}>
-                  {record.quality_score}/10
-                </Badge>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Timeline */}
-      <div className="space-y-2">
-        <h4 className="font-medium text-sm text-muted-foreground uppercase">Activity Timeline</h4>
-        <div className="relative pl-6 space-y-4">
-          {timeline.map((event, i) => (
-            <div key={i} className="relative">
-              <div className="absolute -left-6 w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center">
-                <div className="w-2 h-2 rounded-full bg-primary" />
-              </div>
-              {i < timeline.length - 1 && (
-                <div className="absolute -left-4 top-4 w-0.5 h-full bg-border" />
-              )}
-              <p className="font-medium text-sm">{event.label}</p>
-              <p className="text-xs text-muted-foreground">
-                {new Date(event.date).toLocaleString()}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
