@@ -19,6 +19,7 @@ import { FundedInvestorsDrillDownModal } from '@/components/drilldown/FundedInve
 import { AdSpendDrillDownModal } from '@/components/drilldown/AdSpendDrillDownModal';
 import { MeetingsList } from '@/components/meetings/MeetingsList';
 import { PendingTasksReview } from '@/components/meetings/PendingTasksReview';
+import { DataDiscrepancyBanner } from '@/components/dashboard/DataDiscrepancyBanner';
 import { Button } from '@/components/ui/button';
 import { Sliders, Video, CheckCircle, RefreshCw } from 'lucide-react';
 import { useClients, Client } from '@/hooks/useClients';
@@ -26,6 +27,7 @@ import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics, AggregatedMet
 import { useAllClientSettings, useAllClientFullSettings } from '@/hooks/useAllClientSettings';
 import { useAllClientMRR } from '@/hooks/useClientMRR';
 import { useMeetings, usePendingMeetingTasks, useSyncMeetings } from '@/hooks/useMeetings';
+import { useDataDiscrepancies } from '@/hooks/useDataDiscrepancies';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { exportToCSV } from '@/lib/exportUtils';
 import { useQueryClient } from '@tanstack/react-query';
@@ -58,6 +60,9 @@ const Index = () => {
   const { data: meetings = [] } = useMeetings();
   const { data: pendingTasks = [] } = usePendingMeetingTasks();
   const syncMeetings = useSyncMeetings();
+  
+  // Data discrepancies
+  const { data: discrepancies = [] } = useDataDiscrepancies();
 
   const aggregatedMetrics = useMemo(() => {
     return aggregateMetrics(dailyMetrics, fundedInvestors);
@@ -140,6 +145,11 @@ const Index = () => {
           onAddClient={handleAddClient}
           onRefresh={handleRefresh}
         />
+
+        {/* Data Discrepancy Alert */}
+        {discrepancies.length > 0 && (
+          <DataDiscrepancyBanner discrepancies={discrepancies} />
+        )}
 
         <section>
           <div className="flex items-center justify-between mb-2">

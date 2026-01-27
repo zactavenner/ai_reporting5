@@ -385,11 +385,99 @@ async function syncContactToDatabase(
   }
 }
 
+async function detectDiscrepancies(
+  supabase: any,
+  clientId: string,
+  apiContactsTotal: number,
+  syncLogId?: string
+): Promise<void> {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  try {
+    // Count webhook leads in last 24h
+    const { count: webhookCount } = await supabase
+      .from('webhook_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('client_id', clientId)
+      .eq('webhook_type', 'lead')
+      .eq('status', 'success')
+      .gte('processed_at', yesterday.toISOString());
+    
+    // Count DB leads in last 24h
+    const { count: dbCount } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('client_id', clientId)
+      .gte('created_at', yesterday.toISOString());
+    
+    // Calculate discrepancy
+    const webhookNum = webhookCount || 0;
+    const dbNum = dbCount || 0;
+    const difference = Math.abs(webhookNum - dbNum);
+    const percentDiff = dbNum > 0 ? (difference / dbNum) * 100 : (webhookNum > 0 ? 100 : 0);
+    
+    // Only log if significant (>5% or >3 records)
+    if (difference > 3 || percentDiff > 5) {
+      const severity = percentDiff > 20 ? 'critical' : percentDiff > 10 ? 'warning' : 'info';
+      
+      console.log(`Discrepancy detected for client ${clientId}: webhook=${webhookNum}, db=${dbNum}, api=${apiContactsTotal}, diff=${difference}, severity=${severity}`);
+      
+      await supabase.from('data_discrepancies').insert({
+        client_id: clientId,
+        discrepancy_type: 'lead_count_mismatch',
+        date_range_start: yesterday.toISOString().split('T')[0],
+        date_range_end: today.toISOString().split('T')[0],
+        webhook_count: webhookNum,
+        api_count: apiContactsTotal,
+        db_count: dbNum,
+        difference,
+        severity,
+        status: 'open',
+        sync_log_id: syncLogId || null,
+      });
+    }
+    
+    // Also check for failed webhooks
+    const { count: failedWebhooks } = await supabase
+      .from('webhook_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('client_id', clientId)
+      .eq('status', 'error')
+      .gte('processed_at', yesterday.toISOString());
+    
+    const failedNum = failedWebhooks || 0;
+    if (failedNum > 2) {
+      const failedSeverity = failedNum > 5 ? 'critical' : 'warning';
+      
+      console.log(`Failed webhooks detected for client ${clientId}: count=${failedNum}, severity=${failedSeverity}`);
+      
+      await supabase.from('data_discrepancies').insert({
+        client_id: clientId,
+        discrepancy_type: 'failed_webhooks',
+        date_range_start: yesterday.toISOString().split('T')[0],
+        date_range_end: today.toISOString().split('T')[0],
+        webhook_count: failedNum,
+        api_count: 0,
+        db_count: 0,
+        difference: failedNum,
+        severity: failedSeverity,
+        status: 'open',
+        sync_log_id: syncLogId || null,
+      });
+    }
+  } catch (err) {
+    console.error(`Error detecting discrepancies for client ${clientId}:`, err);
+  }
+}
+
 async function syncClientContacts(
   supabase: any,
-  client: { id: string; name: string; ghl_api_key: string; ghl_location_id: string }
-): Promise<{ created: number; updated: number; skipped: number; errors: string[] }> {
-  const result = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
+  client: { id: string; name: string; ghl_api_key: string; ghl_location_id: string },
+  syncLogId?: string
+): Promise<{ created: number; updated: number; skipped: number; errors: string[]; totalApiContacts: number }> {
+  const result = { created: 0, updated: 0, skipped: 0, errors: [] as string[], totalApiContacts: 0 };
   
   console.log(`Starting GHL sync for client: ${client.name} (${client.id})`);
   
@@ -430,6 +518,13 @@ async function syncClientContacts(
 
       await new Promise(resolve => setTimeout(resolve, 500));
     }
+    
+    // Track total API contacts for discrepancy detection
+    result.totalApiContacts = totalProcessed;
+    
+    // Run discrepancy detection after sync
+    await detectDiscrepancies(supabase, client.id, result.totalApiContacts, syncLogId);
+    
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
     result.errors.push(`Sync failed: ${errorMsg}`);
@@ -518,7 +613,7 @@ serve(async (req) => {
 
       // Sync contacts
       if (syncType === 'contacts' || syncType === 'all') {
-        clientResult.contacts = await syncClientContacts(supabase, client as any);
+        clientResult.contacts = await syncClientContacts(supabase, client as any, syncLog?.id);
         
         // Update last contacts sync timestamp
         await supabase

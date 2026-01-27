@@ -781,6 +781,75 @@ export type Database = {
           },
         ]
       }
+      data_discrepancies: {
+        Row: {
+          api_count: number
+          client_id: string
+          date_range_end: string
+          date_range_start: string
+          db_count: number
+          detected_at: string
+          difference: number
+          discrepancy_type: string
+          id: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          severity: string
+          status: string
+          sync_log_id: string | null
+          webhook_count: number
+        }
+        Insert: {
+          api_count?: number
+          client_id: string
+          date_range_end: string
+          date_range_start: string
+          db_count?: number
+          detected_at?: string
+          difference?: number
+          discrepancy_type: string
+          id?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          sync_log_id?: string | null
+          webhook_count?: number
+        }
+        Update: {
+          api_count?: number
+          client_id?: string
+          date_range_end?: string
+          date_range_start?: string
+          db_count?: number
+          detected_at?: string
+          difference?: number
+          discrepancy_type?: string
+          id?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          sync_log_id?: string | null
+          webhook_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_discrepancies_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_discrepancies_sync_log_id_fkey"
+            columns: ["sync_log_id"]
+            isOneToOne: false
+            referencedRelation: "sync_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_parsed_investors: {
         Row: {
           client_id: string

@@ -22,6 +22,7 @@ import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { AIAnalysisChat } from '@/components/ai/AIAnalysisChat';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
+import { DataDiscrepancyBanner } from '@/components/dashboard/DataDiscrepancyBanner';
 import { useClient } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
 import { usePriorPeriodMetrics } from '@/hooks/usePriorMetrics';
@@ -31,6 +32,7 @@ import { useCustomTabs, useDeleteCustomTab } from '@/hooks/useCustomTabs';
 import { useAllTasks } from '@/hooks/useTasks';
 import { useVoiceNotes } from '@/hooks/useVoiceNotes';
 import { useMeetings } from '@/hooks/useMeetings';
+import { useDataDiscrepancies } from '@/hooks/useDataDiscrepancies';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { exportToCSV } from '@/lib/exportUtils';
 import { useQueryClient } from '@tanstack/react-query';
@@ -77,6 +79,7 @@ export default function ClientDetail() {
   const { data: allTasks = [] } = useAllTasks();
   const { data: voiceNotes = [] } = useVoiceNotes(clientId);
   const { data: meetings = [] } = useMeetings(clientId);
+  const { data: discrepancies = [] } = useDataDiscrepancies(clientId);
   const deleteCustomTab = useDeleteCustomTab();
 
   // Filter tasks for this client
@@ -222,6 +225,11 @@ export default function ClientDetail() {
 
       <main className="p-6 space-y-6">
         <DateRangeFilter showAddClient={false} onExportCSV={handleExportCSV} onRefresh={handleRefresh} />
+
+        {/* Client-specific data discrepancy alert */}
+        {discrepancies.length > 0 && (
+          <DataDiscrepancyBanner discrepancies={discrepancies} compact />
+        )}
 
         {/* Main Navigation Tabs */}
         <div className="flex items-center gap-2 flex-wrap">
