@@ -15,6 +15,7 @@ import {
   FileText,
   Filter,
   CheckSquare,
+  Mic,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -24,14 +25,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Task } from '@/hooks/useTasks';
 import { Creative } from '@/hooks/useCreatives';
+import { VoiceNote } from '@/hooks/useVoiceNotes';
 import { cn } from '@/lib/utils';
 
 interface ActivityFeedProps {
   tasks: Task[];
   creatives: Creative[];
+  voiceNotes?: VoiceNote[];
 }
 
-type ActivityType = 'task_created' | 'task_completed' | 'creative_uploaded' | 'creative_approved' | 'creative_launched' | 'meeting_synced' | 'meeting_task_created';
+type ActivityType = 'task_created' | 'task_completed' | 'creative_uploaded' | 'creative_approved' | 'creative_launched' | 'meeting_synced' | 'meeting_task_created' | 'voice_note_recorded';
 
 interface Activity {
   id: string;
@@ -42,6 +45,7 @@ interface Activity {
     creativeType?: string;
     platform?: string;
     priority?: string;
+    summary?: string;
   };
 }
 
@@ -53,9 +57,10 @@ const ACTIVITY_CONFIG: Record<ActivityType, { icon: typeof CheckCircle2; label: 
   creative_launched: { icon: Rocket, label: 'Creative Launched', color: 'text-orange-500' },
   meeting_synced: { icon: Video, label: 'Meeting Synced', color: 'text-indigo-500' },
   meeting_task_created: { icon: CheckSquare, label: 'Task from Meeting', color: 'text-cyan-500' },
+  voice_note_recorded: { icon: Mic, label: 'Voice Note', color: 'text-pink-500' },
 };
 
-export function ActivityFeed({ tasks, creatives }: ActivityFeedProps) {
+export function ActivityFeed({ tasks, creatives, voiceNotes = [] }: ActivityFeedProps) {
   const [filters, setFilters] = useState<Set<ActivityType>>(new Set());
   const [showAll, setShowAll] = useState(false);
 
@@ -131,11 +136,24 @@ export function ActivityFeed({ tasks, creatives }: ActivityFeedProps) {
       }
     });
 
+    // Voice note activities
+    voiceNotes.forEach(note => {
+      items.push({
+        id: `voice-note-${note.id}`,
+        type: 'voice_note_recorded',
+        title: note.title,
+        timestamp: new Date(note.created_at),
+        metadata: { 
+          summary: note.summary || undefined,
+        },
+      });
+    });
+
     // Sort by timestamp descending
     items.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
     return items;
-  }, [tasks, creatives]);
+  }, [tasks, creatives, voiceNotes]);
 
   // Apply filters
   const filteredActivities = useMemo(() => {

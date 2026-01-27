@@ -441,6 +441,56 @@ export type Database = {
         }
         Relationships: []
       }
+      client_voice_notes: {
+        Row: {
+          action_items: Json | null
+          audio_url: string | null
+          client_id: string
+          created_at: string
+          duration_seconds: number | null
+          id: string
+          is_public_recording: boolean | null
+          recorded_by: string | null
+          summary: string | null
+          title: string
+          transcript: string | null
+        }
+        Insert: {
+          action_items?: Json | null
+          audio_url?: string | null
+          client_id: string
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          is_public_recording?: boolean | null
+          recorded_by?: string | null
+          summary?: string | null
+          title: string
+          transcript?: string | null
+        }
+        Update: {
+          action_items?: Json | null
+          audio_url?: string | null
+          client_id?: string
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          is_public_recording?: boolean | null
+          recorded_by?: string | null
+          summary?: string | null
+          title?: string
+          transcript?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_voice_notes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           business_manager_url: string | null
@@ -945,11 +995,12 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
-          meeting_id: string
+          meeting_id: string | null
           priority: string
           status: string
           task_id: string | null
           title: string
+          voice_note_id: string | null
         }
         Insert: {
           approved_at?: string | null
@@ -958,11 +1009,12 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
-          meeting_id: string
+          meeting_id?: string | null
           priority?: string
           status?: string
           task_id?: string | null
           title: string
+          voice_note_id?: string | null
         }
         Update: {
           approved_at?: string | null
@@ -971,11 +1023,12 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
-          meeting_id?: string
+          meeting_id?: string | null
           priority?: string
           status?: string
           task_id?: string | null
           title?: string
+          voice_note_id?: string | null
         }
         Relationships: [
           {
@@ -997,6 +1050,13 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_meeting_tasks_voice_note_id_fkey"
+            columns: ["voice_note_id"]
+            isOneToOne: false
+            referencedRelation: "client_voice_notes"
             referencedColumns: ["id"]
           },
         ]

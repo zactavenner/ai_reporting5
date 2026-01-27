@@ -18,6 +18,7 @@ import { useDateFilter } from '@/contexts/DateFilterContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
 import { ExternalLink, ClipboardList } from 'lucide-react';
+import { VoiceRecordButton } from '@/components/voice/VoiceRecordButton';
 
 export default function PublicReport() {
   const { token } = useParams<{ token: string }>();
@@ -91,8 +92,17 @@ export default function PublicReport() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b-2 border-border bg-card px-6 py-4">
-        <h1 className="text-2xl font-bold">{client.name} - Performance Report</h1>
-        <p className="text-sm text-muted-foreground">Capital Raising Performance Dashboard</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">{client.name} - Performance Report</h1>
+            <p className="text-sm text-muted-foreground">Capital Raising Performance Dashboard</p>
+          </div>
+          <VoiceRecordButton 
+            clientId={client.id}
+            clientName={client.name}
+            isPublicView={true}
+          />
+        </div>
       </header>
 
       <main className="p-6 space-y-6 max-w-7xl mx-auto">

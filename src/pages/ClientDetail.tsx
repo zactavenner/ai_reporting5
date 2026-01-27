@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Settings, DollarSign, Mic, Upload, History, Plus, ExternalLink, X, ClipboardList } from 'lucide-react';
+import { ArrowLeft, Settings, DollarSign, Upload, History, Plus, ExternalLink, X, ClipboardList } from 'lucide-react';
+import { VoiceRecordButton } from '@/components/voice/VoiceRecordButton';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
@@ -145,6 +146,11 @@ export default function ClientDetail() {
             </Button>
           </div>
           <div className="flex items-center gap-2">
+            <VoiceRecordButton 
+              clientId={client.id}
+              clientName={client.name}
+              isPublicView={false}
+            />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
