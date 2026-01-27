@@ -1,5 +1,12 @@
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { ConfidenceLevel, CONFIDENCE_CONFIG } from '@/lib/metricConfidence';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export interface KPIThreshold {
   yellow: number;
@@ -17,6 +24,8 @@ interface KPICardProps {
   threshold?: KPIThreshold;
   /** For cost metrics, higher is worse. For percent metrics like show rate, lower is worse */
   invertThreshold?: boolean;
+  /** Data confidence level for this metric */
+  confidence?: ConfidenceLevel;
 }
 
 export function KPICard({
@@ -29,6 +38,7 @@ export function KPICard({
   format = 'number',
   threshold,
   invertThreshold = false,
+  confidence,
 }: KPICardProps) {
   const formatValue = (val: string | number): string => {
     if (typeof val === 'string') return val;
@@ -83,10 +93,26 @@ export function KPICard({
       )}
       onClick={clickable ? onClick : undefined}
     >
-      <p className="text-sm font-medium text-muted-foreground">
-        {label}
-        {clickable && <span className="text-muted-foreground/70 ml-1 text-xs">(click to view)</span>}
-      </p>
+      <div className="flex items-center gap-1">
+        <p className="text-sm font-medium text-muted-foreground">
+          {label}
+          {clickable && <span className="text-muted-foreground/70 ml-1 text-xs">(click to view)</span>}
+        </p>
+        {confidence && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className={cn('text-xs cursor-help', CONFIDENCE_CONFIG[confidence].color)}>
+                  {CONFIDENCE_CONFIG[confidence].icon}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {CONFIDENCE_CONFIG[confidence].label} Confidence
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
       <p className="text-3xl font-semibold mt-2 tracking-tight tabular-nums">{formatValue(value)}</p>
       <div className={cn('flex items-center gap-1 mt-2 text-sm', getTrendColor())}>
         {getTrendIcon()}

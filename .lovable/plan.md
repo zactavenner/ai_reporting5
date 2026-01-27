@@ -1,9 +1,19 @@
 
 # Plan: Formalize Hybrid Data Ingestion Architecture
 
+## Status: ✅ IMPLEMENTED
+
 ## Summary
 
 Lock in the clean separation of concerns for the data ingestion system with three distinct layers: **Webhooks** for real-time funnel events, **GHL API** for reconciliation/enrichment, and **Make.com** for client-level ad spend. This plan also adds data confidence flags and a sync status UI.
+
+### Implementation Completed:
+- ✅ Database migration: Added `call_connected`, `call_duration_seconds`, `ghl_synced_at` to calls table
+- ✅ Database migration: Added `ghl_sync_*_enabled` and `ghl_last_*_sync` columns to client_settings
+- ✅ Edge function: Extended `sync-ghl-contacts` with `syncClientCallLogs()` for call validation
+- ✅ Types: Created `src/lib/metricConfidence.ts` with confidence level definitions
+- ✅ UI: Updated `KPICard.tsx` with confidence indicator tooltip
+- ✅ UI: Updated `ClientSettingsModal.tsx` with sync status display
 
 ---
 

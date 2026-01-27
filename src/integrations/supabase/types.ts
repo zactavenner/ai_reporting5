@@ -182,10 +182,13 @@ export type Database = {
       }
       calls: {
         Row: {
+          call_connected: boolean | null
+          call_duration_seconds: number | null
           client_id: string
           created_at: string
           direction: string | null
           external_id: string
+          ghl_synced_at: string | null
           id: string
           is_reconnect: boolean | null
           lead_id: string | null
@@ -199,10 +202,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          call_connected?: boolean | null
+          call_duration_seconds?: number | null
           client_id: string
           created_at?: string
           direction?: string | null
           external_id: string
+          ghl_synced_at?: string | null
           id?: string
           is_reconnect?: boolean | null
           lead_id?: string | null
@@ -216,10 +222,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          call_connected?: boolean | null
+          call_duration_seconds?: number | null
           client_id?: string
           created_at?: string
           direction?: string | null
           external_id?: string
+          ghl_synced_at?: string | null
           id?: string
           is_reconnect?: boolean | null
           lead_id?: string | null
@@ -376,6 +385,11 @@ export type Database = {
           email_parsing_enabled: boolean | null
           email_trusted_domains: string[] | null
           funded_investor_label: string | null
+          ghl_last_calls_sync: string | null
+          ghl_last_contacts_sync: string | null
+          ghl_sync_calls_enabled: boolean | null
+          ghl_sync_contacts_enabled: boolean | null
+          ghl_sync_conversations_enabled: boolean | null
           id: string
           monthly_ad_spend_target: number | null
           mrr: number | null
@@ -404,6 +418,11 @@ export type Database = {
           email_parsing_enabled?: boolean | null
           email_trusted_domains?: string[] | null
           funded_investor_label?: string | null
+          ghl_last_calls_sync?: string | null
+          ghl_last_contacts_sync?: string | null
+          ghl_sync_calls_enabled?: boolean | null
+          ghl_sync_contacts_enabled?: boolean | null
+          ghl_sync_conversations_enabled?: boolean | null
           id?: string
           monthly_ad_spend_target?: number | null
           mrr?: number | null
@@ -432,6 +451,11 @@ export type Database = {
           email_parsing_enabled?: boolean | null
           email_trusted_domains?: string[] | null
           funded_investor_label?: string | null
+          ghl_last_calls_sync?: string | null
+          ghl_last_contacts_sync?: string | null
+          ghl_sync_calls_enabled?: boolean | null
+          ghl_sync_contacts_enabled?: boolean | null
+          ghl_sync_conversations_enabled?: boolean | null
           id?: string
           monthly_ad_spend_target?: number | null
           mrr?: number | null

@@ -29,6 +29,16 @@ interface GHLContact {
   };
 }
 
+interface GHLCall {
+  id: string;
+  contactId: string;
+  direction: 'inbound' | 'outbound';
+  status: string;
+  duration?: number;
+  recordingUrl?: string;
+  dateAdded: string;
+}
+
 async function fetchGHLContacts(
   apiKey: string,
   locationId: string,
@@ -60,28 +70,146 @@ async function fetchGHLContacts(
   };
 }
 
-async function fetchGHLContact(
+async function fetchGHLConversations(
   apiKey: string,
-  contactId: string
-): Promise<GHLContact | null> {
+  locationId: string,
+  sinceDate: Date
+): Promise<GHLCall[]> {
   const headers = {
     'Authorization': `Bearer ${apiKey}`,
     'Content-Type': 'application/json',
     'Version': '2021-07-28',
   };
 
-  const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}`, {
-    method: 'GET',
-    headers,
-  });
+  const calls: GHLCall[] = [];
+  let hasMore = true;
+  let lastMessageId: string | undefined;
+  const MAX_PAGES = 10;
+  let pageCount = 0;
 
-  if (!response.ok) {
-    console.error(`Failed to fetch contact ${contactId}: ${response.status}`);
-    return null;
+  try {
+    while (hasMore && pageCount < MAX_PAGES) {
+      let url = `${GHL_BASE_URL}/conversations/search?locationId=${locationId}&type=TYPE_CALL`;
+      if (lastMessageId) {
+        url += `&startAfterId=${lastMessageId}`;
+      }
+
+      const response = await fetch(url, { method: 'GET', headers });
+      
+      if (!response.ok) {
+        console.error(`GHL Conversations API error: ${response.status}`);
+        break;
+      }
+
+      const data = await response.json();
+      const conversations = data.conversations || [];
+
+      for (const conv of conversations) {
+        if (!conv.lastMessageDate || new Date(conv.lastMessageDate) < sinceDate) {
+          hasMore = false;
+          break;
+        }
+
+        // Extract call messages from conversation
+        if (conv.type === 'TYPE_CALL' && conv.contactId) {
+          calls.push({
+            id: conv.id,
+            contactId: conv.contactId,
+            direction: conv.lastMessageDirection === 'inbound' ? 'inbound' : 'outbound',
+            status: conv.lastMessageStatus || 'unknown',
+            duration: conv.lastCallDuration || undefined,
+            recordingUrl: conv.lastCallRecording || undefined,
+            dateAdded: conv.lastMessageDate,
+          });
+        }
+      }
+
+      if (conversations.length > 0) {
+        lastMessageId = conversations[conversations.length - 1].id;
+      } else {
+        hasMore = false;
+      }
+
+      pageCount++;
+      await new Promise(resolve => setTimeout(resolve, 300)); // Rate limiting
+    }
+  } catch (err) {
+    console.error('Error fetching GHL conversations:', err);
   }
 
-  const data = await response.json();
-  return data.contact || null;
+  return calls;
+}
+
+async function syncCallToDatabase(
+  supabase: any,
+  clientId: string,
+  ghlCall: GHLCall
+): Promise<{ action: 'enriched' | 'skipped' }> {
+  // Find matching call by contact external_id or lead's external_id
+  const { data: existingCall } = await supabase
+    .from('calls')
+    .select('id, external_id, call_connected, recording_url')
+    .eq('client_id', clientId)
+    .or(`external_id.eq.${ghlCall.id},external_id.eq.${ghlCall.contactId}`)
+    .maybeSingle();
+
+  if (existingCall) {
+    // Enrich existing call with API data - DO NOT override 'showed' field
+    const updates: Record<string, any> = {
+      call_connected: ghlCall.status === 'completed' || ghlCall.status === 'answered',
+      ghl_synced_at: new Date().toISOString(),
+    };
+
+    if (ghlCall.duration && ghlCall.duration > 0) {
+      updates.call_duration_seconds = ghlCall.duration;
+    }
+
+    if (ghlCall.recordingUrl && !existingCall.recording_url) {
+      updates.recording_url = ghlCall.recordingUrl;
+    }
+
+    await supabase
+      .from('calls')
+      .update(updates)
+      .eq('id', existingCall.id);
+
+    return { action: 'enriched' };
+  }
+
+  return { action: 'skipped' };
+}
+
+async function syncClientCallLogs(
+  supabase: any,
+  client: { id: string; name: string; ghl_api_key: string; ghl_location_id: string },
+  sinceDate: Date
+): Promise<{ enriched: number; skipped: number; errors: string[] }> {
+  const result = { enriched: 0, skipped: 0, errors: [] as string[] };
+
+  console.log(`Starting GHL call sync for client: ${client.name}`);
+
+  try {
+    const calls = await fetchGHLConversations(client.ghl_api_key, client.ghl_location_id, sinceDate);
+    console.log(`Fetched ${calls.length} calls for ${client.name}`);
+
+    for (const call of calls) {
+      try {
+        const syncResult = await syncCallToDatabase(supabase, client.id, call);
+        if (syncResult.action === 'enriched') result.enriched++;
+        else result.skipped++;
+      } catch (err) {
+        result.errors.push(`Call ${call.id}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        result.skipped++;
+      }
+    }
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    result.errors.push(`Call sync failed: ${errorMsg}`);
+    console.error(`GHL call sync error for ${client.name}:`, errorMsg);
+  }
+
+  console.log(`GHL call sync complete for ${client.name}: enriched=${result.enriched}, skipped=${result.skipped}`);
+  return result;
 }
 
 function parseCustomFields(customFields: any[] | undefined): Record<string, any> {
@@ -90,7 +218,6 @@ function parseCustomFields(customFields: any[] | undefined): Record<string, any>
   const result: Record<string, any> = {};
   for (const field of customFields) {
     if (field.id && field.value !== undefined && field.value !== null && field.value !== '') {
-      // Use field name if available, otherwise use ID
       const key = field.fieldKey || field.id;
       result[key] = field.value;
     }
@@ -100,7 +227,6 @@ function parseCustomFields(customFields: any[] | undefined): Record<string, any>
 
 function extractQuestionsFromCustomFields(customFields: Record<string, any>): any[] {
   const questions: any[] = [];
-  // Skip these fields as they're not actual questions
   const skipFields = new Set([
     'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
     'campaign_name', 'ad_set_name', 'ad_id', 'assigned_user', 'source',
@@ -124,7 +250,6 @@ function extractCampaignAttribution(contact: GHLContact, customFields: Record<st
   ad_set_name: string | null;
   ad_id: string | null;
 } {
-  // Try multiple field names for campaign
   const campaignFields = ['Campaign Tracker', 'campaign', 'campaign_name', 'utm_campaign'];
   const adSetFields = ['Ad Set', 'ad_set', 'ad_set_name', 'adset_name'];
   const adIdFields = ['Ad ID', 'ad_id', 'adId'];
@@ -133,7 +258,6 @@ function extractCampaignAttribution(contact: GHLContact, customFields: Record<st
   let ad_set_name: string | null = null;
   let ad_id: string | null = null;
   
-  // Check custom fields first
   for (const field of campaignFields) {
     if (customFields[field]) {
       campaign_name = String(customFields[field]);
@@ -155,7 +279,6 @@ function extractCampaignAttribution(contact: GHLContact, customFields: Record<st
     }
   }
   
-  // Fallback to UTM campaign from attribution source
   if (!campaign_name && contact.attributionSource?.utm_campaign) {
     campaign_name = contact.attributionSource.utm_campaign;
   }
@@ -177,10 +300,8 @@ async function syncContactToDatabase(
   const questions = extractQuestionsFromCustomFields(customFields);
   const campaignAttribution = extractCampaignAttribution(contact, customFields);
   
-  // Extract UTMs from attribution
   const attribution = contact.attributionSource || {};
   
-  // Check if lead already exists
   const { data: existingLead } = await supabase
     .from('leads')
     .select('id, updated_at')
@@ -209,7 +330,6 @@ async function syncContactToDatabase(
   };
 
   if (existingLead) {
-    // Update existing lead
     const { error } = await supabase
       .from('leads')
       .update(leadData)
@@ -221,7 +341,6 @@ async function syncContactToDatabase(
     }
     return { action: 'updated', leadId: existingLead.id };
   } else {
-    // Create new lead
     const { data: newLead, error } = await supabase
       .from('leads')
       .insert({
@@ -251,7 +370,7 @@ async function syncClientContacts(
   let hasMore = true;
   let startAfterId: string | undefined;
   let totalProcessed = 0;
-  const MAX_CONTACTS = 1000; // Safety limit per client
+  const MAX_CONTACTS = 1000;
 
   try {
     while (hasMore && totalProcessed < MAX_CONTACTS) {
@@ -277,14 +396,12 @@ async function syncClientContacts(
         totalProcessed++;
       }
 
-      // Check if there are more pages
       if (nextPageUrl && contacts.length === 100) {
         startAfterId = contacts[contacts.length - 1].id;
       } else {
         hasMore = false;
       }
 
-      // Rate limiting - GHL has rate limits
       await new Promise(resolve => setTimeout(resolve, 500));
     }
   } catch (err) {
@@ -307,11 +424,13 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
-    // Parse optional client_id from request body
     let targetClientId: string | null = null;
+    let syncType: 'contacts' | 'calls' | 'all' = 'all';
+    
     try {
       const body = await req.json();
       targetClientId = body?.client_id || null;
+      syncType = body?.syncType || 'all';
     } catch {
       // No body or invalid JSON - sync all clients
     }
@@ -341,63 +460,95 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Starting GHL sync for ${clients.length} client(s)`);
+    console.log(`Starting GHL ${syncType} sync for ${clients.length} client(s)`);
 
     const results: Array<{
       client_id: string;
       client_name: string;
-      created: number;
-      updated: number;
-      skipped: number;
-      errors: string[];
+      contacts?: { created: number; updated: number; skipped: number; errors: string[] };
+      calls?: { enriched: number; skipped: number; errors: string[] };
     }> = [];
 
+    // Default to syncing from last 7 days for calls
+    const sinceDate = new Date();
+    sinceDate.setDate(sinceDate.getDate() - 7);
+
     for (const client of clients) {
+      const clientResult: typeof results[0] = {
+        client_id: client.id,
+        client_name: client.name,
+      };
+
       // Log sync start
       const { data: syncLog } = await supabase
         .from('sync_logs')
         .insert({
           client_id: client.id,
-          sync_type: 'ghl_contacts',
+          sync_type: syncType === 'calls' ? 'ghl_calls' : 'ghl_contacts',
           status: 'running',
         })
         .select('id')
         .single();
 
-      const syncResult = await syncClientContacts(supabase, client as any);
-      
-      results.push({
-        client_id: client.id,
-        client_name: client.name,
-        ...syncResult,
-      });
+      // Sync contacts
+      if (syncType === 'contacts' || syncType === 'all') {
+        clientResult.contacts = await syncClientContacts(supabase, client as any);
+        
+        // Update last contacts sync timestamp
+        await supabase
+          .from('client_settings')
+          .update({ ghl_last_contacts_sync: new Date().toISOString() })
+          .eq('client_id', client.id);
+      }
+
+      // Sync calls
+      if (syncType === 'calls' || syncType === 'all') {
+        clientResult.calls = await syncClientCallLogs(supabase, client as any, sinceDate);
+        
+        // Update last calls sync timestamp
+        await supabase
+          .from('client_settings')
+          .update({ ghl_last_calls_sync: new Date().toISOString() })
+          .eq('client_id', client.id);
+      }
+
+      results.push(clientResult);
 
       // Update sync log
       if (syncLog) {
+        const hasErrors = (clientResult.contacts?.errors?.length || 0) > 0 || 
+                         (clientResult.calls?.errors?.length || 0) > 0;
+        const recordsSynced = (clientResult.contacts?.created || 0) + 
+                             (clientResult.contacts?.updated || 0) +
+                             (clientResult.calls?.enriched || 0);
+        
         await supabase
           .from('sync_logs')
           .update({
-            status: syncResult.errors.length > 0 ? 'partial' : 'success',
-            records_synced: syncResult.created + syncResult.updated,
-            error_message: syncResult.errors.length > 0 ? syncResult.errors.join('; ') : null,
+            status: hasErrors ? 'partial' : 'success',
+            records_synced: recordsSynced,
+            error_message: hasErrors ? 
+              [...(clientResult.contacts?.errors || []), ...(clientResult.calls?.errors || [])].join('; ') : null,
             completed_at: new Date().toISOString(),
           })
           .eq('id', syncLog.id);
       }
     }
 
-    const totalCreated = results.reduce((sum, r) => sum + r.created, 0);
-    const totalUpdated = results.reduce((sum, r) => sum + r.updated, 0);
+    const totalContactsCreated = results.reduce((sum, r) => sum + (r.contacts?.created || 0), 0);
+    const totalContactsUpdated = results.reduce((sum, r) => sum + (r.contacts?.updated || 0), 0);
+    const totalCallsEnriched = results.reduce((sum, r) => sum + (r.calls?.enriched || 0), 0);
 
-    console.log(`GHL sync complete: ${totalCreated} created, ${totalUpdated} updated across ${clients.length} clients`);
+    console.log(`GHL sync complete: ${totalContactsCreated} contacts created, ${totalContactsUpdated} updated, ${totalCallsEnriched} calls enriched`);
 
     return new Response(
       JSON.stringify({
         success: true,
         summary: {
           clients_synced: clients.length,
-          total_created: totalCreated,
-          total_updated: totalUpdated,
+          total_contacts_created: totalContactsCreated,
+          total_contacts_updated: totalContactsUpdated,
+          total_calls_enriched: totalCallsEnriched,
         },
         results,
       }),

@@ -543,6 +543,26 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
                 )}
               </div>
 
+              {/* Last Sync Status */}
+              {settings?.ghl_last_contacts_sync && (
+                <div className="p-3 border-2 border-border bg-muted/30 space-y-1">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Last Contacts Sync:</span>
+                    <span className="font-medium">
+                      {new Date(settings.ghl_last_contacts_sync).toLocaleString()}
+                    </span>
+                  </div>
+                  {settings?.ghl_last_calls_sync && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">Last Calls Sync:</span>
+                      <span className="font-medium">
+                        {new Date(settings.ghl_last_calls_sync).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-2 pt-2">
                 <Button
                   type="button"
@@ -573,7 +593,7 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
                   ) : (
                     <>
                       <RefreshCw className="h-4 w-4 mr-2" />
-                      Sync Contacts Now
+                      Sync Now
                     </>
                   )}
                 </Button>
@@ -589,7 +609,7 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
                 <li>Contacts (read/write) - Required for syncing leads</li>
                 <li>Calendars (read) - For appointment data</li>
                 <li>Opportunities (read) - For pipeline tracking</li>
-                <li>Conversations (write) - Optional, for notifications</li>
+                <li>Conversations (read) - For call validation</li>
               </ul>
             </div>
           </TabsContent>

@@ -21,6 +21,12 @@ export interface ClientSettings {
   monthly_ad_spend_target: number;
   daily_ad_spend_target: number | null;
   total_raise_amount: number;
+  // GHL sync settings
+  ghl_sync_contacts_enabled?: boolean;
+  ghl_sync_calls_enabled?: boolean;
+  ghl_sync_conversations_enabled?: boolean;
+  ghl_last_contacts_sync?: string | null;
+  ghl_last_calls_sync?: string | null;
 }
 
 export interface KPIThresholds {
@@ -49,6 +55,12 @@ const defaultSettings: Omit<ClientSettings, 'id' | 'client_id'> = {
   monthly_ad_spend_target: 0,
   daily_ad_spend_target: null,
   total_raise_amount: 0,
+  // GHL sync defaults
+  ghl_sync_contacts_enabled: true,
+  ghl_sync_calls_enabled: true,
+  ghl_sync_conversations_enabled: false,
+  ghl_last_contacts_sync: null,
+  ghl_last_calls_sync: null,
 };
 
 export function useClientSettings(clientId: string | undefined) {
