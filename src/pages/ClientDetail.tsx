@@ -294,18 +294,11 @@ export default function ClientDetail() {
             Overview
           </Button>
           <Button 
-            variant={activeTab === 'attribution' ? 'default' : 'outline'} 
-            size="sm"
-            onClick={() => setActiveTab('attribution')}
-          >
-            Attribution
-          </Button>
-          <Button 
             variant={activeTab === 'records' ? 'default' : 'outline'} 
             size="sm"
             onClick={() => setActiveTab('records')}
           >
-            Detailed Records
+            Attribution & Records
           </Button>
           <Button 
             variant={activeTab === 'tasks' ? 'default' : 'outline'} 
@@ -407,29 +400,36 @@ export default function ClientDetail() {
           </>
         )}
 
-        {/* Detailed Records Tab */}
+        {/* Attribution & Records Tab */}
         {activeTab === 'records' && (
-          <InlineRecordsView
-            dailyMetrics={dailyMetrics}
-            leads={leads}
-            calls={calls}
-            fundedInvestors={fundedInvestors}
-            isLoading={metricsLoading || leadsLoading}
-            onRecordSelect={handleRecordSelect}
-            selectedRecord={selectedRecord}
-            selectedType={selectedType}
-            clientId={clientId}
-            ghlLocationId={client.ghl_location_id}
-          />
-        )}
+          <div className="space-y-6">
+            {/* Attribution Section */}
+            <section>
+              <h2 className="text-lg font-bold mb-4">Attribution</h2>
+              <AttributionDashboard 
+                leads={leads} 
+                calls={calls} 
+                fundedInvestors={fundedInvestors} 
+              />
+            </section>
 
-        {/* Attribution Tab */}
-        {activeTab === 'attribution' && (
-          <AttributionDashboard 
-            leads={leads} 
-            calls={calls} 
-            fundedInvestors={fundedInvestors} 
-          />
+            {/* Detailed Records Section */}
+            <section>
+              <h2 className="text-lg font-bold mb-4">Detailed Records</h2>
+              <InlineRecordsView
+                dailyMetrics={dailyMetrics}
+                leads={leads}
+                calls={calls}
+                fundedInvestors={fundedInvestors}
+                isLoading={metricsLoading || leadsLoading}
+                onRecordSelect={handleRecordSelect}
+                selectedRecord={selectedRecord}
+                selectedType={selectedType}
+                clientId={clientId}
+                ghlLocationId={client.ghl_location_id}
+              />
+            </section>
+          </div>
         )}
 
         {/* Tasks Tab */}
