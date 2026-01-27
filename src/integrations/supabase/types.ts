@@ -528,6 +528,7 @@ export type Database = {
           name: string
           public_token: string | null
           slug: string | null
+          sort_order: number | null
           status: string
           updated_at: string
           webhook_secret: string | null
@@ -544,6 +545,7 @@ export type Database = {
           name: string
           public_token?: string | null
           slug?: string | null
+          sort_order?: number | null
           status?: string
           updated_at?: string
           webhook_secret?: string | null
@@ -560,6 +562,7 @@ export type Database = {
           name?: string
           public_token?: string | null
           slug?: string | null
+          sort_order?: number | null
           status?: string
           updated_at?: string
           webhook_secret?: string | null

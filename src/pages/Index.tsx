@@ -29,6 +29,7 @@ import { useMeetings, usePendingMeetingTasks, useSyncMeetings } from '@/hooks/us
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { exportToCSV } from '@/lib/exportUtils';
 import { useQueryClient } from '@tanstack/react-query';
+import { useUpdateClientOrder } from '@/hooks/useClientOrder';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -37,11 +38,11 @@ const Index = () => {
   const [agencySettingsOpen, setAgencySettingsOpen] = useState(false);
   const [addClientOpen, setAddClientOpen] = useState(false);
   const [deleteClient, setDeleteClient] = useState<Client | null>(null);
-  const [clientOrder, setClientOrder] = useState<string[]>([]);
   const [metricsCustomizeOpen, setMetricsCustomizeOpen] = useState(false);
   const [drillDownModal, setDrillDownModal] = useState<string | null>(null);
   const [pendingTasksOpen, setPendingTasksOpen] = useState(false);
   const queryClient = useQueryClient();
+  const updateClientOrder = useUpdateClientOrder();
 
   const { startDate, endDate } = useDateFilter();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
@@ -117,22 +118,9 @@ const Index = () => {
   };
 
   const handleReorder = (orderedIds: string[]) => {
-    setClientOrder(orderedIds);
-    // In production, persist this order to user preferences or database
+    // Persist the new order to the database
+    updateClientOrder.mutate(orderedIds);
   };
-
-  // Order clients based on drag-drop order
-  const orderedClients = useMemo(() => {
-    if (clientOrder.length === 0) return clients;
-    return [...clients].sort((a, b) => {
-      const aIndex = clientOrder.indexOf(a.id);
-      const bIndex = clientOrder.indexOf(b.id);
-      if (aIndex === -1 && bIndex === -1) return 0;
-      if (aIndex === -1) return 1;
-      if (bIndex === -1) return -1;
-      return aIndex - bIndex;
-    });
-  }, [clients, clientOrder]);
 
   const isLoading = clientsLoading || metricsLoading;
 
@@ -192,13 +180,13 @@ const Index = () => {
           ) : (
             <>
               <AgencyStatsBar 
-                clients={orderedClients}
+                clients={clients}
                 clientMRRSettings={clientMRRSettings}
                 clientAdSpends={clientAdSpends}
                 clientFullSettings={clientFullSettings}
               />
               <DraggableClientTable
-                clients={orderedClients}
+                clients={clients}
                 metrics={clientMetrics}
                 thresholds={clientThresholds}
                 fullSettings={clientFullSettings}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Client, useUpdateClient } from '@/hooks/useClients';
 import { AggregatedMetrics } from '@/hooks/useMetrics';
 import { KPIThresholds, ClientSettings, getEffectiveDailyTarget, getEffectiveMonthlyTarget } from '@/hooks/useClientSettings';
@@ -20,10 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3, TrendingUp, TrendingDown, Minus, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { SortConfig, SortDirection } from './SortableTableHeader';
 
 interface DraggableClientTableProps {
   clients: Client[];
@@ -53,13 +54,150 @@ export function DraggableClientTable({
   onReorder,
 }: DraggableClientTableProps) {
   const navigate = useNavigate();
-  const [orderedClients, setOrderedClients] = useState(clients);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ column: '', direction: null });
   const updateClient = useUpdateClient();
 
-  useEffect(() => {
-    setOrderedClients(clients);
-  }, [clients]);
+  // Calculate computed values for sorting
+  const clientsWithComputedValues = useMemo(() => {
+    return clients.map(client => {
+      const m = metrics[client.id] || {} as AggregatedMetrics;
+      const s = fullSettings[client.id];
+      const showedPercent = (m.totalCalls || 0) > 0 ? ((m.showedCalls || 0) / (m.totalCalls || 1) * 100) : 0;
+      const costOfCapital = m.fundedDollars > 0 ? ((m.totalAdSpend || 0) / m.fundedDollars * 100) : 0;
+      const costPerInvestor = m.fundedInvestors > 0 ? (m.totalAdSpend || 0) / m.fundedInvestors : 0;
+      
+      // Calculate estimated revenue
+      let estRevenue = 0;
+      if (s) {
+        const monthlyTarget = getEffectiveMonthlyTarget(s);
+        estRevenue = calculateClientRevenue(
+          s.mrr || 0,
+          monthlyTarget,
+          s.ad_spend_fee_threshold || 30000,
+          s.ad_spend_fee_percent || 10
+        );
+      }
+
+      return {
+        client,
+        metrics: m,
+        computed: {
+          showedPercent,
+          costOfCapital,
+          costPerInvestor,
+          estRevenue,
+        },
+      };
+    });
+  }, [clients, metrics, fullSettings]);
+
+  // Sort clients based on sort config
+  const sortedClients = useMemo(() => {
+    if (!sortConfig.column || !sortConfig.direction) {
+      return clientsWithComputedValues;
+    }
+
+    return [...clientsWithComputedValues].sort((a, b) => {
+      let aVal: number = 0;
+      let bVal: number = 0;
+
+      // Map column names to values
+      switch (sortConfig.column) {
+        case 'adSpend':
+          aVal = a.metrics.totalAdSpend || 0;
+          bVal = b.metrics.totalAdSpend || 0;
+          break;
+        case 'ctr':
+          aVal = a.metrics.ctr || 0;
+          bVal = b.metrics.ctr || 0;
+          break;
+        case 'leads':
+          aVal = a.metrics.totalLeads || 0;
+          bVal = b.metrics.totalLeads || 0;
+          break;
+        case 'spam':
+          aVal = a.metrics.spamLeads || 0;
+          bVal = b.metrics.spamLeads || 0;
+          break;
+        case 'cpl':
+          aVal = a.metrics.costPerLead || 0;
+          bVal = b.metrics.costPerLead || 0;
+          break;
+        case 'calls':
+          aVal = a.metrics.totalCalls || 0;
+          bVal = b.metrics.totalCalls || 0;
+          break;
+        case 'costPerCall':
+          aVal = a.metrics.costPerCall || 0;
+          bVal = b.metrics.costPerCall || 0;
+          break;
+        case 'showed':
+          aVal = a.metrics.showedCalls || 0;
+          bVal = b.metrics.showedCalls || 0;
+          break;
+        case 'showedPercent':
+          aVal = a.computed.showedPercent;
+          bVal = b.computed.showedPercent;
+          break;
+        case 'costPerShow':
+          aVal = a.metrics.costPerShow || 0;
+          bVal = b.metrics.costPerShow || 0;
+          break;
+        case 'commit':
+          aVal = a.metrics.totalCommitments || 0;
+          bVal = b.metrics.totalCommitments || 0;
+          break;
+        case 'commitDollars':
+          aVal = a.metrics.commitmentDollars || 0;
+          bVal = b.metrics.commitmentDollars || 0;
+          break;
+        case 'funded':
+          aVal = a.metrics.fundedInvestors || 0;
+          bVal = b.metrics.fundedInvestors || 0;
+          break;
+        case 'fundedDollars':
+          aVal = a.metrics.fundedDollars || 0;
+          bVal = b.metrics.fundedDollars || 0;
+          break;
+        case 'costPerInvestor':
+          aVal = a.computed.costPerInvestor;
+          bVal = b.computed.costPerInvestor;
+          break;
+        case 'coc':
+          aVal = a.computed.costOfCapital;
+          bVal = b.computed.costOfCapital;
+          break;
+        case 'estRev':
+          aVal = a.computed.estRevenue;
+          bVal = b.computed.estRevenue;
+          break;
+        default:
+          return 0;
+      }
+
+      if (sortConfig.direction === 'asc') {
+        return aVal - bVal;
+      } else {
+        return bVal - aVal;
+      }
+    });
+  }, [clientsWithComputedValues, sortConfig]);
+
+  const handleSort = (column: string) => {
+    setSortConfig(prev => {
+      if (prev.column === column) {
+        // Toggle through: asc -> desc -> null
+        if (prev.direction === 'asc') {
+          return { column, direction: 'desc' };
+        } else if (prev.direction === 'desc') {
+          return { column: '', direction: null };
+        }
+      }
+      // Start with descending (highest first) for metrics
+      return { column, direction: 'desc' };
+    });
+  };
 
   const getStatusVariant = (status: string) => {
     switch (status) {
@@ -115,15 +253,16 @@ export function DraggableClientTable({
     e.preventDefault();
     if (!draggedId || draggedId === targetId) return;
 
-    const draggedIndex = orderedClients.findIndex(c => c.id === draggedId);
-    const targetIndex = orderedClients.findIndex(c => c.id === targetId);
+    const draggedIndex = sortedClients.findIndex(c => c.client.id === draggedId);
+    const targetIndex = sortedClients.findIndex(c => c.client.id === targetId);
 
-    const newOrder = [...orderedClients];
+    const newOrder = [...sortedClients];
     const [removed] = newOrder.splice(draggedIndex, 1);
     newOrder.splice(targetIndex, 0, removed);
 
-    setOrderedClients(newOrder);
-    onReorder?.(newOrder.map(c => c.id));
+    // Clear sort when drag-dropping (manual order takes precedence)
+    setSortConfig({ column: '', direction: null });
+    onReorder?.(newOrder.map(c => c.client.id));
     setDraggedId(null);
   };
 
@@ -204,37 +343,32 @@ export function DraggableClientTable({
             <TableHead className="w-8"></TableHead>
             <TableHead className="font-bold text-sm">Client</TableHead>
             <TableHead className="font-bold text-sm">Status</TableHead>
-            <TableHead className="font-bold text-sm text-right">Ad Spend</TableHead>
+            <SortableHeader column="adSpend" label="Ad Spend" sortConfig={sortConfig} onSort={handleSort} />
             <TableHead className="font-bold text-sm text-center">Pacing</TableHead>
-            <TableHead className="font-bold text-sm text-right">CTR</TableHead>
-            <TableHead className="font-bold text-sm text-right">Leads</TableHead>
-            <TableHead className="font-bold text-sm text-right">Spam/Bad</TableHead>
-            <TableHead className="font-bold text-sm text-right">CPL</TableHead>
-            <TableHead className="font-bold text-sm text-right">Calls</TableHead>
-            <TableHead className="font-bold text-sm text-right">Cost/Call</TableHead>
-            <TableHead className="font-bold text-sm text-right">Showed</TableHead>
-            <TableHead className="font-bold text-sm text-right">Showed %</TableHead>
-            <TableHead className="font-bold text-sm text-right">Cost/Show</TableHead>
-            <TableHead className="font-bold text-sm text-right">Commit</TableHead>
-            <TableHead className="font-bold text-sm text-right">Commit $</TableHead>
-            <TableHead className="font-bold text-sm text-right">Funded</TableHead>
-            <TableHead className="font-bold text-sm text-right">Funded $</TableHead>
-            <TableHead className="font-bold text-sm text-right">Cost/Inv</TableHead>
-            <TableHead className="font-bold text-sm text-right">CoC %</TableHead>
-            <TableHead className="font-bold text-sm text-right">Est. Rev</TableHead>
+            <SortableHeader column="ctr" label="CTR" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHeader column="leads" label="Leads" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHeader column="spam" label="Spam/Bad" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHeader column="cpl" label="CPL" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHeader column="calls" label="Calls" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHeader column="costPerCall" label="Cost/Call" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHeader column="showed" label="Showed" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHeader column="showedPercent" label="Showed %" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHeader column="costPerShow" label="Cost/Show" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHeader column="commit" label="Commit" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHeader column="commitDollars" label="Commit $" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHeader column="funded" label="Funded" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHeader column="fundedDollars" label="Funded $" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHeader column="costPerInvestor" label="Cost/Inv" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHeader column="coc" label="CoC %" sortConfig={sortConfig} onSort={handleSort} />
+            <SortableHeader column="estRev" label="Est. Rev" sortConfig={sortConfig} onSort={handleSort} />
             <TableHead className="font-bold text-sm">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {orderedClients.map((client) => {
-            const m = metrics[client.id] || {} as AggregatedMetrics;
+          {sortedClients.map(({ client, metrics: m, computed }) => {
             const t = thresholds[client.id] || {};
             const s = fullSettings[client.id];
-            const showedPercent = (m.totalCalls || 0) > 0 ? ((m.showedCalls || 0) / (m.totalCalls || 1) * 100) : 0;
-            const costOfCapital = m.fundedDollars > 0 ? ((m.totalAdSpend || 0) / m.fundedDollars * 100) : 0;
-            const costPerInvestor = m.fundedInvestors > 0 ? (m.totalAdSpend || 0) / m.fundedInvestors : 0;
             const pacing = getPacingStatus(m.totalAdSpend || 0, s);
-            const estRevenue = getEstimatedRevenue(s);
             const PacingIcon = pacing.icon;
             
             return (
@@ -308,9 +442,9 @@ export function DraggableClientTable({
                 <TableCell className="text-right font-mono tabular-nums text-sm">{m.showedCalls || 0}</TableCell>
                 <TableCell className={cn(
                   "text-right font-mono tabular-nums text-sm",
-                  getShowedPercentColor(showedPercent)
+                  getShowedPercentColor(computed.showedPercent)
                 )}>
-                  {formatPercent(showedPercent)}
+                  {formatPercent(computed.showedPercent)}
                 </TableCell>
                 <TableCell className={cn(
                   "text-right font-mono tabular-nums text-sm",
@@ -329,18 +463,18 @@ export function DraggableClientTable({
                 </TableCell>
                 <TableCell className={cn(
                   "text-right font-mono tabular-nums text-sm",
-                  getThresholdColor(costPerInvestor, t.costPerInvestor)
+                  getThresholdColor(computed.costPerInvestor, t.costPerInvestor)
                 )}>
-                  {formatCurrency(costPerInvestor)}
+                  {formatCurrency(computed.costPerInvestor)}
                 </TableCell>
                 <TableCell className={cn(
                   "text-right font-mono tabular-nums text-sm",
-                  getCostOfCapitalColor(costOfCapital, t.costOfCapital)
+                  getCostOfCapitalColor(computed.costOfCapital, t.costOfCapital)
                 )}>
-                  {formatPercent(costOfCapital)}
+                  {formatPercent(computed.costOfCapital)}
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums text-sm text-chart-2 font-semibold">
-                  {estRevenue > 0 ? formatCurrency(estRevenue) : '-'}
+                  {computed.estRevenue > 0 ? formatCurrency(computed.estRevenue) : '-'}
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1">
@@ -395,5 +529,39 @@ export function DraggableClientTable({
         </TableBody>
       </Table>
     </div>
+  );
+}
+
+// Inline sortable header component
+function SortableHeader({
+  column,
+  label,
+  sortConfig,
+  onSort,
+}: {
+  column: string;
+  label: string;
+  sortConfig: SortConfig;
+  onSort: (column: string) => void;
+}) {
+  const isActive = sortConfig.column === column;
+  const direction = isActive ? sortConfig.direction : null;
+
+  return (
+    <TableHead
+      className="font-bold text-sm text-right cursor-pointer select-none hover:bg-muted/50 transition-colors"
+      onClick={() => onSort(column)}
+    >
+      <div className="flex items-center gap-1 justify-end">
+        <span>{label}</span>
+        {direction === 'asc' ? (
+          <ArrowUp className="h-3 w-3" />
+        ) : direction === 'desc' ? (
+          <ArrowDown className="h-3 w-3" />
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-30" />
+        )}
+      </div>
+    </TableHead>
   );
 }
