@@ -77,6 +77,7 @@ export function PendingTasksReview({
       title: task.title,
       description: task.description || '',
       priority: task.priority,
+      meetingId: task.meeting_id || null,
     });
   };
 

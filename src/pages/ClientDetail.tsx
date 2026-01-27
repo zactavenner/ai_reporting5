@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Settings, DollarSign, Upload, History, Plus, ExternalLink, X, ClipboardList, Phone, Users, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Settings, DollarSign, Upload, History, Plus, ExternalLink, X, ClipboardList, Phone, Users, BarChart3, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { VoiceRecordButton } from '@/components/voice/VoiceRecordButton';
 import { ActivityPanel } from '@/components/activity/ActivityPanel';
+import { ClientMeetingsSection } from '@/components/meetings/ClientMeetingsSection';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
@@ -391,6 +392,17 @@ export default function ClientDetail() {
               clientName={client.name} 
               isPublicView={false}
             />
+
+            {/* Client Meetings Section */}
+            {meetings.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <Video className="h-5 w-5 text-muted-foreground" />
+                  <h2 className="text-lg font-bold">Recent Meetings</h2>
+                </div>
+                <ClientMeetingsSection meetings={meetings} client={client} />
+              </section>
+            )}
           </>
         )}
 

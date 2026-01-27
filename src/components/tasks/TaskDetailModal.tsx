@@ -35,11 +35,15 @@ import {
   Clock,
   User,
   CheckCircle2,
+  Video,
+  ExternalLink,
+  Mic,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
   Task,
+  TaskComment,
   useUpdateTask,
   useDeleteTask,
   useTaskComments,
@@ -49,6 +53,8 @@ import {
   useUploadTaskFile,
   useAgencyMembers,
 } from '@/hooks/useTasks';
+import { useMeetings } from '@/hooks/useMeetings';
+import { TaskDiscussionVoiceNote, VoiceNotePlayer } from './TaskDiscussionVoiceNote';
 
 interface TaskDetailModalProps {
   task: Task | null;
@@ -65,6 +71,7 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
   const { data: files = [] } = useTaskFiles(task?.id);
   const { data: history = [] } = useTaskHistory(task?.id);
   const { data: agencyMembers = [] } = useAgencyMembers();
+  const { data: meetings = [] } = useMeetings();
   const addComment = useAddTaskComment();
   const uploadFile = useUploadTaskFile();
   
@@ -181,6 +188,29 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
           {clientName && (
             <p className="text-sm text-muted-foreground">Client: {clientName}</p>
           )}
+          {/* MeetGeek Reference Link */}
+          {(task as any).meeting_id && (() => {
+            const meeting = meetings.find(m => m.id === (task as any).meeting_id);
+            return meeting ? (
+              <div className="flex items-center gap-2 mt-1">
+                <Video className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">From meeting:</span>
+                {meeting.meetgeek_url ? (
+                  <a 
+                    href={meeting.meetgeek_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-primary hover:underline flex items-center gap-1"
+                  >
+                    {meeting.title}
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  <span className="text-sm">{meeting.title}</span>
+                )}
+              </div>
+            ) : null;
+          })()}
         </DialogHeader>
         
         <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
@@ -332,15 +362,37 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
                     No comments yet
                   </p>
                 ) : (
-                  comments.map(comment => (
+                  comments.map((comment: TaskComment) => (
                     <div key={comment.id} className="border rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-sm">{comment.author_name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{comment.author_name}</span>
+                          {comment.comment_type === 'voice' && (
+                            <Badge variant="outline" className="text-xs">
+                              <Mic className="h-3 w-3 mr-1" />
+                              Voice
+                            </Badge>
+                          )}
+                        </div>
                         <span className="text-xs text-muted-foreground">
                           {format(new Date(comment.created_at), 'PPp')}
                         </span>
                       </div>
-                      <p className="text-sm">{comment.content}</p>
+                      {/* Voice Note Player */}
+                      {comment.comment_type === 'voice' && comment.audio_url && (
+                        <div className="mb-2">
+                          <VoiceNotePlayer 
+                            audioUrl={comment.audio_url} 
+                            duration={comment.duration_seconds || undefined} 
+                          />
+                        </div>
+                      )}
+                      {/* Transcript or Text Content */}
+                      <p className="text-sm">
+                        {comment.comment_type === 'voice' && comment.transcript 
+                          ? comment.transcript 
+                          : comment.content}
+                      </p>
                     </div>
                   ))
                 )}
@@ -352,6 +404,11 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder="Add a comment..."
                 onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
+                className="flex-1"
+              />
+              <TaskDiscussionVoiceNote 
+                taskId={task.id} 
+                authorName={isPublicView ? 'Client' : 'Agency'}
               />
               <Button 
                 onClick={handleAddComment}

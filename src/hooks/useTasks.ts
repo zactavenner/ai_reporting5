@@ -15,6 +15,7 @@ export interface Task {
   due_date: string | null;
   created_by: string | null;
   completed_at: string | null;
+  meeting_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -24,6 +25,10 @@ export interface TaskComment {
   task_id: string;
   author_name: string;
   content: string;
+  audio_url: string | null;
+  duration_seconds: number | null;
+  transcript: string | null;
+  comment_type: 'text' | 'voice';
   created_at: string;
 }
 
@@ -273,7 +278,7 @@ export function useDeleteTask() {
   });
 }
 
-// Add comment mutation
+// Add text comment mutation
 export function useAddTaskComment() {
   const queryClient = useQueryClient();
   
@@ -285,6 +290,7 @@ export function useAddTaskComment() {
           task_id: taskId,
           author_name: authorName,
           content,
+          comment_type: 'text',
         })
         .select()
         .single();
@@ -297,6 +303,51 @@ export function useAddTaskComment() {
     },
     onError: (error: Error) => {
       toast.error('Failed to add comment: ' + error.message);
+    },
+  });
+}
+
+// Add voice comment mutation
+export function useAddVoiceComment() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      taskId, 
+      authorName, 
+      audioUrl, 
+      durationSeconds,
+      transcript,
+    }: { 
+      taskId: string; 
+      authorName: string; 
+      audioUrl: string;
+      durationSeconds: number;
+      transcript?: string;
+    }) => {
+      const { data, error } = await supabase
+        .from('task_comments')
+        .insert({
+          task_id: taskId,
+          author_name: authorName,
+          content: transcript || 'Voice note',
+          audio_url: audioUrl,
+          duration_seconds: durationSeconds,
+          transcript: transcript || null,
+          comment_type: 'voice',
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, { taskId }) => {
+      queryClient.invalidateQueries({ queryKey: ['task-comments', taskId] });
+      toast.success('Voice note added');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to add voice note: ' + error.message);
     },
   });
 }

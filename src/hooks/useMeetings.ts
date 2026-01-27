@@ -2,6 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+export interface MeetingHighlight {
+  highlightText: string;
+  label: string;
+  timestamp?: number;
+  speaker?: string;
+}
+
 export interface Meeting {
   id: string;
   client_id: string | null;
@@ -13,6 +20,7 @@ export interface Meeting {
   summary: string | null;
   transcript: string | null;
   action_items: any[];
+  highlights: MeetingHighlight[];
   recording_url: string | null;
   meetgeek_url: string | null;
   created_at: string;
@@ -48,7 +56,13 @@ export function useMeetings(clientId?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []) as Meeting[];
+      
+      // Map database JSON fields to typed arrays
+      return (data || []).map(meeting => ({
+        ...meeting,
+        highlights: (meeting.highlights as unknown as MeetingHighlight[]) || [],
+        action_items: (meeting.action_items as unknown as any[]) || [],
+      })) as Meeting[];
     },
   });
 }
@@ -67,7 +81,16 @@ export function usePendingMeetingTasks() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return (data || []) as PendingMeetingTask[];
+      
+      // Map meeting data with proper types
+      return (data || []).map(task => ({
+        ...task,
+        meeting: task.meeting ? {
+          ...task.meeting,
+          highlights: (task.meeting.highlights as unknown as MeetingHighlight[]) || [],
+          action_items: (task.meeting.action_items as unknown as any[]) || [],
+        } : undefined,
+      })) as PendingMeetingTask[];
     },
   });
 }
@@ -115,14 +138,16 @@ export function useApprovePendingTask() {
       title,
       description,
       priority,
+      meetingId,
     }: {
       pendingTaskId: string;
       clientId: string | null;
       title: string;
       description: string;
       priority: string;
+      meetingId?: string | null;
     }) => {
-      // Create the real task
+      // Create the real task with meeting_id reference
       const { data: newTask, error: taskError } = await supabase
         .from('tasks')
         .insert({
@@ -133,6 +158,7 @@ export function useApprovePendingTask() {
           status: 'todo',
           stage: 'TODO',
           created_by: 'MeetGeek',
+          meeting_id: meetingId || null,
         })
         .select()
         .single();
@@ -157,6 +183,7 @@ export function useApprovePendingTask() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-meeting-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
       toast.success('Task approved and created');
     },
     onError: (error) => {

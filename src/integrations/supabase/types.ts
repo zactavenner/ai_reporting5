@@ -20,6 +20,7 @@ export type Database = {
           client_id: string | null
           created_at: string
           duration_minutes: number | null
+          highlights: Json | null
           id: string
           meetgeek_url: string | null
           meeting_date: string | null
@@ -35,6 +36,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           duration_minutes?: number | null
+          highlights?: Json | null
           id?: string
           meetgeek_url?: string | null
           meeting_date?: string | null
@@ -50,6 +52,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           duration_minutes?: number | null
+          highlights?: Json | null
           id?: string
           meetgeek_url?: string | null
           meeting_date?: string | null
@@ -1304,25 +1307,37 @@ export type Database = {
       }
       task_comments: {
         Row: {
+          audio_url: string | null
           author_name: string
+          comment_type: string | null
           content: string
           created_at: string
+          duration_seconds: number | null
           id: string
           task_id: string
+          transcript: string | null
         }
         Insert: {
+          audio_url?: string | null
           author_name: string
+          comment_type?: string | null
           content: string
           created_at?: string
+          duration_seconds?: number | null
           id?: string
           task_id: string
+          transcript?: string | null
         }
         Update: {
+          audio_url?: string | null
           author_name?: string
+          comment_type?: string | null
           content?: string
           created_at?: string
+          duration_seconds?: number | null
           id?: string
           task_id?: string
+          transcript?: string | null
         }
         Relationships: [
           {
@@ -1421,6 +1436,7 @@ export type Database = {
           description: string | null
           due_date: string | null
           id: string
+          meeting_id: string | null
           priority: string
           stage: string
           status: string
@@ -1437,6 +1453,7 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           id?: string
+          meeting_id?: string | null
           priority?: string
           stage?: string
           status?: string
@@ -1453,6 +1470,7 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           id?: string
+          meeting_id?: string | null
           priority?: string
           stage?: string
           status?: string
@@ -1472,6 +1490,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "agency_meetings"
             referencedColumns: ["id"]
           },
         ]
