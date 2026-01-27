@@ -286,6 +286,18 @@ function extractCampaignAttribution(contact: GHLContact, customFields: Record<st
   return { campaign_name, ad_set_name, ad_id };
 }
 
+function hasBadLeadTag(contact: GHLContact): boolean {
+  if (!contact.tags || !Array.isArray(contact.tags)) return false;
+  
+  // Check for various "bad lead" tag variations (case-insensitive)
+  const badLeadPatterns = ['bad lead', 'badlead', 'bad_lead', 'bad-lead'];
+  return contact.tags.some(tag => 
+    badLeadPatterns.some(pattern => 
+      tag.toLowerCase().includes(pattern)
+    )
+  );
+}
+
 async function syncContactToDatabase(
   supabase: any,
   clientId: string,
@@ -302,14 +314,17 @@ async function syncContactToDatabase(
   
   const attribution = contact.attributionSource || {};
   
+  // Check for BAD LEAD tag
+  const isBadLead = hasBadLeadTag(contact);
+  
   const { data: existingLead } = await supabase
     .from('leads')
-    .select('id, updated_at')
+    .select('id, updated_at, is_spam')
     .eq('client_id', clientId)
     .eq('external_id', externalId)
     .maybeSingle();
 
-  const leadData = {
+  const leadData: Record<string, any> = {
     client_id: clientId,
     external_id: externalId,
     name,
@@ -329,7 +344,18 @@ async function syncContactToDatabase(
     updated_at: new Date().toISOString(),
   };
 
+  // If contact has BAD LEAD tag, mark as spam
+  if (isBadLead) {
+    leadData.is_spam = true;
+    console.log(`Marking contact ${externalId} as bad lead (tag detected)`);
+  }
+
   if (existingLead) {
+    // Only update is_spam if it's a bad lead (don't override existing spam status)
+    if (!isBadLead && existingLead.is_spam) {
+      delete leadData.is_spam;
+    }
+    
     const { error } = await supabase
       .from('leads')
       .update(leadData)
@@ -346,7 +372,7 @@ async function syncContactToDatabase(
       .insert({
         ...leadData,
         status: 'new',
-        is_spam: false,
+        is_spam: isBadLead,
       })
       .select('id')
       .single();

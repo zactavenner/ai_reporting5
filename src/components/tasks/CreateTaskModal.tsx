@@ -47,7 +47,7 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId }
   const [dueDate, setDueDate] = useState<Date>();
   const [assignedTo, setAssignedTo] = useState('');
   const [assignedClientName, setAssignedClientName] = useState('');
-  const [stage, setStage] = useState('backlog');
+  const [stage, setStage] = useState('todo');
   
   useEffect(() => {
     if (defaultClientId) {
@@ -78,7 +78,7 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId }
     setDueDate(undefined);
     setAssignedTo('');
     setAssignedClientName('');
-    setStage('backlog');
+    setStage('todo');
     onOpenChange(false);
   };
 
