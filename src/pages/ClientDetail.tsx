@@ -24,6 +24,7 @@ import { CashBagLoader } from '@/components/ui/CashBagLoader';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import { useClient } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
+import { usePriorPeriodMetrics } from '@/hooks/usePriorMetrics';
 import { useLeads, useCalls } from '@/hooks/useLeadsAndCalls';
 import { useClientSettings, getThresholdsFromSettings } from '@/hooks/useClientSettings';
 import { useCustomTabs, useDeleteCustomTab } from '@/hooks/useCustomTabs';
@@ -68,6 +69,7 @@ export default function ClientDetail() {
   const { data: client, isLoading: clientLoading } = useClient(clientId);
   const { data: dailyMetrics = [], isLoading: metricsLoading } = useDailyMetrics(clientId, startDate, endDate);
   const { data: fundedInvestors = [] } = useFundedInvestors(clientId, startDate, endDate);
+  const { data: priorMetrics } = usePriorPeriodMetrics(clientId, startDate, endDate);
   const { data: leads = [], isLoading: leadsLoading } = useLeads(clientId, startDate, endDate);
   const { data: calls = [] } = useCalls(clientId, false, startDate, endDate);
   const { data: settings } = useClientSettings(clientId);
@@ -312,6 +314,7 @@ export default function ClientDetail() {
               </p>
               <KPIGrid 
                 metrics={aggregatedMetrics} 
+                priorMetrics={priorMetrics || undefined}
                 showFundedMetrics 
                 thresholds={thresholds}
                 fundedInvestorLabel={fundedInvestorLabel}

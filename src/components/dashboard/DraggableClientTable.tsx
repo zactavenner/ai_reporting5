@@ -186,17 +186,31 @@ export function DraggableClientTable({
 
   const handleSort = (column: string) => {
     setSortConfig(prev => {
+      let newConfig: SortConfig;
       if (prev.column === column) {
         // Toggle through: asc -> desc -> null
         if (prev.direction === 'asc') {
-          return { column, direction: 'desc' };
+          newConfig = { column, direction: 'desc' };
         } else if (prev.direction === 'desc') {
-          return { column: '', direction: null };
+          newConfig = { column: '', direction: null };
+        } else {
+          newConfig = { column, direction: 'desc' };
         }
+      } else {
+        // Start with descending (highest first) for metrics
+        newConfig = { column, direction: 'desc' };
       }
-      // Start with descending (highest first) for metrics
-      return { column, direction: 'desc' };
+      return newConfig;
     });
+  };
+
+  // Effect to save order after sorting is applied
+  const handleSaveOrderAfterSort = () => {
+    if (sortConfig.column && sortConfig.direction && onReorder) {
+      // Save the currently sorted order to database
+      const orderedIds = sortedClients.map(c => c.client.id);
+      onReorder(orderedIds);
+    }
   };
 
   const getStatusVariant = (status: string) => {
@@ -336,8 +350,24 @@ export function DraggableClientTable({
   };
 
   return (
-    <div className="border-2 border-border bg-card overflow-x-auto">
-      <Table>
+    <div className="space-y-2">
+      {/* Save sorted order button when sorting is active */}
+      {sortConfig.column && sortConfig.direction && (
+        <div className="flex items-center justify-between px-2 py-1 bg-muted/50 rounded border border-border">
+          <span className="text-sm text-muted-foreground">
+            Sorted by <strong>{sortConfig.column}</strong> ({sortConfig.direction === 'asc' ? 'Low to High' : 'High to Low'})
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSaveOrderAfterSort}
+          >
+            Save This Order
+          </Button>
+        </div>
+      )}
+      <div className="border-2 border-border bg-card overflow-x-auto">
+        <Table>
         <TableHeader>
           <TableRow className="border-b-2">
             <TableHead className="w-8"></TableHead>
@@ -528,6 +558,7 @@ export function DraggableClientTable({
           })}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }

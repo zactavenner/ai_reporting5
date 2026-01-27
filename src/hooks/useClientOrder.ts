@@ -25,12 +25,17 @@ export function useUpdateClientOrder() {
 
       return orderedClientIds;
     },
+    onMutate: () => {
+      // Show saving indicator
+      toast.loading('Saving order...', { id: 'client-order-save' });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      toast.success('Order saved', { id: 'client-order-save' });
     },
     onError: (error) => {
       console.error('Failed to update client order:', error);
-      toast.error('Failed to save client order');
+      toast.error('Failed to save client order', { id: 'client-order-save' });
     },
   });
 }
