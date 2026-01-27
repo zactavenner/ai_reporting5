@@ -25,41 +25,40 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get Gemini API key from agency settings
-    const { data: settings } = await supabase
-      .from("agency_settings")
-      .select("gemini_api_key")
-      .limit(1)
-      .single();
-
-    const geminiApiKey = settings?.gemini_api_key;
-    if (!geminiApiKey) {
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "Gemini API key not configured in agency settings" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Lovable API key not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     console.log("Processing voice note for client:", clientId);
 
-    // Step 1: Transcribe audio using Gemini
+    // Step 1: Transcribe audio using Lovable AI
     const transcriptResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          contents: [
+          model: "google/gemini-2.5-flash",
+          messages: [
             {
-              parts: [
+              role: "user",
+              content: [
                 {
-                  inline_data: {
-                    mime_type: "audio/webm",
-                    data: audioBase64,
+                  type: "image_url",
+                  image_url: {
+                    url: `data:audio/webm;base64,${audioBase64}`,
                   },
                 },
                 {
-                  text: "Transcribe this audio recording accurately. Only output the transcription, nothing else.",
+                  type: "text",
+                  text: "Transcribe this audio recording accurately. Only output the transcription text, nothing else. If you cannot hear any speech or the audio is unclear, respond with 'No speech detected'.",
                 },
               ],
             },
@@ -70,7 +69,21 @@ serve(async (req) => {
 
     if (!transcriptResponse.ok) {
       const errorText = await transcriptResponse.text();
-      console.error("Transcription error:", errorText);
+      console.error("Transcription error:", transcriptResponse.status, errorText);
+      
+      if (transcriptResponse.status === 429) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (transcriptResponse.status === 402) {
+        return new Response(
+          JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ error: "Failed to transcribe audio" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -78,9 +91,9 @@ serve(async (req) => {
     }
 
     const transcriptData = await transcriptResponse.json();
-    const transcript = transcriptData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const transcript = transcriptData.choices?.[0]?.message?.content || "";
 
-    if (!transcript.trim()) {
+    if (!transcript.trim() || transcript.toLowerCase().includes("no speech detected")) {
       return new Response(
         JSON.stringify({ error: "No speech detected in audio" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -89,18 +102,25 @@ serve(async (req) => {
 
     console.log("Transcript:", transcript.substring(0, 100) + "...");
 
-    // Step 2: Generate summary and extract action items using tool calling
+    // Step 2: Generate summary and extract action items
     const analysisResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          contents: [
+          model: "google/gemini-2.5-flash",
+          messages: [
             {
-              parts: [
-                {
-                  text: `You are analyzing a voice note recording from an agency meeting or call with a client${clientName ? ` named "${clientName}"` : ""}.
+              role: "system",
+              content: "You are an expert at analyzing meeting transcripts and extracting actionable insights.",
+            },
+            {
+              role: "user",
+              content: `You are analyzing a voice note recording from an agency meeting or call with a client${clientName ? ` named "${clientName}"` : ""}.
 
 Transcript:
 ${transcript}
@@ -110,71 +130,25 @@ Based on this transcript, extract:
 2. A concise 2-3 sentence summary of the key points discussed
 3. Any action items or tasks mentioned that need to be done
 
-Use the extract_voice_note_data function to return your analysis.`,
-                },
-              ],
+Return your response in the following JSON format:
+{
+  "title": "Short title here",
+  "summary": "2-3 sentence summary here",
+  "action_items": [
+    {"title": "Task title", "description": "Optional description", "priority": "low|medium|high"}
+  ]
+}
+
+Only return valid JSON, no other text.`,
             },
           ],
-          tools: [
-            {
-              function_declarations: [
-                {
-                  name: "extract_voice_note_data",
-                  description: "Extract structured data from a voice note transcript",
-                  parameters: {
-                    type: "object",
-                    properties: {
-                      title: {
-                        type: "string",
-                        description: "Short descriptive title for the voice note (max 60 chars)",
-                      },
-                      summary: {
-                        type: "string",
-                        description: "2-3 sentence summary of the key points discussed",
-                      },
-                      action_items: {
-                        type: "array",
-                        description: "List of action items or tasks extracted from the transcript",
-                        items: {
-                          type: "object",
-                          properties: {
-                            title: {
-                              type: "string",
-                              description: "Task title",
-                            },
-                            description: {
-                              type: "string",
-                              description: "Optional task description",
-                            },
-                            priority: {
-                              type: "string",
-                              enum: ["low", "medium", "high"],
-                              description: "Task priority",
-                            },
-                          },
-                          required: ["title", "priority"],
-                        },
-                      },
-                    },
-                    required: ["title", "summary", "action_items"],
-                  },
-                },
-              ],
-            },
-          ],
-          tool_config: {
-            function_calling_config: {
-              mode: "ANY",
-              allowed_function_names: ["extract_voice_note_data"],
-            },
-          },
         }),
       }
     );
 
     if (!analysisResponse.ok) {
       const errorText = await analysisResponse.text();
-      console.error("Analysis error:", errorText);
+      console.error("Analysis error:", analysisResponse.status, errorText);
       return new Response(
         JSON.stringify({ error: "Failed to analyze transcript" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -182,21 +156,31 @@ Use the extract_voice_note_data function to return your analysis.`,
     }
 
     const analysisData = await analysisResponse.json();
-    console.log("Analysis response:", JSON.stringify(analysisData, null, 2));
+    const analysisContent = analysisData.choices?.[0]?.message?.content || "";
+    
+    console.log("Analysis response:", analysisContent);
 
-    // Extract function call result
+    // Parse the JSON response
     let title = "Voice Note";
     let summary = "";
     let actionItems: Array<{ title: string; description?: string; priority: string }> = [];
 
-    const functionCall = analysisData.candidates?.[0]?.content?.parts?.find(
-      (p: any) => p.functionCall
-    )?.functionCall;
-
-    if (functionCall?.args) {
-      title = functionCall.args.title || title;
-      summary = functionCall.args.summary || "";
-      actionItems = functionCall.args.action_items || [];
+    try {
+      // Extract JSON from the response (handle potential markdown code blocks)
+      let jsonStr = analysisContent;
+      const jsonMatch = analysisContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[1];
+      }
+      
+      const parsed = JSON.parse(jsonStr.trim());
+      title = parsed.title || title;
+      summary = parsed.summary || "";
+      actionItems = parsed.action_items || [];
+    } catch (parseError) {
+      console.error("Error parsing analysis JSON:", parseError);
+      // Fallback: use transcript as summary
+      summary = transcript.substring(0, 200) + (transcript.length > 200 ? "..." : "");
     }
 
     console.log("Extracted:", { title, summary, actionItemsCount: actionItems.length });
@@ -244,7 +228,6 @@ Use the extract_voice_note_data function to return your analysis.`,
 
       if (tasksError) {
         console.error("Error creating pending tasks:", tasksError);
-        // Don't fail the whole request, just log the error
       } else {
         console.log("Created", pendingTasks.length, "pending tasks");
       }
