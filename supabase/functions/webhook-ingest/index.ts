@@ -77,6 +77,48 @@ async function findExistingLead(supabase: any, clientId: string, externalId: str
   return null;
 }
 
+// Extract UTM values from questions array and return filtered questions
+function extractUtmFromQuestions(questions: any[]): {
+  utm_campaign?: string;
+  utm_medium?: string;
+  utm_content?: string;
+  utm_term?: string;
+  filteredQuestions: any[];
+} {
+  const result: any = { filteredQuestions: [] };
+  
+  for (const q of questions) {
+    const questionLower = String(q.question || '').toLowerCase().trim();
+    
+    // Check for UTM Campaign variations
+    if (questionLower.includes('utm_campaign') || questionLower === 'utm campaign' || 
+        questionLower === 'utm campaign\t' || questionLower.includes('utm campaign')) {
+      result.utm_campaign = q.answer;
+    } 
+    // Check for UTM Medium variations
+    else if (questionLower.includes('utm_medium') || questionLower === 'utm medium' ||
+             questionLower.includes('utm medium')) {
+      result.utm_medium = q.answer;
+    } 
+    // Check for UTM Content variations
+    else if (questionLower.includes('utm_content') || questionLower === 'utm content' ||
+             questionLower.includes('utm content')) {
+      result.utm_content = q.answer;
+    } 
+    // Check for UTM Term variations
+    else if (questionLower.includes('utm_term') || questionLower === 'utm term' ||
+             questionLower.includes('utm term')) {
+      result.utm_term = q.answer;
+    } 
+    // Keep non-UTM questions
+    else {
+      result.filteredQuestions.push(q);
+    }
+  }
+  
+  return result;
+}
+
 // Extract all questions/form responses from payload
 // In GHL, survey/form questions are often at the ROOT level of the payload
 function extractQuestions(payload: any): any[] {
@@ -472,8 +514,18 @@ async function processLead(supabase: any, clientId: string, payload: any, mappin
     }
   }
 
-  // Extract all questions from the payload
-  const questions = extractQuestions(payload);
+// Extract all questions from the payload
+  const rawQuestions = extractQuestions(payload);
+  
+  // Extract UTM values from questions and filter them out
+  const utmFromQuestions = extractUtmFromQuestions(rawQuestions);
+  const questions = utmFromQuestions.filteredQuestions;
+  
+  // Use UTM from questions as fallback if direct fields are empty
+  const final_utm_campaign = utm_campaign || utmFromQuestions.utm_campaign;
+  const final_utm_medium = utm_medium || utmFromQuestions.utm_medium;
+  const final_utm_content = utm_content || utmFromQuestions.utm_content;
+  const final_utm_term = utm_term || utmFromQuestions.utm_term;
 
   // Store all custom fields from the payload
   const customFields: Record<string, any> = {};
@@ -575,7 +627,11 @@ async function processLead(supabase: any, clientId: string, payload: any, mappin
     client_id: clientId,
     external_id: existingLead?.external_id || String(externalId),
     source: 'webhook',
-    name, email, phone, utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+    name, email, phone, utm_source, 
+    utm_medium: final_utm_medium, 
+    utm_campaign: final_utm_campaign, 
+    utm_content: final_utm_content, 
+    utm_term: final_utm_term,
     campaign_name, ad_set_name, ad_id,
     pipeline_value: pipelineValue,
     assigned_user: assignedUser,

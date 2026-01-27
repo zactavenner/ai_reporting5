@@ -21,6 +21,9 @@ interface Lead {
   ad_set_name?: string | null;
   ad_id?: string | null;
   utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  utm_content?: string | null;
   created_at: string;
 }
 
@@ -165,6 +168,8 @@ export function AttributionDashboard({ leads, calls, fundedInvestors }: Attribut
   const [campaignFilter, setCampaignFilter] = useState<string[]>([]);
   const [adSetFilter, setAdSetFilter] = useState<string[]>([]);
   const [adFilter, setAdFilter] = useState<string[]>([]);
+  const [contentFilter, setContentFilter] = useState<string[]>([]);
+  const [mediumFilter, setMediumFilter] = useState<string[]>([]);
 
   // Extract unique values for filters
   const uniqueSources = useMemo(() => {
@@ -199,14 +204,32 @@ export function AttributionDashboard({ leads, calls, fundedInvestors }: Attribut
     return Array.from(ads).sort();
   }, [leads]);
 
+  const uniqueContents = useMemo(() => {
+    const contents = new Set<string>();
+    leads.forEach(lead => {
+      if (lead.utm_content) contents.add(lead.utm_content);
+    });
+    return Array.from(contents).sort();
+  }, [leads]);
+
+  const uniqueMediums = useMemo(() => {
+    const mediums = new Set<string>();
+    leads.forEach(lead => {
+      if (lead.utm_medium) mediums.add(lead.utm_medium);
+    });
+    return Array.from(mediums).sort();
+  }, [leads]);
+
   const hasActiveFilters = sourceFilter.length > 0 || campaignFilter.length > 0 || 
-    adSetFilter.length > 0 || adFilter.length > 0;
+    adSetFilter.length > 0 || adFilter.length > 0 || contentFilter.length > 0 || mediumFilter.length > 0;
 
   const clearAllFilters = () => {
     setSourceFilter([]);
     setCampaignFilter([]);
     setAdSetFilter([]);
     setAdFilter([]);
+    setContentFilter([]);
+    setMediumFilter([]);
   };
 
   // Calculate date range based on preset
@@ -254,9 +277,15 @@ export function AttributionDashboard({ leads, calls, fundedInvestors }: Attribut
       const matchesAd = adFilter.length === 0 || 
         (lead.ad_id && adFilter.includes(lead.ad_id));
       
-      return inDateRange && matchesSource && matchesCampaign && matchesAdSet && matchesAd;
+      const matchesContent = contentFilter.length === 0 || 
+        (lead.utm_content && contentFilter.includes(lead.utm_content));
+      
+      const matchesMedium = mediumFilter.length === 0 || 
+        (lead.utm_medium && mediumFilter.includes(lead.utm_medium));
+      
+      return inDateRange && matchesSource && matchesCampaign && matchesAdSet && matchesAd && matchesContent && matchesMedium;
     });
-  }, [leads, dateRange, sourceFilter, campaignFilter, adSetFilter, adFilter]);
+  }, [leads, dateRange, sourceFilter, campaignFilter, adSetFilter, adFilter, contentFilter, mediumFilter]);
 
   const filteredCalls = useMemo(() => {
     return calls.filter(call => {
@@ -449,6 +478,22 @@ export function AttributionDashboard({ leads, calls, fundedInvestors }: Attribut
       onRemove: () => setAdFilter(prev => prev.filter(v => v !== value))
     });
   });
+  
+  contentFilter.forEach(value => {
+    activeFilters.push({
+      type: 'Content',
+      value,
+      onRemove: () => setContentFilter(prev => prev.filter(v => v !== value))
+    });
+  });
+  
+  mediumFilter.forEach(value => {
+    activeFilters.push({
+      type: 'Medium',
+      value,
+      onRemove: () => setMediumFilter(prev => prev.filter(v => v !== value))
+    });
+  });
 
   return (
     <Card className="border-2 border-border">
@@ -565,6 +610,22 @@ export function AttributionDashboard({ leads, calls, fundedInvestors }: Attribut
               selected={adFilter}
               onChange={setAdFilter}
               icon={<FileText className="h-3 w-3" />}
+            />
+            
+            <FilterDropdown
+              label="Medium"
+              options={uniqueMediums}
+              selected={mediumFilter}
+              onChange={setMediumFilter}
+              icon={<Layers className="h-3 w-3" />}
+            />
+            
+            <FilterDropdown
+              label="Content"
+              options={uniqueContents}
+              selected={contentFilter}
+              onChange={setContentFilter}
+              icon={<Target className="h-3 w-3" />}
             />
 
             {hasActiveFilters && (
