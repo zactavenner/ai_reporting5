@@ -154,6 +154,53 @@ async function syncRecentMeetings(supabase: any, apiKey: string) {
   }
 }
 
+async function matchClientByTitle(supabase: any, title: string): Promise<string | null> {
+  try {
+    // Fetch all clients
+    const { data: clients, error } = await supabase
+      .from('clients')
+      .select('id, name');
+    
+    if (error || !clients || clients.length === 0) {
+      return null;
+    }
+    
+    const titleLower = title.toLowerCase();
+    
+    // Try to find a client match in the meeting title
+    for (const client of clients) {
+      const clientName = client.name.toLowerCase();
+      
+      // Split client name into words for partial matching
+      const clientWords = clientName.split(/\s+/).filter((w: string) => w.length > 2);
+      
+      // Check if any significant word from client name appears in title
+      for (const word of clientWords) {
+        // Skip common words
+        if (['the', 'and', 'inc', 'llc', 'corp', 'group', 'capital', 'investments', 'management'].includes(word)) {
+          continue;
+        }
+        if (titleLower.includes(word)) {
+          console.log(`Auto-matched meeting "${title}" to client "${client.name}" via word "${word}"`);
+          return client.id;
+        }
+      }
+      
+      // Also check if first word (often unique identifier) matches
+      const firstWord = clientWords[0];
+      if (firstWord && firstWord.length > 3 && titleLower.includes(firstWord)) {
+        console.log(`Auto-matched meeting "${title}" to client "${client.name}" via first word "${firstWord}"`);
+        return client.id;
+      }
+    }
+    
+    return null;
+  } catch (e) {
+    console.error('Error matching client by title:', e);
+    return null;
+  }
+}
+
 async function processMeeting(supabase: any, apiKey: string, meetingId: string) {
   try {
     // Fetch meeting details
@@ -214,9 +261,18 @@ async function processMeeting(supabase: any, apiKey: string, meetingId: string) 
     }
 
     // Calculate duration in minutes
-    const startTime = new Date(meeting.start_time);
-    const endTime = new Date(meeting.end_time);
-    const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
+    let durationMinutes = meeting.duration;
+    if (meeting.start_time && meeting.end_time) {
+      const startTime = new Date(meeting.start_time);
+      const endTime = new Date(meeting.end_time);
+      durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
+    }
+
+    // Use meeting start_time, or fallback to current timestamp
+    const meetingDate = meeting.start_time || new Date().toISOString();
+
+    // Auto-match client by title
+    const matchedClientId = await matchClientByTitle(supabase, meeting.title || '');
 
     // Store meeting in database
     const { data: insertedMeeting, error: insertError } = await supabase
@@ -224,14 +280,15 @@ async function processMeeting(supabase: any, apiKey: string, meetingId: string) 
       .upsert({
         meeting_id: meetingId,
         title: meeting.title || 'Untitled Meeting',
-        meeting_date: meeting.start_time,
-        duration_minutes: durationMinutes || meeting.duration,
+        meeting_date: meetingDate,
+        duration_minutes: durationMinutes,
         participants: meeting.participants || [],
         summary: summary,
         transcript: transcript,
         action_items: actionItems,
         recording_url: meeting.recording_url,
         meetgeek_url: meeting.meetgeek_url || `https://app.meetgeek.ai/meetings/${meetingId}`,
+        client_id: matchedClientId,
       }, { onConflict: 'meeting_id' })
       .select()
       .single();
