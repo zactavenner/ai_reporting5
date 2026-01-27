@@ -26,11 +26,12 @@ import {
 } from '@/components/ui/popover';
 import { CalendarIcon, Loader2, User, Building2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { cn, addBusinessDays } from '@/lib/utils';
 import { useCreateTask, useAgencyMembers, AgencyMember } from '@/hooks/useTasks';
 import { useAgencyPods } from '@/hooks/useAgencyPods';
 import { Client } from '@/hooks/useClients';
 import { Badge } from '@/components/ui/badge';
+import { useTeamMember } from '@/contexts/TeamMemberContext';
 
 interface CreateTaskModalProps {
   open: boolean;
@@ -43,12 +44,17 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId }
   const createTask = useCreateTask();
   const { data: agencyMembers = [] } = useAgencyMembers();
   const { data: pods = [] } = useAgencyPods();
+  const { currentMember } = useTeamMember();
+  
+  // Calculate default due date (2 business days from today)
+  const defaultDueDate = useMemo(() => addBusinessDays(new Date(), 2), []);
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [clientId, setClientId] = useState(defaultClientId || '');
   const [priority, setPriority] = useState('medium');
-  const [dueDate, setDueDate] = useState<Date>();
+  const [dueDate, setDueDate] = useState<Date | undefined>(defaultDueDate);
+  const [dueDateManuallySet, setDueDateManuallySet] = useState(false);
   const [assignedTo, setAssignedTo] = useState('');
   const [assignedClientName, setAssignedClientName] = useState('');
   const [stage, setStage] = useState('todo');
@@ -58,6 +64,15 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId }
       setClientId(defaultClientId);
     }
   }, [defaultClientId]);
+  
+  // Reset due date when modal opens
+  useEffect(() => {
+    if (open) {
+      const newDefaultDate = addBusinessDays(new Date(), 2);
+      setDueDate(newDefaultDate);
+      setDueDateManuallySet(false);
+    }
+  }, [open]);
   
   const handleCreate = async () => {
     if (!title.trim()) return;
@@ -72,6 +87,7 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId }
       stage,
       assigned_to: assignedTo || null,
       assigned_client_name: assignedClientName || null,
+      created_by: currentMember?.name || null,
     });
     
     // Reset form
@@ -79,7 +95,8 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId }
     setDescription('');
     setClientId(defaultClientId || '');
     setPriority('medium');
-    setDueDate(undefined);
+    setDueDate(addBusinessDays(new Date(), 2));
+    setDueDateManuallySet(false);
     setAssignedTo('');
     setAssignedClientName('');
     setStage('todo');
@@ -193,7 +210,12 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId }
             </div>
             
             <div>
-              <Label>Due Date</Label>
+              <Label>
+                Due Date
+                {!dueDateManuallySet && dueDate && (
+                  <span className="text-xs text-muted-foreground ml-2">(auto: 2 business days)</span>
+                )}
+              </Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -211,8 +233,12 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId }
                   <Calendar
                     mode="single"
                     selected={dueDate}
-                    onSelect={setDueDate}
+                    onSelect={(date) => {
+                      setDueDate(date);
+                      setDueDateManuallySet(true);
+                    }}
                     initialFocus
+                    className="pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>

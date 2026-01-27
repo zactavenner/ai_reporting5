@@ -27,6 +27,8 @@ export interface ClientSettings {
   ghl_sync_conversations_enabled?: boolean;
   ghl_last_contacts_sync?: string | null;
   ghl_last_calls_sync?: string | null;
+  // Public link password protection
+  public_link_password?: string | null;
 }
 
 export interface KPIThresholds {

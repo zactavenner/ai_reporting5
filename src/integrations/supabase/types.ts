@@ -78,6 +78,7 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          last_login_at: string | null
           name: string
           pod_id: string | null
           role: string
@@ -87,6 +88,7 @@ export type Database = {
           created_at?: string
           email: string
           id?: string
+          last_login_at?: string | null
           name: string
           pod_id?: string | null
           role?: string
@@ -96,6 +98,7 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+          last_login_at?: string | null
           name?: string
           pod_id?: string | null
           role?: string
@@ -473,6 +476,7 @@ export type Database = {
           id: string
           monthly_ad_spend_target: number | null
           mrr: number | null
+          public_link_password: string | null
           total_raise_amount: number | null
           updated_at: string
           webhook_mappings: Json | null
@@ -506,6 +510,7 @@ export type Database = {
           id?: string
           monthly_ad_spend_target?: number | null
           mrr?: number | null
+          public_link_password?: string | null
           total_raise_amount?: number | null
           updated_at?: string
           webhook_mappings?: Json | null
@@ -539,6 +544,7 @@ export type Database = {
           id?: string
           monthly_ad_spend_target?: number | null
           mrr?: number | null
+          public_link_password?: string | null
           total_raise_amount?: number | null
           updated_at?: string
           webhook_mappings?: Json | null
@@ -1159,6 +1165,44 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_activity_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          member_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          member_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          member_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_activity_log_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "agency_members"
             referencedColumns: ["id"]
           },
         ]

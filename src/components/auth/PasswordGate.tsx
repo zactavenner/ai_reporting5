@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Lock } from 'lucide-react';
+import { Lock, LogOut, User } from 'lucide-react';
+import { TeamMemberLogin } from './TeamMemberLogin';
+import { TeamMemberProvider, useTeamMember } from '@/contexts/TeamMemberContext';
 
 const CORRECT_PASSWORD = 'HPA';
 const SESSION_KEY = 'dashboard_auth';
@@ -11,11 +13,14 @@ interface PasswordGateProps {
   children: React.ReactNode;
 }
 
-export function PasswordGate({ children }: PasswordGateProps) {
+function PasswordGateContent({ children }: PasswordGateProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showTeamLogin, setShowTeamLogin] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+
+  const { currentMember, logout } = useTeamMember();
 
   useEffect(() => {
     // Check if already authenticated in this session
@@ -31,11 +36,20 @@ export function PasswordGate({ children }: PasswordGateProps) {
     if (password === CORRECT_PASSWORD) {
       sessionStorage.setItem(SESSION_KEY, 'true');
       setIsAuthenticated(true);
+      setShowTeamLogin(true);
       setError('');
     } else {
       setError('Incorrect password');
       setPassword('');
     }
+  };
+
+  const handleTeamLoginSuccess = () => {
+    setShowTeamLogin(false);
+  };
+
+  const handleTeamLoginSkip = () => {
+    setShowTeamLogin(false);
   };
 
   if (isLoading) {
@@ -46,8 +60,37 @@ export function PasswordGate({ children }: PasswordGateProps) {
     );
   }
 
+  // Show team login after main password
+  if (isAuthenticated && showTeamLogin && !currentMember) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <TeamMemberLogin onSkip={handleTeamLoginSkip} onSuccess={handleTeamLoginSuccess} />
+      </div>
+    );
+  }
+
   if (isAuthenticated) {
-    return <>{children}</>;
+    return (
+      <div className="relative">
+        {/* Team member header badge */}
+        {currentMember && (
+          <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-card border-2 border-border px-3 py-2 rounded-lg shadow-sm">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">{currentMember.name}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 ml-1"
+              onClick={logout}
+              title="Sign out"
+            >
+              <LogOut className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+        {children}
+      </div>
+    );
   }
 
   return (
@@ -82,5 +125,13 @@ export function PasswordGate({ children }: PasswordGateProps) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export function PasswordGate({ children }: PasswordGateProps) {
+  return (
+    <TeamMemberProvider>
+      <PasswordGateContent>{children}</PasswordGateContent>
+    </TeamMemberProvider>
   );
 }

@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Json } from '@/integrations/supabase/types';
+import { addBusinessDays } from '@/lib/utils';
+import { format } from 'date-fns';
 
 export interface CreativeComment {
   id: string;
@@ -89,8 +91,10 @@ export function useCreateCreative() {
       
       if (error) throw error;
       
-      // Auto-create task for client to review the creative
+      // Auto-create task for client to review the creative with due date
       const previewLink = creative.file_url ? `\n\n**Preview:** ${creative.file_url}` : '';
+      const dueDate = addBusinessDays(new Date(), 2);
+      
       const { error: taskError } = await supabase
         .from('tasks')
         .insert({
@@ -102,6 +106,7 @@ export function useCreateCreative() {
           priority: 'medium',
           created_by: 'System',
           assigned_client_name: creative.client_name || null,
+          due_date: format(dueDate, 'yyyy-MM-dd'),
         });
       
       if (taskError) {
@@ -149,6 +154,8 @@ export function useUpdateCreativeStatus() {
       // Auto-create task when creative is approved
       if (status === 'approved' && data) {
         const title = creativeTitle || data.title || 'Untitled Creative';
+        const dueDate = addBusinessDays(new Date(), 2);
+        
         const { error: taskError } = await supabase
           .from('tasks')
           .insert({
@@ -159,6 +166,7 @@ export function useUpdateCreativeStatus() {
             stage: 'todo',
             priority: 'high',
             created_by: 'System',
+            due_date: format(dueDate, 'yyyy-MM-dd'),
           });
         
         if (taskError) {

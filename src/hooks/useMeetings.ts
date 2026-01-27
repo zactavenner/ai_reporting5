@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { addBusinessDays } from '@/lib/utils';
+import { format } from 'date-fns';
 
 export interface MeetingHighlight {
   highlightText: string;
@@ -147,7 +149,9 @@ export function useApprovePendingTask() {
       priority: string;
       meetingId?: string | null;
     }) => {
-      // Create the real task with meeting_id reference
+      // Create the real task with meeting_id reference and due date
+      const dueDate = addBusinessDays(new Date(), 2);
+      
       const { data: newTask, error: taskError } = await supabase
         .from('tasks')
         .insert({
@@ -159,6 +163,7 @@ export function useApprovePendingTask() {
           stage: 'TODO',
           created_by: 'MeetGeek',
           meeting_id: meetingId || null,
+          due_date: format(dueDate, 'yyyy-MM-dd'),
         })
         .select()
         .single();

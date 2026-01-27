@@ -8,6 +8,7 @@ import { useAllTasks } from '@/hooks/useTasks';
 import { useVoiceNotes } from '@/hooks/useVoiceNotes';
 import { useMeetings } from '@/hooks/useMeetings';
 import { useCreatives } from '@/hooks/useCreatives';
+import { useClientSettings } from '@/hooks/useClientSettings';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
 import { MetricChartsGrid } from '@/components/dashboard/MetricChartsGrid';
@@ -18,6 +19,7 @@ import { AIAnalysisChat } from '@/components/ai/AIAnalysisChat';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import { AttributionDashboard } from '@/components/dashboard/AttributionDashboard';
 import { ActivityPanel } from '@/components/activity/ActivityPanel';
+import { PublicLinkPasswordGate } from '@/components/auth/PublicLinkPasswordGate';
 import { Button } from '@/components/ui/button';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { useQueryClient } from '@tanstack/react-query';
@@ -31,6 +33,7 @@ export default function PublicReport() {
   const queryClient = useQueryClient();
   
   const { data: client, isLoading } = useClientByToken(token);
+  const { data: clientSettings } = useClientSettings(client?.id);
   const { data: dailyMetrics = [], isLoading: metricsLoading } = useDailyMetrics(client?.id, startDate, endDate);
   const { data: fundedInvestors = [] } = useFundedInvestors(client?.id, startDate, endDate);
   const { data: leads = [], isLoading: leadsLoading } = useLeads(client?.id, startDate, endDate);
@@ -112,7 +115,10 @@ export default function PublicReport() {
     );
   }
 
-  return (
+  // Check if password protection is enabled
+  const publicLinkPassword = clientSettings?.public_link_password;
+  
+  const reportContent = (
     <div className="min-h-screen bg-background">
       <header className="border-b-2 border-border bg-card px-6 py-4">
         <div className="flex items-center justify-between">
@@ -268,4 +274,19 @@ export default function PublicReport() {
       <AIAnalysisChat context={aiContext} />
     </div>
   );
+
+  // Wrap in password gate if password is set
+  if (publicLinkPassword) {
+    return (
+      <PublicLinkPasswordGate
+        clientId={client.id}
+        clientName={client.name}
+        requiredPassword={publicLinkPassword}
+      >
+        {reportContent}
+      </PublicLinkPasswordGate>
+    );
+  }
+
+  return reportContent;
 }

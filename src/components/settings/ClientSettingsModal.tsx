@@ -19,7 +19,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { WebhookSettingsTab } from './WebhookSettingsTab';
 import { EmailParsingTab } from './EmailParsingTab';
 import { PodAssignmentSection } from './PodAssignmentSection';
-import { DollarSign, Target, Plug, Loader2, RefreshCw, CheckCircle, XCircle, Users } from 'lucide-react';
+import { DollarSign, Target, Plug, Loader2, RefreshCw, CheckCircle, XCircle, Users, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface ClientSettingsModalProps {
   client: Client | null;
@@ -71,6 +71,10 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
   const [syncing, setSyncing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
 
+  // Public link password state
+  const [publicLinkPassword, setPublicLinkPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
   // Load settings when available
   useEffect(() => {
     if (settings) {
@@ -100,6 +104,9 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
         setMonthlyAdSpendTarget(String(settings.monthly_ad_spend_target || 0));
         setDailyAdSpendTarget('');
       }
+    }
+    if (settings?.public_link_password !== undefined) {
+      setPublicLinkPassword(settings.public_link_password || '');
     }
   }, [settings]);
 
@@ -178,6 +185,7 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
         monthly_ad_spend_target: adSpendInputMode === 'monthly' ? (parseFloat(monthlyAdSpendTarget) || 0) : 0,
         daily_ad_spend_target: adSpendInputMode === 'daily' ? (parseFloat(dailyAdSpendTarget) || null) : null,
         total_raise_amount: parseFloat(totalRaiseAmount) || 0,
+        public_link_password: publicLinkPassword.trim() || null,
       });
 
       // Save alert configs if slack webhook provided
@@ -301,9 +309,10 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
         </DialogHeader>
 
         <Tabs defaultValue="kpis" className="mt-4">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="kpis">KPIs</TabsTrigger>
             <TabsTrigger value="teams">Teams</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
             <TabsTrigger value="email-parsing">Email</TabsTrigger>
@@ -323,6 +332,46 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
                 </p>
               </div>
               <PodAssignmentSection clientId={client.id} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="security" className="space-y-4 mt-4">
+            <div className="border-2 border-border p-4 space-y-4">
+              <div>
+                <h4 className="font-medium mb-1 flex items-center gap-2">
+                  <Lock className="h-4 w-4" />
+                  Public Link Password
+                </h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Protect the public shareable link with a password. Leave empty for no password protection.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="publicLinkPassword">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="publicLinkPassword"
+                    type={showPassword ? 'text' : 'password'}
+                    value={publicLinkPassword}
+                    onChange={(e) => setPublicLinkPassword(e.target.value)}
+                    placeholder="Enter password for public link..."
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {publicLinkPassword ? 'Password protection is enabled' : 'No password protection - link is publicly accessible'}
+                </p>
+              </div>
             </div>
           </TabsContent>
 
