@@ -1,166 +1,265 @@
 
-# Implementation Plan: Task Due Dates, Team Sign-in & Activity Tracking, Public Link Passwords
+# Enhanced Funnel Section: Multi-Device Preview, Flow Visualization & Reordering
 
-This plan covers three feature requests:
-1. **Auto-set task due dates** to two business days in the future
-2. **Team member sign-in** with password = lowercase name and activity tracking
-3. **Public link password protection** managed in client settings
+This plan enhances the Funnel tab with tablet/desktop previews, visual flow diagrams similar to Funnelytics, and drag-and-drop step reordering.
 
 ---
 
-## Feature 1: Automated Task Due Dates (Two Business Days)
+## Overview
 
-### Overview
-When new tasks are created, automatically set the due date to two business days from today unless the user explicitly picks a different date.
+The enhanced Funnel section will transform the current simple iPhone preview grid into a comprehensive funnel visualization tool with:
 
-### Implementation Details
-
-**1.1 Create Business Day Helper Function**
-- Add a new utility function `addBusinessDays(date, days)` in `src/lib/utils.ts`
-- This function skips weekends (Saturday/Sunday) when calculating the target date
-- Example: Friday → Tuesday (skips Sat/Sun)
-
-**1.2 Update CreateTaskModal.tsx**
-- Initialize `dueDate` state with `addBusinessDays(new Date(), 2)` instead of `undefined`
-- Add a `dueDateManuallySet` flag to track if user explicitly changed the date
-- If user clears the date picker, keep the auto-calculated default
-- Show "(auto)" indicator next to the date when it's the default value
-
-**1.3 Update Other Task Creation Points**
-- **useCreatives.ts**: When auto-creating review tasks, include due_date calculation
-- **useMeetings.ts**: When converting meeting action items to tasks, add due_date
+1. **Multi-device previews** - iPhone, iPad (tablet), and desktop browser mockups
+2. **Funnel flow visualization** - Visual diagram showing step connections with arrows and conversion metrics
+3. **Drag-and-drop reordering** - Reorder funnel steps with persistence to database
+4. **Tab placement** - Move Funnel tab after Tasks and add to agency-level Project Management
 
 ---
 
-## Feature 2: Team Member Sign-in & Activity Tracking
+## Feature 1: Multi-Device Mockups
 
-### Overview
-Enable team members to sign in using their name (password = lowercase version of their name), then track their activity including task creation.
+### New Device Components
+
+Create additional mockup components for different device sizes:
+
+**1.1 TabletMockup Component**
+- iPad-style frame with 768x1024 viewport
+- Rounded corners, thin bezel aesthetic
+- Responsive iframe scaling similar to iPhone mockup
+- Home indicator at bottom
+
+**1.2 DesktopMockup Component**
+- Browser window frame with address bar, traffic light buttons
+- 1280x720 viewport (simulated)
+- Chrome/Safari-style window chrome
+- URL display showing the actual page URL
+
+**1.3 Device Selector UI**
+- Toggle button group to switch between device views
+- Icons: Smartphone, Tablet, Monitor
+- Selected device type persists per step or globally
 
 ### Implementation Details
 
-**2.1 Database Schema Update**
-Add a migration to extend `agency_members` table:
-```sql
-ALTER TABLE public.agency_members
-ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP WITH TIME ZONE;
+```text
++----------------+   +----------------+   +------------------+
+|  iPhone 14     |   |   iPad Pro     |   |  Desktop Browser |
+|  390 x 844     |   |   820 x 1180   |   |   1280 x 720     |
++----------------+   +----------------+   +------------------+
 ```
-
-Create a new activity log table:
-```sql
-CREATE TABLE public.member_activity_log (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  member_id UUID REFERENCES public.agency_members(id) ON DELETE CASCADE,
-  action TEXT NOT NULL,
-  entity_type TEXT,
-  entity_id UUID,
-  details JSONB DEFAULT '{}',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-```
-
-**2.2 Create Team Member Login Component**
-- New component: `src/components/auth/TeamMemberLogin.tsx`
-- Provides a dropdown to select team member by name
-- Password field validates against `memberName.toLowerCase()`
-- On success, stores member info in sessionStorage:
-  - `team_member_id`
-  - `team_member_name`
-- Creates a custom React context for current team member
-
-**2.3 Create Team Member Context**
-- New context: `src/contexts/TeamMemberContext.tsx`
-- Provides `currentMember` state and `login/logout` functions
-- Persists to sessionStorage for session continuity
-- Updates `last_login_at` in database on login
-
-**2.4 Update PasswordGate Component**
-- After main dashboard password check passes, show team member login
-- Make team login optional initially (can skip for anonymous access)
-- When logged in, show member name in header with logout option
-
-**2.5 Track Activity on Task Creation**
-- Update `useCreateTask` mutation to:
-  - Set `created_by` field to current team member name
-  - Insert record into `member_activity_log` table
-- Update `CreateTaskModal` to pass current member context
-
-**2.6 Activity Feed Enhancement**
-- Update `ActivityFeed.tsx` to show who created each task
-- Display member name badge next to task activities
-- Add "My Activity" filter option for logged-in members
 
 ---
 
-## Feature 3: Public Link Password Protection
+## Feature 2: Funnel Flow Visualization
 
-### Overview
-Add an optional password field in client settings that protects the public shareable link.
+### Visual Flow Diagram
 
-### Implementation Details
+Create a horizontal or vertical flow diagram that shows:
+- Each step as a node/card
+- Connecting arrows between steps
+- Optional: Conversion rate labels on arrows
 
-**3.1 Database Schema Update**
-Add password field to `client_settings`:
-```sql
-ALTER TABLE public.client_settings
-ADD COLUMN IF NOT EXISTS public_link_password TEXT;
+**2.1 FunnelFlowDiagram Component**
+- Uses SVG for drawing connection lines and arrows
+- Step nodes positioned in a horizontal row
+- Curved or straight arrows connecting consecutive steps
+- Animated flow indicators (optional)
+
+**2.2 Step Node Design**
+```text
++---------------------------+
+|  [1] Landing Page         |
+|  +-----------------+      |
+|  |   Thumbnail     |      |  ------>  [2] Form Page  ------>  [3] Thank You
+|  |   Preview       |      |
+|  +-----------------+      |
+|  example.com/landing      |
++---------------------------+
 ```
 
-**3.2 Update ClientSettings Interface**
-- Add `public_link_password?: string` to the TypeScript interface in `useClientSettings.ts`
+**2.3 Optional Conversion Metrics**
+- If metrics data is available, display conversion rates on arrows
+- Example: "75% →" between steps
+- Color-coded based on performance (green/yellow/red)
 
-**3.3 Update ClientSettingsModal.tsx**
-- Add new section under a "Security" or within existing tabs
-- Include:
-  - Password input field (with show/hide toggle)
-  - "Enable password protection" switch
-  - Help text explaining this protects the public link
-- Save password to `client_settings` table
+### Flow Layout Options
+- **Horizontal scroll**: Steps flow left-to-right with horizontal scrolling
+- **Stacked vertical**: For mobile/narrow screens, stack vertically with downward arrows
+- **Canvas view**: Zoomable/pannable canvas for complex funnels (future enhancement)
 
-**3.4 Update PublicReport.tsx**
-- Fetch client settings to check if `public_link_password` is set
-- If password is set, show a password gate before rendering the report
-- Create a simple password form similar to main PasswordGate but client-specific
-- Store auth state in sessionStorage with client-specific key: `public_auth_{clientId}`
+---
+
+## Feature 3: Drag-and-Drop Reordering
+
+### Implementation Approach
+
+Leverage the existing `@dnd-kit` library (already installed) for smooth drag-and-drop:
+
+**3.1 Update FunnelPreviewTab**
+- Wrap step grid in `DndContext` and `SortableContext`
+- Each step card becomes a `useSortable` draggable item
+- Grip handle icon for drag affordance
+- Visual feedback during drag (opacity, shadow)
+
+**3.2 New Hook: useReorderFunnelSteps**
+```typescript
+export function useReorderFunnelSteps() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ clientId, orderedIds }: { 
+      clientId: string; 
+      orderedIds: string[] 
+    }) => {
+      // Batch update sort_order for all steps
+      const updates = orderedIds.map((id, index) => 
+        supabase
+          .from('client_funnel_steps')
+          .update({ sort_order: index })
+          .eq('id', id)
+      );
+      await Promise.all(updates);
+      return { clientId };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['funnel-steps', result.clientId] });
+      toast.success('Funnel order updated');
+    },
+  });
+}
+```
+
+**3.3 Drag Event Handlers**
+```typescript
+const handleDragEnd = (event: DragEndEvent) => {
+  const { active, over } = event;
+  if (!over || active.id === over.id) return;
+  
+  const oldIndex = steps.findIndex(s => s.id === active.id);
+  const newIndex = steps.findIndex(s => s.id === over.id);
+  
+  const newOrder = arrayMove(steps, oldIndex, newIndex);
+  reorderSteps.mutate({
+    clientId,
+    orderedIds: newOrder.map(s => s.id)
+  });
+};
+```
+
+---
+
+## Feature 4: Tab Placement Updates
+
+### Client Detail Page (ClientDetail.tsx)
+
+Reorder tabs so Funnel appears after Tasks:
+```
+Overview | Attribution & Records | Tasks | Funnel | Creatives | [Custom Tabs] | + Add Tab
+```
+
+### Agency Dashboard (Index.tsx)
+
+Add Funnel tab to the agency-level tabs alongside Dashboard, Meetings, and Creatives:
+```
+Dashboard | Meetings | Creatives | Funnel
+```
+
+The agency-level Funnel view would show:
+- Client selector dropdown
+- Preview of selected client's funnel
+- Or aggregate view showing all client funnels in a list
 
 ---
 
 ## Technical Summary
 
-| Component | Changes |
-|-----------|---------|
-| `src/lib/utils.ts` | Add `addBusinessDays()` helper |
-| `src/components/tasks/CreateTaskModal.tsx` | Auto-set due date, add created_by |
-| `src/hooks/useCreatives.ts` | Add due_date to auto-created tasks |
-| `src/hooks/useMeetings.ts` | Add due_date to meeting tasks |
-| `src/contexts/TeamMemberContext.tsx` | New context for member session |
-| `src/components/auth/TeamMemberLogin.tsx` | New login component |
-| `src/components/auth/PasswordGate.tsx` | Integrate team member login |
-| `src/hooks/useTasks.ts` | Update to track created_by and log activity |
-| `src/hooks/useClientSettings.ts` | Add public_link_password field |
-| `src/components/settings/ClientSettingsModal.tsx` | Add password config UI |
-| `src/pages/PublicReport.tsx` | Add password protection check |
-| `supabase/migrations/` | Schema updates for activity log and password fields |
+| Component | Changes/New |
+|-----------|-------------|
+| `src/components/funnel/FunnelPreviewTab.tsx` | Add device toggle, flow view, dnd-kit integration |
+| `src/components/funnel/IPhoneMockup.tsx` | Minor refinements (already exists) |
+| `src/components/funnel/TabletMockup.tsx` | **NEW** - iPad mockup frame |
+| `src/components/funnel/DesktopMockup.tsx` | **NEW** - Browser window mockup |
+| `src/components/funnel/FunnelFlowDiagram.tsx` | **NEW** - SVG flow visualization |
+| `src/components/funnel/SortableFunnelStep.tsx` | **NEW** - dnd-kit sortable wrapper |
+| `src/components/funnel/DeviceSwitcher.tsx` | **NEW** - Device type toggle UI |
+| `src/hooks/useFunnelSteps.ts` | Add `useReorderFunnelSteps` mutation |
+| `src/pages/ClientDetail.tsx` | Move Funnel tab after Tasks |
+| `src/pages/Index.tsx` | Add agency-level Funnel tab |
 
 ---
 
-## User Experience Flow
+## UI/UX Flow
 
-### Task Creation
-1. User opens "Create Task" modal
-2. Due date is pre-filled with date 2 business days from today
-3. User can override by picking a different date
-4. If logged in as team member, their name is recorded as creator
+### Preview Mode (Default)
+1. User navigates to Funnel tab
+2. Sees device switcher (iPhone/Tablet/Desktop)
+3. Views funnel steps in selected device mockups
+4. Grid layout with step numbers and names
 
-### Team Member Login
-1. After entering "HPA" password, a secondary step appears
-2. User selects their name from dropdown
-3. Enters password (their name in lowercase, e.g., "john doe" → "john doe")
-4. On success, their name appears in the header
-5. All their task creations are attributed to them
+### Flow Mode
+1. User clicks "View Flow" toggle
+2. Switches to horizontal flow diagram view
+3. Steps shown as connected nodes with arrows
+4. Compact thumbnails instead of full mockups
 
-### Public Link Password
-1. Agency goes to Client Settings → adds password for public link
-2. When clients visit the public URL, they see a password prompt
-3. After entering correct password, they access the dashboard
-4. Session persists in browser until cleared
+### Reordering
+1. User hovers over step card, sees grip handle
+2. Drags step to new position
+3. Other steps animate to make room
+4. Order saved automatically on drop
+
+---
+
+## Visual Design
+
+### Device Mockup Dimensions
+
+```text
+iPhone 14 Pro       iPad Pro 11"        Desktop 1280px
+┌─────────────┐    ┌──────────────────┐  ┌────────────────────────┐
+│ ▢▢▢         │    │                  │  │ ⏺ ⏺ ⏺  example.com    │
+│             │    │                  │  ├────────────────────────┤
+│   280x580   │    │    400x580       │  │                        │
+│   scaled    │    │    scaled        │  │       640x400          │
+│             │    │                  │  │       scaled           │
+│             │    │                  │  │                        │
+│      ═      │    │       ═          │  │                        │
+└─────────────┘    └──────────────────┘  └────────────────────────┘
+```
+
+### Flow Diagram Style
+
+```text
+┌─────────────┐        ┌─────────────┐        ┌─────────────┐
+│ 1. Landing  │  ───→  │  2. Form    │  ───→  │ 3. Thanks   │
+│ ┌─────────┐ │        │ ┌─────────┐ │        │ ┌─────────┐ │
+│ │ [thumb] │ │        │ │ [thumb] │ │        │ │ [thumb] │ │
+│ └─────────┘ │        │ └─────────┘ │        │ └─────────┘ │
+│ Edit Delete │        │ Edit Delete │        │ Edit Delete │
+└─────────────┘        └─────────────┘        └─────────────┘
+```
+
+---
+
+## Dependencies
+
+No new npm packages required:
+- **@dnd-kit/core** - Already installed (v6.3.1)
+- **@dnd-kit/sortable** - Already installed (v10.0.0)
+- **lucide-react** - Already has Monitor, Tablet, Smartphone icons
+- SVG arrows will be custom-built (no external library needed)
+
+---
+
+## Implementation Order
+
+1. Create TabletMockup and DesktopMockup components
+2. Create DeviceSwitcher toggle component
+3. Update FunnelPreviewTab with device switching
+4. Implement SortableFunnelStep with dnd-kit
+5. Add useReorderFunnelSteps hook
+6. Integrate drag-and-drop into FunnelPreviewTab
+7. Create FunnelFlowDiagram component
+8. Add flow/preview view toggle
+9. Update tab ordering in ClientDetail.tsx
+10. Add Funnel tab to agency dashboard Index.tsx
