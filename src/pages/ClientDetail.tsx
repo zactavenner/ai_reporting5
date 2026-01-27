@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Settings, DollarSign, Upload, History, Plus, ExternalLink, X, ClipboardList, Phone, Users, BarChart3, Video } from 'lucide-react';
+import { ArrowLeft, Settings, DollarSign, Upload, History, Plus, ExternalLink, X, ClipboardList, Phone, Users, BarChart3, Video, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { VoiceRecordButton } from '@/components/voice/VoiceRecordButton';
 import { ActivityPanel } from '@/components/activity/ActivityPanel';
@@ -25,6 +25,7 @@ import { AIAnalysisChat } from '@/components/ai/AIAnalysisChat';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import { DataDiscrepancyBanner } from '@/components/dashboard/DataDiscrepancyBanner';
+import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
 import { useClient } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
 import { usePriorPeriodMetrics } from '@/hooks/usePriorMetrics';
@@ -316,6 +317,14 @@ export default function ClientDetail() {
             <Upload className="h-4 w-4 mr-1" />
             Creatives
           </Button>
+          <Button 
+            variant={activeTab === 'funnel' ? 'default' : 'outline'} 
+            size="sm"
+            onClick={() => setActiveTab('funnel')}
+          >
+            <Smartphone className="h-4 w-4 mr-1" />
+            Funnel
+          </Button>
           {customTabs.map((tab) => (
             <div key={tab.id} className="relative group">
               <Button 
@@ -444,6 +453,10 @@ export default function ClientDetail() {
             clientName={client.name} 
             isPublicView={false}
           />
+        )}
+        {/* Funnel Tab */}
+        {activeTab === 'funnel' && (
+          <FunnelPreviewTab clientId={client.id} isPublicView={false} />
         )}
         {customTabs.map((tab) => (
           activeTab === `custom-${tab.id}` && (

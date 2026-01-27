@@ -4,6 +4,7 @@ import { useClientByToken } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
 import { useLeads, useCalls } from '@/hooks/useLeadsAndCalls';
 import { useCustomTabs } from '@/hooks/useCustomTabs';
+import { useFunnelSteps } from '@/hooks/useFunnelSteps';
 import { useAllTasks } from '@/hooks/useTasks';
 import { useVoiceNotes } from '@/hooks/useVoiceNotes';
 import { useMeetings } from '@/hooks/useMeetings';
@@ -24,7 +25,8 @@ import { Button } from '@/components/ui/button';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
-import { ExternalLink, ClipboardList } from 'lucide-react';
+import { ExternalLink, ClipboardList, Smartphone } from 'lucide-react';
+import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
 import { VoiceRecordButton } from '@/components/voice/VoiceRecordButton';
 
 export default function PublicReport() {
@@ -39,6 +41,7 @@ export default function PublicReport() {
   const { data: leads = [], isLoading: leadsLoading } = useLeads(client?.id, startDate, endDate);
   const { data: calls = [] } = useCalls(client?.id, false, startDate, endDate);
   const { data: customTabs = [] } = useCustomTabs(client?.id);
+  const { data: funnelSteps = [] } = useFunnelSteps(client?.id);
   const { data: allTasks = [] } = useAllTasks();
   const { data: voiceNotes = [] } = useVoiceNotes(client?.id);
   const { data: meetings = [] } = useMeetings(client?.id);
@@ -178,6 +181,16 @@ export default function PublicReport() {
             <ClipboardList className="h-4 w-4 mr-1" />
             Tasks
           </Button>
+          {funnelSteps.length > 0 && (
+            <Button 
+              variant={activeSection === 'funnel' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => setActiveSection('funnel')}
+            >
+              <Smartphone className="h-4 w-4 mr-1" />
+              Funnel
+            </Button>
+          )}
           {customTabs.map((tab) => (
             <Button 
               key={tab.id}
@@ -238,6 +251,11 @@ export default function PublicReport() {
         {/* Tasks Section */}
         {activeSection === 'tasks' && client && (
           <TaskBoardView clientId={client.id} isPublicView={true} />
+        )}
+
+        {/* Funnel Preview Section */}
+        {activeSection === 'funnel' && client && (
+          <FunnelPreviewTab clientId={client.id} isPublicView={true} />
         )}
 
         {/* Custom Embed Tabs */}
