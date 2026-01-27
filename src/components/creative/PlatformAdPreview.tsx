@@ -37,7 +37,6 @@ export function PlatformAdPreview({ creative, platform, clientName }: PlatformAd
         className="w-full h-full object-cover"
         loop
         playsInline
-        muted
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
       />
