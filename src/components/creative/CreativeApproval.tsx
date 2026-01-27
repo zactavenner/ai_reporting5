@@ -100,6 +100,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
 
       await createCreative.mutateAsync({
         client_id: clientId,
+        client_name: clientName,
         title: newCreative.title,
         type: newCreative.type,
         platform: newCreative.platform,
@@ -151,6 +152,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
 
           await createCreative.mutateAsync({
             client_id: clientId,
+            client_name: clientName,
             title: title,
             type: isVideo ? 'video' : 'image',
             platform: bulkPlatform,

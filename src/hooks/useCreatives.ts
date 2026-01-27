@@ -59,6 +59,7 @@ export function useCreateCreative() {
   return useMutation({
     mutationFn: async (creative: {
       client_id: string;
+      client_name?: string;
       title: string;
       type?: string;
       platform?: string;
@@ -87,11 +88,33 @@ export function useCreateCreative() {
         .single();
       
       if (error) throw error;
+      
+      // Auto-create task for client to review the creative
+      const previewLink = creative.file_url ? `\n\n**Preview:** ${creative.file_url}` : '';
+      const { error: taskError } = await supabase
+        .from('tasks')
+        .insert({
+          client_id: creative.client_id,
+          title: `Review creative: ${creative.title}`,
+          description: `Please review the new ${creative.type || 'image'} creative "${creative.title}" for ${creative.platform || 'meta'}.${previewLink}`,
+          status: 'todo',
+          stage: 'todo',
+          priority: 'medium',
+          created_by: 'System',
+          assigned_client_name: creative.client_name || null,
+        });
+      
+      if (taskError) {
+        console.error('Failed to create review task for creative:', taskError);
+      }
+      
       return data;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['creatives', variables.client_id] });
-      toast.success('Creative uploaded successfully');
+      queryClient.invalidateQueries({ queryKey: ['tasks', variables.client_id] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      toast.success('Creative uploaded and review task created');
     },
     onError: (error: Error) => {
       toast.error('Failed to upload creative: ' + error.message);
