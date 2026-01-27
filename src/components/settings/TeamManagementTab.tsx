@@ -380,12 +380,12 @@ export function TeamManagementTab() {
                 </div>
                 <div>
                   <Label>Assign to Pod</Label>
-                  <Select value={memberPodId} onValueChange={setMemberPodId}>
+                  <Select value={memberPodId || 'unassigned'} onValueChange={(val) => setMemberPodId(val === 'unassigned' ? '' : val)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select pod..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Unassigned</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
                       {pods.map((pod) => (
                         <SelectItem key={pod.id} value={pod.id}>
                           <div className="flex items-center gap-2">
@@ -440,8 +440,8 @@ export function TeamManagementTab() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Select
-                      value={(member as any).pod_id || ''}
-                      onValueChange={(val) => handleUpdateMemberPod(member.id, val || null)}
+                      value={(member as any).pod_id || 'unassigned'}
+                      onValueChange={(val) => handleUpdateMemberPod(member.id, val === 'unassigned' ? null : val)}
                     >
                       <SelectTrigger className="w-40">
                         <SelectValue placeholder="Unassigned">
@@ -459,7 +459,7 @@ export function TeamManagementTab() {
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Unassigned</SelectItem>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
                         {pods.map((pod) => (
                           <SelectItem key={pod.id} value={pod.id}>
                             <div className="flex items-center gap-2">
