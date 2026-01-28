@@ -52,6 +52,13 @@ interface GHLOpportunity {
   lastStageChangeAt?: string;
 }
 
+interface GHLNote {
+  id: string;
+  body: string;
+  userId?: string;
+  dateAdded: string;
+}
+
 // Tag patterns that indicate a funded investor
 const FUNDED_TAG_PATTERNS = [
   'funded',
@@ -871,13 +878,43 @@ async function fetchSingleGHLContact(
   }
 }
 
+// Fetch notes for a GHL contact
+async function fetchGHLNotes(
+  apiKey: string,
+  contactId: string
+): Promise<GHLNote[]> {
+  const headers = {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'Version': '2021-07-28',
+  };
+
+  try {
+    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}/notes`, { 
+      method: 'GET', 
+      headers 
+    });
+    
+    if (!response.ok) {
+      console.error(`GHL notes fetch error: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.notes || [];
+  } catch (err) {
+    console.error('Error fetching GHL notes:', err);
+    return [];
+  }
+}
+
 // Handle single contact sync mode
 async function syncSingleContact(
   supabase: any,
   clientId: string,
   contactId: string,
   apiKey: string
-): Promise<{ success: boolean; contact?: any; error?: string }> {
+): Promise<{ success: boolean; contact?: any; notes?: GHLNote[]; error?: string }> {
   console.log(`Single contact sync: fetching contact ${contactId} for client ${clientId}`);
   
   const contact = await fetchSingleGHLContact(apiKey, contactId);
@@ -888,20 +925,27 @@ async function syncSingleContact(
   
   console.log(`Found GHL contact: ${contact.name || contact.firstName || 'Unknown'}`);
   
+  // Fetch notes for this contact
+  const notes = await fetchGHLNotes(apiKey, contactId);
+  console.log(`Fetched ${notes.length} notes for contact ${contactId}`);
+  
   // Sync the contact to database
   const syncResult = await syncContactToDatabase(supabase, clientId, contact);
   
-  // Update ghl_synced_at timestamp for lead
+  // Update ghl_synced_at timestamp and ghl_notes for lead
   const { data: updatedLead, error: updateError } = await supabase
     .from('leads')
-    .update({ ghl_synced_at: new Date().toISOString() })
+    .update({ 
+      ghl_synced_at: new Date().toISOString(),
+      ghl_notes: notes.length > 0 ? notes : []
+    })
     .eq('client_id', clientId)
     .eq('external_id', contactId)
-    .select('id, name, ghl_synced_at')
+    .select('id, name, ghl_synced_at, ghl_notes')
     .maybeSingle();
   
   if (updateError) {
-    console.error('Error updating ghl_synced_at:', updateError);
+    console.error('Error updating lead with sync data:', updateError);
   }
   
   // Also update any calls associated with this contact
@@ -911,15 +955,17 @@ async function syncSingleContact(
     .eq('client_id', clientId)
     .or(`external_id.eq.${contactId},lead_id.eq.${updatedLead?.id || ''}`);
   
-  console.log(`Single contact sync complete: ${syncResult.action}`);
+  console.log(`Single contact sync complete: ${syncResult.action}, notes: ${notes.length}`);
   
   return { 
     success: true, 
     contact: updatedLead || { 
       id: syncResult.leadId, 
       name: contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
-      ghl_synced_at: new Date().toISOString()
-    }
+      ghl_synced_at: new Date().toISOString(),
+      ghl_notes: notes
+    },
+    notes
   };
 }
 

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +53,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useSingleContactSync } from '@/hooks/useSingleContactSync';
+import { RecordDetailsGHLSection, LinkedContactInfo } from './RecordDetailsGHLSection';
 import {
   Dialog,
   DialogContent,
@@ -213,6 +214,46 @@ export function InlineRecordsView({
     if (!leadId) return '-';
     return leadNameMap[leadId] || '-';
   };
+
+  // Helper to get linked lead for any record type
+  const getLinkedLead = useCallback((record: any, recordType: string): Lead | null => {
+    if (recordType === 'lead') return record as Lead;
+    
+    // For calls, use lead_id
+    if (record?.lead_id) {
+      return leads.find(l => l.id === record.lead_id) || null;
+    }
+    
+    // For funded/commitments, match by external_id or lead_id
+    if (record?.lead_id) {
+      return leads.find(l => l.id === record.lead_id) || null;
+    }
+    if (record?.external_id) {
+      return leads.find(l => l.external_id === record.external_id) || null;
+    }
+    
+    return null;
+  }, [leads]);
+
+  // Get current selected record's linked lead
+  const selectedLinkedLead = useMemo(() => {
+    if (!selectedRecord || !selectedType) return null;
+    return getLinkedLead(selectedRecord, selectedType);
+  }, [selectedRecord, selectedType, getLinkedLead]);
+
+  // Handle sync for selected record
+  const handleSelectedRecordSync = useCallback(async () => {
+    if (!selectedRecord || !clientId) return;
+    
+    // Get the external_id to sync
+    const externalId = selectedType === 'lead' 
+      ? selectedRecord.external_id 
+      : selectedLinkedLead?.external_id || selectedRecord.external_id;
+    
+    if (!externalId) return;
+    
+    await syncContact(clientId, externalId, 'lead');
+  }, [selectedRecord, selectedType, selectedLinkedLead, clientId, syncContact]);
 
   // Reset page when tab changes
   const handleTabChange = (tab: string) => {
@@ -1691,7 +1732,27 @@ export function InlineRecordsView({
           </CardHeader>
           <CardContent>
             {selectedRecord ? (
+              <ScrollArea className="h-[calc(100vh-200px)] pr-2">
               <div className="space-y-4">
+                {/* GHL Integration Section - Top of Record Details */}
+                <RecordDetailsGHLSection
+                  record={selectedRecord}
+                  recordType={selectedType || ''}
+                  ghlLocationId={ghlLocationId || null}
+                  linkedLead={selectedLinkedLead}
+                  onSync={handleSelectedRecordSync}
+                  isSyncing={isSyncing(
+                    selectedType === 'lead' 
+                      ? selectedRecord.external_id 
+                      : selectedLinkedLead?.external_id || selectedRecord.external_id || ''
+                  )}
+                />
+
+                {/* Linked Contact Info for non-lead records */}
+                {selectedType !== 'lead' && selectedType !== 'adspend' && selectedLinkedLead && (
+                  <LinkedContactInfo lead={selectedLinkedLead} />
+                )}
+
                 {/* Timeline */}
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium flex items-center gap-2">
@@ -1918,6 +1979,7 @@ export function InlineRecordsView({
                   </div>
                 )}
               </div>
+              </ScrollArea>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <p>Select a record to view details</p>

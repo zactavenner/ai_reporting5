@@ -1402,6 +1402,7 @@ export type Database = {
           custom_fields: Json | null
           email: string | null
           external_id: string
+          ghl_notes: Json | null
           ghl_synced_at: string | null
           id: string
           is_spam: boolean | null
@@ -1428,6 +1429,7 @@ export type Database = {
           custom_fields?: Json | null
           email?: string | null
           external_id: string
+          ghl_notes?: Json | null
           ghl_synced_at?: string | null
           id?: string
           is_spam?: boolean | null
@@ -1454,6 +1456,7 @@ export type Database = {
           custom_fields?: Json | null
           email?: string | null
           external_id?: string
+          ghl_notes?: Json | null
           ghl_synced_at?: string | null
           id?: string
           is_spam?: boolean | null

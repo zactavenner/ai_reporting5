@@ -7,6 +7,13 @@ export interface LeadQuestion {
   source: string;
 }
 
+export interface GHLNote {
+  id: string;
+  body: string;
+  userId?: string;
+  dateAdded: string;
+}
+
 export interface Lead {
   id: string;
   client_id: string;
@@ -32,6 +39,7 @@ export interface Lead {
   ad_set_name?: string | null;
   ad_id?: string | null;
   ghl_synced_at?: string | null;
+  ghl_notes?: GHLNote[] | null;
 }
 
 export interface Call {
@@ -82,7 +90,11 @@ export function useLeads(clientId?: string, startDate?: string, endDate?: string
       
       const { data, error } = await query;
       if (error) throw error;
-      return data as Lead[];
+      // Cast ghl_notes from Json to GHLNote[] for each lead
+      return (data || []).map(lead => ({
+        ...lead,
+        ghl_notes: Array.isArray(lead.ghl_notes) ? (lead.ghl_notes as unknown as GHLNote[]) : null,
+      })) as Lead[];
     },
   });
 }
