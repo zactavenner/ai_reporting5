@@ -483,7 +483,20 @@ async function syncContactToDatabase(
   }
 
   // Use GHL dateAdded for lead creation date if creating new lead
-  const ghlCreatedAt = contact.dateAdded ? new Date(contact.dateAdded).toISOString() : new Date().toISOString();
+  let ghlCreatedAt = new Date().toISOString();
+  if (contact.dateAdded) {
+    try {
+      const parsedDate = new Date(contact.dateAdded);
+      if (!isNaN(parsedDate.getTime())) {
+        ghlCreatedAt = parsedDate.toISOString();
+        console.log(`Using GHL dateAdded for contact ${externalId}: ${contact.dateAdded} -> ${ghlCreatedAt}`);
+      }
+    } catch (e) {
+      console.error(`Failed to parse GHL dateAdded for contact ${externalId}: ${contact.dateAdded}`);
+    }
+  } else {
+    console.log(`No dateAdded for contact ${externalId}, using current time`);
+  }
 
   const leadData: Record<string, any> = {
     client_id: clientId,
