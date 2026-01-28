@@ -23,6 +23,7 @@ interface GHLContact {
   phone?: string;
   tags?: string[];
   dateAdded: string;
+  dateUpdated?: string;
   customFields?: Array<{ key: string; value: string }>;
 }
 
@@ -39,8 +40,45 @@ interface GHLOpportunity {
   contactId: string;
   status: string;
   monetaryValue?: number;
+  monetary_value?: number;
   pipelineStageId?: string;
+  pipelineStageName?: string;
+  stageName?: string;
   dateAdded: string;
+  lastStageChangeAt?: string;
+}
+
+// Tag patterns that indicate a funded investor
+const FUNDED_TAG_PATTERNS = [
+  'funded',
+  'funded investor',
+  'fundedinvestor',
+  'funded_investor',
+  'active investor',
+  'activeinvestor',
+  'active_investor'
+];
+
+function hasFundedInvestorTag(contact: GHLContact): boolean {
+  if (!contact.tags || !Array.isArray(contact.tags)) return false;
+  
+  return contact.tags.some(tag => 
+    FUNDED_TAG_PATTERNS.some(pattern => 
+      tag.toLowerCase().trim() === pattern ||
+      tag.toLowerCase().includes(pattern)
+    )
+  );
+}
+
+function isFundedOpportunity(opp: GHLOpportunity): boolean {
+  const stageName = (opp.stageName || opp.pipelineStageName || '').toLowerCase();
+  const stageId = (opp.pipelineStageId || '').toLowerCase();
+  
+  return opp.status === 'won' || 
+    stageName.includes('funded') ||
+    stageName.includes('active investor') ||
+    stageId.includes('funded') ||
+    stageId.includes('closed');
 }
 
 serve(async (req) => {
@@ -53,7 +91,6 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get optional client_id from request body
     let targetClientId: string | null = null;
     try {
       const body = await req.json();
@@ -62,7 +99,6 @@ serve(async (req) => {
       // No body or invalid JSON, sync all clients
     }
 
-    // Get all active clients (or specific client)
     let clientsQuery = supabase
       .from('clients')
       .select('*')
@@ -97,7 +133,6 @@ serve(async (req) => {
         errors: [] as string[],
       };
 
-      // Create sync log entry
       const { data: syncLog } = await supabase
         .from('sync_logs')
         .insert({
@@ -140,10 +175,8 @@ serve(async (req) => {
           console.log(`Skipping GHL sync for ${client.name} - missing credentials`);
         }
 
-        // Check alerts after sync
         await checkAlerts(supabase, client);
 
-        // Update sync log
         await supabase
           .from('sync_logs')
           .update({
@@ -199,7 +232,6 @@ async function syncMetaAds(supabase: any, client: any): Promise<void> {
     until: today.toISOString().split('T')[0],
   };
 
-  // Fetch Meta Ads insights
   const insightsUrl = `https://graph.facebook.com/v18.0/act_${client.meta_ad_account_id}/insights?` +
     `fields=spend,impressions,clicks,ctr,actions&` +
     `time_range={"since":"${dateRange.since}","until":"${dateRange.until}"}&` +
@@ -219,7 +251,6 @@ async function syncMetaAds(supabase: any, client: any): Promise<void> {
   for (const day of insights) {
     const leads = day.actions?.find(a => a.action_type === 'lead')?.value || '0';
     
-    // Upsert daily metrics (deduplication via UNIQUE constraint)
     await supabase
       .from('daily_metrics')
       .upsert({
@@ -245,7 +276,9 @@ async function syncGHLData(supabase: any, client: any): Promise<{ leads: number;
     'Content-Type': 'application/json',
   };
 
-  // Fetch contacts (leads)
+  // Fetch contacts (leads) - store map for funded investor matching
+  const contactsMap = new Map<string, GHLContact>();
+  
   try {
     const contactsResponse = await fetch(
       `${baseUrl}/contacts/?locationId=${client.ghl_location_id}&limit=100`,
@@ -257,11 +290,15 @@ async function syncGHLData(supabase: any, client: any): Promise<{ leads: number;
       const contacts: GHLContact[] = contactsData.contacts || [];
 
       for (const contact of contacts) {
+        contactsMap.set(contact.id, contact);
+        
         const isSpam = contact.tags?.some(t => 
           t.toLowerCase().includes('spam') || t.toLowerCase().includes('bad')
         ) || false;
 
-        // Upsert lead (deduplication via UNIQUE constraint on client_id, external_id, source)
+        // Use GHL dateAdded as created_at for new leads
+        const ghlCreatedAt = contact.dateAdded ? new Date(contact.dateAdded).toISOString() : new Date().toISOString();
+
         const { data: leadData, error: leadError } = await supabase
           .from('leads')
           .upsert({
@@ -272,6 +309,7 @@ async function syncGHLData(supabase: any, client: any): Promise<{ leads: number;
             email: contact.email,
             phone: contact.phone,
             is_spam: isSpam,
+            created_at: ghlCreatedAt,
           }, {
             onConflict: 'client_id,external_id,source',
             ignoreDuplicates: false,
@@ -300,7 +338,6 @@ async function syncGHLData(supabase: any, client: any): Promise<{ leads: number;
       const appointments: GHLAppointment[] = appointmentsData.appointments || [];
 
       for (const apt of appointments) {
-        // Find matching lead
         const { data: lead } = await supabase
           .from('leads')
           .select('id')
@@ -310,7 +347,6 @@ async function syncGHLData(supabase: any, client: any): Promise<{ leads: number;
 
         const showed = apt.status === 'showed' || apt.appointmentStatus === 'showed';
 
-        // Upsert call (deduplication via UNIQUE constraint on client_id, external_id)
         const { error: callError } = await supabase
           .from('calls')
           .upsert({
@@ -345,15 +381,10 @@ async function syncGHLData(supabase: any, client: any): Promise<{ leads: number;
       const oppsData = await oppsResponse.json();
       const opportunities: GHLOpportunity[] = oppsData.opportunities || [];
 
-      // Filter for funded opportunities (you may need to adjust based on actual pipeline stage names)
-      const fundedOpps = opportunities.filter(opp => 
-        opp.status === 'won' || 
-        opp.pipelineStageId?.toLowerCase().includes('funded') ||
-        opp.pipelineStageId?.toLowerCase().includes('closed')
-      );
+      // Filter for funded opportunities using expanded logic
+      const fundedOpps = opportunities.filter(isFundedOpportunity);
 
       for (const opp of fundedOpps) {
-        // Find matching lead
         const { data: lead } = await supabase
           .from('leads')
           .select('id, created_at')
@@ -361,29 +392,33 @@ async function syncGHLData(supabase: any, client: any): Promise<{ leads: number;
           .eq('external_id', opp.contactId)
           .single();
 
-        // Count calls for this lead
         const { count: callCount } = await supabase
           .from('calls')
           .select('*', { count: 'exact', head: true })
           .eq('lead_id', lead?.id);
 
-        // Calculate time to fund
+        // Calculate time to fund using lead created_at
         let timeToFundDays: number | null = null;
+        // Use lastStageChangeAt if available, otherwise dateAdded
+        const fundedAt = opp.lastStageChangeAt || opp.dateAdded;
+        
         if (lead?.created_at) {
           const leadDate = new Date(lead.created_at);
-          const fundedDate = new Date(opp.dateAdded);
+          const fundedDate = new Date(fundedAt);
           timeToFundDays = Math.floor((fundedDate.getTime() - leadDate.getTime()) / (1000 * 60 * 60 * 24));
         }
 
-        // Upsert funded investor (deduplication via UNIQUE constraint)
+        // Extract value with multiple field fallbacks
+        const fundedAmount = opp.monetaryValue ?? opp.monetary_value ?? 0;
+
         const { error: fundedError } = await supabase
           .from('funded_investors')
           .upsert({
             client_id: client.id,
             lead_id: lead?.id || null,
             external_id: opp.id,
-            funded_amount: opp.monetaryValue || 0,
-            funded_at: opp.dateAdded,
+            funded_amount: fundedAmount,
+            funded_at: fundedAt,
             first_contact_at: lead?.created_at || null,
             time_to_fund_days: timeToFundDays,
             calls_to_fund: callCount || 0,
@@ -396,12 +431,71 @@ async function syncGHLData(supabase: any, client: any): Promise<{ leads: number;
           result.funded++;
         }
       }
+      
+      // Also check contacts with funded tags that don't have opportunities
+      for (const [contactId, contact] of contactsMap) {
+        if (hasFundedInvestorTag(contact)) {
+          // Check if already a funded investor from opportunities
+          const { data: existingFunded } = await supabase
+            .from('funded_investors')
+            .select('id')
+            .eq('client_id', client.id)
+            .eq('external_id', contactId)
+            .maybeSingle();
+          
+          if (!existingFunded) {
+            // Get lead for this contact
+            const { data: lead } = await supabase
+              .from('leads')
+              .select('id, created_at')
+              .eq('client_id', client.id)
+              .eq('external_id', contactId)
+              .maybeSingle();
+            
+            // Use dateUpdated as funded date (approximation of when tag was added)
+            const fundedAt = contact.dateUpdated || contact.dateAdded;
+            
+            let timeToFundDays: number | null = null;
+            if (lead?.created_at) {
+              const leadDate = new Date(lead.created_at);
+              const fundedDate = new Date(fundedAt);
+              timeToFundDays = Math.floor((fundedDate.getTime() - leadDate.getTime()) / (1000 * 60 * 60 * 24));
+            }
+            
+            const { count: callCount } = await supabase
+              .from('calls')
+              .select('*', { count: 'exact', head: true })
+              .eq('lead_id', lead?.id);
+            
+            const name = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+            
+            const { error: fundedError } = await supabase
+              .from('funded_investors')
+              .insert({
+                client_id: client.id,
+                lead_id: lead?.id || null,
+                external_id: contactId,
+                name,
+                funded_amount: 0, // Will be 0 since no opportunity value
+                funded_at: fundedAt,
+                first_contact_at: lead?.created_at || null,
+                time_to_fund_days: timeToFundDays,
+                calls_to_fund: callCount || 0,
+                source: 'tag_sync',
+              });
+            
+            if (!fundedError) {
+              result.funded++;
+              console.log(`Created funded investor from tag: ${name}`);
+            }
+          }
+        }
+      }
     }
   } catch (error) {
     console.error('Error fetching GHL opportunities:', error);
   }
 
-  // Update daily metrics with aggregated GHL data
   await updateDailyMetricsFromGHL(supabase, client.id);
 
   return result;
@@ -410,7 +504,6 @@ async function syncGHLData(supabase: any, client: any): Promise<{ leads: number;
 async function updateDailyMetricsFromGHL(supabase: any, clientId: string): Promise<void> {
   const today = new Date().toISOString().split('T')[0];
   
-  // Get today's counts
   const { count: leadsCount } = await supabase
     .from('leads')
     .select('*', { count: 'exact', head: true })
@@ -446,7 +539,6 @@ async function updateDailyMetricsFromGHL(supabase: any, clientId: string): Promi
   const fundedCount = fundedData?.length || 0;
   const fundedDollars = fundedData?.reduce((sum: number, f: any) => sum + (f.funded_amount || 0), 0) || 0;
 
-  // Update today's metrics
   await supabase
     .from('daily_metrics')
     .upsert({
@@ -465,7 +557,6 @@ async function updateDailyMetricsFromGHL(supabase: any, clientId: string): Promi
 }
 
 async function checkAlerts(supabase: any, client: any): Promise<void> {
-  // Get alert configs for this client
   const { data: alerts } = await supabase
     .from('alert_configs')
     .select('*')
@@ -474,7 +565,6 @@ async function checkAlerts(supabase: any, client: any): Promise<void> {
 
   if (!alerts || alerts.length === 0) return;
 
-  // Get latest metrics
   const today = new Date().toISOString().split('T')[0];
   const { data: metrics } = await supabase
     .from('daily_metrics')
@@ -485,7 +575,6 @@ async function checkAlerts(supabase: any, client: any): Promise<void> {
 
   if (!metrics) return;
 
-  // Calculate derived metrics
   const costPerLead = metrics.leads > 0 ? metrics.ad_spend / metrics.leads : 0;
   const costPerCall = metrics.calls > 0 ? metrics.ad_spend / metrics.calls : 0;
 

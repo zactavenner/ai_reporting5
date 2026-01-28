@@ -39,6 +39,52 @@ interface GHLCall {
   dateAdded: string;
 }
 
+interface GHLOpportunity {
+  id: string;
+  contactId: string;
+  status: string;
+  monetaryValue?: number;
+  monetary_value?: number;
+  pipelineStageId?: string;
+  pipelineStageName?: string;
+  stageName?: string;
+  dateAdded: string;
+  lastStageChangeAt?: string;
+}
+
+// Tag patterns that indicate a funded investor
+const FUNDED_TAG_PATTERNS = [
+  'funded',
+  'funded investor',
+  'fundedinvestor',
+  'funded_investor',
+  'active investor',
+  'activeinvestor',
+  'active_investor'
+];
+
+function hasFundedInvestorTag(contact: GHLContact): boolean {
+  if (!contact.tags || !Array.isArray(contact.tags)) return false;
+  
+  return contact.tags.some(tag => 
+    FUNDED_TAG_PATTERNS.some(pattern => 
+      tag.toLowerCase().trim() === pattern ||
+      tag.toLowerCase().includes(pattern)
+    )
+  );
+}
+
+function hasBadLeadTag(contact: GHLContact): boolean {
+  if (!contact.tags || !Array.isArray(contact.tags)) return false;
+  
+  const badLeadPatterns = ['bad lead', 'badlead', 'bad_lead', 'bad-lead'];
+  return contact.tags.some(tag => 
+    badLeadPatterns.some(pattern => 
+      tag.toLowerCase().includes(pattern)
+    )
+  );
+}
+
 async function fetchGHLContacts(
   apiKey: string,
   locationId: string,
@@ -68,6 +114,35 @@ async function fetchGHLContacts(
     contacts: data.contacts || [],
     nextPageUrl: data.meta?.nextPageUrl,
   };
+}
+
+async function fetchGHLOpportunities(
+  apiKey: string,
+  locationId: string
+): Promise<GHLOpportunity[]> {
+  const headers = {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'Version': '2021-07-28',
+  };
+
+  try {
+    const response = await fetch(
+      `${GHL_BASE_URL}/opportunities/?locationId=${locationId}&limit=100`,
+      { method: 'GET', headers }
+    );
+
+    if (!response.ok) {
+      console.error(`GHL Opportunities API error: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.opportunities || [];
+  } catch (err) {
+    console.error('Error fetching GHL opportunities:', err);
+    return [];
+  }
 }
 
 async function fetchGHLConversations(
@@ -110,7 +185,6 @@ async function fetchGHLConversations(
           break;
         }
 
-        // Extract call messages from conversation
         if (conv.type === 'TYPE_CALL' && conv.contactId) {
           calls.push({
             id: conv.id,
@@ -131,7 +205,7 @@ async function fetchGHLConversations(
       }
 
       pageCount++;
-      await new Promise(resolve => setTimeout(resolve, 300)); // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
   } catch (err) {
     console.error('Error fetching GHL conversations:', err);
@@ -145,7 +219,6 @@ async function syncCallToDatabase(
   clientId: string,
   ghlCall: GHLCall
 ): Promise<{ action: 'enriched' | 'skipped' }> {
-  // Find matching call by contact external_id or lead's external_id
   const { data: existingCall } = await supabase
     .from('calls')
     .select('id, external_id, call_connected, recording_url')
@@ -154,7 +227,6 @@ async function syncCallToDatabase(
     .maybeSingle();
 
   if (existingCall) {
-    // Enrich existing call with API data - DO NOT override 'showed' field
     const updates: Record<string, any> = {
       call_connected: ghlCall.status === 'completed' || ghlCall.status === 'answered',
       ghl_synced_at: new Date().toISOString(),
@@ -225,7 +297,6 @@ function parseCustomFields(customFields: any[] | undefined): Record<string, any>
   return result;
 }
 
-// Extract UTM values from questions array and return filtered questions
 function extractUtmFromQuestions(questions: any[]): {
   utm_campaign?: string;
   utm_medium?: string;
@@ -238,27 +309,22 @@ function extractUtmFromQuestions(questions: any[]): {
   for (const q of questions) {
     const questionLower = String(q.question || '').toLowerCase().trim();
     
-    // Check for UTM Campaign variations
     if (questionLower.includes('utm_campaign') || questionLower === 'utm campaign' || 
         questionLower === 'utm campaign\t' || questionLower.includes('utm campaign')) {
       result.utm_campaign = q.answer;
     } 
-    // Check for UTM Medium variations
     else if (questionLower.includes('utm_medium') || questionLower === 'utm medium' ||
              questionLower.includes('utm medium')) {
       result.utm_medium = q.answer;
     } 
-    // Check for UTM Content variations
     else if (questionLower.includes('utm_content') || questionLower === 'utm content' ||
              questionLower.includes('utm content')) {
       result.utm_content = q.answer;
     } 
-    // Check for UTM Term variations
     else if (questionLower.includes('utm_term') || questionLower === 'utm term' ||
              questionLower.includes('utm term')) {
       result.utm_term = q.answer;
     } 
-    // Keep non-UTM questions
     else {
       result.filteredQuestions.push(q);
     }
@@ -328,16 +394,27 @@ function extractCampaignAttribution(contact: GHLContact, customFields: Record<st
   return { campaign_name, ad_set_name, ad_id };
 }
 
-function hasBadLeadTag(contact: GHLContact): boolean {
-  if (!contact.tags || !Array.isArray(contact.tags)) return false;
+// Extract pipeline value from contact custom fields or opportunities
+function extractPipelineValue(contact: GHLContact, opportunity?: GHLOpportunity): number {
+  // First check opportunity monetary value
+  if (opportunity) {
+    const oppValue = opportunity.monetaryValue ?? opportunity.monetary_value ?? 0;
+    if (oppValue > 0) return oppValue;
+  }
   
-  // Check for various "bad lead" tag variations (case-insensitive)
-  const badLeadPatterns = ['bad lead', 'badlead', 'bad_lead', 'bad-lead'];
-  return contact.tags.some(tag => 
-    badLeadPatterns.some(pattern => 
-      tag.toLowerCase().includes(pattern)
-    )
-  );
+  // Check custom fields for capital/investment amounts
+  const customFields = parseCustomFields(contact.customFields);
+  for (const [key, value] of Object.entries(customFields)) {
+    const keyLower = String(key).toLowerCase();
+    if (keyLower.includes('capital') || keyLower.includes('deploy') || keyLower.includes('invest') || keyLower.includes('amount')) {
+      const numValue = parseFloat(String(value).replace(/[^0-9.-]/g, ''));
+      if (!isNaN(numValue) && numValue > 0) {
+        return numValue;
+      }
+    }
+  }
+  
+  return 0;
 }
 
 async function syncContactToDatabase(
@@ -352,8 +429,6 @@ async function syncContactToDatabase(
   
   const customFields = parseCustomFields(contact.customFields);
   const rawQuestions = extractQuestionsFromCustomFields(customFields);
-  
-  // Extract UTM values from questions and filter them out
   const utmFromQuestions = extractUtmFromQuestions(rawQuestions);
   const questions = utmFromQuestions.filteredQuestions;
   
@@ -361,22 +436,18 @@ async function syncContactToDatabase(
   
   const attribution = contact.attributionSource || {};
   
-  // Use UTM from questions as fallback if attribution fields are empty
   const final_utm_campaign = attribution.utm_campaign || utmFromQuestions.utm_campaign;
   const final_utm_medium = attribution.utm_medium || utmFromQuestions.utm_medium;
   const final_utm_content = attribution.utm_content || utmFromQuestions.utm_content;
   const final_utm_term = attribution.utm_term || utmFromQuestions.utm_term;
   
-  // Check for BAD LEAD tag
   const isBadLead = hasBadLeadTag(contact);
   
-  // Try to find existing lead by external_id first, then by email, then by phone
   let existingLead = null;
   
-  // 1. Try matching by GHL contact ID (external_id)
   const { data: leadByExternalId } = await supabase
     .from('leads')
-    .select('id, updated_at, is_spam, external_id')
+    .select('id, updated_at, is_spam, external_id, created_at')
     .eq('client_id', clientId)
     .eq('external_id', externalId)
     .maybeSingle();
@@ -384,10 +455,9 @@ async function syncContactToDatabase(
   if (leadByExternalId) {
     existingLead = leadByExternalId;
   } else if (email) {
-    // 2. Try matching by email (for webhook-created leads)
     const { data: leadByEmail } = await supabase
       .from('leads')
-      .select('id, updated_at, is_spam, external_id')
+      .select('id, updated_at, is_spam, external_id, created_at')
       .eq('client_id', clientId)
       .eq('email', email)
       .maybeSingle();
@@ -399,10 +469,9 @@ async function syncContactToDatabase(
   }
   
   if (!existingLead && phone) {
-    // 3. Try matching by phone as last resort
     const { data: leadByPhone } = await supabase
       .from('leads')
-      .select('id, updated_at, is_spam, external_id')
+      .select('id, updated_at, is_spam, external_id, created_at')
       .eq('client_id', clientId)
       .eq('phone', phone)
       .maybeSingle();
@@ -412,6 +481,9 @@ async function syncContactToDatabase(
       console.log(`Matched GHL contact ${externalId} to existing lead ${leadByPhone.id} by phone: ${phone}`);
     }
   }
+
+  // Use GHL dateAdded for lead creation date if creating new lead
+  const ghlCreatedAt = contact.dateAdded ? new Date(contact.dateAdded).toISOString() : new Date().toISOString();
 
   const leadData: Record<string, any> = {
     client_id: clientId,
@@ -433,15 +505,12 @@ async function syncContactToDatabase(
     updated_at: new Date().toISOString(),
   };
 
-  // If contact has BAD LEAD tag, mark as spam
   if (isBadLead) {
     leadData.is_spam = true;
     console.log(`Marking contact ${externalId} as bad lead (tag detected)`);
   }
 
   if (existingLead) {
-    // When updating existing lead, DON'T overwrite external_id or source
-    // Only enrich with GHL data
     const updateData: Record<string, any> = {
       name: name || undefined,
       custom_fields: customFields,
@@ -457,12 +526,10 @@ async function syncContactToDatabase(
       updated_at: new Date().toISOString(),
     };
     
-    // Remove undefined values to avoid overwriting with null
     Object.keys(updateData).forEach(key => {
       if (updateData[key] === undefined) delete updateData[key];
     });
     
-    // Only update is_spam if it's a bad lead (don't override existing spam status)
     if (isBadLead) {
       updateData.is_spam = true;
     }
@@ -478,12 +545,14 @@ async function syncContactToDatabase(
     }
     return { action: 'updated', leadId: existingLead.id };
   } else {
+    // Use GHL dateAdded as created_at for new leads
     const { data: newLead, error } = await supabase
       .from('leads')
       .insert({
         ...leadData,
         status: 'new',
         is_spam: isBadLead,
+        created_at: ghlCreatedAt,
       })
       .select('id')
       .single();
@@ -494,6 +563,90 @@ async function syncContactToDatabase(
     }
     return { action: 'created', leadId: newLead.id };
   }
+}
+
+async function createFundedInvestorFromContact(
+  supabase: any,
+  clientId: string,
+  contact: GHLContact,
+  leadId: string | null,
+  opportunity?: GHLOpportunity
+): Promise<boolean> {
+  const externalId = contact.id;
+  
+  // Check if already exists
+  const { data: existingFunded } = await supabase
+    .from('funded_investors')
+    .select('id')
+    .eq('client_id', clientId)
+    .eq('external_id', externalId)
+    .maybeSingle();
+  
+  if (existingFunded) {
+    return false; // Already exists
+  }
+  
+  // Extract funded amount from opportunity or contact custom fields
+  const fundedAmount = extractPipelineValue(contact, opportunity);
+  
+  // Determine funded date - prefer opportunity's lastStageChangeAt, then contact's dateUpdated
+  let fundedAt = new Date().toISOString();
+  if (opportunity?.lastStageChangeAt) {
+    fundedAt = opportunity.lastStageChangeAt;
+  } else if (contact.dateUpdated) {
+    fundedAt = contact.dateUpdated;
+  } else if (opportunity?.dateAdded) {
+    fundedAt = opportunity.dateAdded;
+  }
+  
+  // Get lead creation date for first_contact_at
+  let firstContactAt: string | null = null;
+  let timeToFundDays: number | null = null;
+  let callsToFund = 0;
+  
+  if (leadId) {
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('created_at')
+      .eq('id', leadId)
+      .maybeSingle();
+    
+    if (lead?.created_at) {
+      firstContactAt = lead.created_at;
+      const leadDate = new Date(lead.created_at);
+      const fundDate = new Date(fundedAt);
+      timeToFundDays = Math.floor((fundDate.getTime() - leadDate.getTime()) / (1000 * 60 * 60 * 24));
+    }
+    
+    const { count } = await supabase
+      .from('calls')
+      .select('*', { count: 'exact', head: true })
+      .eq('lead_id', leadId);
+    callsToFund = count || 0;
+  }
+  
+  const name = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown';
+  
+  const { error } = await supabase.from('funded_investors').insert({
+    client_id: clientId,
+    external_id: externalId,
+    name,
+    lead_id: leadId,
+    funded_amount: fundedAmount,
+    funded_at: fundedAt,
+    first_contact_at: firstContactAt,
+    time_to_fund_days: timeToFundDays,
+    calls_to_fund: callsToFund,
+    source: 'tag_sync',
+  });
+  
+  if (error) {
+    console.error(`Failed to create funded investor for contact ${externalId}:`, error);
+    return false;
+  }
+  
+  console.log(`Created funded investor from tag: ${name} ($${fundedAmount})`);
+  return true;
 }
 
 async function detectDiscrepancies(
@@ -507,7 +660,6 @@ async function detectDiscrepancies(
   yesterday.setDate(yesterday.getDate() - 1);
   
   try {
-    // Count webhook leads in last 24h
     const { count: webhookCount } = await supabase
       .from('webhook_logs')
       .select('*', { count: 'exact', head: true })
@@ -516,20 +668,17 @@ async function detectDiscrepancies(
       .eq('status', 'success')
       .gte('processed_at', yesterday.toISOString());
     
-    // Count DB leads in last 24h
     const { count: dbCount } = await supabase
       .from('leads')
       .select('*', { count: 'exact', head: true })
       .eq('client_id', clientId)
       .gte('created_at', yesterday.toISOString());
     
-    // Calculate discrepancy
     const webhookNum = webhookCount || 0;
     const dbNum = dbCount || 0;
     const difference = Math.abs(webhookNum - dbNum);
     const percentDiff = dbNum > 0 ? (difference / dbNum) * 100 : (webhookNum > 0 ? 100 : 0);
     
-    // Only log if significant (>5% or >3 records)
     if (difference > 3 || percentDiff > 5) {
       const severity = percentDiff > 20 ? 'critical' : percentDiff > 10 ? 'warning' : 'info';
       
@@ -550,7 +699,6 @@ async function detectDiscrepancies(
       });
     }
     
-    // Also check for failed webhooks
     const { count: failedWebhooks } = await supabase
       .from('webhook_logs')
       .select('*', { count: 'exact', head: true })
@@ -586,16 +734,30 @@ async function detectDiscrepancies(
 async function syncClientContacts(
   supabase: any,
   client: { id: string; name: string; ghl_api_key: string; ghl_location_id: string },
-  syncLogId?: string
-): Promise<{ created: number; updated: number; skipped: number; errors: string[]; totalApiContacts: number }> {
-  const result = { created: 0, updated: 0, skipped: 0, errors: [] as string[], totalApiContacts: 0 };
+  syncLogId?: string,
+  sinceDateDays?: number
+): Promise<{ created: number; updated: number; skipped: number; fundedFromTags: number; errors: string[]; totalApiContacts: number }> {
+  const result = { created: 0, updated: 0, skipped: 0, fundedFromTags: 0, errors: [] as string[], totalApiContacts: 0 };
   
-  console.log(`Starting GHL sync for client: ${client.name} (${client.id})`);
+  console.log(`Starting GHL sync for client: ${client.name} (${client.id}), sinceDateDays: ${sinceDateDays || 'all'}`);
+  
+  // Fetch opportunities to match with contacts for funded investor creation
+  const opportunities = await fetchGHLOpportunities(client.ghl_api_key, client.ghl_location_id);
+  const opportunityByContactId = new Map<string, GHLOpportunity>();
+  for (const opp of opportunities) {
+    if (opp.contactId) {
+      opportunityByContactId.set(opp.contactId, opp);
+    }
+  }
+  console.log(`Fetched ${opportunities.length} opportunities for ${client.name}`);
   
   let hasMore = true;
   let startAfterId: string | undefined;
   let totalProcessed = 0;
   const MAX_CONTACTS = 1000;
+  
+  // Calculate cutoff date if sinceDateDays is specified
+  const cutoffDate = sinceDateDays ? new Date(Date.now() - sinceDateDays * 24 * 60 * 60 * 1000) : null;
 
   try {
     while (hasMore && totalProcessed < MAX_CONTACTS) {
@@ -609,11 +771,34 @@ async function syncClientContacts(
       console.log(`Fetched ${contacts.length} contacts for ${client.name}`);
 
       for (const contact of contacts) {
+        // If sinceDateDays is set and contact is older than cutoff, skip (but count for total)
+        if (cutoffDate && contact.dateAdded) {
+          const contactDate = new Date(contact.dateAdded);
+          if (contactDate < cutoffDate) {
+            result.skipped++;
+            totalProcessed++;
+            continue;
+          }
+        }
+        
         try {
           const syncResult = await syncContactToDatabase(supabase, client.id, contact);
           if (syncResult.action === 'created') result.created++;
           else if (syncResult.action === 'updated') result.updated++;
           else result.skipped++;
+          
+          // Check if contact has funded investor tag
+          if (hasFundedInvestorTag(contact)) {
+            const opp = opportunityByContactId.get(contact.id);
+            const created = await createFundedInvestorFromContact(
+              supabase, 
+              client.id, 
+              contact, 
+              syncResult.leadId || null,
+              opp
+            );
+            if (created) result.fundedFromTags++;
+          }
         } catch (err) {
           result.errors.push(`Contact ${contact.id}: ${err instanceof Error ? err.message : 'Unknown error'}`);
           result.skipped++;
@@ -630,10 +815,7 @@ async function syncClientContacts(
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     
-    // Track total API contacts for discrepancy detection
     result.totalApiContacts = totalProcessed;
-    
-    // Run discrepancy detection after sync
     await detectDiscrepancies(supabase, client.id, result.totalApiContacts, syncLogId);
     
   } catch (err) {
@@ -642,7 +824,7 @@ async function syncClientContacts(
     console.error(`GHL sync error for ${client.name}:`, errorMsg);
   }
 
-  console.log(`GHL sync complete for ${client.name}: created=${result.created}, updated=${result.updated}, skipped=${result.skipped}`);
+  console.log(`GHL sync complete for ${client.name}: created=${result.created}, updated=${result.updated}, skipped=${result.skipped}, fundedFromTags=${result.fundedFromTags}`);
   return result;
 }
 
@@ -658,16 +840,20 @@ serve(async (req) => {
   try {
     let targetClientId: string | null = null;
     let syncType: 'contacts' | 'calls' | 'all' = 'all';
+    let sinceDateDays: number | undefined;
     
     try {
       const body = await req.json();
       targetClientId = body?.client_id || null;
       syncType = body?.syncType || 'all';
+      // Support historical sync with sinceDateDays parameter (default: 7, max: 365)
+      if (body?.sinceDateDays) {
+        sinceDateDays = Math.min(Math.max(parseInt(body.sinceDateDays) || 7, 1), 365);
+      }
     } catch {
       // No body or invalid JSON - sync all clients
     }
 
-    // Fetch clients with GHL credentials
     let query = supabase
       .from('clients')
       .select('id, name, ghl_api_key, ghl_location_id')
@@ -692,18 +878,18 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Starting GHL ${syncType} sync for ${clients.length} client(s)`);
+    console.log(`Starting GHL ${syncType} sync for ${clients.length} client(s), sinceDateDays: ${sinceDateDays || 'default'}`);
 
     const results: Array<{
       client_id: string;
       client_name: string;
-      contacts?: { created: number; updated: number; skipped: number; errors: string[] };
+      contacts?: { created: number; updated: number; skipped: number; fundedFromTags: number; errors: string[] };
       calls?: { enriched: number; skipped: number; errors: string[] };
     }> = [];
 
-    // Default to syncing from last 7 days for calls
-    const sinceDate = new Date();
-    sinceDate.setDate(sinceDate.getDate() - 7);
+    // Use sinceDateDays for calls if provided, otherwise default to 7 days
+    const callsSinceDate = new Date();
+    callsSinceDate.setDate(callsSinceDate.getDate() - (sinceDateDays || 7));
 
     for (const client of clients) {
       const clientResult: typeof results[0] = {
@@ -711,7 +897,6 @@ serve(async (req) => {
         client_name: client.name,
       };
 
-      // Log sync start
       const { data: syncLog } = await supabase
         .from('sync_logs')
         .insert({
@@ -722,22 +907,18 @@ serve(async (req) => {
         .select('id')
         .single();
 
-      // Sync contacts
       if (syncType === 'contacts' || syncType === 'all') {
-        clientResult.contacts = await syncClientContacts(supabase, client as any, syncLog?.id);
+        clientResult.contacts = await syncClientContacts(supabase, client as any, syncLog?.id, sinceDateDays);
         
-        // Update last contacts sync timestamp
         await supabase
           .from('client_settings')
           .update({ ghl_last_contacts_sync: new Date().toISOString() })
           .eq('client_id', client.id);
       }
 
-      // Sync calls
       if (syncType === 'calls' || syncType === 'all') {
-        clientResult.calls = await syncClientCallLogs(supabase, client as any, sinceDate);
+        clientResult.calls = await syncClientCallLogs(supabase, client as any, callsSinceDate);
         
-        // Update last calls sync timestamp
         await supabase
           .from('client_settings')
           .update({ ghl_last_calls_sync: new Date().toISOString() })
@@ -746,12 +927,12 @@ serve(async (req) => {
 
       results.push(clientResult);
 
-      // Update sync log
       if (syncLog) {
         const hasErrors = (clientResult.contacts?.errors?.length || 0) > 0 || 
                          (clientResult.calls?.errors?.length || 0) > 0;
         const recordsSynced = (clientResult.contacts?.created || 0) + 
                              (clientResult.contacts?.updated || 0) +
+                             (clientResult.contacts?.fundedFromTags || 0) +
                              (clientResult.calls?.enriched || 0);
         
         await supabase
@@ -769,9 +950,10 @@ serve(async (req) => {
 
     const totalContactsCreated = results.reduce((sum, r) => sum + (r.contacts?.created || 0), 0);
     const totalContactsUpdated = results.reduce((sum, r) => sum + (r.contacts?.updated || 0), 0);
+    const totalFundedFromTags = results.reduce((sum, r) => sum + (r.contacts?.fundedFromTags || 0), 0);
     const totalCallsEnriched = results.reduce((sum, r) => sum + (r.calls?.enriched || 0), 0);
 
-    console.log(`GHL sync complete: ${totalContactsCreated} contacts created, ${totalContactsUpdated} updated, ${totalCallsEnriched} calls enriched`);
+    console.log(`GHL sync complete: ${totalContactsCreated} contacts created, ${totalContactsUpdated} updated, ${totalFundedFromTags} funded from tags, ${totalCallsEnriched} calls enriched`);
 
     return new Response(
       JSON.stringify({
@@ -780,6 +962,7 @@ serve(async (req) => {
           clients_synced: clients.length,
           total_contacts_created: totalContactsCreated,
           total_contacts_updated: totalContactsUpdated,
+          total_funded_from_tags: totalFundedFromTags,
           total_calls_enriched: totalCallsEnriched,
         },
         results,

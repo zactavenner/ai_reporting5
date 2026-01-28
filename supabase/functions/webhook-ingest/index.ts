@@ -840,9 +840,45 @@ async function processAdSpend(supabase: any, clientId: string, payload: any, map
   const impressions = extractNumber(payload.impressions ?? (mappings?.impressionsField ? getValueByPath(payload, mappings.impressionsField) : null));
   const clicks = extractNumber(payload.clicks ?? (mappings?.clicksField ? getValueByPath(payload, mappings.clicksField) : null));
   const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+  
+  // NEW: Extract time/reported_at for granular tracking
+  const timeValue = payload.time ?? payload.reported_at ?? payload.report_time ?? null;
+  const platform = payload.platform ?? 'meta';
+  const campaignName = payload.campaign_name ?? payload.campaignName ?? null;
+  const adSetName = payload.ad_set_name ?? payload.adSetName ?? null;
+  
+  // Build full timestamp: if time is provided, combine with date; otherwise use noon
+  let reportedAt: string;
+  if (timeValue) {
+    // Check if time includes date already
+    if (timeValue.includes('T') || timeValue.includes('-')) {
+      reportedAt = new Date(timeValue).toISOString();
+    } else {
+      // Combine date + time
+      reportedAt = new Date(`${date}T${timeValue}:00`).toISOString();
+    }
+  } else {
+    // Default to noon of the date
+    reportedAt = new Date(`${date}T12:00:00`).toISOString();
+  }
 
-  console.log('Extracted ad-spend values:', { date, spend, impressions, clicks, ctr });
+  console.log('Extracted ad-spend values:', { date, spend, impressions, clicks, ctr, reportedAt, platform });
 
+  // Insert into ad_spend_reports for granular time tracking
+  if (spend > 0 || impressions > 0 || clicks > 0) {
+    await supabase.from('ad_spend_reports').insert({
+      client_id: clientId,
+      reported_at: reportedAt,
+      platform,
+      spend,
+      impressions,
+      clicks,
+      campaign_name: campaignName,
+      ad_set_name: adSetName,
+    });
+  }
+
+  // Also update daily_metrics for dashboard compatibility
   const { data: existing } = await supabase.from('daily_metrics').select('*').eq('client_id', clientId).eq('date', date).maybeSingle();
 
   await supabase.from('daily_metrics').upsert({
@@ -854,7 +890,7 @@ async function processAdSpend(supabase: any, clientId: string, payload: any, map
     commitment_dollars: existing?.commitment_dollars || 0,
   }, { onConflict: 'client_id,date', ignoreDuplicates: false });
 
-  return { date, spend, impressions, clicks, ctr };
+  return { date, spend, impressions, clicks, ctr, reported_at: reportedAt, platform };
 }
 
 async function processBadLead(supabase: any, clientId: string, payload: any, mappings: any) {

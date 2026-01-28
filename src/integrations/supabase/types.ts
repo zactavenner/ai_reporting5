@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_spend_reports: {
+        Row: {
+          ad_set_name: string | null
+          campaign_name: string | null
+          clicks: number | null
+          client_id: string
+          created_at: string | null
+          id: string
+          impressions: number | null
+          platform: string | null
+          reported_at: string
+          spend: number | null
+        }
+        Insert: {
+          ad_set_name?: string | null
+          campaign_name?: string | null
+          clicks?: number | null
+          client_id: string
+          created_at?: string | null
+          id?: string
+          impressions?: number | null
+          platform?: string | null
+          reported_at: string
+          spend?: number | null
+        }
+        Update: {
+          ad_set_name?: string | null
+          campaign_name?: string | null
+          clicks?: number | null
+          client_id?: string
+          created_at?: string | null
+          id?: string
+          impressions?: number | null
+          platform?: string | null
+          reported_at?: string
+          spend?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_spend_reports_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agency_meetings: {
         Row: {
           action_items: Json | null

@@ -70,6 +70,8 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
   const [testingConnection, setTestingConnection] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
+  const [historicalSyncRange, setHistoricalSyncRange] = useState<'7' | '30' | '90' | '365'>('7');
+  const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
 
   // Public link password state
   const [publicLinkPassword, setPublicLinkPassword] = useState('');
@@ -273,21 +275,25 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
     }
   };
 
-  const handleSyncContacts = async () => {
+  const handleSyncContacts = async (isHistorical: boolean = false) => {
     if (!client?.ghl_location_id || !client?.ghl_api_key) {
       toast.error('Please save GHL credentials first');
       return;
     }
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('sync-ghl-contacts', {
-        body: { client_id: client.id }
-      });
+      const body: any = { client_id: client.id };
+      if (isHistorical) {
+        body.sinceDateDays = parseInt(historicalSyncRange);
+      }
+      const { data, error } = await supabase.functions.invoke('sync-ghl-contacts', { body });
       if (error) throw error;
-      const created = data?.results?.[0]?.created || 0;
-      const updated = data?.results?.[0]?.updated || 0;
-      toast.success(`Synced ${created + updated} contacts (${created} new, ${updated} updated)`);
+      const created = data?.results?.[0]?.contacts?.created || 0;
+      const updated = data?.results?.[0]?.contacts?.updated || 0;
+      const fundedFromTags = data?.results?.[0]?.contacts?.fundedFromTags || 0;
+      toast.success(`Synced ${created + updated} contacts (${created} new, ${updated} updated${fundedFromTags > 0 ? `, ${fundedFromTags} funded from tags` : ''})`);
       queryClient.invalidateQueries({ queryKey: ['leads', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['funded-investors', client.id] });
     } catch (error) {
       console.error('GHL sync failed:', error);
       toast.error('Sync failed - please try again');
@@ -648,8 +654,51 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={handleSyncContacts}
+                  onClick={() => handleSyncContacts(false)}
                   disabled={syncing || !client?.ghl_location_id || !client?.ghl_api_key}
+                >
+                  {syncing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Sync Now
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Historical Sync Section */}
+              <div className="border-t border-border pt-4 mt-4">
+                <h5 className="font-medium text-sm mb-2">Historical Data Sync</h5>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Pull historical contacts and detect funded investors from tags
+                </p>
+                <div className="flex gap-2 items-center">
+                  <select
+                    value={historicalSyncRange}
+                    onChange={(e) => setHistoricalSyncRange(e.target.value as any)}
+                    className="h-9 px-3 border-2 border-border bg-background text-sm rounded-md"
+                  >
+                    <option value="7">Last 7 days</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="365">All time (365 days)</option>
+                  </select>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => handleSyncContacts(true)}
+                    disabled={syncing || !client?.ghl_location_id || !client?.ghl_api_key}
+                  >
+                    {syncing ? 'Syncing...' : 'Sync Historical'}
+                  </Button>
+                </div>
+              </div>
+            </div>
                 >
                   {syncing ? (
                     <>

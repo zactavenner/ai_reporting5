@@ -38,11 +38,11 @@ interface ParsedRow {
 const IMPORT_CONFIG = {
   ad_spend: {
     title: 'Import Ad Spend from CSV',
-    description: 'Upload a CSV file exported from Meta Ads Manager or similar. Required columns: date, spend. Optional: impressions, clicks.',
+    description: 'Upload a CSV file exported from Meta Ads Manager or similar. Required columns: date, spend. Optional: time/reported_at, impressions, clicks, platform, campaign_name.',
     requiredFields: ['date'],
-    optionalFields: ['spend', 'ad_spend', 'impressions', 'clicks'],
+    optionalFields: ['spend', 'ad_spend', 'impressions', 'clicks', 'time', 'reported_at', 'platform', 'campaign_name', 'ad_set_name'],
     tableName: 'daily_metrics',
-    exampleRow: 'date,spend,impressions,clicks\n2024-01-15,150.50,5000,120',
+    exampleRow: 'date,time,spend,impressions,clicks,platform\n2024-01-15,14:30,150.50,5000,120,meta',
   },
   leads: {
     title: 'Import Leads from CSV',
@@ -138,14 +138,49 @@ export function CSVImportModal({ clientId, importType, open, onOpenChange }: CSV
               continue;
             }
 
+            const spend = parseFloat(row.spend || row.ad_spend || '0') || 0;
+            const impressions = parseInt(row.impressions || '0') || 0;
+            const clicks = parseInt(row.clicks || '0') || 0;
+            const platform = row.platform || 'meta';
+            const campaignName = row.campaign_name || null;
+            const adSetName = row.ad_set_name || null;
+            
+            // Build reported_at timestamp with optional time
+            const timeValue = row.time || row.reported_at || null;
+            let reportedAt: string;
+            if (timeValue) {
+              if (timeValue.includes('T') || timeValue.includes('-')) {
+                reportedAt = new Date(timeValue).toISOString();
+              } else {
+                reportedAt = new Date(`${date}T${timeValue}:00`).toISOString();
+              }
+            } else {
+              reportedAt = new Date(`${date}T12:00:00`).toISOString();
+            }
+
+            // Insert into ad_spend_reports for granular time tracking
+            if (spend > 0 || impressions > 0 || clicks > 0) {
+              await supabase.from('ad_spend_reports').insert({
+                client_id: clientId,
+                reported_at: reportedAt,
+                platform,
+                spend,
+                impressions,
+                clicks,
+                campaign_name: campaignName,
+                ad_set_name: adSetName,
+              });
+            }
+
+            // Also upsert to daily_metrics for dashboard compatibility
             const { error } = await supabase
               .from('daily_metrics')
               .upsert({
                 client_id: clientId,
                 date: date,
-                ad_spend: parseFloat(row.spend || row.ad_spend || '0') || 0,
-                impressions: parseInt(row.impressions || '0') || 0,
-                clicks: parseInt(row.clicks || '0') || 0,
+                ad_spend: spend,
+                impressions: impressions,
+                clicks: clicks,
               }, { onConflict: 'client_id,date' });
 
             if (error) throw error;
