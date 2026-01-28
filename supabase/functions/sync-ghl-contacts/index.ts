@@ -365,37 +365,81 @@ function extractCampaignAttribution(contact: GHLContact, customFields: Record<st
   ad_set_name: string | null;
   ad_id: string | null;
 } {
-  const campaignFields = ['Campaign Tracker', 'campaign', 'campaign_name', 'utm_campaign'];
-  const adSetFields = ['Ad Set', 'ad_set', 'ad_set_name', 'adset_name'];
-  const adIdFields = ['Ad ID', 'ad_id', 'adId'];
+  // GHL Page Details field names (from screenshot) + common variations
+  // Priority order: GHL page details fields first, then common field names
+  const campaignFields = [
+    'Utm Campaign',      // GHL Page Details
+    'utm_campaign',      // Standard
+    'Campaign Tracker',  // Common custom field
+    'campaign_name',
+    'campaign',
+    'Campaign Id',       // GHL Page Details (ID, can use as fallback)
+  ];
+  
+  const adSetFields = [
+    'Utm Medium',        // GHL stores Ad Set name in Utm Medium often
+    'Adset Id',          // GHL Page Details
+    'ad_set_name',
+    'Ad Set',
+    'ad_set',
+    'adset_name',
+    'adGroupName',
+    'Ad Set Name',
+  ];
+  
+  const adIdFields = [
+    'Utm Content',       // GHL stores Ad name in Utm Content often
+    'Ad Id',             // GHL Page Details
+    'ad_id',
+    'Ad ID',
+    'adId',
+  ];
   
   let campaign_name: string | null = null;
   let ad_set_name: string | null = null;
   let ad_id: string | null = null;
   
+  // Check custom fields for campaign name
   for (const field of campaignFields) {
     if (customFields[field]) {
       campaign_name = String(customFields[field]);
+      console.log(`Found campaign_name in field "${field}": ${campaign_name}`);
       break;
     }
   }
   
+  // Check custom fields for ad set name  
   for (const field of adSetFields) {
     if (customFields[field]) {
       ad_set_name = String(customFields[field]);
+      console.log(`Found ad_set_name in field "${field}": ${ad_set_name}`);
       break;
     }
   }
   
+  // Check custom fields for ad ID/name
   for (const field of adIdFields) {
     if (customFields[field]) {
       ad_id = String(customFields[field]);
+      console.log(`Found ad_id in field "${field}": ${ad_id}`);
       break;
     }
   }
   
+  // Fallback to attributionSource
   if (!campaign_name && contact.attributionSource?.utm_campaign) {
     campaign_name = contact.attributionSource.utm_campaign;
+    console.log(`Using attributionSource.utm_campaign: ${campaign_name}`);
+  }
+  
+  if (!ad_set_name && contact.attributionSource?.utm_medium) {
+    ad_set_name = contact.attributionSource.utm_medium;
+    console.log(`Using attributionSource.utm_medium as ad_set: ${ad_set_name}`);
+  }
+  
+  if (!ad_id && contact.attributionSource?.utm_content) {
+    ad_id = contact.attributionSource.utm_content;
+    console.log(`Using attributionSource.utm_content as ad_id: ${ad_id}`);
   }
   
   return { campaign_name, ad_set_name, ad_id };

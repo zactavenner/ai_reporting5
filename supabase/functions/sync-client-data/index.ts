@@ -345,7 +345,21 @@ async function syncGHLData(supabase: any, client: any): Promise<{ leads: number;
           .eq('external_id', apt.contactId)
           .single();
 
-        const showed = apt.status === 'showed' || apt.appointmentStatus === 'showed';
+        // Properly determine showed status based on GHL appointment status
+        // confirmed = booked (not showed yet)
+        // showed = showed
+        // no_show/noshow = no show
+        // rescheduled = rescheduled
+        const status = (apt.status || apt.appointmentStatus || '').toLowerCase();
+        const showed = status === 'showed';
+        
+        // Determine outcome based on status - don't mark as no_show unless GHL explicitly says so
+        let outcome = status;
+        if (status === 'noshow' || status === 'no-show') {
+          outcome = 'no_show';
+        } else if (status === 'confirmed' || status === 'booked') {
+          outcome = 'confirmed';
+        }
 
         const { error: callError } = await supabase
           .from('calls')
@@ -355,7 +369,7 @@ async function syncGHLData(supabase: any, client: any): Promise<{ leads: number;
             external_id: apt.id,
             scheduled_at: apt.startTime,
             showed: showed,
-            outcome: apt.status,
+            outcome: outcome,
           }, {
             onConflict: 'client_id,external_id',
             ignoreDuplicates: false,

@@ -1830,6 +1830,106 @@ export function InlineRecordsView({
                   </div>
                 </div>
 
+                {/* Customer Journey for Leads - Show linked calls */}
+                {selectedType === 'lead' && (() => {
+                  // Find all calls linked to this lead
+                  const linkedCalls = calls.filter(c => 
+                    c.lead_id === selectedRecord.id || 
+                    c.external_id === selectedRecord.external_id
+                  ).sort((a, b) => {
+                    const dateA = a.scheduled_at || a.created_at;
+                    const dateB = b.scheduled_at || b.created_at;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                  });
+                  
+                  // Find linked funded investor
+                  const linkedFunded = fundedInvestors.find(f => 
+                    f.lead_id === selectedRecord.id || 
+                    f.external_id === selectedRecord.external_id
+                  );
+                  
+                  if (linkedCalls.length === 0 && !linkedFunded) return null;
+                  
+                  return (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4" />
+                        Customer Journey
+                      </h4>
+                      <div className="pl-6 border-l-2 border-primary/30 space-y-3">
+                        {/* Lead Created */}
+                        <div className="relative">
+                          <div className="absolute -left-[25px] w-3 h-3 rounded-full bg-chart-1" />
+                          <p className="text-sm font-medium">Lead Created</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(selectedRecord.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        
+                        {/* Calls */}
+                        {linkedCalls.map((call, idx) => {
+                          // Determine call status label based on outcome field
+                          const getCallStatusLabel = () => {
+                            const outcome = call.outcome?.toLowerCase();
+                            if (outcome === 'no_show' || outcome === 'noshow' || outcome === 'no-show') {
+                              return { label: 'No Show', color: 'bg-destructive' };
+                            }
+                            if (outcome === 'rescheduled') {
+                              return { label: 'Rescheduled', color: 'bg-amber-500' };
+                            }
+                            if (call.showed) {
+                              return { label: 'Showed', color: 'bg-chart-2' };
+                            }
+                            if (outcome === 'confirmed' || outcome === 'booked') {
+                              return { label: 'Confirmed', color: 'bg-chart-4' };
+                            }
+                            // Default: Booked (not yet confirmed, showed, or no-show)
+                            return { label: 'Booked', color: 'bg-chart-3' };
+                          };
+                          
+                          const status = getCallStatusLabel();
+                          const callDate = call.scheduled_at || call.created_at;
+                          
+                          return (
+                            <div key={call.id} className="relative">
+                              <div className={`absolute -left-[25px] w-3 h-3 rounded-full ${status.color}`} />
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium">
+                                  {call.is_reconnect ? 'Reconnect Call' : 'Call'} - {status.label}
+                                </p>
+                                <Badge variant="outline" className="text-[10px] h-4">
+                                  {call.is_reconnect ? 'RC' : '#' + (idx + 1)}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(callDate).toLocaleString()}
+                              </p>
+                              {call.outcome && call.outcome !== status.label.toLowerCase() && (
+                                <p className="text-xs text-muted-foreground">
+                                  Outcome: {call.outcome}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                        
+                        {/* Funded */}
+                        {linkedFunded && (
+                          <div className="relative">
+                            <div className="absolute -left-[25px] w-3 h-3 rounded-full bg-primary" />
+                            <p className="text-sm font-medium">
+                              Funded - ${Number(linkedFunded.funded_amount || 0).toLocaleString()}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(linkedFunded.funded_at).toLocaleString()}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Contact Info for Leads */}
                 {selectedType === 'lead' && (
                   <div className="space-y-2">

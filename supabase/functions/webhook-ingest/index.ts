@@ -382,8 +382,21 @@ serve(async (req) => {
       case 'booked':
         result = await processBookedCall(supabase, clientId, payload, mappings);
         break;
+      case 'confirmed':
+        // Confirmed is just an update to booked status - appointment confirmed but not yet showed
+        result = await processConfirmedCall(supabase, clientId, payload, mappings);
+        break;
       case 'showed':
         result = await processShowedCall(supabase, clientId, payload, mappings);
+        break;
+      case 'no-show':
+      case 'noshow':
+        // Handle no-show webhook from GHL
+        result = await processNoShowCall(supabase, clientId, payload, mappings);
+        break;
+      case 'rescheduled':
+        // Handle rescheduled appointment
+        result = await processRescheduledCall(supabase, clientId, payload, mappings);
         break;
       case 'reconnect':
         result = await processReconnectCall(supabase, clientId, payload, mappings, false);
@@ -480,11 +493,23 @@ async function processLead(supabase: any, clientId: string, payload: any, mappin
     : tryExtractValue(payload, ['contact.attribution.utm_term'], ['utm_term']);
 
   // Campaign attribution fields from Meta/GHL
-  // GHL often sends these as root-level fields OR in attribution object
-  // Also check for "Campaign Tracker" which is a common GHL custom field name
-  let campaign_name = tryExtractValue(payload, ['campaign.name', 'adCampaign.name', 'attribution.campaignName', 'attribution.campaign'], ['campaign_name', 'campaignName', 'Campaign Tracker', 'campaign']);
-  let ad_set_name = tryExtractValue(payload, ['adSet.name', 'adGroup.name', 'attribution.adSetName', 'attribution.adSet'], ['ad_set_name', 'adSetName', 'adGroupName', 'Ad Set Name', 'adset_name']);
-  let ad_id = tryExtractValue(payload, ['ad.id', 'adId', 'attribution.adId', 'attribution.ad'], ['ad_id', 'adId', 'Ad ID', 'ad']);
+  // GHL Page Details field names: Utm Campaign, Utm Medium, Utm Content, Adset Id, Ad Id, Campaign Id
+  // Also check common GHL custom field names
+  let campaign_name = tryExtractValue(
+    payload, 
+    ['campaign.name', 'adCampaign.name', 'attribution.campaignName', 'attribution.campaign', 'attribution.utm_campaign'], 
+    ['Utm Campaign', 'utm_campaign', 'campaign_name', 'campaignName', 'Campaign Tracker', 'campaign', 'Campaign Id']
+  );
+  let ad_set_name = tryExtractValue(
+    payload, 
+    ['adSet.name', 'adGroup.name', 'attribution.adSetName', 'attribution.adSet', 'attribution.utm_medium'], 
+    ['Utm Medium', 'Adset Id', 'ad_set_name', 'adSetName', 'adGroupName', 'Ad Set Name', 'adset_name', 'Ad Set']
+  );
+  let ad_id = tryExtractValue(
+    payload, 
+    ['ad.id', 'adId', 'attribution.adId', 'attribution.ad', 'attribution.utm_content'], 
+    ['Utm Content', 'Ad Id', 'ad_id', 'adId', 'Ad ID', 'ad']
+  );
   
   // If still no campaign name, try to extract from contact_source for Meta leads
   if (!campaign_name) {
@@ -770,6 +795,95 @@ async function processShowedCall(supabase: any, clientId: string, payload: any, 
     return { call_id: newCall.id, action: 'created_as_showed' };
   }
   return { call_id: data.id, action: 'marked_showed' };
+}
+
+// Handle confirmed appointment - appointment is confirmed but not yet showed
+async function processConfirmedCall(supabase: any, clientId: string, payload: any, mappings: any) {
+  const externalId = tryExtractValue(payload, ['calendar.appointmentId', 'appointment.id'], ['id', 'call_id', 'appointmentId']);
+  if (!externalId) throw new Error('Missing appointment/call ID');
+
+  // Update existing call to confirmed status (still not showed)
+  const { data } = await supabase.from('calls').update({ outcome: 'confirmed', showed: false })
+    .eq('client_id', clientId).eq('external_id', String(externalId)).select().maybeSingle();
+
+  if (!data) {
+    // Create new call with confirmed status
+    const scheduledAt = tryExtractValue(payload, ['calendar.startTime', 'appointment.meta.start_time'], ['scheduled_at', 'startTime']) || new Date().toISOString();
+    const contactId = tryExtractValue(payload, ['contact.id', 'appointment.contactId'], ['contactId', 'contact_id']);
+    const phone = tryExtractValue(payload, ['phone', 'contact.phone'], ['phone']);
+    const email = tryExtractValue(payload, ['email', 'contact.email'], ['email']);
+    
+    const existingLead = await findExistingLead(supabase, clientId, contactId, phone, email);
+    
+    const { data: newCall, error } = await supabase.from('calls').insert({
+      client_id: clientId, external_id: String(externalId), lead_id: existingLead?.id || null,
+      showed: false, outcome: 'confirmed', scheduled_at: scheduledAt, direction: 'outbound',
+    }).select().single();
+    if (error) throw error;
+    return { call_id: newCall.id, action: 'created_as_confirmed' };
+  }
+  return { call_id: data.id, action: 'marked_confirmed' };
+}
+
+// Handle no-show webhook - appointment where contact didn't show
+async function processNoShowCall(supabase: any, clientId: string, payload: any, mappings: any) {
+  const externalId = tryExtractValue(payload, ['calendar.appointmentId', 'appointment.id'], ['id', 'call_id', 'appointmentId']);
+  if (!externalId) throw new Error('Missing appointment/call ID');
+
+  // Update existing call to no_show status
+  const { data } = await supabase.from('calls').update({ showed: false, outcome: 'no_show' })
+    .eq('client_id', clientId).eq('external_id', String(externalId)).select().maybeSingle();
+
+  if (!data) {
+    // Create new call with no_show status if it doesn't exist
+    const scheduledAt = tryExtractValue(payload, ['calendar.startTime', 'appointment.meta.start_time'], ['scheduled_at', 'startTime']) || new Date().toISOString();
+    const contactId = tryExtractValue(payload, ['contact.id', 'appointment.contactId'], ['contactId', 'contact_id']);
+    const phone = tryExtractValue(payload, ['phone', 'contact.phone'], ['phone']);
+    const email = tryExtractValue(payload, ['email', 'contact.email'], ['email']);
+    
+    const existingLead = await findExistingLead(supabase, clientId, contactId, phone, email);
+    
+    const { data: newCall, error } = await supabase.from('calls').insert({
+      client_id: clientId, external_id: String(externalId), lead_id: existingLead?.id || null,
+      showed: false, outcome: 'no_show', scheduled_at: scheduledAt, direction: 'outbound',
+    }).select().single();
+    if (error) throw error;
+    return { call_id: newCall.id, action: 'created_as_no_show' };
+  }
+  return { call_id: data.id, action: 'marked_no_show' };
+}
+
+// Handle rescheduled appointment webhook
+async function processRescheduledCall(supabase: any, clientId: string, payload: any, mappings: any) {
+  const externalId = tryExtractValue(payload, ['calendar.appointmentId', 'appointment.id'], ['id', 'call_id', 'appointmentId']);
+  if (!externalId) throw new Error('Missing appointment/call ID');
+  
+  const newScheduledAt = tryExtractValue(payload, ['calendar.startTime', 'appointment.meta.start_time', 'new_start_time'], ['scheduled_at', 'startTime', 'new_scheduled_at']) || new Date().toISOString();
+
+  // Update existing call to rescheduled status with new time
+  const { data } = await supabase.from('calls').update({ 
+    outcome: 'rescheduled', 
+    showed: false,
+    scheduled_at: newScheduledAt 
+  })
+    .eq('client_id', clientId).eq('external_id', String(externalId)).select().maybeSingle();
+
+  if (!data) {
+    // Create new call with rescheduled status if it doesn't exist
+    const contactId = tryExtractValue(payload, ['contact.id', 'appointment.contactId'], ['contactId', 'contact_id']);
+    const phone = tryExtractValue(payload, ['phone', 'contact.phone'], ['phone']);
+    const email = tryExtractValue(payload, ['email', 'contact.email'], ['email']);
+    
+    const existingLead = await findExistingLead(supabase, clientId, contactId, phone, email);
+    
+    const { data: newCall, error } = await supabase.from('calls').insert({
+      client_id: clientId, external_id: String(externalId), lead_id: existingLead?.id || null,
+      showed: false, outcome: 'rescheduled', scheduled_at: newScheduledAt, direction: 'outbound',
+    }).select().single();
+    if (error) throw error;
+    return { call_id: newCall.id, action: 'created_as_rescheduled' };
+  }
+  return { call_id: data.id, action: 'marked_rescheduled', new_scheduled_at: newScheduledAt };
 }
 
 async function processCommitment(supabase: any, clientId: string, payload: any, mappings: any) {
