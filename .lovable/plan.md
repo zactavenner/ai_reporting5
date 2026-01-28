@@ -1,355 +1,207 @@
 
+# Enhanced GHL Sync, Ad Spend Timing, and Funded Investor Tag Detection
 
-# Enhanced Funnel Section: Campaigns, Improved Mockups & PageSpeed Integration
-
-This plan restructures the Funnel tab to support multiple campaigns, improved device mockups matching real phone UIs, visual flow progression, and Google PageSpeed testing.
-
----
-
-## Overview
-
-The enhanced Funnel section will transform from a flat list of steps into a campaign-based structure with:
-
-1. **Campaign Grouping** - Steps organized under named campaigns (e.g., "1031 Exchange", "Accredited Investor")
-2. **Improved iPhone Mockup** - Realistic iOS status bar, Safari bottom nav, matching the reference screenshot
-3. **Visual Flow Progression** - Numbered step cards (1 → 2 → 3) with connecting arrows like Funnelytics
-4. **Multi-Device Responsive Previews** - iPhone, iPad, Desktop browser mockups
-5. **Google PageSpeed Integration** - Test page performance directly from the funnel view
-6. **Single Unified Tab** - Everything under one Funnel tab in Project Management section
+This plan adds three key improvements to the data ingestion system: historical GHL sync options, ad spend time tracking, and expanded funded investor detection via contact tags.
 
 ---
 
-## Feature 1: Campaign Data Structure
+## Feature 1: GHL Historical Data Sync with Date References
 
-### Database Schema Change
+### Current Behavior
+- Contacts sync fetches up to 1000 contacts without date filtering
+- Calls sync uses a hardcoded 7-day lookback
+- No UI option to specify historical date ranges
 
-Add a `funnel_campaigns` table to group steps:
+### Proposed Changes
+
+**1.1 Update `sync-ghl-contacts` Edge Function**
+- Add optional `sinceDateDays` parameter (default: 7, max: 365) to control how far back to fetch calls
+- Use GHL contact's `dateAdded` field for lead creation date reference
+- Track call `dateAdded` for scheduling reference in calls table
+
+**1.2 Update `sync-client-data` Edge Function**
+- Add date range parameters for historical backfill
+- Preserve original `created_at` from GHL when creating new leads
+
+**1.3 Add UI Controls in Client Settings**
+- Add "Historical Sync" section in Integrations tab
+- Dropdown to select sync range (7 days, 30 days, 90 days, All Time)
+- "Sync Historical Data" button that triggers deep sync
+
+---
+
+## Feature 2: Ad Spend Time Tracking
+
+### Current Behavior
+- `daily_metrics.date` is a DATE type (no time component)
+- Ad spend imports/webhooks aggregate by date only
+- CSV import has no time field support
+
+### Proposed Changes
+
+**2.1 Database Schema Update**
+Add a new `ad_spend_reports` table for granular time tracking:
 
 ```sql
-CREATE TABLE public.funnel_campaigns (
+CREATE TABLE public.ad_spend_reports (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  color TEXT DEFAULT '#f3f4f6',  -- Background color for visual distinction
-  sort_order INTEGER DEFAULT 0,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+  reported_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  platform TEXT DEFAULT 'meta',
+  spend NUMERIC DEFAULT 0,
+  impressions INTEGER DEFAULT 0,
+  clicks INTEGER DEFAULT 0,
+  campaign_name TEXT,
+  ad_set_name TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- Add campaign_id to existing steps table
-ALTER TABLE public.client_funnel_steps 
-ADD COLUMN campaign_id UUID REFERENCES public.funnel_campaigns(id) ON DELETE CASCADE;
+-- Index for efficient queries
+CREATE INDEX idx_ad_spend_reports_client_date ON public.ad_spend_reports(client_id, reported_at);
+
+-- RLS policies
+ALTER TABLE public.ad_spend_reports ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public can view ad_spend_reports" ON public.ad_spend_reports FOR SELECT USING (true);
+CREATE POLICY "Public can insert ad_spend_reports" ON public.ad_spend_reports FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public can delete ad_spend_reports" ON public.ad_spend_reports FOR DELETE USING (true);
 ```
 
-### Updated Data Interfaces
+**2.2 Update Webhook Ingestion**
+- Modify `processAdSpend` to accept `time` or `reported_at` parameter
+- Store granular records in `ad_spend_reports` table
+- Continue aggregating to `daily_metrics` for dashboard compatibility
 
-```typescript
-interface FunnelCampaign {
-  id: string;
-  client_id: string;
-  name: string;
-  color: string;  // e.g., '#f3f4f6' for gray, '#ffffff' for white
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
-}
+**2.3 Update CSV Import**
+- Add `time` or `reported_at` optional column for ad spend imports
+- Parse datetime when provided, default to noon of the date if not
 
-interface FunnelStep {
-  id: string;
-  client_id: string;
-  campaign_id: string | null;  // NEW: Link to campaign
-  name: string;
-  url: string;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
-}
-```
+**2.4 Optional: Display Intraday Spend**
+- Add expandable section in client detail to view ad spend by hour/time
 
 ---
 
-## Feature 2: Improved iPhone Mockup (Matching Reference)
+## Feature 3: Enhanced Funded Investor Tag Detection
 
-### Visual Updates to Match Real iOS
+### Current Behavior
+- Only checks opportunity `status === 'won'` OR `pipelineStageId` containing "funded"/"closed"
+- Does not check contact tags
+- Uses `opp.dateAdded` as funded date (not stage move date)
 
-Based on the reference screenshot showing a real iPhone with Safari browser:
+### Proposed Changes
 
-**2.1 Status Bar**
-- Time display (top left)
-- Signal bars, WiFi icon, battery indicator (top right)
-- Proper iOS 17+ styling
-
-**2.2 Safari Bottom Navigation Bar**
-- Back arrow button (left)
-- Message/chat icon
-- URL display showing domain (e.g., "investbluecapfunds.com")
-- Refresh icon
-- More options (...)
-- Frosted glass appearance with rounded pill buttons
-
-**2.3 Implementation**
+**3.1 Add Tag-Based Detection Function**
+Create helper function to identify funded contacts by tags:
 
 ```typescript
-// Updated IPhoneMockup with iOS Safari UI
-<div className="relative bg-black rounded-[50px] p-3 shadow-xl">
-  {/* Dynamic Island */}
-  <div className="absolute top-3 left-1/2 -translate-x-1/2 w-28 h-8 bg-black rounded-full z-20" />
+function hasFundedInvestorTag(contact: GHLContact): boolean {
+  if (!contact.tags || !Array.isArray(contact.tags)) return false;
   
-  {/* Screen */}
-  <div className="bg-white rounded-[40px] overflow-hidden">
-    {/* Status Bar */}
-    <div className="h-12 bg-white flex items-center justify-between px-8 pt-2">
-      <span className="text-sm font-semibold">2:24</span>
-      <div className="flex items-center gap-1">
-        <SignalIcon />
-        <WifiIcon />
-        <BatteryIcon value={71} />
-      </div>
-    </div>
-    
-    {/* Content Iframe */}
-    <div className="w-[375px] h-[680px] overflow-hidden">
-      <iframe src={url} ... />
-    </div>
-    
-    {/* Safari Bottom Bar */}
-    <div className="h-20 bg-white/80 backdrop-blur border-t flex items-center justify-around px-4">
-      <button className="p-3 bg-gray-100 rounded-full"><ChevronLeft /></button>
-      <button className="p-3 bg-gray-100 rounded-full"><MessageSquare /></button>
-      <div className="px-4 py-2 bg-gray-100 rounded-full text-sm truncate max-w-[180px]">
-        {getDomain(url)}
-      </div>
-      <button className="p-3 bg-gray-100 rounded-full"><RefreshCw /></button>
-      <button className="p-3 bg-gray-100 rounded-full"><MoreHorizontal /></button>
-    </div>
-  </div>
+  const fundedPatterns = [
+    'funded', 
+    'funded investor', 
+    'fundedinvestor',
+    'funded_investor',
+    'active investor',
+    'activeinvestor',
+    'active_investor'
+  ];
   
-  {/* Home Indicator */}
-  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-1 bg-gray-400 rounded-full" />
-</div>
-```
-
----
-
-## Feature 3: Campaign-Based Flow View
-
-### Visual Design (Matching Funnelytics Style)
-
-Each campaign displays as a titled section with steps flowing horizontally:
-
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  1031 Exchange                                                    [+ Add Step] │
-│  ┌─────────────────────┐        ┌─────────────────────┐                      │
-│  │ [1] 1031 Exchange   │  ───→  │ [2] 1031 Book A Call│                      │
-│  │ ┌─────────────────┐ │        │ ┌─────────────────┐ │                      │
-│  │ │  Page Preview   │ │        │ │  Page Preview   │ │                      │
-│  │ │  (thumbnail)    │ │        │ │  (thumbnail)    │ │                      │
-│  │ └─────────────────┘ │        │ └─────────────────┘ │                      │
-│  │ investbluecapfunds  │        │ investbluecapfunds  │                      │
-│  └─────────────────────┘        └─────────────────────┘                      │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  RV Park Fund                                                     [+ Add Step] │
-│  (different background color for visual distinction)                         │
-│  ...steps...                                                                  │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Component Structure
-
-```typescript
-// CampaignFlowSection.tsx
-interface CampaignFlowSectionProps {
-  campaign: FunnelCampaign;
-  steps: FunnelStep[];
-  onAddStep: () => void;
-  onReorder: (orderedIds: string[]) => void;
-  deviceType: DeviceType;
-  isPublicView: boolean;
-}
-
-export function CampaignFlowSection({ campaign, steps, ... }: CampaignFlowSectionProps) {
-  return (
-    <div 
-      className="rounded-xl p-6 mb-6"
-      style={{ backgroundColor: campaign.color }}
-    >
-      {/* Campaign Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-bold flex items-center gap-2">
-          {campaign.name}
-        </h3>
-        {!isPublicView && (
-          <Button size="sm" variant="outline" onClick={onAddStep}>
-            <Plus className="h-4 w-4 mr-1" /> Add Step
-          </Button>
-        )}
-      </div>
-      
-      {/* Flow Diagram with Steps */}
-      <div className="flex items-center gap-4 overflow-x-auto pb-4">
-        {steps.map((step, index) => (
-          <div key={step.id} className="flex items-center">
-            <FunnelStepCard 
-              step={step} 
-              stepNumber={index + 1}
-              deviceType={deviceType}
-            />
-            {index < steps.length - 1 && (
-              <ArrowRight className="mx-2 text-muted-foreground" />
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
+  return contact.tags.some(tag => 
+    fundedPatterns.some(pattern => 
+      tag.toLowerCase().trim() === pattern ||
+      tag.toLowerCase().includes(pattern)
+    )
   );
 }
 ```
 
----
-
-## Feature 4: Google PageSpeed Integration
-
-### Implementation Approach
-
-Add a "Test Speed" button on each step card that calls Google's PageSpeed Insights API:
-
-**4.1 Edge Function for PageSpeed**
-
-Create `supabase/functions/pagespeed-test/index.ts`:
+**3.2 Update `sync-client-data` Opportunity Filtering**
+Expand the funded detection logic:
 
 ```typescript
-const PAGESPEED_API = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
+// Current logic (too restrictive)
+const fundedOpps = opportunities.filter(opp => 
+  opp.status === 'won' || 
+  opp.pipelineStageId?.toLowerCase().includes('funded') ||
+  opp.pipelineStageId?.toLowerCase().includes('closed')
+);
 
-Deno.serve(async (req) => {
-  const { url, strategy = 'mobile' } = await req.json();
+// Updated logic - also check stage NAME not just ID
+const fundedOpps = opportunities.filter(opp => {
+  const stageName = (opp.stageName || opp.pipelineStageName || '').toLowerCase();
+  const stageId = (opp.pipelineStageId || '').toLowerCase();
   
-  const apiUrl = `${PAGESPEED_API}?url=${encodeURIComponent(url)}&strategy=${strategy}`;
-  const response = await fetch(apiUrl);
-  const data = await response.json();
-  
-  // Extract key metrics
-  const lighthouse = data.lighthouseResult;
-  return new Response(JSON.stringify({
-    performanceScore: lighthouse.categories.performance.score * 100,
-    metrics: {
-      firstContentfulPaint: lighthouse.audits['first-contentful-paint'].displayValue,
-      speedIndex: lighthouse.audits['speed-index'].displayValue,
-      largestContentfulPaint: lighthouse.audits['largest-contentful-paint'].displayValue,
-      timeToInteractive: lighthouse.audits['interactive'].displayValue,
-      totalBlockingTime: lighthouse.audits['total-blocking-time'].displayValue,
-      cumulativeLayoutShift: lighthouse.audits['cumulative-layout-shift'].displayValue,
-    }
-  }));
+  return opp.status === 'won' || 
+    stageName.includes('funded') ||
+    stageName.includes('active investor') ||
+    stageId.includes('funded') ||
+    stageId.includes('closed');
 });
 ```
 
-**4.2 PageSpeed Button & Modal**
+**3.3 Add Contact-Based Funded Detection**
+For contacts without opportunities but with funded tags:
 
 ```typescript
-// PageSpeedButton.tsx
-function PageSpeedButton({ url }: { url: string }) {
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<PageSpeedResults | null>(null);
-  
-  const runTest = async () => {
-    setLoading(true);
-    const { data } = await supabase.functions.invoke('pagespeed-test', {
-      body: { url, strategy: 'mobile' }
-    });
-    setResults(data);
-    setLoading(false);
-  };
-  
-  return (
-    <>
-      <Button size="sm" variant="ghost" onClick={runTest} disabled={loading}>
-        <Gauge className="h-4 w-4 mr-1" />
-        {loading ? 'Testing...' : 'Speed Test'}
-      </Button>
+// After processing opportunities, also check contacts with funded tags
+for (const contact of contacts) {
+  if (hasFundedInvestorTag(contact)) {
+    // Check if already a funded investor
+    const { data: existingFunded } = await supabase
+      .from('funded_investors')
+      .select('id')
+      .eq('client_id', client.id)
+      .eq('external_id', contact.id)
+      .maybeSingle();
+    
+    if (!existingFunded) {
+      // Extract pipeline value from custom fields or opportunities
+      const pipelineValue = extractPipelineValue(contact);
       
-      {results && (
-        <PageSpeedResultsModal 
-          results={results} 
-          onClose={() => setResults(null)} 
-        />
-      )}
-    </>
-  );
+      await supabase.from('funded_investors').insert({
+        client_id: client.id,
+        external_id: contact.id,
+        name: contact.name,
+        lead_id: leadId,
+        funded_amount: pipelineValue,
+        funded_at: contact.dateUpdated || contact.dateAdded,
+        source: 'tag_sync'
+      });
+    }
+  }
 }
 ```
 
-**4.3 Results Display**
+**3.4 Update `sync-ghl-contacts` for Tags**
+Add funded investor creation during contact sync when funded tags detected:
 
-Show a modal or popover with:
-- Overall performance score (0-100 with color coding)
-- Core Web Vitals: FCP, LCP, TBT, CLS
-- Speed Index and Time to Interactive
-- Mobile vs Desktop toggle
+- Check for funded investor tags during contact processing
+- If found, look up or create corresponding funded_investor record
+- Use opportunity `monetaryValue` as `funded_amount`
+- Use the tag addition date or stage move date as `funded_at` (requires GHL activity log or approximate with `dateUpdated`)
 
----
-
-## Feature 5: Unified Tab Structure
-
-### Single Funnel Tab Layout
-
-All functionality consolidated under one tab:
+**3.5 Opportunity Value Extraction**
+Update to properly pull opportunity value:
 
 ```typescript
-// FunnelPreviewTab.tsx (updated)
-export function FunnelPreviewTab({ clientId, isPublicView }: Props) {
-  const [viewMode, setViewMode] = useState<'flow' | 'preview'>('flow');
-  const [deviceType, setDeviceType] = useState<DeviceType>('phone');
-  
-  const { data: campaigns = [] } = useFunnelCampaigns(clientId);
-  const { data: steps = [] } = useFunnelSteps(clientId);
-  
-  // Group steps by campaign
-  const stepsByCampaign = useMemo(() => {
-    return campaigns.map(campaign => ({
-      campaign,
-      steps: steps.filter(s => s.campaign_id === campaign.id)
-        .sort((a, b) => a.sort_order - b.sort_order)
-    }));
-  }, [campaigns, steps]);
-  
-  return (
-    <div className="space-y-6">
-      {/* Header with controls */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold">Funnel Preview</h2>
-          <p className="text-sm text-muted-foreground">
-            Visualize and test your funnels across devices
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <ViewModeToggle value={viewMode} onChange={setViewMode} />
-          <DeviceSwitcher value={deviceType} onChange={setDeviceType} />
-          {!isPublicView && <AddCampaignButton clientId={clientId} />}
-        </div>
-      </div>
-      
-      {/* Campaign Sections */}
-      {stepsByCampaign.map(({ campaign, steps }) => (
-        <CampaignFlowSection
-          key={campaign.id}
-          campaign={campaign}
-          steps={steps}
-          deviceType={deviceType}
-          isPublicView={isPublicView}
-        />
-      ))}
-      
-      {/* Empty State */}
-      {campaigns.length === 0 && (
-        <EmptyState onAddCampaign={() => setAddCampaignOpen(true)} />
-      )}
-    </div>
-  );
+interface GHLOpportunity {
+  id: string;
+  contactId: string;
+  status: string;
+  monetaryValue?: number;
+  monetary_value?: number; // alternate field name
+  pipelineStageId?: string;
+  pipelineStageName?: string;
+  stageName?: string;
+  dateAdded: string;
+  lastStageChangeAt?: string; // Use this for accurate funded date if available
 }
+
+// Extract value with multiple field fallbacks
+const fundedAmount = opp.monetaryValue ?? opp.monetary_value ?? 0;
+
+// Use stage change date if available, otherwise dateAdded
+const fundedAt = opp.lastStageChangeAt || opp.dateAdded;
 ```
 
 ---
@@ -358,62 +210,66 @@ export function FunnelPreviewTab({ clientId, isPublicView }: Props) {
 
 | Component | Changes |
 |-----------|---------|
-| `supabase/migrations/` | Add `funnel_campaigns` table, add `campaign_id` to `client_funnel_steps` |
-| `src/hooks/useFunnelCampaigns.ts` | **NEW** - CRUD hooks for campaigns |
-| `src/hooks/useFunnelSteps.ts` | Update to include `campaign_id` field |
-| `src/components/funnel/IPhoneMockup.tsx` | Complete redesign with iOS Safari UI |
-| `src/components/funnel/CampaignFlowSection.tsx` | **NEW** - Campaign container with flow |
-| `src/components/funnel/FunnelStepCard.tsx` | **NEW** - Individual step card with thumbnail |
-| `src/components/funnel/PageSpeedButton.tsx` | **NEW** - PageSpeed test trigger |
-| `src/components/funnel/PageSpeedModal.tsx` | **NEW** - Results display modal |
-| `src/components/funnel/FunnelPreviewTab.tsx` | Refactor for campaign-based structure |
-| `supabase/functions/pagespeed-test/index.ts` | **NEW** - Edge function for PageSpeed API |
+| `supabase/migrations/` | Add `ad_spend_reports` table with timestamp tracking |
+| `supabase/functions/sync-ghl-contacts/index.ts` | Add `hasFundedInvestorTag()`, historical date range param, funded investor creation from tags |
+| `supabase/functions/sync-client-data/index.ts` | Expand funded detection (stage name, tags), use `lastStageChangeAt`, proper value extraction |
+| `supabase/functions/webhook-ingest/index.ts` | Add time parameter to ad-spend webhook, store in `ad_spend_reports` |
+| `src/components/import/CSVImportModal.tsx` | Add `time`/`reported_at` column support for ad spend imports |
+| `src/components/settings/ClientSettingsModal.tsx` | Add historical sync date range selector and button |
+| `src/hooks/useAdSpendReports.ts` | **NEW** - Hook to query granular ad spend data by time |
 
 ---
 
-## User Experience Flow
+## Data Flow Changes
 
-### Adding a Campaign
-1. Click "+ Add Campaign" button
-2. Enter campaign name (e.g., "1031 Exchange")
-3. Optionally pick background color (gray, white, light blue, etc.)
-4. Campaign section appears with empty state
+### Current Funded Investor Detection
+```text
+GHL Opportunity with status='won' OR stageId contains 'funded'/'closed'
+    ↓
+Extract monetaryValue → funded_amount
+Extract dateAdded → funded_at
+```
 
-### Adding Steps to Campaign
-1. Click "+ Add Step" within a campaign section
-2. Enter step name and URL
-3. Step appears in flow with automatic numbering
-4. Drag to reorder within the campaign
+### Updated Funded Investor Detection
+```text
+Contact has tag: "Funded" / "funded investor" / "active investor"
+    OR
+Opportunity stage NAME contains: 'funded' / 'active investor'
+    OR
+Opportunity status = 'won' / stageId contains 'funded'/'closed'
+    ↓
+Extract monetaryValue/monetary_value → funded_amount
+Extract lastStageChangeAt OR dateUpdated → funded_at (stage move date)
+Match to lead using contactId → calculate time_to_fund_days
+```
 
-### Testing Page Speed
-1. Click "Speed Test" icon on any step card
-2. Loading spinner while API runs (~5-10 seconds)
-3. Modal opens with performance score and metrics
-4. Toggle between Mobile and Desktop results
-
-### Device Preview
-1. Select device type (Phone/Tablet/Desktop)
-2. All step previews update to selected mockup
-3. Flow view shows compact cards; Preview view shows full mockups
+### Ad Spend Time Tracking
+```text
+Webhook/CSV with date + time
+    ↓
+Insert into ad_spend_reports (granular, with reported_at timestamp)
+    ↓
+Aggregate to daily_metrics (for dashboard compatibility)
+```
 
 ---
 
-## Visual Design Notes
+## User Experience
 
-### Campaign Backgrounds
-- Default: `#f3f4f6` (light gray)
-- Alternative: `#ffffff` (white with border)
-- Accent: `#f0fdf4` (light green for active campaigns)
+### Historical Sync
+1. Open Client Settings → Integrations tab
+2. Select sync range from dropdown (7d / 30d / 90d / All)
+3. Click "Sync Historical Data"
+4. Progress indicator shows sync status
+5. Success message with counts: leads created, calls synced, funded investors found
 
-### Step Cards in Flow Mode
-- White cards with subtle shadow
-- Green numbered badge (matching existing design)
-- Thumbnail preview at ~0.2 scale
-- Domain URL below thumbnail
-- Action buttons on hover (Edit, Delete, Speed Test, Open)
+### Ad Spend Time Upload
+- CSV format: `date,time,spend,impressions,clicks`
+- Example: `2024-01-15,14:30,150.50,5000,120`
+- Time is optional; if omitted, records still import by date
 
-### Connecting Arrows
-- Simple horizontal arrow between consecutive steps
-- Muted foreground color
-- Could add animation later for visual interest
-
+### Funded Investor Tags
+- Contacts tagged "Funded", "funded investor", or "active investor" auto-detected
+- Opportunity value pulled as funded amount
+- Stage move date (or last update) used as funded date
+- No manual intervention required after GHL sync
