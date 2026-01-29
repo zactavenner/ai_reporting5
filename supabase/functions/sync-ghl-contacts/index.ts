@@ -968,6 +968,128 @@ async function fetchGHLNotes(
   }
 }
 
+// Fetch tasks for a GHL contact
+async function fetchGHLTasks(
+  apiKey: string,
+  contactId: string
+): Promise<any[]> {
+  const headers = {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'Version': '2021-07-28',
+  };
+
+  try {
+    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}/tasks`, { 
+      method: 'GET', 
+      headers 
+    });
+    
+    if (!response.ok) {
+      console.error(`GHL tasks fetch error: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.tasks || [];
+  } catch (err) {
+    console.error('Error fetching GHL tasks:', err);
+    return [];
+  }
+}
+
+// Fetch appointments for a GHL contact
+async function fetchGHLAppointments(
+  apiKey: string,
+  contactId: string
+): Promise<any[]> {
+  const headers = {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'Version': '2021-07-28',
+  };
+
+  try {
+    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}/appointments`, { 
+      method: 'GET', 
+      headers 
+    });
+    
+    if (!response.ok) {
+      console.error(`GHL appointments fetch error: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.appointments || data.events || [];
+  } catch (err) {
+    console.error('Error fetching GHL appointments:', err);
+    return [];
+  }
+}
+
+// Fetch conversation messages for a GHL contact (SMS, Email, Call logs)
+async function fetchGHLConversationMessages(
+  apiKey: string,
+  locationId: string,
+  contactId: string
+): Promise<any[]> {
+  const headers = {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'Version': '2021-07-28',
+  };
+
+  const messages: any[] = [];
+
+  try {
+    // Search for conversations with this contact
+    const searchResponse = await fetch(
+      `${GHL_BASE_URL}/conversations/search?locationId=${locationId}&contactId=${contactId}`, 
+      { method: 'GET', headers }
+    );
+    
+    if (!searchResponse.ok) {
+      console.error(`GHL conversations search error: ${searchResponse.status}`);
+      return [];
+    }
+
+    const searchData = await searchResponse.json();
+    const conversations = searchData.conversations || [];
+
+    // For each conversation, get the messages
+    for (const conv of conversations.slice(0, 5)) { // Limit to 5 conversations
+      try {
+        const messagesResponse = await fetch(
+          `${GHL_BASE_URL}/conversations/${conv.id}/messages?limit=50`,
+          { method: 'GET', headers }
+        );
+
+        if (messagesResponse.ok) {
+          const messagesData = await messagesResponse.json();
+          const convMessages = messagesData.messages || [];
+          
+          for (const msg of convMessages) {
+            messages.push({
+              ...msg,
+              conversationType: conv.type,
+            });
+          }
+        }
+      } catch (err) {
+        console.error(`Error fetching messages for conversation ${conv.id}:`, err);
+      }
+      
+      // Small delay between requests
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  } catch (err) {
+    console.error('Error fetching GHL conversations:', err);
+  }
+
+  return messages;
+}
+
 // Handle single contact sync mode
 async function syncSingleContact(
   supabase: any,
@@ -1029,6 +1151,157 @@ async function syncSingleContact(
   };
 }
 
+// Handle deep sync mode - pulls full timeline history for a contact
+async function syncContactDeepTimeline(
+  supabase: any,
+  clientId: string,
+  contactId: string,
+  apiKey: string,
+  locationId: string
+): Promise<{ success: boolean; events_count: number; error?: string }> {
+  console.log(`Deep timeline sync: fetching full history for contact ${contactId}`);
+  
+  let eventsCount = 0;
+  
+  try {
+    // Fetch all data in parallel
+    const [notes, tasks, appointments, messages] = await Promise.all([
+      fetchGHLNotes(apiKey, contactId),
+      fetchGHLTasks(apiKey, contactId),
+      fetchGHLAppointments(apiKey, contactId),
+      fetchGHLConversationMessages(apiKey, locationId, contactId),
+    ]);
+    
+    console.log(`Fetched: ${notes.length} notes, ${tasks.length} tasks, ${appointments.length} appointments, ${messages.length} messages`);
+    
+    // Get lead_id if exists
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('external_id', contactId)
+      .maybeSingle();
+    
+    const leadId = lead?.id || null;
+    
+    // Clear existing timeline events for this contact
+    await supabase
+      .from('contact_timeline_events')
+      .delete()
+      .eq('client_id', clientId)
+      .eq('ghl_contact_id', contactId);
+    
+    const timelineEvents: any[] = [];
+    
+    // Process notes
+    for (const note of notes) {
+      timelineEvents.push({
+        client_id: clientId,
+        lead_id: leadId,
+        ghl_contact_id: contactId,
+        event_type: 'note',
+        event_subtype: null,
+        title: null,
+        body: note.body,
+        event_at: note.dateAdded || new Date().toISOString(),
+        metadata: { userId: note.userId, noteId: note.id },
+      });
+    }
+    
+    // Process tasks
+    for (const task of tasks) {
+      timelineEvents.push({
+        client_id: clientId,
+        lead_id: leadId,
+        ghl_contact_id: contactId,
+        event_type: 'task',
+        event_subtype: task.status || task.completed ? 'completed' : 'pending',
+        title: task.title || task.body,
+        body: task.description || task.body,
+        event_at: task.dueDate || task.dateAdded || new Date().toISOString(),
+        metadata: { taskId: task.id, assignedTo: task.assignedTo },
+      });
+    }
+    
+    // Process appointments
+    for (const appt of appointments) {
+      timelineEvents.push({
+        client_id: clientId,
+        lead_id: leadId,
+        ghl_contact_id: contactId,
+        event_type: 'appointment',
+        event_subtype: appt.status || appt.appointmentStatus,
+        title: appt.title || appt.calendarName,
+        body: appt.notes || null,
+        event_at: appt.startTime || appt.selectedTimezone || appt.dateAdded || new Date().toISOString(),
+        metadata: { 
+          appointmentId: appt.id, 
+          calendarId: appt.calendarId,
+          endTime: appt.endTime,
+          status: appt.status,
+        },
+      });
+    }
+    
+    // Process messages (SMS, Email, Calls)
+    for (const msg of messages) {
+      let eventType = 'sms';
+      if (msg.type === 'TYPE_EMAIL' || msg.messageType === 'TYPE_EMAIL') {
+        eventType = 'email';
+      } else if (msg.type === 'TYPE_CALL' || msg.messageType === 'TYPE_CALL' || msg.conversationType === 'TYPE_CALL') {
+        eventType = 'call';
+      } else if (msg.type === 'TYPE_SMS' || msg.messageType === 'TYPE_SMS') {
+        eventType = 'sms';
+      }
+      
+      timelineEvents.push({
+        client_id: clientId,
+        lead_id: leadId,
+        ghl_contact_id: contactId,
+        event_type: eventType,
+        event_subtype: msg.direction || (msg.direction === 1 ? 'inbound' : 'outbound'),
+        title: msg.subject || null,
+        body: msg.body || msg.message,
+        event_at: msg.dateAdded || new Date().toISOString(),
+        metadata: { 
+          messageId: msg.id, 
+          conversationId: msg.conversationId,
+          status: msg.status,
+          direction: msg.direction,
+        },
+      });
+    }
+    
+    // Insert all events in batches
+    if (timelineEvents.length > 0) {
+      const batchSize = 50;
+      for (let i = 0; i < timelineEvents.length; i += batchSize) {
+        const batch = timelineEvents.slice(i, i + batchSize);
+        const { error: insertError } = await supabase
+          .from('contact_timeline_events')
+          .insert(batch);
+        
+        if (insertError) {
+          console.error('Error inserting timeline events batch:', insertError);
+        } else {
+          eventsCount += batch.length;
+        }
+      }
+    }
+    
+    console.log(`Deep timeline sync complete: ${eventsCount} events stored`);
+    
+    return { success: true, events_count: eventsCount };
+  } catch (err) {
+    console.error('Error in deep timeline sync:', err);
+    return { 
+      success: false, 
+      events_count: eventsCount,
+      error: err instanceof Error ? err.message : 'Unknown error' 
+    };
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -1085,6 +1358,63 @@ serve(async (req) => {
       }
       
       const result = await syncSingleContact(supabase, targetClientId, singleContactId, client.ghl_api_key);
+      
+      return new Response(
+        JSON.stringify(result),
+        { 
+          status: result.success ? 200 : 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+    
+    // Handle deep sync mode - pulls full timeline history for a contact
+    if (mode === 'deep_sync' && targetClientId) {
+      const contactIdForDeepSync = singleContactId;
+      // Also accept contact_id parameter
+      let deepSyncContactId = contactIdForDeepSync;
+      try {
+        const body = await req.clone().json();
+        deepSyncContactId = body?.contact_id || contactIdForDeepSync;
+      } catch {}
+      
+      if (!deepSyncContactId) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'contact_id is required for deep_sync mode' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      console.log(`Deep sync mode: contactId=${deepSyncContactId}, clientId=${targetClientId}`);
+      
+      // Fetch client's GHL credentials
+      const { data: client, error: clientError } = await supabase
+        .from('clients')
+        .select('id, name, ghl_api_key, ghl_location_id')
+        .eq('id', targetClientId)
+        .maybeSingle();
+      
+      if (clientError || !client) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Client not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      if (!client.ghl_api_key || !client.ghl_location_id) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Client has no GHL credentials configured' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      const result = await syncContactDeepTimeline(
+        supabase, 
+        targetClientId, 
+        deepSyncContactId, 
+        client.ghl_api_key,
+        client.ghl_location_id
+      );
       
       return new Response(
         JSON.stringify(result),

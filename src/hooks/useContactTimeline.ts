@@ -45,11 +45,13 @@ export function useSyncContactTimeline() {
         body: { 
           client_id: clientId, 
           mode: 'deep_sync',
-          contact_id: ghlContactId 
+          contactId: ghlContactId,
+          contact_id: ghlContactId // Support both parameter names
         },
       });
 
       if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Deep sync failed');
       return data;
     },
     onSuccess: (data, variables) => {
