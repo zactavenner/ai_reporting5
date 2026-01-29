@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Edit2, Trash2, ChevronRight, GripVertical } from 'lucide-react';
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -17,6 +17,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { FunnelStepCard } from './FunnelStepCard';
+import { useAllStepVariants, type FunnelStepVariant } from '@/hooks/useFunnelStepVariants';
 import type { FunnelCampaign } from '@/hooks/useFunnelCampaigns';
 import type { FunnelStep } from '@/hooks/useFunnelSteps';
 import type { DeviceType } from './DeviceSwitcher';
@@ -40,11 +41,12 @@ interface SortableStepProps {
   deviceType: DeviceType;
   isPublicView: boolean;
   isLast: boolean;
+  variants: FunnelStepVariant[];
   onEdit: () => void;
   onDelete: () => void;
 }
 
-function SortableStep({ step, index, deviceType, isPublicView, isLast, onEdit, onDelete }: SortableStepProps) {
+function SortableStep({ step, index, deviceType, isPublicView, isLast, variants, onEdit, onDelete }: SortableStepProps) {
   const {
     attributes,
     listeners,
@@ -77,6 +79,7 @@ function SortableStep({ step, index, deviceType, isPublicView, isLast, onEdit, o
           stepNumber={index + 1}
           deviceType={deviceType}
           isPublicView={isPublicView}
+          variants={variants}
           onEdit={onEdit}
           onDelete={onDelete}
         />
@@ -102,6 +105,20 @@ export function CampaignFlowSection({
 }: CampaignFlowSectionProps) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(campaign.name);
+
+  // Fetch all variants for steps in this campaign
+  const stepIds = useMemo(() => steps.map(s => s.id), [steps]);
+  const { data: allVariants = [] } = useAllStepVariants(stepIds);
+  
+  // Group variants by step ID
+  const variantsByStep = useMemo(() => {
+    const map: Record<string, FunnelStepVariant[]> = {};
+    allVariants.forEach(v => {
+      if (!map[v.step_id]) map[v.step_id] = [];
+      map[v.step_id].push(v);
+    });
+    return map;
+  }, [allVariants]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -213,6 +230,7 @@ export function CampaignFlowSection({
                   deviceType={deviceType}
                   isPublicView={isPublicView}
                   isLast={index === steps.length - 1}
+                  variants={variantsByStep[step.id] || []}
                   onEdit={() => onEditStep(step)}
                   onDelete={() => onDeleteStep(step.id)}
                 />

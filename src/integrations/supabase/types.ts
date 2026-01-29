@@ -1414,6 +1414,44 @@ export type Database = {
           },
         ]
       }
+      funnel_step_variants: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          sort_order: number | null
+          step_id: string
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          sort_order?: number | null
+          step_id: string
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          sort_order?: number | null
+          step_id?: string
+          updated_at?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnel_step_variants_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "client_funnel_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gpt_files: {
         Row: {
           character_count: number | null

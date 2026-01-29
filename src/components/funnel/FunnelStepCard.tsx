@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Edit2, ExternalLink, Trash2, Gauge, Loader2, Radio } from 'lucide-react';
+import { Edit2, ExternalLink, Trash2, Gauge, Loader2, Radio, TestTube2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,8 +18,10 @@ import { TabletMockup } from './TabletMockup';
 import { DesktopMockup } from './DesktopMockup';
 import { PageSpeedModal } from './PageSpeedModal';
 import { PixelVerificationModal } from './PixelVerificationModal';
+import { SplitTestModal } from './SplitTestModal';
 import { supabase } from '@/integrations/supabase/client';
 import type { FunnelStep } from '@/hooks/useFunnelSteps';
+import type { FunnelStepVariant } from '@/hooks/useFunnelStepVariants';
 import type { DeviceType } from './DeviceSwitcher';
 
 interface FunnelStepCardProps {
@@ -26,6 +29,7 @@ interface FunnelStepCardProps {
   stepNumber: number;
   deviceType: DeviceType;
   isPublicView: boolean;
+  variants?: FunnelStepVariant[];
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -47,6 +51,7 @@ export function FunnelStepCard({
   stepNumber,
   deviceType,
   isPublicView,
+  variants = [],
   onEdit,
   onDelete,
 }: FunnelStepCardProps) {
@@ -54,6 +59,9 @@ export function FunnelStepCard({
   const [speedResults, setSpeedResults] = useState<PageSpeedResults | null>(null);
   const [speedModalOpen, setSpeedModalOpen] = useState(false);
   const [pixelModalOpen, setPixelModalOpen] = useState(false);
+  const [splitTestModalOpen, setSplitTestModalOpen] = useState(false);
+
+  const hasVariants = variants.length > 0;
 
   const runSpeedTest = async () => {
     setSpeedTestLoading(true);
@@ -73,27 +81,66 @@ export function FunnelStepCard({
     }
   };
 
-  const renderDeviceMockup = () => {
-    const title = `${stepNumber}. ${step.name}`;
-    
+  const renderDeviceMockup = (url: string, title: string, variantLabel?: string) => {
     switch (deviceType) {
       case 'desktop':
-        return <DesktopMockup url={step.url} title={title} />;
+        return <DesktopMockup url={url} title={title} />;
       case 'tablet':
-        return <TabletMockup url={step.url} title={title} />;
+        return <TabletMockup url={url} title={title} />;
       default:
-        return <IPhoneMockup url={step.url} title={title} />;
+        return <IPhoneMockup url={url} title={title} />;
     }
   };
+
+  // All URLs including variants
+  const allUrls = [
+    { url: step.url, label: 'A', isOriginal: true },
+    ...variants.map((v, i) => ({ 
+      url: v.url, 
+      label: ['B', 'C', 'D', 'E', 'F', 'G', 'H'][i] || `${i + 2}`, 
+      isOriginal: false 
+    }))
+  ];
 
   return (
     <>
       <div className="flex flex-col items-center">
-        {/* Full Device Mockup */}
-        {renderDeviceMockup()}
+        {/* Show variants side-by-side if they exist */}
+        {hasVariants ? (
+          <div className="flex gap-2">
+            {allUrls.map(({ url, label, isOriginal }) => (
+              <div key={label} className="flex flex-col items-center">
+                <Badge 
+                  variant={isOriginal ? "default" : "secondary"} 
+                  className="mb-1 text-xs"
+                >
+                  {label}
+                </Badge>
+                <div className="transform scale-[0.5] origin-top -mb-32">
+                  {renderDeviceMockup(url, `${stepNumber}. ${step.name}`)}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Single Mockup */
+          renderDeviceMockup(step.url, `${stepNumber}. ${step.name}`)
+        )}
         
         {/* Action Buttons Row */}
         <div className="flex items-center gap-1 mt-3">
+          {/* Split Test Button */}
+          <Button
+            variant={hasVariants ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setSplitTestModalOpen(true)}
+            className="h-7 px-2 text-xs"
+            title="A/B Split Test"
+          >
+            <TestTube2 className="h-3 w-3 mr-1" />
+            {hasVariants ? `${allUrls.length} Tests` : 'A/B'}
+          </Button>
+          
           {/* Speed Test */}
           <Button
             variant="ghost"
@@ -178,6 +225,13 @@ export function FunnelStepCard({
         onOpenChange={setPixelModalOpen}
         stepUrl={step.url}
         stepName={step.name}
+      />
+
+      <SplitTestModal
+        open={splitTestModalOpen}
+        onOpenChange={setSplitTestModalOpen}
+        step={step}
+        isPublicView={isPublicView}
       />
     </>
   );
