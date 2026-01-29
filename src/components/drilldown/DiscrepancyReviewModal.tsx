@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trash2, CheckCircle, Loader2, AlertTriangle, Globe, Webhook } from 'lucide-react';
+import { Trash2, Loader2, AlertTriangle, Globe } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { DataDiscrepancy } from '@/hooks/useDataDiscrepancies';
@@ -83,27 +83,27 @@ export function DiscrepancyReviewModal({ discrepancy, open, onOpenChange }: Disc
         }
       }
 
-      // Mark leads with their ingestion source
-      return leads.map(lead => {
+      // Only return leads WITHOUT webhook matches (the gap)
+      const gapOnlyLeads: GapLead[] = [];
+      
+      for (const lead of leads) {
         const hasWebhook = webhookExternalIds.has(lead.external_id) || 
                           (lead.email && webhookEmails.has(lead.email.toLowerCase()));
         
-        let ingestionSource: 'webhook' | 'api_sync' | 'unknown' = 'unknown';
-        if (hasWebhook) {
-          ingestionSource = 'webhook';
-        } else if (lead.source === 'ghl_sync' || lead.source === 'api') {
-          ingestionSource = 'api_sync';
-        }
-
-        return {
+        // Skip leads that have webhook matches - we only want the gap
+        if (hasWebhook) continue;
+        
+        gapOnlyLeads.push({
           ...lead,
-          ingestion_source: ingestionSource,
-          has_webhook: !!hasWebhook,
+          ingestion_source: 'api_sync',
+          has_webhook: false,
           campaign_name: lead.campaign_name,
           ad_set_name: lead.ad_set_name,
           utm_source: lead.utm_source,
-        };
-      });
+        });
+      }
+
+      return gapOnlyLeads;
     },
     enabled: open && !!discrepancy,
   });
@@ -138,20 +138,15 @@ export function DiscrepancyReviewModal({ discrepancy, open, onOpenChange }: Disc
     setSelectedIds(newSelected);
   };
 
-  const selectAllApiOnly = () => {
-    const apiOnlyIds = gapLeads
-      .filter(l => l.ingestion_source === 'api_sync' || !l.has_webhook)
-      .map(l => l.id);
-    setSelectedIds(new Set(apiOnlyIds));
+  const selectAll = () => {
+    // All leads in gapLeads are already API-only (the gap)
+    setSelectedIds(new Set(gapLeads.map(l => l.id)));
   };
 
   const handleDeleteSelected = () => {
     if (selectedIds.size === 0) return;
     deleteMutation.mutate(Array.from(selectedIds));
   };
-
-  const apiOnlyCount = gapLeads.filter(l => !l.has_webhook).length;
-  const webhookCount = gapLeads.filter(l => l.has_webhook).length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -172,23 +167,19 @@ export function DiscrepancyReviewModal({ discrepancy, open, onOpenChange }: Disc
 
         <div className="space-y-4">
           {/* Summary stats */}
-          <div className="flex gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <Webhook className="h-4 w-4 text-primary" />
-              <span><strong>{webhookCount}</strong> via webhook</span>
-            </div>
+          <div className="flex flex-wrap gap-4 text-sm items-center">
             <div className="flex items-center gap-2">
               <Globe className="h-4 w-4 text-chart-4" />
-              <span><strong>{apiOnlyCount}</strong> API-only (gap)</span>
+              <span><strong>{gapLeads.length}</strong> leads in gap (API-only, no webhook)</span>
             </div>
             <div className="ml-auto flex gap-2">
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={selectAllApiOnly}
-                disabled={apiOnlyCount === 0}
+                onClick={selectAll}
+                disabled={gapLeads.length === 0}
               >
-                Select API-Only
+                Select All
               </Button>
               <Button 
                 variant="destructive" 
@@ -207,15 +198,9 @@ export function DiscrepancyReviewModal({ discrepancy, open, onOpenChange }: Disc
           </div>
 
           {/* Legend */}
-          <div className="flex gap-4 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-primary" />
-              Webhook = Came via real-time webhook
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-chart-4" />
-              API Only = Added via GHL sync (no webhook)
-            </div>
+          <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+            These are leads that were added via GHL API sync but have no matching real-time webhook. 
+            They may be duplicates or backfilled data that shouldn't count toward your metrics.
           </div>
 
           {/* Leads table */}
@@ -232,7 +217,7 @@ export function DiscrepancyReviewModal({ discrepancy, open, onOpenChange }: Disc
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-10">
+                    <TableHead className="w-[40px]">
                       <Checkbox
                         checked={selectedIds.size === gapLeads.length && gapLeads.length > 0}
                         onCheckedChange={(checked) => {
@@ -244,7 +229,6 @@ export function DiscrepancyReviewModal({ discrepancy, open, onOpenChange }: Disc
                         }}
                       />
                     </TableHead>
-                    <TableHead>Source</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Campaign / Ad Set</TableHead>
                     <TableHead>Email</TableHead>
@@ -254,28 +238,12 @@ export function DiscrepancyReviewModal({ discrepancy, open, onOpenChange }: Disc
                 </TableHeader>
                 <TableBody>
                   {gapLeads.map((lead) => (
-                    <TableRow 
-                      key={lead.id} 
-                      className={!lead.has_webhook ? 'bg-chart-4/5' : ''}
-                    >
+                    <TableRow key={lead.id}>
                       <TableCell>
                         <Checkbox
                           checked={selectedIds.has(lead.id)}
                           onCheckedChange={() => toggleSelect(lead.id)}
                         />
-                      </TableCell>
-                      <TableCell>
-                        {lead.has_webhook ? (
-                          <Badge variant="default" className="text-xs">
-                            <Webhook className="h-3 w-3 mr-1" />
-                            Webhook
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs border-chart-4 text-chart-4">
-                            <Globe className="h-3 w-3 mr-1" />
-                            API Only
-                          </Badge>
-                        )}
                       </TableCell>
                       <TableCell className="font-medium">
                         {lead.name || '-'}
