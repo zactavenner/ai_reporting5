@@ -238,21 +238,6 @@ export function FunnelPreviewTab({ clientId, isPublicView = false }: FunnelPrevi
             />
           ))}
 
-          {/* Uncategorized steps (legacy support) */}
-          {uncategorizedSteps.length > 0 && (
-            <div className="rounded-xl p-6 border bg-muted/30">
-              <h3 className="text-lg font-bold mb-4">Uncategorized Steps</h3>
-              <div className="flex items-center gap-4 overflow-x-auto pb-4">
-                {uncategorizedSteps.map((step, index) => (
-                  <div key={step.id} className="flex-shrink-0">
-                    {deviceType === 'phone' && <IPhoneMockup url={step.url} title={`${index + 1}. ${step.name}`} />}
-                    {deviceType === 'tablet' && <TabletMockup url={step.url} title={`${index + 1}. ${step.name}`} />}
-                    {deviceType === 'desktop' && <DesktopMockup url={step.url} title={`${index + 1}. ${step.name}`} />}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
