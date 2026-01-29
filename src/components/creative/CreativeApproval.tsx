@@ -6,9 +6,11 @@ import {
   useAddCreativeComment,
   useDeleteCreative,
   uploadCreativeFile,
+  detectAspectRatio,
   Creative,
   CreativeComment 
 } from '@/hooks/useCreatives';
+import { useTeamMember } from '@/contexts/TeamMemberContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -45,6 +47,10 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
   const updateStatus = useUpdateCreativeStatus();
   const addComment = useAddCreativeComment();
   const deleteCreative = useDeleteCreative();
+  const { currentMember } = useTeamMember();
+  
+  // Check if this is an agency upload (team member logged in and not public view)
+  const isAgencyUpload = !!currentMember && !isPublicView;
   
   const [uploadOpen, setUploadOpen] = useState(false);
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
@@ -94,7 +100,11 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
     setUploading(true);
     try {
       let fileUrl = null;
+      let aspectRatio = null;
+      
       if (newCreative.file && (newCreative.type === 'image' || newCreative.type === 'video')) {
+        // Detect aspect ratio before upload
+        aspectRatio = await detectAspectRatio(newCreative.file);
         fileUrl = await uploadCreativeFile(newCreative.file, clientId);
       }
 
@@ -110,6 +120,8 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
         cta_text: newCreative.cta_text || null,
         status: 'pending',
         comments: [],
+        aspect_ratio: aspectRatio,
+        isAgencyUpload, // Pass the agency flag for AI spelling check
       });
 
       setUploadOpen(false);
@@ -144,6 +156,9 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
       for (const file of bulkFiles) {
         try {
           const isVideo = file.type.startsWith('video/');
+          
+          // Detect aspect ratio before upload
+          const aspectRatio = await detectAspectRatio(file);
           const fileUrl = await uploadCreativeFile(file, clientId);
           
           // Generate dynamic title from filename
@@ -162,6 +177,8 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
             cta_text: null,
             status: 'pending',
             comments: [],
+            aspect_ratio: aspectRatio,
+            isAgencyUpload, // Pass the agency flag for AI spelling check
           });
           successCount++;
         } catch (err) {

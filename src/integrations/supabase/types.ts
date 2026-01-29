@@ -816,6 +816,7 @@ export type Database = {
       }
       creatives: {
         Row: {
+          aspect_ratio: string | null
           body_copy: string | null
           client_id: string
           comments: Json | null
@@ -831,6 +832,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          aspect_ratio?: string | null
           body_copy?: string | null
           client_id: string
           comments?: Json | null
@@ -846,6 +848,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          aspect_ratio?: string | null
           body_copy?: string | null
           client_id?: string
           comments?: Json | null

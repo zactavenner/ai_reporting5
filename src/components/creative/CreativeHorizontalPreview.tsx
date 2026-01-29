@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { getAspectFitClasses } from '@/lib/aspectRatioUtils';
 import { 
   Heart, 
   MessageCircle, 
@@ -61,27 +62,32 @@ export function CreativeHorizontalPreview({ creative, clientName }: CreativeHori
     return name.toLowerCase().replace(/\s+/g, '') + '.com';
   };
 
-  const renderMedia = (platform: string, aspectClass: string) => {
+  // Render media with aspect ratio awareness
+  const renderMedia = (platform: string, containerAspect: string) => {
+    const { objectFit, bgClass } = getAspectFitClasses(containerAspect, creative.aspect_ratio);
+    
     if (creative.type === 'image' && creative.file_url) {
       return (
-        <img 
-          src={creative.file_url} 
-          alt={creative.title}
-          className="w-full h-full object-cover"
-        />
+        <div className={`relative w-full h-full ${bgClass}`}>
+          <img 
+            src={creative.file_url} 
+            alt={creative.title}
+            className={`w-full h-full ${objectFit}`}
+          />
+        </div>
       );
     }
     
     if (creative.type === 'video' && creative.file_url) {
       return (
         <div 
-          className="relative w-full h-full group cursor-pointer" 
+          className={`relative w-full h-full group cursor-pointer ${bgClass}`}
           onClick={() => toggleVideo(platform)}
         >
           <video 
             ref={(el) => { videoRefs.current[platform] = el; }}
             src={creative.file_url}
-            className="w-full h-full object-cover"
+            className={`w-full h-full ${objectFit}`}
             loop
             playsInline
             muted={isMuted}
@@ -143,9 +149,9 @@ export function CreativeHorizontalPreview({ creative, clientName }: CreativeHori
           </div>
         )}
 
-        {/* Media */}
+        {/* Media - 4:5 container for feed */}
         <div className="aspect-[4/5] bg-muted relative">
-          {renderMedia('facebook', 'aspect-[4/5]')}
+          {renderMedia('facebook', '4:5')}
         </div>
 
         {/* CTA Bar */}
@@ -206,9 +212,9 @@ export function CreativeHorizontalPreview({ creative, clientName }: CreativeHori
           <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
         </div>
 
-        {/* Media */}
+        {/* Media - 4:5 container for feed */}
         <div className="aspect-[4/5] bg-muted relative">
-          {renderMedia('instagram', 'aspect-[4/5]')}
+          {renderMedia('instagram', '4:5')}
         </div>
 
         {/* CTA */}
@@ -258,9 +264,9 @@ export function CreativeHorizontalPreview({ creative, clientName }: CreativeHori
         <MoreHorizontal className="h-4 w-4 ml-auto text-muted-foreground" />
       </div>
       <div className="bg-black rounded-xl overflow-hidden aspect-[9/16] relative">
-        {/* Media Background */}
+        {/* Media Background - 9:16 container for stories */}
         <div className="absolute inset-0">
-          {renderMedia('ig-stories', 'aspect-[9/16]')}
+          {renderMedia('ig-stories', '9:16')}
         </div>
 
         {/* Overlay */}
@@ -307,9 +313,9 @@ export function CreativeHorizontalPreview({ creative, clientName }: CreativeHori
         <MoreHorizontal className="h-4 w-4 ml-auto text-muted-foreground" />
       </div>
       <div className="bg-black rounded-xl overflow-hidden aspect-[9/16] relative">
-        {/* Media Background */}
+        {/* Media Background - 9:16 container for stories */}
         <div className="absolute inset-0">
-          {renderMedia('fb-stories', 'aspect-[9/16]')}
+          {renderMedia('fb-stories', '9:16')}
         </div>
 
         {/* Overlay */}

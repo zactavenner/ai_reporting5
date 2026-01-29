@@ -18,6 +18,112 @@ serve(async (req) => {
       throw new Error("GEMINI_API_KEY is not configured");
     }
 
+    // New action: Spelling and grammar check for ad copy
+    if (action === "spelling_check") {
+      const textContent = `
+Headline: ${creative?.headline || '(none)'}
+Body Copy: ${creative?.body_copy || '(none)'}
+CTA: ${creative?.cta_text || '(none)'}
+      `.trim();
+
+      // Skip if no text content
+      if (!creative?.headline && !creative?.body_copy && !creative?.cta_text) {
+        return new Response(
+          JSON.stringify({ 
+            hasErrors: false, 
+            severity: "none", 
+            errors: [], 
+            summary: "No text content to review" 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `You are a professional proofreader for advertising copy. Analyze this ad copy for spelling and grammar errors ONLY (not style suggestions).
+
+${textContent}
+
+Respond ONLY with valid JSON in this exact format, no other text:
+{
+  "hasErrors": true or false,
+  "severity": "none" or "minor" or "critical",
+  "errors": [{"text": "the misspelled or incorrect word/phrase", "issue": "description of error", "suggestion": "corrected version"}],
+  "summary": "Brief 1-2 sentence summary of issues found, or 'No spelling or grammar issues found' if clean"
+}
+
+Severity guide:
+- "critical" = Obvious spelling mistakes, major grammar errors that look unprofessional (e.g., "teh" instead of "the", subject-verb disagreement)
+- "minor" = Minor punctuation issues, spacing problems, capitalization inconsistencies
+- "none" = Clean copy with no errors
+
+Focus ONLY on objective errors, not style preferences. Marketing abbreviations and intentional stylization are acceptable.`
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 1024,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Spelling check error:", response.status, errorText);
+        throw new Error("Spelling check failed");
+      }
+
+      const result = await response.json();
+      const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      
+      // Parse the JSON response
+      try {
+        // Clean up the response - remove markdown code blocks if present
+        let cleanedText = rawText.trim();
+        if (cleanedText.startsWith("```json")) {
+          cleanedText = cleanedText.slice(7);
+        } else if (cleanedText.startsWith("```")) {
+          cleanedText = cleanedText.slice(3);
+        }
+        if (cleanedText.endsWith("```")) {
+          cleanedText = cleanedText.slice(0, -3);
+        }
+        cleanedText = cleanedText.trim();
+        
+        const parsed = JSON.parse(cleanedText);
+        return new Response(
+          JSON.stringify(parsed),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (parseError) {
+        console.error("Failed to parse AI response:", rawText);
+        // Return a safe default if parsing fails
+        return new Response(
+          JSON.stringify({ 
+            hasErrors: false, 
+            severity: "none", 
+            errors: [], 
+            summary: "Unable to analyze copy" 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     if (action === "transcribe") {
       if (!videoUrl) {
         return new Response(

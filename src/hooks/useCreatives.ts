@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Json } from '@/integrations/supabase/types';
 import { addBusinessDays } from '@/lib/utils';
 import { format } from 'date-fns';
+import { detectAspectRatio } from '@/lib/aspectRatioUtils';
 
 export interface CreativeComment {
   id: string;
@@ -24,6 +25,7 @@ export interface Creative {
   cta_text: string | null;
   status: 'pending' | 'approved' | 'revisions' | 'rejected' | 'launched';
   comments: CreativeComment[];
+  aspect_ratio: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -49,10 +51,40 @@ export function useCreatives(clientId?: string) {
         platform: (item.platform as 'meta' | 'tiktok' | 'youtube' | 'google') || 'meta',
         status: item.status as 'pending' | 'approved' | 'revisions' | 'rejected',
         comments: (item.comments as unknown as CreativeComment[]) || [],
+        aspect_ratio: (item as any).aspect_ratio || null,
       })) as Creative[];
     },
     enabled: !!clientId,
   });
+}
+
+interface SpellingCheckResult {
+  hasErrors: boolean;
+  severity: 'none' | 'minor' | 'critical';
+  errors: Array<{ text: string; issue: string; suggestion: string }>;
+  summary: string;
+}
+
+async function runSpellingCheck(creative: {
+  headline?: string | null;
+  body_copy?: string | null;
+  cta_text?: string | null;
+}): Promise<SpellingCheckResult | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('creative-ai-audit', {
+      body: { action: 'spelling_check', creative }
+    });
+    
+    if (error) {
+      console.error('Spelling check error:', error);
+      return null;
+    }
+    
+    return data as SpellingCheckResult;
+  } catch (err) {
+    console.error('Failed to run spelling check:', err);
+    return null;
+  }
 }
 
 export function useCreateCreative() {
@@ -71,6 +103,8 @@ export function useCreateCreative() {
       cta_text?: string | null;
       status?: string;
       comments?: Json;
+      aspect_ratio?: string | null;
+      isAgencyUpload?: boolean;
     }) => {
       const { data, error } = await supabase
         .from('creatives')
@@ -85,11 +119,53 @@ export function useCreateCreative() {
           cta_text: creative.cta_text || null,
           status: creative.status || 'pending',
           comments: creative.comments || [],
+          aspect_ratio: creative.aspect_ratio || null,
         })
         .select()
         .single();
       
       if (error) throw error;
+      
+      // Run AI spelling/grammar check for agency uploads with text content
+      if (creative.isAgencyUpload && (creative.headline || creative.body_copy || creative.cta_text)) {
+        const spellCheckResult = await runSpellingCheck({
+          headline: creative.headline,
+          body_copy: creative.body_copy,
+          cta_text: creative.cta_text,
+        });
+        
+        if (spellCheckResult?.hasErrors) {
+          // Add AI review comment and potentially update status
+          const aiComment = {
+            id: Date.now().toString(),
+            author: 'AI Review',
+            text: `⚠️ **Spelling/Grammar Review**\n\n${spellCheckResult.summary}${
+              spellCheckResult.errors.length > 0 
+                ? '\n\n**Issues found:**\n' + spellCheckResult.errors.map(e => 
+                    `• "${e.text}" - ${e.issue} → Suggestion: "${e.suggestion}"`
+                  ).join('\n')
+                : ''
+            }`,
+            createdAt: new Date().toISOString(),
+          };
+          
+          const newStatus = spellCheckResult.severity === 'critical' ? 'revisions' : 'pending';
+          
+          await supabase
+            .from('creatives')
+            .update({ 
+              comments: [aiComment] as unknown as Json,
+              status: newStatus,
+            })
+            .eq('id', data.id);
+          
+          if (spellCheckResult.severity === 'critical') {
+            toast.warning('AI found spelling/grammar issues - creative needs revisions');
+          } else if (spellCheckResult.severity === 'minor') {
+            toast.info('AI found minor spelling/grammar issues - please review');
+          }
+        }
+      }
       
       // Auto-create task for client to review the creative with due date
       const previewLink = creative.file_url ? `\n\n**Preview:** ${creative.file_url}` : '';
@@ -271,3 +347,6 @@ export async function uploadCreativeFile(file: File, clientId: string): Promise<
   
   return publicUrl;
 }
+
+// Export the detectAspectRatio utility for use in components
+export { detectAspectRatio };

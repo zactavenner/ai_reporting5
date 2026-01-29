@@ -19,6 +19,7 @@ export function useAllCreatives() {
         platform: (item.platform as 'meta' | 'tiktok' | 'youtube' | 'google') || 'meta',
         status: item.status as 'pending' | 'approved' | 'revisions' | 'rejected' | 'launched',
         comments: (item.comments as unknown as CreativeComment[]) || [],
+        aspect_ratio: (item as any).aspect_ratio || null,
       })) as Creative[];
     },
   });
