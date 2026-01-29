@@ -18,16 +18,25 @@ serve(async (req) => {
       throw new Error("GEMINI_API_KEY is not configured");
     }
 
-    // New action: Spelling and grammar check for ad copy
+    // New action: Spelling and grammar check for ad copy (text, images, and videos)
     if (action === "spelling_check") {
-      const textContent = `
+      // Build text content from all available sources
+      let textContent = `
 Headline: ${creative?.headline || '(none)'}
 Body Copy: ${creative?.body_copy || '(none)'}
 CTA: ${creative?.cta_text || '(none)'}
       `.trim();
 
-      // Skip if no text content
-      if (!creative?.headline && !creative?.body_copy && !creative?.cta_text) {
+      // Add transcript for video content if provided
+      if (transcript) {
+        textContent += `\n\nVideo Transcript/Spoken Content:\n${transcript}`;
+      }
+
+      // Skip if no text content at all
+      const hasTextFields = creative?.headline || creative?.body_copy || creative?.cta_text;
+      const hasTranscript = !!transcript;
+      
+      if (!hasTextFields && !hasTranscript) {
         return new Response(
           JSON.stringify({ 
             hasErrors: false, 
@@ -51,7 +60,7 @@ CTA: ${creative?.cta_text || '(none)'}
               {
                 parts: [
                   {
-                    text: `You are a professional proofreader for advertising copy. Analyze this ad copy for spelling and grammar errors ONLY (not style suggestions).
+                    text: `You are a professional proofreader for advertising copy. Analyze this ad copy for spelling, grammar, and number formatting errors.
 
 ${textContent}
 
@@ -59,12 +68,22 @@ Respond ONLY with valid JSON in this exact format, no other text:
 {
   "hasErrors": true or false,
   "severity": "none" or "minor" or "critical",
-  "errors": [{"text": "the misspelled or incorrect word/phrase", "issue": "description of error", "suggestion": "corrected version"}],
-  "summary": "Brief 1-2 sentence summary of issues found, or 'No spelling or grammar issues found' if clean"
+  "errors": [{"text": "the incorrect word/phrase", "issue": "description of error", "suggestion": "corrected version"}],
+  "summary": "Brief 1-2 sentence summary of issues found, or 'No issues found' if clean"
 }
 
+IMPORTANT RULES:
+1. **Number Formatting (CRITICAL)**: Numbers should use "#" symbol, not written out. 
+   - WRONG: "number one market", "number 1 market"
+   - CORRECT: "#1 market"
+   - This applies to rankings, positions, and similar numeric references in marketing
+
+2. **Spelling & Grammar**: Check for typos, misspellings, subject-verb agreement, etc.
+
+3. **Video/Audio Transcripts**: If transcript is provided, check spoken content for the same issues.
+
 Severity guide:
-- "critical" = Obvious spelling mistakes, major grammar errors that look unprofessional (e.g., "teh" instead of "the", subject-verb disagreement)
+- "critical" = Spelling mistakes, major grammar errors, or numbers written out instead of using # symbol
 - "minor" = Minor punctuation issues, spacing problems, capitalization inconsistencies
 - "none" = Clean copy with no errors
 

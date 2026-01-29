@@ -69,10 +69,29 @@ async function runSpellingCheck(creative: {
   headline?: string | null;
   body_copy?: string | null;
   cta_text?: string | null;
+  type?: string;
+  file_url?: string | null;
 }): Promise<SpellingCheckResult | null> {
   try {
+    let transcript: string | undefined;
+    
+    // For video content, first get transcript for review
+    if (creative.type === 'video' && creative.file_url) {
+      try {
+        const { data: transcriptData } = await supabase.functions.invoke('creative-ai-audit', {
+          body: { action: 'transcribe', videoUrl: creative.file_url }
+        });
+        if (transcriptData?.transcript) {
+          transcript = transcriptData.transcript;
+        }
+      } catch (err) {
+        console.error('Failed to get video transcript for review:', err);
+        // Continue with text-only check
+      }
+    }
+    
     const { data, error } = await supabase.functions.invoke('creative-ai-audit', {
-      body: { action: 'spelling_check', creative }
+      body: { action: 'spelling_check', creative, transcript }
     });
     
     if (error) {
@@ -126,12 +145,18 @@ export function useCreateCreative() {
       
       if (error) throw error;
       
-      // Run AI spelling/grammar check for agency uploads with text content
-      if (creative.isAgencyUpload && (creative.headline || creative.body_copy || creative.cta_text)) {
+      // Run AI spelling/grammar check for agency uploads
+      // Check text content OR video/image creatives (which may have text overlays or spoken content)
+      const hasTextContent = creative.headline || creative.body_copy || creative.cta_text;
+      const isMediaCreative = creative.type === 'video' || creative.type === 'image';
+      
+      if (creative.isAgencyUpload && (hasTextContent || isMediaCreative)) {
         const spellCheckResult = await runSpellingCheck({
           headline: creative.headline,
           body_copy: creative.body_copy,
           cta_text: creative.cta_text,
+          type: creative.type,
+          file_url: creative.file_url,
         });
         
         if (spellCheckResult?.hasErrors) {
