@@ -93,8 +93,17 @@ serve(async (req) => {
       if (!pipelinesResponse.ok) {
         const errorText = await pipelinesResponse.text();
         console.error('GHL API error:', pipelinesResponse.status, errorText);
+        
+        // Provide user-friendly error messages
+        let errorMessage = `GHL API error: ${pipelinesResponse.status}`;
+        if (pipelinesResponse.status === 401) {
+          errorMessage = 'GHL credentials are invalid or expired. Please update your Private Integration Key in Client Settings → Integrations.';
+        } else if (pipelinesResponse.status === 403) {
+          errorMessage = 'GHL API access denied. Please ensure your Private Integration has the "Opportunities" scope enabled.';
+        }
+        
         return new Response(
-          JSON.stringify({ error: `GHL API error: ${pipelinesResponse.status}` }),
+          JSON.stringify({ error: errorMessage, code: pipelinesResponse.status }),
           { status: pipelinesResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

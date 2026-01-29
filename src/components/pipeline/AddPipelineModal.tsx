@@ -52,7 +52,9 @@ export function AddPipelineModal({
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Failed to load pipelines. Make sure GHL credentials are configured.
+                {(error as any)?.message?.includes('401') || (error as any)?.message?.includes('expired')
+                  ? 'GHL credentials are invalid or expired. Please update your Private Integration Key in Client Settings → Integrations tab.'
+                  : 'Failed to load pipelines. Make sure GHL credentials are configured in Client Settings → Integrations.'}
               </AlertDescription>
             </Alert>
           )}

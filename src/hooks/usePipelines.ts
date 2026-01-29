@@ -147,7 +147,12 @@ export function useSyncPipeline() {
       queryClient.invalidateQueries({ queryKey: ['pipeline-opportunities'] });
     },
     onError: (error: Error) => {
-      toast.error(`Failed to sync pipeline: ${error.message}`);
+      const errorMsg = error.message || 'Unknown error';
+      if (errorMsg.includes('401') || errorMsg.includes('expired') || errorMsg.includes('Invalid JWT')) {
+        toast.error('GHL credentials expired. Please update your API key in Client Settings → Integrations.');
+      } else {
+        toast.error(`Failed to sync pipeline: ${errorMsg}`);
+      }
     },
   });
 }
