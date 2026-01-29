@@ -366,15 +366,15 @@ export function DraggableClientTable({
           </Button>
         </div>
       )}
-      <div className="border-2 border-border bg-card overflow-x-auto">
-        <Table>
+      <div className="border-2 border-border bg-card overflow-x-auto scrollbar-thin">
+        <Table className="min-w-[1800px]">
         <TableHeader>
           <TableRow className="border-b-2">
-            <TableHead className="w-8"></TableHead>
-            <TableHead className="font-bold text-sm">Client</TableHead>
-            <TableHead className="font-bold text-sm">Status</TableHead>
+            <TableHead className="w-10 sticky left-0 bg-card z-10"></TableHead>
+            <TableHead className="font-bold text-sm sticky left-10 bg-card z-10 min-w-[140px]">Client</TableHead>
+            <TableHead className="font-bold text-sm min-w-[130px]">Status</TableHead>
             <SortableHeader column="adSpend" label="Ad Spend" sortConfig={sortConfig} onSort={handleSort} />
-            <TableHead className="font-bold text-sm text-center">Pacing</TableHead>
+            <TableHead className="font-bold text-sm text-center min-w-[90px]">Pacing</TableHead>
             <SortableHeader column="ctr" label="CTR" sortConfig={sortConfig} onSort={handleSort} />
             <SortableHeader column="leads" label="Leads" sortConfig={sortConfig} onSort={handleSort} />
             <SortableHeader column="spam" label="Spam/Bad" sortConfig={sortConfig} onSort={handleSort} />
@@ -391,7 +391,7 @@ export function DraggableClientTable({
             <SortableHeader column="costPerInvestor" label="Cost/Inv" sortConfig={sortConfig} onSort={handleSort} />
             <SortableHeader column="coc" label="CoC %" sortConfig={sortConfig} onSort={handleSort} />
             <SortableHeader column="estRev" label="Est. Rev" sortConfig={sortConfig} onSort={handleSort} />
-            <TableHead className="font-bold text-sm">Actions</TableHead>
+            <TableHead className="font-bold text-sm min-w-[100px]">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -405,7 +405,7 @@ export function DraggableClientTable({
               <TableRow
                 key={client.id}
                 className={cn(
-                  "cursor-pointer hover:bg-muted/50 border-b-2",
+                  "cursor-pointer hover:bg-muted/50 border-b h-14",
                   draggedId === client.id && "opacity-50"
                 )}
                 draggable
@@ -415,10 +415,10 @@ export function DraggableClientTable({
                 onDragEnd={handleDragEnd}
                 onClick={() => navigate(`/client/${client.id}`)}
               >
-                <TableCell className="cursor-grab" onClick={(e) => e.stopPropagation()}>
+                <TableCell className="cursor-grab sticky left-0 bg-card z-10" onClick={(e) => e.stopPropagation()}>
                   <GripVertical className="h-4 w-4 text-muted-foreground" />
                 </TableCell>
-                <TableCell className="font-semibold text-sm">{client.name}</TableCell>
+                <TableCell className="font-semibold text-sm sticky left-10 bg-card z-10">{client.name}</TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <Select
                     value={client.status}

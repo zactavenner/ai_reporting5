@@ -10,7 +10,6 @@ import { AgencySettingsModal } from '@/components/settings/AgencySettingsModal';
 import { AddClientModal } from '@/components/settings/AddClientModal';
 import { DeleteClientDialog } from '@/components/settings/DeleteClientDialog';
 import { AgencyAIChat } from '@/components/ai/AgencyAIChat';
-import { AgencyChatInterface } from '@/components/chat/AgencyChatInterface';
 import { AIHubTab } from '@/components/ai/AIHubTab';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import { MetricsCustomizeModal } from '@/components/dashboard/MetricsCustomizeModal';
@@ -200,30 +199,7 @@ const Index = () => {
 
           {/* Dashboard Tab */}
           <TabsContent value="dashboard" className="space-y-6">
-            <section>
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <h2 className="text-lg font-bold">Key Performance Indicators</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Agency-wide performance metrics with trend comparison
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setMetricsCustomizeOpen(true)}>
-                  <Sliders className="h-4 w-4 mr-2" />
-                  Customize
-                </Button>
-              </div>
-              {isLoading ? (
-                <div className="text-center py-8 text-muted-foreground">Loading metrics...</div>
-              ) : (
-                <KPIGrid 
-                  metrics={aggregatedMetrics} 
-                  showFundedMetrics 
-                  onMetricClick={(metric) => setDrillDownModal(metric)}
-                />
-              )}
-            </section>
-
+            {/* Client Summary - moved to top */}
             <section>
               <h2 className="text-lg font-bold mb-2">Client Summary</h2>
               <p className="text-sm text-muted-foreground mb-4">
@@ -257,17 +233,29 @@ const Index = () => {
               )}
             </section>
 
-            {/* AI Chat Interface */}
+            {/* KPIs below Client Summary */}
             <section>
-              <h2 className="text-lg font-bold mb-2">AI Assistant</h2>
-              <p className="text-sm text-muted-foreground mb-4">
-                Chat with AI about clients, metrics, and tasks. Create tasks with AI assistance.
-              </p>
-              <AgencyChatInterface
-                clients={clients}
-                clientMetrics={clientMetrics as Record<string, AggregatedMetrics>}
-                agencyMetrics={aggregatedMetrics}
-              />
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <h2 className="text-lg font-bold">Key Performance Indicators</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Agency-wide performance metrics with trend comparison
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setMetricsCustomizeOpen(true)}>
+                  <Sliders className="h-4 w-4 mr-2" />
+                  Customize
+                </Button>
+              </div>
+              {isLoading ? (
+                <div className="text-center py-8 text-muted-foreground">Loading metrics...</div>
+              ) : (
+                <KPIGrid 
+                  metrics={aggregatedMetrics} 
+                  showFundedMetrics 
+                  onMetricClick={(metric) => setDrillDownModal(metric)}
+                />
+              )}
             </section>
 
             {/* Project Management */}
