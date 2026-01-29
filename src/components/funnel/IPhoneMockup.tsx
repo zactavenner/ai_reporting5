@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Signal, Wifi, Battery } from 'lucide-react';
 
@@ -8,12 +9,18 @@ interface IPhoneMockupProps {
 }
 
 export function IPhoneMockup({ url, title, className }: IPhoneMockupProps) {
+  const [iframeKey, setIframeKey] = useState(0);
+
   const getDomain = (urlStr: string) => {
     try {
       return new URL(urlStr).hostname;
     } catch {
       return urlStr;
     }
+  };
+
+  const handleRefresh = () => {
+    setIframeKey(k => k + 1);
   };
 
   return (
@@ -50,6 +57,7 @@ export function IPhoneMockup({ url, title, className }: IPhoneMockupProps) {
               {/* Screen Content */}
               <div className="w-[320px] h-[620px] overflow-hidden bg-background">
                 <iframe
+                  key={iframeKey}
                   src={url}
                   className="w-full h-full border-0"
                   style={{ 
@@ -81,7 +89,11 @@ export function IPhoneMockup({ url, title, className }: IPhoneMockupProps) {
                     {getDomain(url)}
                   </p>
                 </div>
-                <button className="p-2.5 bg-muted rounded-full">
+                <button 
+                  onClick={handleRefresh}
+                  className="p-2.5 bg-muted rounded-full hover:bg-muted/80 transition-colors"
+                  title="Refresh"
+                >
                   <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
