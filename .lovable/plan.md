@@ -1,61 +1,160 @@
 
-# Plan: Enhanced Task File Management & Creative Approval Workflow
+# Plan: Fix Public Links & Enhance Facebook Ads Library Integration
 
-## ✅ COMPLETED
-
-## Summary
-Overhaul the task file management system to provide inline media previews, direct creative approval workflow integration, task reassignment capabilities, and AI-powered content review directly on files.
-
----
-
-## Implementation Complete
-
-### 1. ✅ Inline Media Preview in Task Detail Modal
-- Display media files directly in the task modal with large preview
-- Videos play inline with controls
-- Images show at readable size with aspect ratio preserved
-- Navigation arrows to cycle through files
-- "View Full Screen" button to open the lightbox
-- **Files:** `src/components/tasks/InlineFilePreview.tsx` (NEW), `src/components/tasks/TaskDetailModal.tsx`
-
-### 2. ✅ "Send to Creative Approval" Button
-- Button available in both inline preview and lightbox
-- Opens modal to configure: title, platform, headline, body copy
-- Uses `useCreateCreative` hook with `isAgencyUpload: true`
-- Auto-runs AI spelling/grammar check on video transcripts
-- Creates review task for client with 2-business-day due date
-- **Files:** `src/components/tasks/SendToCreativeModal.tsx` (NEW)
-
-### 3. ✅ Task Reassignment in Modal
-- Added "Assigned To" dropdown in task metadata section
-- Shows all agency members with their pod assignments
-- Reassignment automatically resets due date to 2 business days
-- Records history entry for the reassignment
-- **Files:** `src/components/tasks/TaskDetailModal.tsx`
-
-### 4. ✅ AI Review for Task Files
-- "AI Review" button appears for image/video files
-- For videos: Transcribes content and checks for spelling/grammar issues
-- For images: Checks for text/grammar issues
-- Results appear as a comment in the task discussion thread
-- References the specific file being reviewed
-- **Files:** `src/hooks/useTaskFileReview.ts` (NEW)
-
-### 5. ✅ Updated File Lightbox
-- Added "Send to Creative Approval" button next to Download
-- Added "AI Review" button for supported file types
-- Shows loading state during AI analysis
-- **Files:** `src/components/tasks/FilePreviewLightbox.tsx`
+## Problem Summary
+1. **Public report pages are blank** for `/public/legacy-capital` and potentially other clients
+2. **Facebook Ads Library integration** needs evaluation - currently implemented via Firecrawl scraping, user wants to either embed or redirect to the Ads Library
 
 ---
 
-## New Files Created
-- `src/hooks/useTaskFileReview.ts` - AI review hook for spelling/grammar check
-- `src/components/tasks/SendToCreativeModal.tsx` - Modal for configuring creative before approval
-- `src/components/tasks/InlineFilePreview.tsx` - Large inline media preview component
+## Part 1: Fix Public Links
 
-## Files Modified
-- `src/components/tasks/TaskDetailModal.tsx` - Added inline preview, assignee field, AI review integration
-- `src/components/tasks/FilePreviewLightbox.tsx` - Added action buttons, MiniThumbnail component
-- `src/components/tasks/KanbanBoard.tsx` - Pass clientId to TaskDetailModal
-- `src/components/tasks/AgencyTaskSummary.tsx` - Pass clientId to TaskDetailModal
+### Root Cause Analysis
+After thorough investigation, I identified several potential issues:
+
+1. **Inconsistent RLS Policy**: The `client_settings` table uses `roles:{anon,authenticated}` while all other tables use `roles:{public}`. This inconsistency could cause silent query failures for anonymous users.
+
+2. **Silent Hook Errors**: If any data-fetching hook throws an error, React doesn't show it properly, resulting in a blank page.
+
+3. **Debug Logging Exists**: Recent logging was added but may not be reaching the browser - indicating the issue happens before render.
+
+### Fix Implementation
+
+**Step 1: Fix RLS Policy Consistency**
+Update the `client_settings` table RLS policy to use `TO public` instead of `TO anon, authenticated`:
+
+```sql
+DROP POLICY IF EXISTS "Public can view client_settings" ON client_settings;
+CREATE POLICY "Public can view client_settings"
+ON client_settings FOR SELECT
+TO public
+USING (true);
+```
+
+**Step 2: Add Error Boundary to PublicReport**
+Wrap the entire page in an error boundary to catch and display any runtime errors:
+
+```text
++------------------------------------------+
+| Error Boundary Wrapper                   |
+|  +--------------------------------------+|
+|  | PublicReport Content                 ||
+|  | (catches all errors and shows UI)   ||
+|  +--------------------------------------+|
++------------------------------------------+
+```
+
+**Step 3: Add Try-Catch Around Hook Errors**
+Ensure silent query errors don't cause blank screens by showing error states per section.
+
+---
+
+## Part 2: Facebook Ads Library Integration
+
+### Current Implementation
+The system already has a working Facebook Ads Library integration:
+- `LiveAdsSection` component renders scraped ads
+- `scrape-fb-ads` edge function uses Firecrawl to scrape the Ads Library page
+- `LiveAdCard` displays ads in a Facebook-style preview format
+- Stored in `client_live_ads` table
+
+### Enhancement Options
+
+**Option A: Embed Facebook Ads Library (NOT RECOMMENDED)**
+Facebook does not allow embedding via iframe - their security headers block this approach.
+
+**Option B: Redirect to Facebook Ads Library (Simple)**
+Add a "View All in Ads Library" button that opens the full library in a new tab.
+
+**Option C: Enhanced Scraping with High-Fidelity Preview (RECOMMENDED)**
+Keep the current scraping approach but enhance the display to match the MagicBrief aesthetic shown in the screenshots.
+
+### Recommended Implementation
+
+**Enhance LiveAdCard Component:**
+- Larger creative images with better quality
+- Show full ad copy with emoji support
+- Display "Started running on" dates prominently
+- Add platform badges (Facebook, Instagram, Messenger)
+- Include AI analysis button for each ad
+
+**Add Bulk Actions:**
+- "Open All in Ads Library" - opens all ads in separate tabs
+- "Refresh All Ads" - re-scrapes the latest ads
+- "AI Analyze All" - runs AI analysis on all creatives
+
+**Data Flow:**
+```text
+User clicks "Sync from Ads Library"
+        │
+        ▼
+┌─────────────────────────────┐
+│ ScrapeAdsModal opens        │
+│ - Enter Page ID or URL      │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│ Edge Function: scrape-fb-ads│
+│ - Uses Firecrawl API        │
+│ - Parses markdown content   │
+│ - Extracts ad copy, images  │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│ client_live_ads table       │
+│ - Stores scraped ads        │
+│ - Primary text, images, CTA │
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│ LiveAdsSection displays     │
+│ - High-fidelity ad cards    │
+│ - AI analysis available     │
+│ - Click to view in library  │
+└─────────────────────────────┘
+```
+
+---
+
+## Files to Modify
+
+### RLS Fix (Database Migration)
+- Fix `client_settings` policy to use `TO public`
+
+### PublicReport.tsx
+- Add error boundary component wrapper
+- Improve error display for individual sections
+- Add graceful degradation when sections fail
+
+### LiveAdCard.tsx
+- Enhance image display quality
+- Improve ad copy formatting
+- Add prominent "View in Library" button
+
+### LiveAdsSection.tsx
+- Add "Open All in Library" button
+- Improve empty state messaging
+- Add last synced timestamp display (already exists)
+
+---
+
+## Expected Results
+
+After implementation:
+1. Public links like `/public/legacy-capital` will load correctly
+2. Console logging will help debug any future issues
+3. Facebook ads will display with high-fidelity previews
+4. Users can click any ad to view it directly in Facebook Ads Library
+5. AI analysis remains available for each scraped ad
+
+---
+
+## Technical Notes
+
+- Facebook Ads Library URLs follow the pattern: `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&view_all_page_id={PAGE_ID}`
+- The Firecrawl connector is already configured with `FIRECRAWL_API_KEY`
+- Embedding Facebook content is not possible due to X-Frame-Options headers
+- The scraping approach extracts markdown, images, and metadata from the Ads Library page
