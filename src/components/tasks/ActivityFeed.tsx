@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -264,9 +264,14 @@ export function ActivityFeed({ tasks, creatives, voiceNotes = [] }: ActivityFeed
                     {activity.title}
                   </p>
                 </div>
-                <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
-                  {formatDistanceToNow(activity.timestamp, { addSuffix: true })}
-                </span>
+                <div className="flex flex-col items-end flex-shrink-0">
+                  <span className="text-xs font-medium text-foreground whitespace-nowrap">
+                    {format(activity.timestamp, 'MMM d, yyyy')}
+                  </span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {format(activity.timestamp, 'h:mm a')}
+                  </span>
+                </div>
               </div>
             );
           })}

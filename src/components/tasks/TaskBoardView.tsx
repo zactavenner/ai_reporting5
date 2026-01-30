@@ -10,6 +10,7 @@ import {
   Clock,
   Trophy,
   PenLine,
+  History,
 } from 'lucide-react';
 import { useAllTasks, Task } from '@/hooks/useTasks';
 import { useClients, Client } from '@/hooks/useClients';
@@ -17,6 +18,7 @@ import { useTaskMetrics } from '@/hooks/useTaskMetrics';
 import { KanbanBoard } from './KanbanBoard';
 import { AgencyTaskSummary } from './AgencyTaskSummary';
 import { CreateTaskModal } from './CreateTaskModal';
+import { TaskHistoryTab } from './TaskHistoryTab';
 
 interface TaskBoardViewProps {
   clientId?: string;
@@ -27,7 +29,7 @@ interface TaskBoardViewProps {
 export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskBoardViewProps) {
   const { data: allTasks = [] } = useAllTasks();
   const { data: clients = [] } = useClients();
-  const [view, setView] = useState<'kanban' | 'summary'>('kanban');
+  const [view, setView] = useState<'kanban' | 'summary' | 'history'>('kanban');
   const [showCreateTask, setShowCreateTask] = useState(false);
 
   // In public view, only show tasks for the specific client
@@ -94,6 +96,10 @@ export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskB
                     <LayoutGrid className="h-3 w-3 mr-1" />
                     Kanban
                   </TabsTrigger>
+                  <TabsTrigger value="history" className="text-xs px-3 h-7">
+                    <History className="h-3 w-3 mr-1" />
+                    History
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             )}
@@ -107,8 +113,10 @@ export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskB
       <CardContent>
         {view === 'kanban' ? (
           <KanbanBoard tasks={tasks} clients={filteredClients} clientId={clientId} isPublicView={isPublicView} />
-        ) : (
+        ) : view === 'summary' ? (
           <AgencyTaskSummary />
+        ) : (
+          <TaskHistoryTab tasks={tasks} clientId={clientId} />
         )}
       </CardContent>
 
