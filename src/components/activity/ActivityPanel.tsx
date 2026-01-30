@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -317,10 +317,21 @@ export function ActivityPanel({
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {formatDistanceToNow(activity.timestamp, { addSuffix: true })}
-                        </span>
+                      <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                        {isPublicView ? (
+                          <>
+                            <span className="text-xs font-medium text-foreground whitespace-nowrap">
+                              {format(activity.timestamp, 'MMM d, yyyy')}
+                            </span>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {format(activity.timestamp, 'h:mm a')}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {formatDistanceToNow(activity.timestamp, { addSuffix: true })}
+                          </span>
+                        )}
                         {onActivityClick && (
                           <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                         )}

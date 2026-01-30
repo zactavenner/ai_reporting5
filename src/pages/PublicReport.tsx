@@ -34,6 +34,10 @@ import { VoiceRecordButton } from '@/components/voice/VoiceRecordButton';
 import { PipelineTab } from '@/components/pipeline/PipelineTab';
 import { useClientPipelines } from '@/hooks/usePipelines';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal';
+import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
+import { AdSpendDrillDownModal } from '@/components/drilldown/AdSpendDrillDownModal';
+import { FundedInvestorsDrillDownModal } from '@/components/drilldown/FundedInvestorsDrillDownModal';
 
 function PublicReportContent() {
   const { token } = useParams<{ token: string }>();
@@ -87,6 +91,7 @@ function PublicReportContent() {
   const [activeSection, setActiveSection] = useState<string>('overview');
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [selectedType, setSelectedType] = useState<string>('');
+  const [drillDownModal, setDrillDownModal] = useState<string | null>(null);
 
   const handleActivityClick = (activityId: string, type: string) => {
     if (type.startsWith('task_')) {
@@ -296,7 +301,11 @@ function PublicReportContent() {
             <SectionErrorBoundary sectionName="KPI Grid">
               <section>
                 <h2 className="text-lg font-bold mb-2">Key Performance Indicators</h2>
-                <KPIGrid metrics={metrics} showFundedMetrics />
+                <KPIGrid 
+                  metrics={metrics} 
+                  showFundedMetrics 
+                  onMetricClick={(metric) => setDrillDownModal(metric)}
+                />
               </section>
             </SectionErrorBoundary>
 
@@ -404,6 +413,34 @@ function PublicReportContent() {
       <SectionErrorBoundary sectionName="AI Chat">
         <AIAnalysisChat context={aiContext} />
       </SectionErrorBoundary>
+
+      {/* Drill-down modals */}
+      <LeadsDrillDownModal
+        clientId={client.id}
+        open={drillDownModal === 'leads'}
+        onOpenChange={(open) => !open && setDrillDownModal(null)}
+      />
+      <CallsDrillDownModal
+        clientId={client.id}
+        open={drillDownModal === 'calls'}
+        onOpenChange={(open) => !open && setDrillDownModal(null)}
+      />
+      <CallsDrillDownModal
+        clientId={client.id}
+        showedOnly
+        open={drillDownModal === 'showedCalls'}
+        onOpenChange={(open) => !open && setDrillDownModal(null)}
+      />
+      <AdSpendDrillDownModal
+        clientId={client.id}
+        open={drillDownModal === 'totalAdSpend'}
+        onOpenChange={(open) => !open && setDrillDownModal(null)}
+      />
+      <FundedInvestorsDrillDownModal
+        clientId={client.id}
+        open={drillDownModal === 'fundedInvestors'}
+        onOpenChange={(open) => !open && setDrillDownModal(null)}
+      />
     </div>
   );
 
