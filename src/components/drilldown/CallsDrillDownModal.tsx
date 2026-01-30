@@ -280,7 +280,7 @@ export function CallsDrillDownModal({ clientId, showedOnly, open, onOpenChange }
                       </TableCell>
                       <TableCell>
                         {(call as any).is_reconnect ? (
-                          <Badge variant="outline" className="bg-purple-100 dark:bg-purple-900">
+                          <Badge variant="outline" className="bg-secondary text-secondary-foreground">
                             Reconnect
                           </Badge>
                         ) : (
@@ -288,11 +288,17 @@ export function CallsDrillDownModal({ clientId, showedOnly, open, onOpenChange }
                         )}
                       </TableCell>
                       <TableCell>
-                        {call.showed ? (
-                          <Badge className="bg-chart-2 text-chart-2-foreground">Showed</Badge>
-                        ) : (
-                          <Badge variant="secondary">No Show</Badge>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/30">
+                            Confirmed
+                          </Badge>
+                          <span className="text-muted-foreground">→</span>
+                          {call.showed ? (
+                            <Badge className="bg-chart-2 text-chart-2-foreground">SHOWED</Badge>
+                          ) : (
+                            <Badge variant="destructive">NO SHOW</Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>{call.outcome || '-'}</TableCell>
                       <TableCell className="font-mono text-sm">
