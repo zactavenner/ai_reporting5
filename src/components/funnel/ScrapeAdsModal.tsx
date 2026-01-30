@@ -167,8 +167,8 @@ export function ScrapeAdsModal({ clientId, open, onOpenChange }: ScrapeAdsModalP
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription className="text-xs">
-              We'll scrape the ad content including images, copy, and CTAs. 
-              This may take a few seconds depending on the number of ads.
+              Using Apify to sync active ads including images, videos, copy, and CTAs. 
+              This may take 30-60 seconds depending on the number of ads. Cost: ~$0.75 per 1,000 ads.
             </AlertDescription>
           </Alert>
 
