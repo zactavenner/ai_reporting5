@@ -40,6 +40,11 @@ export interface Lead {
   ad_id?: string | null;
   ghl_synced_at?: string | null;
   ghl_notes?: GHLNote[] | null;
+  // Opportunity fields from GHL sync
+  opportunity_status?: string | null;
+  opportunity_stage?: string | null;
+  opportunity_stage_id?: string | null;
+  opportunity_value?: number | null;
 }
 
 export interface Call {

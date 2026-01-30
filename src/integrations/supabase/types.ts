@@ -1707,6 +1707,10 @@ export type Database = {
           id: string
           is_spam: boolean | null
           name: string | null
+          opportunity_stage: string | null
+          opportunity_stage_id: string | null
+          opportunity_status: string | null
+          opportunity_value: number | null
           phone: string | null
           pipeline_value: number | null
           questions: Json | null
@@ -1734,6 +1738,10 @@ export type Database = {
           id?: string
           is_spam?: boolean | null
           name?: string | null
+          opportunity_stage?: string | null
+          opportunity_stage_id?: string | null
+          opportunity_status?: string | null
+          opportunity_value?: number | null
           phone?: string | null
           pipeline_value?: number | null
           questions?: Json | null
@@ -1761,6 +1769,10 @@ export type Database = {
           id?: string
           is_spam?: boolean | null
           name?: string | null
+          opportunity_stage?: string | null
+          opportunity_stage_id?: string | null
+          opportunity_status?: string | null
+          opportunity_value?: number | null
           phone?: string | null
           pipeline_value?: number | null
           questions?: Json | null

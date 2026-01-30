@@ -471,7 +471,8 @@ function extractPipelineValue(contact: GHLContact, opportunity?: GHLOpportunity)
 async function syncContactToDatabase(
   supabase: any,
   clientId: string,
-  contact: GHLContact
+  contact: GHLContact,
+  opportunity?: GHLOpportunity
 ): Promise<{ action: 'created' | 'updated' | 'skipped'; leadId?: string }> {
   const externalId = contact.id;
   const name = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown';
@@ -549,6 +550,12 @@ async function syncContactToDatabase(
     console.log(`No dateAdded for contact ${externalId}, using current time`);
   }
 
+  // Extract opportunity data if available
+  const opportunityStatus = opportunity?.status || null;
+  const opportunityStage = opportunity?.stageName || opportunity?.pipelineStageName || null;
+  const opportunityStageId = opportunity?.pipelineStageId || null;
+  const opportunityValue = opportunity?.monetaryValue ?? opportunity?.monetary_value ?? 0;
+
   const leadData: Record<string, any> = {
     client_id: clientId,
     external_id: externalId,
@@ -566,6 +573,10 @@ async function syncContactToDatabase(
     campaign_name: campaignAttribution.campaign_name,
     ad_set_name: campaignAttribution.ad_set_name,
     ad_id: campaignAttribution.ad_id,
+    opportunity_status: opportunityStatus,
+    opportunity_stage: opportunityStage,
+    opportunity_stage_id: opportunityStageId,
+    opportunity_value: opportunityValue,
     updated_at: new Date().toISOString(),
   };
 
@@ -587,6 +598,10 @@ async function syncContactToDatabase(
       campaign_name: campaignAttribution.campaign_name || undefined,
       ad_set_name: campaignAttribution.ad_set_name || undefined,
       ad_id: campaignAttribution.ad_id || undefined,
+      opportunity_status: opportunityStatus || undefined,
+      opportunity_stage: opportunityStage || undefined,
+      opportunity_stage_id: opportunityStageId || undefined,
+      opportunity_value: opportunityValue > 0 ? opportunityValue : undefined,
       updated_at: new Date().toISOString(),
     };
     
@@ -859,7 +874,9 @@ async function syncClientContacts(
         }
         
         try {
-          const syncResult = await syncContactToDatabase(supabase, client.id, contact);
+          // Get opportunity for this contact to sync opportunity data
+          const contactOpportunity = opportunityByContactId.get(contact.id);
+          const syncResult = await syncContactToDatabase(supabase, client.id, contact, contactOpportunity);
           if (syncResult.action === 'created') result.created++;
           else if (syncResult.action === 'updated') result.updated++;
           else result.skipped++;

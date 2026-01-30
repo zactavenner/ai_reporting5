@@ -24,8 +24,11 @@ export function AgencyStatsBar({
   const pausedClients = clients.filter(c => c.status === 'paused' || c.status === 'on_hold').length;
   
   // Calculate total MRR with actual ad spend fees (current performance)
+  // Only include ACTIVE clients in revenue calculations (exclude paused, on_hold, inactive)
+  const activeClientsForRevenue = clients.filter(c => c.status === 'active');
+  
   let totalMRR = 0;
-  for (const client of clients) {
+  for (const client of activeClientsForRevenue) {
     const settings = clientMRRSettings[client.id] || {
       mrr: 0,
       ad_spend_fee_threshold: 30000,
@@ -41,8 +44,9 @@ export function AgencyStatsBar({
   }
   
   // Calculate estimated monthly revenue based on targets
+  // Only include ACTIVE clients in revenue calculations
   let estimatedMonthlyRevenue = 0;
-  for (const client of clients) {
+  for (const client of activeClientsForRevenue) {
     const fullSettings = clientFullSettings[client.id];
     if (fullSettings) {
       const monthlyTarget = getEffectiveMonthlyTarget(fullSettings);

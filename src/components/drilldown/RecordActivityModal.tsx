@@ -7,7 +7,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Calendar, Phone, CheckCircle2, DollarSign, User, MapPin, Tag, Clock, Mail, Globe, Building, FileText } from 'lucide-react';
+import { Calendar, Phone, CheckCircle2, DollarSign, User, MapPin, Tag, Clock, Mail, Globe, Building, FileText, TrendingUp, Target } from 'lucide-react';
 
 interface ActivityEvent {
   date: string;
@@ -202,6 +202,41 @@ export function RecordActivityModal({
                   </>
                 )}
               </div>
+
+              {/* Opportunity Status Section */}
+              {leadRecord && (leadRecord.opportunity_status || leadRecord.opportunity_stage || leadRecord.opportunity_value > 0) && (
+                <>
+                  <Separator />
+                  <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                    Pipeline Status
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    {leadRecord.opportunity_status && (
+                      <div className="flex items-center gap-2">
+                        <Target className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">Status:</span>
+                        <Badge variant={leadRecord.opportunity_status === 'won' ? 'success' : leadRecord.opportunity_status === 'lost' ? 'destructive' : 'secondary'} className="text-xs">
+                          {leadRecord.opportunity_status.charAt(0).toUpperCase() + leadRecord.opportunity_status.slice(1)}
+                        </Badge>
+                      </div>
+                    )}
+                    {leadRecord.opportunity_stage && (
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">Stage:</span>
+                        <Badge variant="outline" className="text-xs">{leadRecord.opportunity_stage}</Badge>
+                      </div>
+                    )}
+                    {leadRecord.opportunity_value > 0 && (
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">Value:</span>
+                        <span className="font-medium text-chart-2">${Number(leadRecord.opportunity_value).toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
 
               {/* Campaign Attribution */}
               {leadRecord && (leadRecord.campaign_name || leadRecord.ad_set_name || leadRecord.ad_id) && (
