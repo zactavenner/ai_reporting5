@@ -19,6 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { LiveAd, useDeleteLiveAd, useAnalyzeLiveAd } from '@/hooks/useLiveAds';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
+import { format } from 'date-fns';
 
 interface LiveAdCardProps {
   ad: LiveAd;
@@ -46,12 +47,15 @@ export function LiveAdCard({ ad, isPublicView = false }: LiveAdCardProps) {
     }
   };
 
-  const platformColors: Record<string, string> = {
-    facebook: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
-    instagram: 'bg-pink-500/10 text-pink-600 border-pink-500/20',
-    messenger: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
-    'audience network': 'bg-gray-500/10 text-gray-600 border-gray-500/20',
-  };
+  // Format the start date
+  const formattedDate = ad.started_running_on 
+    ? format(new Date(ad.started_running_on), 'MMM d, yyyy')
+    : ad.scraped_at 
+      ? format(new Date(ad.scraped_at), 'MMM d, yyyy')
+      : null;
+
+  // Get the display image
+  const displayImage = ad.thumbnail_url || (ad.media_urls && ad.media_urls.length > 0 ? ad.media_urls[0] : null);
 
   return (
     <>
@@ -95,18 +99,12 @@ export function LiveAdCard({ ad, isPublicView = false }: LiveAdCardProps) {
         </div>
 
         <CardContent className="p-0">
-          {/* Ad Preview */}
+          {/* Ad Preview Image */}
           <div className="relative aspect-square bg-muted">
-            {ad.thumbnail_url ? (
+            {displayImage ? (
               <img
-                src={ad.thumbnail_url}
-                alt={ad.headline || 'Ad preview'}
-                className="w-full h-full object-cover"
-              />
-            ) : ad.media_urls && ad.media_urls.length > 0 ? (
-              <img
-                src={ad.media_urls[0]}
-                alt={ad.headline || 'Ad preview'}
+                src={displayImage}
+                alt={ad.headline || ad.page_name || 'Ad preview'}
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -136,40 +134,49 @@ export function LiveAdCard({ ad, isPublicView = false }: LiveAdCardProps) {
             )}
           </div>
 
-          {/* Ad Content */}
-          <div className="p-3 space-y-2">
-            {/* Page Name */}
-            {ad.page_name && (
-              <p className="text-sm font-medium truncate">{ad.page_name}</p>
-            )}
+          {/* Ad Info Section - MagicBrief Style */}
+          <div className="p-3 space-y-2 border-t border-border">
+            {/* Title - Always show "Ad Library" or page name */}
+            <h3 className="font-semibold text-sm">
+              {ad.page_name || 'Ad Library'}
+            </h3>
 
-            {/* Primary Text */}
+            {/* Primary Text Preview */}
             {ad.primary_text && (
               <p className="text-xs text-muted-foreground line-clamp-2">
                 {ad.primary_text}
               </p>
             )}
 
-            {/* Headline */}
-            {ad.headline && (
-              <p className="text-sm font-semibold line-clamp-1">{ad.headline}</p>
+            {/* Headline with CTA */}
+            {(ad.headline || ad.cta_type) && (
+              <div className="flex items-center gap-2">
+                {ad.headline && (
+                  <p className="text-xs font-medium line-clamp-1 flex-1">{ad.headline}</p>
+                )}
+                {ad.cta_type && (
+                  <Badge variant="secondary" className="text-[10px] shrink-0">
+                    {ad.cta_type}
+                  </Badge>
+                )}
+              </div>
             )}
 
-            {/* CTA */}
-            {ad.cta_type && (
-              <Button size="sm" variant="secondary" className="w-full text-xs h-7">
-                {ad.cta_type}
-              </Button>
+            {/* Started Running Date */}
+            {formattedDate && (
+              <p className="text-xs text-muted-foreground">
+                Started running on {formattedDate}
+              </p>
             )}
 
-            {/* Platforms */}
+            {/* Platform Badges */}
             {ad.platforms && ad.platforms.length > 0 && (
               <div className="flex flex-wrap gap-1 pt-1">
                 {ad.platforms.map((platform) => (
                   <Badge
                     key={platform}
                     variant="outline"
-                    className={cn('text-[10px] capitalize', platformColors[platform.toLowerCase()])}
+                    className="text-[10px] capitalize bg-secondary/50"
                   >
                     {platform}
                   </Badge>
@@ -182,7 +189,7 @@ export function LiveAdCard({ ad, isPublicView = false }: LiveAdCardProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-full text-xs h-7 text-primary"
+                className="w-full text-xs h-7 text-primary mt-2"
                 onClick={() => setAnalysisOpen(true)}
               >
                 <Sparkles className="h-3 w-3 mr-1" />
