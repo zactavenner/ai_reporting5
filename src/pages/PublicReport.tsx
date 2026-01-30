@@ -5,7 +5,7 @@ import { useDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/u
 import { useLeads, useCalls } from '@/hooks/useLeadsAndCalls';
 import { useCustomTabs } from '@/hooks/useCustomTabs';
 import { useFunnelSteps } from '@/hooks/useFunnelSteps';
-import { useAllTasks } from '@/hooks/useTasks';
+import { useTasks } from '@/hooks/useTasks';
 import { useVoiceNotes } from '@/hooks/useVoiceNotes';
 import { useMeetings } from '@/hooks/useMeetings';
 import { useCreatives } from '@/hooks/useCreatives';
@@ -44,7 +44,7 @@ export default function PublicReport() {
   const { data: calls = [] } = useCalls(client?.id, false, startDate, endDate);
   const { data: customTabs = [] } = useCustomTabs(client?.id);
   const { data: funnelSteps = [] } = useFunnelSteps(client?.id);
-  const { data: allTasks = [] } = useAllTasks();
+  const { data: clientTasks = [] } = useTasks(client?.id);
   const { data: voiceNotes = [] } = useVoiceNotes(client?.id);
   const { data: meetings = [] } = useMeetings(client?.id);
   const { data: creatives = [] } = useCreatives(client?.id);
@@ -53,12 +53,6 @@ export default function PublicReport() {
   const [activeSection, setActiveSection] = useState<string>('overview');
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [selectedType, setSelectedType] = useState<string>('');
-
-  // Filter tasks for this client
-  const clientTasks = useMemo(() => {
-    if (!client?.id) return [];
-    return allTasks.filter(t => t.client_id === client.id);
-  }, [allTasks, client?.id]);
 
   const handleActivityClick = (activityId: string, type: string) => {
     if (type.startsWith('task_')) {
@@ -249,6 +243,7 @@ export default function PublicReport() {
             selectedType={selectedType}
             clientId={client?.id}
             isPublicView={true}
+            ghlLocationId={client?.ghl_location_id || undefined}
           />
         )}
 
