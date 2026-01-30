@@ -56,7 +56,12 @@ export function useClientByToken(token: string | undefined) {
   return useQuery({
     queryKey: ['client-by-token', token],
     queryFn: async () => {
-      if (!token) return null;
+      if (!token) {
+        console.log('[useClientByToken] No token provided');
+        return null;
+      }
+      
+      console.log('[useClientByToken] Looking up client by token:', token);
       
       // First try to find by slug (friendly URL)
       let { data, error } = await supabase
@@ -65,8 +70,11 @@ export function useClientByToken(token: string | undefined) {
         .eq('slug', token)
         .maybeSingle();
       
+      console.log('[useClientByToken] Slug lookup result:', { data, error: error?.message });
+      
       // If not found by slug, try by public_token (legacy UUID-based URLs)
-      if (!data) {
+      if (!data && !error) {
+        console.log('[useClientByToken] Trying public_token lookup');
         const result = await supabase
           .from('clients')
           .select('id, name, status, public_token, business_manager_url, slug, industry, ghl_location_id, ghl_api_key, sort_order, created_at, updated_at')
@@ -75,12 +83,20 @@ export function useClientByToken(token: string | undefined) {
         
         data = result.data;
         error = result.error;
+        console.log('[useClientByToken] Token lookup result:', { data, error: error?.message });
       }
       
-      if (error) throw error;
+      if (error) {
+        console.error('[useClientByToken] Error:', error);
+        throw error;
+      }
+      
+      console.log('[useClientByToken] Final client data:', data?.name || 'not found');
       return data as Client | null;
     },
     enabled: !!token,
+    retry: 2,
+    staleTime: 30000, // Cache for 30 seconds
   });
 }
 

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useClientByToken } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
@@ -25,30 +25,55 @@ import { Button } from '@/components/ui/button';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
-import { ExternalLink, ClipboardList, Smartphone, Layers } from 'lucide-react';
+import { ExternalLink, ClipboardList, Smartphone, Layers, AlertCircle } from 'lucide-react';
 import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
 import { VoiceRecordButton } from '@/components/voice/VoiceRecordButton';
 import { PipelineTab } from '@/components/pipeline/PipelineTab';
 import { useClientPipelines } from '@/hooks/usePipelines';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function PublicReport() {
   const { token } = useParams<{ token: string }>();
   const { startDate, endDate } = useDateFilter();
   const queryClient = useQueryClient();
   
-  const { data: client, isLoading } = useClientByToken(token);
-  const { data: clientSettings } = useClientSettings(client?.id);
-  const { data: dailyMetrics = [], isLoading: metricsLoading } = useDailyMetrics(client?.id, startDate, endDate);
-  const { data: fundedInvestors = [] } = useFundedInvestors(client?.id, startDate, endDate);
-  const { data: leads = [], isLoading: leadsLoading } = useLeads(client?.id, startDate, endDate);
-  const { data: calls = [] } = useCalls(client?.id, false, startDate, endDate);
-  const { data: customTabs = [] } = useCustomTabs(client?.id);
-  const { data: funnelSteps = [] } = useFunnelSteps(client?.id);
-  const { data: clientTasks = [] } = useTasks(client?.id);
-  const { data: voiceNotes = [] } = useVoiceNotes(client?.id);
-  const { data: meetings = [] } = useMeetings(client?.id);
-  const { data: creatives = [] } = useCreatives(client?.id);
-  const { data: pipelines = [] } = useClientPipelines(client?.id);
+  // Debug logging for public report access
+  useEffect(() => {
+    console.log('[PublicReport] Mounting with token:', token);
+  }, [token]);
+  
+  const { data: client, isLoading, error: clientError } = useClientByToken(token);
+  
+  // Debug logging for client fetch
+  useEffect(() => {
+    console.log('[PublicReport] Client data:', { client, isLoading, error: clientError?.message });
+  }, [client, isLoading, clientError]);
+  
+  const { data: clientSettings, error: settingsError } = useClientSettings(client?.id);
+  const { data: dailyMetrics = [], isLoading: metricsLoading, error: metricsError } = useDailyMetrics(client?.id, startDate, endDate);
+  const { data: fundedInvestors = [], error: fundedError } = useFundedInvestors(client?.id, startDate, endDate);
+  const { data: leads = [], isLoading: leadsLoading, error: leadsError } = useLeads(client?.id, startDate, endDate);
+  const { data: calls = [], error: callsError } = useCalls(client?.id, false, startDate, endDate);
+  const { data: customTabs = [], error: tabsError } = useCustomTabs(client?.id);
+  const { data: funnelSteps = [], error: funnelError } = useFunnelSteps(client?.id);
+  const { data: clientTasks = [], error: tasksError } = useTasks(client?.id);
+  const { data: voiceNotes = [], error: voiceError } = useVoiceNotes(client?.id);
+  const { data: meetings = [], error: meetingsError } = useMeetings(client?.id);
+  const { data: creatives = [], error: creativesError } = useCreatives(client?.id);
+  const { data: pipelines = [], error: pipelinesError } = useClientPipelines(client?.id);
+  
+  // Collect any errors for debugging
+  const dataErrors = [
+    settingsError, metricsError, fundedError, leadsError, callsError,
+    tabsError, funnelError, tasksError, voiceError, meetingsError, creativesError, pipelinesError
+  ].filter(Boolean);
+  
+  // Log data errors for debugging
+  useEffect(() => {
+    if (dataErrors.length > 0) {
+      console.error('[PublicReport] Data fetching errors:', dataErrors.map(e => (e as Error).message));
+    }
+  }, [dataErrors.length]);
   
   const [activeSection, setActiveSection] = useState<string>('overview');
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
@@ -104,12 +129,35 @@ export default function PublicReport() {
     );
   }
 
+  // Handle client fetch error
+  if (clientError) {
+    console.error('[PublicReport] Client fetch error:', clientError);
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error Loading Report</AlertTitle>
+          <AlertDescription>
+            There was a problem loading this report. Please try refreshing the page.
+            <div className="mt-2 text-xs opacity-70">
+              Error: {(clientError as Error).message}
+            </div>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   if (!client) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center border-2 border-border bg-card p-8">
+        <div className="text-center border-2 border-border bg-card p-8 max-w-md">
+          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h1 className="text-2xl font-bold mb-2">Report Not Found</h1>
-          <p className="text-muted-foreground">This report link is invalid or has expired.</p>
+          <p className="text-muted-foreground mb-4">This report link is invalid or has expired.</p>
+          <p className="text-xs text-muted-foreground">
+            Token: {token || 'none'}
+          </p>
         </div>
       </div>
     );
