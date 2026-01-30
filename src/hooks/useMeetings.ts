@@ -273,6 +273,37 @@ export function useSyncMeetings() {
   });
 }
 
+export function useDeleteMeeting() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (meetingId: string) => {
+      // First delete associated pending tasks
+      await supabase
+        .from('pending_meeting_tasks')
+        .delete()
+        .eq('meeting_id', meetingId);
+
+      // Then delete the meeting
+      const { error } = await supabase
+        .from('agency_meetings')
+        .delete()
+        .eq('id', meetingId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['meetings'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-meeting-tasks'] });
+      toast.success('Meeting deleted');
+    },
+    onError: (error) => {
+      toast.error('Failed to delete meeting');
+      console.error(error);
+    },
+  });
+}
+
 export function useCreatePendingTaskFromActionItem() {
   const queryClient = useQueryClient();
 

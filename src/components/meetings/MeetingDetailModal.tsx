@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Video, Clock, Users, ExternalLink, Plus, FileText, ListTodo } from 'lucide-react';
+import { Video, Clock, Users, ExternalLink, Plus, FileText, ListTodo, Lightbulb, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Meeting, useAssignMeetingToClient, useCreatePendingTaskFromActionItem } from '@/hooks/useMeetings';
+import { Meeting, MeetingHighlight, useAssignMeetingToClient, useCreatePendingTaskFromActionItem, useDeleteMeeting } from '@/hooks/useMeetings';
 import { Client } from '@/hooks/useClients';
 
 interface MeetingDetailModalProps {
@@ -38,6 +38,7 @@ export function MeetingDetailModal({
   
   const assignMutation = useAssignMeetingToClient();
   const createTaskMutation = useCreatePendingTaskFromActionItem();
+  const deleteMutation = useDeleteMeeting();
 
   if (!meeting) return null;
 
@@ -56,6 +57,14 @@ export function MeetingDetailModal({
       description: actionItem.notes || actionItem.context || '',
     });
     setAddedItems((prev) => new Set([...prev, index]));
+  };
+
+  const handleDelete = () => {
+    if (confirm('Are you sure you want to delete this meeting? This cannot be undone.')) {
+      deleteMutation.mutate(meeting.id, {
+        onSuccess: () => onOpenChange(false),
+      });
+    }
   };
 
   const assignedClient = clients.find((c) => c.id === meeting.client_id);
@@ -100,6 +109,15 @@ export function MeetingDetailModal({
           </div>
 
           <div className="flex gap-2 ml-auto">
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
+              <Trash2 className="h-3 w-3 mr-1" />
+              Delete
+            </Button>
             {meeting.meetgeek_url && (
               <Button variant="outline" size="sm" asChild>
                 <a href={meeting.meetgeek_url} target="_blank" rel="noopener noreferrer">
@@ -137,7 +155,15 @@ export function MeetingDetailModal({
               <FileText className="h-4 w-4 mr-2" />
               Summary
             </TabsTrigger>
-            <TabsTrigger value="transcript">Transcript</TabsTrigger>
+            <TabsTrigger value="highlights">
+              <Lightbulb className="h-4 w-4 mr-2" />
+              Highlights
+              {meeting.highlights?.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {meeting.highlights.length}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="actions">
               <ListTodo className="h-4 w-4 mr-2" />
               Action Items
@@ -162,16 +188,34 @@ export function MeetingDetailModal({
               )}
             </TabsContent>
 
-            <TabsContent value="transcript" className="mt-0">
-              {meeting.transcript ? (
-                <div className="prose prose-sm max-w-none">
-                  <pre className="whitespace-pre-wrap text-sm font-normal bg-muted p-4 rounded-lg">
-                    {meeting.transcript}
-                  </pre>
+            <TabsContent value="highlights" className="mt-0">
+              {meeting.highlights && meeting.highlights.length > 0 ? (
+                <div className="space-y-3">
+                  {meeting.highlights.map((highlight: MeetingHighlight, index: number) => (
+                    <div
+                      key={index}
+                      className="flex items-start gap-3 p-3 border rounded-lg bg-card"
+                    >
+                      <div className="p-2 rounded-full bg-primary/10 shrink-0">
+                        <Lightbulb className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p className="text-sm">{highlight.highlightText}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Badge variant="outline" className="text-xs">
+                            {highlight.label}
+                          </Badge>
+                          {highlight.speaker && (
+                            <span>— {highlight.speaker}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <p className="text-muted-foreground text-center py-8">
-                  No transcript available for this meeting
+                  No highlights available for this meeting
                 </p>
               )}
             </TabsContent>
