@@ -27,10 +27,8 @@ import {
 import {
   CalendarIcon,
   Loader2,
-  Upload,
   Trash2,
   Send,
-  Clock,
   User,
   CheckCircle2,
   Video,
@@ -41,13 +39,15 @@ import {
   History,
   Plus,
   FileUp,
+  UserCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { cn, addBusinessDays } from '@/lib/utils';
 import {
   Task,
   TaskComment,
   TaskHistory,
+  TaskFile,
   useUpdateTask,
   useDeleteTask,
   useTaskComments,
@@ -60,14 +60,18 @@ import {
 } from '@/hooks/useTasks';
 import { useMeetings } from '@/hooks/useMeetings';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
+import { useTaskFileReview } from '@/hooks/useTaskFileReview';
 import { TaskDiscussionVoiceNote, VoiceNotePlayer } from './TaskDiscussionVoiceNote';
-import { FilePreviewLightbox, FileThumbnail } from './FilePreviewLightbox';
+import { FilePreviewLightbox, FileThumbnail, MiniThumbnail } from './FilePreviewLightbox';
+import { InlineFilePreview } from './InlineFilePreview';
+import { SendToCreativeModal } from './SendToCreativeModal';
 
 interface TaskDetailModalProps {
   task: Task | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clientName?: string;
+  clientId?: string;
   isPublicView?: boolean;
 }
 
@@ -85,7 +89,7 @@ const STAGES = [
   { id: 'done', label: 'Completed' },
 ];
 
-export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublicView = false }: TaskDetailModalProps) {
+export function TaskDetailModal({ task, open, onOpenChange, clientName, clientId, isPublicView = false }: TaskDetailModalProps) {
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
   const addHistory = useAddTaskHistory();
@@ -97,6 +101,7 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
   const addComment = useAddTaskComment();
   const uploadFile = useUploadTaskFile();
   const { currentMember } = useTeamMember();
+  const { reviewFile, isReviewing, reviewingFileId } = useTaskFileReview();
   
   // Inline editing states
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -106,6 +111,13 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
   // Lightbox state
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
+  
+  // Inline preview state
+  const [inlineFileIndex, setInlineFileIndex] = useState(0);
+  
+  // Send to Creative modal state
+  const [sendToCreativeOpen, setSendToCreativeOpen] = useState(false);
+  const [selectedFileForCreative, setSelectedFileForCreative] = useState<TaskFile | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const discussionFileInputRef = useRef<HTMLInputElement>(null);
@@ -161,10 +173,20 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
   useEffect(() => {
     if (task) {
       setEditedDescription(task.description || '');
+      setInlineFileIndex(0);
     }
   }, [task]);
   
+  // Reset inline file index when files change
+  useEffect(() => {
+    if (inlineFileIndex >= files.length && files.length > 0) {
+      setInlineFileIndex(files.length - 1);
+    }
+  }, [files.length, inlineFileIndex]);
+  
   if (!task) return null;
+  
+  const resolvedClientId = clientId || task.client_id;
   
   // Inline field change handlers with history recording
   const handleStatusChange = async (newStatus: string) => {
@@ -214,6 +236,38 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
     await updateTask.mutateAsync({
       id: task.id,
       due_date: newDate ? format(newDate, 'yyyy-MM-dd') : null,
+    });
+  };
+  
+  const handleAssigneeChange = async (newAssignee: string) => {
+    const oldAssignee = task.assigned_to;
+    const newDueDate = addBusinessDays(new Date(), 2);
+    
+    // Record history for reassignment
+    await addHistory.mutateAsync({
+      taskId: task.id,
+      action: 'assigned',
+      oldValue: oldAssignee || 'Unassigned',
+      newValue: newAssignee === 'unassigned' ? 'Unassigned' : newAssignee,
+      changedBy: getAuthorName(),
+    });
+    
+    // Also record the due date change
+    if (newAssignee !== 'unassigned') {
+      await addHistory.mutateAsync({
+        taskId: task.id,
+        action: 'due_date_changed',
+        oldValue: task.due_date ? format(new Date(task.due_date), 'PP') : 'No date',
+        newValue: format(newDueDate, 'PP'),
+        changedBy: getAuthorName(),
+      });
+    }
+    
+    await updateTask.mutateAsync({
+      id: task.id,
+      assigned_to: newAssignee === 'unassigned' ? null : newAssignee,
+      // Reset due date to 2 business days when reassigning
+      ...(newAssignee !== 'unassigned' && { due_date: format(newDueDate, 'yyyy-MM-dd') }),
     });
   };
   
@@ -302,6 +356,16 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
     setLightboxOpen(true);
   };
   
+  const handleSendToCreative = (file: TaskFile) => {
+    setSelectedFileForCreative(file);
+    setSendToCreativeOpen(true);
+  };
+  
+  const handleAIReview = async (file: TaskFile) => {
+    if (!task) return;
+    await reviewFile(file, task.id, getAuthorName());
+  };
+  
   const getPriorityColor = (p: string) => {
     switch (p) {
       case 'high': return 'destructive';
@@ -335,6 +399,8 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
         return <Paperclip className="h-4 w-4 text-muted-foreground" />;
       case 'assigned':
         return <User className="h-4 w-4 text-muted-foreground" />;
+      case 'ai_review':
+        return <CheckCircle2 className="h-4 w-4 text-purple-500" />;
       default:
         return <History className="h-4 w-4 text-muted-foreground" />;
     }
@@ -378,7 +444,14 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
       case 'assigned':
         return (
           <span>
-            Assigned to <span className="font-medium">{entry.new_value}</span>
+            Reassigned from <span className="font-medium">{entry.old_value}</span> to{' '}
+            <span className="font-medium">{entry.new_value}</span>
+          </span>
+        );
+      case 'ai_review':
+        return (
+          <span>
+            AI reviewed file: <span className="font-medium">{entry.new_value}</span>
           </span>
         );
       default:
@@ -483,7 +556,7 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
               </div>
               
               {/* Inline editable fields row */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {/* Status - Inline Select */}
                 <div>
                   <Label className="text-xs text-muted-foreground">Status</Label>
@@ -522,6 +595,43 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
                   </Select>
                 </div>
                 
+                {/* Assigned To - Inline Select */}
+                {!isPublicView && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Assigned To</Label>
+                    <Select 
+                      value={task.assigned_to || 'unassigned'} 
+                      onValueChange={handleAssigneeChange}
+                    >
+                      <SelectTrigger className="mt-1 h-9">
+                        <SelectValue placeholder="Unassigned">
+                          <span className="flex items-center gap-2">
+                            <UserCircle className="h-4 w-4 text-muted-foreground" />
+                            {task.assigned_to || 'Unassigned'}
+                          </span>
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">
+                          <span className="text-muted-foreground">Unassigned</span>
+                        </SelectItem>
+                        {agencyMembers.map(member => (
+                          <SelectItem key={member.id} value={member.name}>
+                            <span className="flex items-center gap-2">
+                              {member.name}
+                              {member.pod && (
+                                <Badge variant="outline" className="text-xs ml-1">
+                                  {member.pod.name}
+                                </Badge>
+                              )}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                
                 {/* Due Date - Inline Calendar */}
                 <div>
                   <Label className="text-xs text-muted-foreground">Due Date</Label>
@@ -556,40 +666,101 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
           {/* Scrollable Content */}
           <ScrollArea className="flex-1 overflow-y-auto">
             <div className="p-6 space-y-6">
-              {/* Files Gallery */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Paperclip className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Files ({files.length})</span>
+              {/* Inline File Preview (Large) */}
+              {files.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Paperclip className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Files ({files.length})</span>
+                  </div>
+                  
+                  <InlineFilePreview
+                    files={files}
+                    currentIndex={inlineFileIndex}
+                    onNavigate={setInlineFileIndex}
+                    onOpenLightbox={() => openLightbox(inlineFileIndex)}
+                    onSendToCreative={handleSendToCreative}
+                    onAIReview={handleAIReview}
+                    isReviewing={isReviewing}
+                    reviewingFileId={reviewingFileId}
+                  />
+                  
+                  {/* Thumbnail gallery for quick navigation */}
+                  {files.length > 1 && (
+                    <div className="flex gap-2 mt-3 overflow-x-auto pb-2">
+                      {files.map((file, index) => (
+                        <MiniThumbnail
+                          key={file.id}
+                          file={file}
+                          isActive={index === inlineFileIndex}
+                          onClick={() => setInlineFileIndex(index)}
+                        />
+                      ))}
+                      {/* Upload button */}
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadFile.isPending}
+                        className="w-12 h-12 rounded border-2 border-dashed border-muted-foreground/30 flex items-center justify-center hover:border-primary/50 hover:bg-muted/50 transition-all flex-shrink-0"
+                      >
+                        {uploadFile.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        ) : (
+                          <Plus className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Upload button when no thumbnails shown */}
+                  {files.length === 1 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadFile.isPending}
+                      className="mt-3"
+                    >
+                      {uploadFile.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Plus className="h-4 w-4 mr-2" />
+                      )}
+                      Add more files
+                    </Button>
+                  )}
                 </div>
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {files.map((file, index) => (
-                    <FileThumbnail
-                      key={file.id}
-                      file={file}
-                      onClick={() => openLightbox(index)}
-                    />
-                  ))}
-                  {/* Upload button */}
+              )}
+              
+              {/* Empty state for files */}
+              {files.length === 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Paperclip className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Files</span>
+                  </div>
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploadFile.isPending}
-                    className="w-20 h-20 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center hover:border-primary/50 hover:bg-muted/50 transition-all flex-shrink-0"
+                    className="w-full h-24 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center hover:border-primary/50 hover:bg-muted/50 transition-all"
                   >
                     {uploadFile.isPending ? (
                       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                     ) : (
-                      <Plus className="h-6 w-6 text-muted-foreground" />
+                      <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                        <Plus className="h-6 w-6" />
+                        <span className="text-sm">Upload files</span>
+                      </div>
                     )}
                   </button>
                 </div>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="hidden"
-                  onChange={handleFileUpload}
-                />
-              </div>
+              )}
+              
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleFileUpload}
+              />
               
               {/* Discussion Thread */}
               <div>
@@ -638,12 +809,12 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
                                   />
                                 </div>
                               )}
-                              {/* Text content */}
-                              <p className="text-sm mt-1">
+                              {/* Text content - render markdown-like formatting */}
+                              <div className="text-sm mt-1 whitespace-pre-wrap">
                                 {entry.data.comment_type === 'voice' && entry.data.transcript 
                                   ? entry.data.transcript 
                                   : entry.data.content}
-                              </p>
+                              </div>
                             </div>
                           </div>
                         ) : (
@@ -728,7 +899,23 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, isPublic
         open={lightboxOpen}
         onOpenChange={setLightboxOpen}
         onNavigate={setSelectedFileIndex}
+        onSendToCreative={handleSendToCreative}
+        onAIReview={handleAIReview}
+        isReviewing={isReviewing}
+        reviewingFileId={reviewingFileId}
       />
+      
+      {/* Send to Creative Modal */}
+      {resolvedClientId && (
+        <SendToCreativeModal
+          file={selectedFileForCreative}
+          clientId={resolvedClientId}
+          clientName={clientName}
+          open={sendToCreativeOpen}
+          onOpenChange={setSendToCreativeOpen}
+          onSuccess={() => setSelectedFileForCreative(null)}
+        />
+      )}
     </>
   );
 }

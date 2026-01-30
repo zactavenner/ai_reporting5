@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +10,9 @@ import {
   X,
   FileText,
   Film,
+  Send,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
 import { TaskFile } from '@/hooks/useTasks';
 
@@ -20,6 +22,10 @@ interface FilePreviewLightboxProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onNavigate: (index: number) => void;
+  onSendToCreative?: (file: TaskFile) => void;
+  onAIReview?: (file: TaskFile) => void;
+  isReviewing?: boolean;
+  reviewingFileId?: string | null;
 }
 
 export function FilePreviewLightbox({ 
@@ -28,6 +34,10 @@ export function FilePreviewLightbox({
   open, 
   onOpenChange,
   onNavigate,
+  onSendToCreative,
+  onAIReview,
+  isReviewing = false,
+  reviewingFileId = null,
 }: FilePreviewLightboxProps) {
   const currentFile = files[selectedIndex];
   
@@ -41,6 +51,8 @@ export function FilePreviewLightbox({
   };
 
   const previewType = getFilePreviewType(currentFile.file_type, currentFile.file_name);
+  const canReview = previewType === 'image' || previewType === 'video';
+  const isCurrentFileReviewing = reviewingFileId === currentFile.id;
 
   const handleDownload = async () => {
     try {
@@ -84,6 +96,31 @@ export function FilePreviewLightbox({
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {canReview && onAIReview && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onAIReview(currentFile)}
+                disabled={isReviewing}
+              >
+                {isCurrentFileReviewing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4 mr-2" />
+                )}
+                AI Review
+              </Button>
+            )}
+            {onSendToCreative && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onSendToCreative(currentFile)}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Send to Creative
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={handleDownload}>
               <Download className="h-4 w-4 mr-2" />
               Download
@@ -131,6 +168,7 @@ export function FilePreviewLightbox({
             )}
             {previewType === 'video' && (
               <video
+                key={currentFile.id}
                 src={currentFile.file_url}
                 controls
                 className="max-w-full max-h-[65vh] rounded-lg"
@@ -218,6 +256,51 @@ export function FileThumbnail({ file, onClick }: FileThumbnailProps) {
       <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-1">
         <span className="text-[10px] text-center truncate">{file.file_name}</span>
       </div>
+    </button>
+  );
+}
+
+// Mini thumbnail for inline gallery navigation
+interface MiniThumbnailProps {
+  file: TaskFile;
+  isActive: boolean;
+  onClick: () => void;
+}
+
+export function MiniThumbnail({ file, isActive, onClick }: MiniThumbnailProps) {
+  const getFilePreviewType = (fileType: string | null, fileName: string): 'image' | 'video' | 'pdf' | 'document' => {
+    if (fileType?.startsWith('image/')) return 'image';
+    if (fileType?.startsWith('video/')) return 'video';
+    if (fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf')) return 'pdf';
+    return 'document';
+  };
+
+  const previewType = getFilePreviewType(file.file_type, file.file_name);
+
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-shrink-0 w-12 h-12 rounded border overflow-hidden transition-all ${
+        isActive ? 'ring-2 ring-primary border-primary' : 'hover:border-primary/50'
+      }`}
+    >
+      {previewType === 'image' && (
+        <img
+          src={file.file_url}
+          alt={file.file_name}
+          className="w-full h-full object-cover"
+        />
+      )}
+      {previewType === 'video' && (
+        <div className="w-full h-full flex items-center justify-center bg-muted">
+          <Film className="h-4 w-4 text-muted-foreground" />
+        </div>
+      )}
+      {(previewType === 'pdf' || previewType === 'document') && (
+        <div className="w-full h-full flex items-center justify-center bg-muted">
+          <FileText className="h-4 w-4 text-muted-foreground" />
+        </div>
+      )}
     </button>
   );
 }

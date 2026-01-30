@@ -199,6 +199,7 @@ export function AgencyTaskSummary({ onOpenFullView }: AgencyTaskSummaryProps) {
         task={selectedTask}
         open={!!selectedTask}
         onOpenChange={(open) => !open && setSelectedTask(null)}
+        clientId={selectedTask?.client_id || undefined}
         clientName={selectedTask?.client_id ? clientMap[selectedTask.client_id] : undefined}
       />
 
