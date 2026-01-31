@@ -891,11 +891,12 @@ async function syncClientContacts(
   supabase: any,
   client: { id: string; name: string; ghl_api_key: string; ghl_location_id: string },
   syncLogId?: string,
-  sinceDateDays?: number
-): Promise<{ created: number; updated: number; skipped: number; fundedFromTags: number; errors: string[]; totalApiContacts: number; contactsInDateRange: number }> {
-  const result = { created: 0, updated: 0, skipped: 0, fundedFromTags: 0, errors: [] as string[], totalApiContacts: 0, contactsInDateRange: 0 };
+  sinceDateDays?: number,
+  syncTimeline: boolean = false
+): Promise<{ created: number; updated: number; skipped: number; fundedFromTags: number; errors: string[]; totalApiContacts: number; contactsInDateRange: number; timelineSynced: number }> {
+  const result = { created: 0, updated: 0, skipped: 0, fundedFromTags: 0, errors: [] as string[], totalApiContacts: 0, contactsInDateRange: 0, timelineSynced: 0 };
   
-  console.log(`Starting GHL sync for client: ${client.name} (${client.id}), sinceDateDays: ${sinceDateDays || 'all'}`);
+  console.log(`Starting GHL sync for client: ${client.name} (${client.id}), sinceDateDays: ${sinceDateDays || 'all'}, syncTimeline: ${syncTimeline}`);
   
   // Fetch opportunities to match with contacts for funded investor creation
   const opportunities = await fetchGHLOpportunities(client.ghl_api_key, client.ghl_location_id);
@@ -910,7 +911,7 @@ async function syncClientContacts(
   let hasMore = true;
   let startAfterId: string | undefined;
   let totalProcessed = 0;
-  const MAX_CONTACTS = 1000;
+  const MAX_CONTACTS = syncTimeline ? 500 : 1000; // Limit when syncing timeline to avoid timeout
   
   // Calculate cutoff date if sinceDateDays is specified
   const cutoffDate = sinceDateDays ? new Date(Date.now() - sinceDateDays * 24 * 60 * 60 * 1000) : null;
@@ -919,6 +920,9 @@ async function syncClientContacts(
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   let contactsInLast24h = 0;
+
+  // Track contacts that need timeline sync
+  const contactsForTimeline: string[] = [];
 
   try {
     while (hasMore && totalProcessed < MAX_CONTACTS) {
@@ -958,6 +962,11 @@ async function syncClientContacts(
           else if (syncResult.action === 'updated') result.updated++;
           else result.skipped++;
           
+          // Queue for timeline sync if requested
+          if (syncTimeline && contact.id) {
+            contactsForTimeline.push(contact.id);
+          }
+          
           // Check if contact has funded investor tag
           if (hasFundedInvestorTag(contact)) {
             const opp = opportunityByContactId.get(contact.id);
@@ -989,6 +998,45 @@ async function syncClientContacts(
     result.totalApiContacts = totalProcessed;
     result.contactsInDateRange = contactsInLast24h;
     
+    // Sync timeline for queued contacts (in batches to avoid timeout)
+    if (syncTimeline && contactsForTimeline.length > 0) {
+      console.log(`Syncing timeline for ${contactsForTimeline.length} contacts...`);
+      
+      // Process in batches of 10 to avoid API rate limits
+      const BATCH_SIZE = 10;
+      for (let i = 0; i < contactsForTimeline.length; i += BATCH_SIZE) {
+        const batch = contactsForTimeline.slice(i, i + BATCH_SIZE);
+        
+        await Promise.allSettled(
+          batch.map(async (contactId) => {
+            try {
+              const timelineResult = await syncContactDeepTimeline(
+                supabase,
+                client.id,
+                contactId,
+                client.ghl_api_key,
+                client.ghl_location_id
+              );
+              if (timelineResult.success) {
+                result.timelineSynced++;
+              }
+            } catch (err) {
+              console.error(`Timeline sync error for ${contactId}:`, err);
+            }
+          })
+        );
+        
+        // Small delay between batches
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // Update last_timeline_sync_at for client
+      await supabase
+        .from('clients')
+        .update({ last_timeline_sync_at: new Date().toISOString() })
+        .eq('id', client.id);
+    }
+    
     // Use contactsInLast24h for discrepancy detection (not totalProcessed which could be 1000)
     await detectDiscrepancies(supabase, client.id, contactsInLast24h, syncLogId);
     
@@ -997,8 +1045,22 @@ async function syncClientContacts(
     result.errors.push(`Sync failed: ${errorMsg}`);
     console.error(`GHL sync error for ${client.name}:`, errorMsg);
   }
+  
+  // Update sync status on client
+  try {
+    await supabase
+      .from('clients')
+      .update({
+        last_ghl_sync_at: new Date().toISOString(),
+        ghl_sync_status: result.errors.length > 0 ? 'error' : 'healthy',
+        ghl_sync_error: result.errors.length > 0 ? result.errors.slice(0, 3).join('; ') : null,
+      })
+      .eq('id', client.id);
+  } catch (err) {
+    console.error(`Error updating client sync status:`, err);
+  }
 
-  console.log(`GHL sync complete for ${client.name}: created=${result.created}, updated=${result.updated}, skipped=${result.skipped}, fundedFromTags=${result.fundedFromTags}, contactsInLast24h=${contactsInLast24h}`);
+  console.log(`GHL sync complete for ${client.name}: created=${result.created}, updated=${result.updated}, skipped=${result.skipped}, fundedFromTags=${result.fundedFromTags}, timelineSynced=${result.timelineSynced}, contactsInLast24h=${contactsInLast24h}`);
   return result;
 }
 
@@ -1411,6 +1473,7 @@ serve(async (req) => {
     let sinceDateDays: number | undefined;
     let singleContactId: string | null = null;
     let mode: string | null = null;
+    let syncTimeline: boolean = false;
     
     try {
       const body = await req.json();
@@ -1418,9 +1481,18 @@ serve(async (req) => {
       syncType = body?.syncType || 'all';
       singleContactId = body?.contactId || null;
       mode = body?.mode || null;
+      syncTimeline = body?.syncTimeline === true;
+      
       // Support historical sync with sinceDateDays parameter (default: 7, max: 365)
       if (body?.sinceDateDays) {
         sinceDateDays = Math.min(Math.max(parseInt(body.sinceDateDays) || 7, 1), 365);
+      }
+      
+      // Full sync mode: sync 365 days of history + timeline
+      if (mode === 'full_sync') {
+        sinceDateDays = 365;
+        syncTimeline = true;
+        console.log('Full sync mode enabled: 365 days history + timeline sync');
       }
     } catch {
       // No body or invalid JSON - sync all clients
@@ -1543,12 +1615,12 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Starting GHL ${syncType} sync for ${clients.length} client(s), sinceDateDays: ${sinceDateDays || 'default'}`);
+    console.log(`Starting GHL ${syncType} sync for ${clients.length} client(s), sinceDateDays: ${sinceDateDays || 'default'}, syncTimeline: ${syncTimeline}`);
 
     const results: Array<{
       client_id: string;
       client_name: string;
-      contacts?: { created: number; updated: number; skipped: number; fundedFromTags: number; errors: string[] };
+      contacts?: { created: number; updated: number; skipped: number; fundedFromTags: number; timelineSynced: number; errors: string[] };
       calls?: { enriched: number; skipped: number; errors: string[] };
     }> = [];
 
@@ -1573,7 +1645,7 @@ serve(async (req) => {
         .single();
 
       if (syncType === 'contacts' || syncType === 'all') {
-        clientResult.contacts = await syncClientContacts(supabase, client as any, syncLog?.id, sinceDateDays);
+        clientResult.contacts = await syncClientContacts(supabase, client as any, syncLog?.id, sinceDateDays, syncTimeline);
         
         await supabase
           .from('client_settings')
@@ -1617,8 +1689,9 @@ serve(async (req) => {
     const totalContactsUpdated = results.reduce((sum, r) => sum + (r.contacts?.updated || 0), 0);
     const totalFundedFromTags = results.reduce((sum, r) => sum + (r.contacts?.fundedFromTags || 0), 0);
     const totalCallsEnriched = results.reduce((sum, r) => sum + (r.calls?.enriched || 0), 0);
+    const totalTimelineSynced = results.reduce((sum, r) => sum + (r.contacts?.timelineSynced || 0), 0);
 
-    console.log(`GHL sync complete: ${totalContactsCreated} contacts created, ${totalContactsUpdated} updated, ${totalFundedFromTags} funded from tags, ${totalCallsEnriched} calls enriched`);
+    console.log(`GHL sync complete: ${totalContactsCreated} contacts created, ${totalContactsUpdated} updated, ${totalFundedFromTags} funded from tags, ${totalCallsEnriched} calls enriched, ${totalTimelineSynced} timelines synced`);
 
     return new Response(
       JSON.stringify({
@@ -1629,6 +1702,7 @@ serve(async (req) => {
           total_contacts_updated: totalContactsUpdated,
           total_funded_from_tags: totalFundedFromTags,
           total_calls_enriched: totalCallsEnriched,
+          total_timelines_synced: totalTimelineSynced,
         },
         results,
       }),

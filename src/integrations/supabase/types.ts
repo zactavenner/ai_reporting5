@@ -947,6 +947,7 @@ export type Database = {
           id: string
           industry: string | null
           last_ghl_sync_at: string | null
+          last_timeline_sync_at: string | null
           meta_access_token: string | null
           meta_ad_account_id: string | null
           name: string
@@ -967,6 +968,7 @@ export type Database = {
           id?: string
           industry?: string | null
           last_ghl_sync_at?: string | null
+          last_timeline_sync_at?: string | null
           meta_access_token?: string | null
           meta_ad_account_id?: string | null
           name: string
@@ -987,6 +989,7 @@ export type Database = {
           id?: string
           industry?: string | null
           last_ghl_sync_at?: string | null
+          last_timeline_sync_at?: string | null
           meta_access_token?: string | null
           meta_ad_account_id?: string | null
           name?: string

@@ -72,6 +72,7 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
   const [ghlApiKey, setGhlApiKey] = useState('');
   const [testingConnection, setTestingConnection] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [fullSyncing, setFullSyncing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
   const [historicalSyncRange, setHistoricalSyncRange] = useState<'7' | '30' | '90' | '365'>('7');
 
@@ -334,7 +335,45 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
     }
   };
 
-  if (!client) return null;
+  const handleFullSync = async () => {
+    if (!client?.ghl_location_id || !client?.ghl_api_key) {
+      toast.error('Please save GHL credentials first');
+      return;
+    }
+    setFullSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-ghl-contacts', {
+        body: { 
+          client_id: client.id,
+          mode: 'full_sync'
+        }
+      });
+      if (error) throw error;
+      
+      const summary = data?.summary;
+      const created = summary?.total_contacts_created || 0;
+      const updated = summary?.total_contacts_updated || 0;
+      const timelineSynced = summary?.total_timelines_synced || 0;
+      const fundedFromTags = summary?.total_funded_from_tags || 0;
+      
+      toast.success(
+        `Full sync complete: ${created} new, ${updated} updated, ${timelineSynced} timelines synced${fundedFromTags > 0 ? `, ${fundedFromTags} funded` : ''}`
+      );
+      
+      queryClient.invalidateQueries({ queryKey: ['leads', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['calls', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['funded-investors', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['contact-timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['sync-health', client.id] });
+    } catch (error) {
+      console.error('Full sync failed:', error);
+      toast.error('Full sync failed - please try again');
+    } finally {
+      setFullSyncing(false);
+    }
+  };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -709,7 +748,7 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
                 <p className="text-xs text-muted-foreground mb-3">
                   Pull historical contacts and detect funded investors from tags
                 </p>
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-2 items-center mb-4">
                   <select
                     value={historicalSyncRange}
                     onChange={(e) => setHistoricalSyncRange(e.target.value as any)}
@@ -727,6 +766,37 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
                     disabled={syncing || !client?.ghl_location_id || !client?.ghl_api_key}
                   >
                     {syncing ? 'Syncing...' : 'Sync Historical'}
+                  </Button>
+                </div>
+                
+                {/* Full Sync with Timeline */}
+                <div className="p-3 border-2 border-dashed border-primary/30 bg-primary/5 rounded">
+                  <h6 className="font-medium text-sm mb-1 flex items-center gap-2">
+                    <RefreshCw className="h-4 w-4" />
+                    Full Sync (Contacts + Timeline)
+                  </h6>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Sync all contacts from the past year AND their full conversation/activity history. 
+                    This provides complete visibility into each contact's journey. May take several minutes.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="default"
+                    onClick={() => handleFullSync()}
+                    disabled={fullSyncing || !client?.ghl_location_id || !client?.ghl_api_key}
+                    className="w-full"
+                  >
+                    {fullSyncing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Running Full Sync...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Run Full Sync (365 days + Timeline)
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>

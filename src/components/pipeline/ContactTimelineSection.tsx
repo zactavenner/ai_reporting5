@@ -2,6 +2,7 @@ import { RefreshCw, Calendar, Mail, Phone, MessageSquare, FileText, CheckCircle,
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TimelineEvent, useSyncContactTimeline } from '@/hooks/useContactTimeline';
+import { useRealtimeTimeline } from '@/hooks/useRealtimeTimeline';
 
 interface ContactTimelineSectionProps {
   events: TimelineEvent[];
@@ -41,6 +42,9 @@ export function ContactTimelineSection({
   isPublicView 
 }: ContactTimelineSectionProps) {
   const syncTimeline = useSyncContactTimeline();
+  
+  // Subscribe to realtime updates for this contact's timeline
+  useRealtimeTimeline(clientId, ghlContactId || undefined);
 
   const handleSync = () => {
     if (ghlContactId) {
