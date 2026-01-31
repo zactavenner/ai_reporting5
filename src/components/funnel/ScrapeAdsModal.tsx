@@ -167,8 +167,8 @@ export function ScrapeAdsModal({ clientId, open, onOpenChange }: ScrapeAdsModalP
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription className="text-xs">
-              Using Apify to sync active ads including images, videos, copy, and CTAs. 
-              This may take 30-60 seconds depending on the number of ads. Cost: ~$0.75 per 1,000 ads.
+              Using the official Meta Marketing API to sync active ads including images, videos, and ad copy.
+              This may take a few seconds depending on the number of ads.
             </AlertDescription>
           </Alert>
 
