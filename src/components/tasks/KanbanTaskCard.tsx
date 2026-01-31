@@ -192,7 +192,7 @@ export function KanbanTaskCard({
               ) : (
                 <Avatar className="h-6 w-6">
                   <AvatarFallback className="text-xs bg-muted">
-                    {assignee.name.slice(0, 2).toUpperCase()}
+                    {(assignee.name || 'N/A').slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               )}
@@ -250,7 +250,7 @@ export function KanbanTaskCard({
             )}
             
             {assignee && (
-              <span>Assigned to {isPublicView && assignee.pod?.name ? `${assignee.pod.name} Pod` : assignee.name}</span>
+              <span>Assigned to {isPublicView && assignee.pod?.name ? `${assignee.pod.name} Pod` : (assignee.name || 'Unknown')}</span>
             )}
           </div>
           

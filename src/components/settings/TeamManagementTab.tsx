@@ -428,10 +428,10 @@ export function TeamManagementTab() {
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-                      {member.name.slice(0, 2).toUpperCase()}
+                      {(member.name || 'N/A').slice(0, 2).toUpperCase()}
                     </div>
                     <div>
-                      <span className="font-medium">{member.name}</span>
+                      <span className="font-medium">{member.name || 'Unknown'}</span>
                       <p className="text-xs text-muted-foreground">{member.email}</p>
                     </div>
                     <Badge variant="outline" className="text-xs">
