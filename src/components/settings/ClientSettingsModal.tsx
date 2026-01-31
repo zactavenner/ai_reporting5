@@ -22,8 +22,8 @@ import { PodAssignmentSection } from './PodAssignmentSection';
 import { CalendarTrackingSection } from './CalendarTrackingSection';
 import { PipelineMappingSection } from './PipelineMappingSection';
 import { SyncHealthIndicator, getSyncStatus } from './SyncHealthIndicator';
-import { DollarSign, Target, Plug, Loader2, RefreshCw, CheckCircle, XCircle, Users, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react';
-
+import { useSyncQueue } from '@/hooks/useSyncQueue';
+import { DollarSign, Target, Plug, Loader2, RefreshCw, CheckCircle, XCircle, Users, Lock, Eye, EyeOff, AlertTriangle, ListOrdered } from 'lucide-react';
 interface ClientSettingsModalProps {
   client: Client | null;
   open: boolean;
@@ -34,6 +34,7 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
   const queryClient = useQueryClient();
   const { data: settings } = useClientSettings(client?.id);
   const updateSettings = useUpdateClientSettings();
+  const { queueClientSync } = useSyncQueue();
   
   const [saving, setSaving] = useState(false);
   
@@ -798,6 +799,30 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
                       </>
                     )}
                   </Button>
+                  
+                  {/* Queue Sync Button */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => queueClientSync.mutate({ clientId: client.id, daysBack: 365 })}
+                    disabled={queueClientSync.isPending || !client?.ghl_location_id || !client?.ghl_api_key}
+                    className="w-full mt-2"
+                  >
+                    {queueClientSync.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Queuing...
+                      </>
+                    ) : (
+                      <>
+                        <ListOrdered className="h-4 w-4 mr-2" />
+                        Queue Background Sync (365 days)
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Adds sync jobs to background queue for processing every 5 minutes
+                  </p>
                 </div>
               </div>
             </div>

@@ -56,3 +56,9 @@ verify_jwt = false
 
 [functions.verify-pixels]
 verify_jwt = false
+
+[functions.scrape-fb-ads]
+verify_jwt = false
+
+[functions.sync-queue-worker]
+verify_jwt = false

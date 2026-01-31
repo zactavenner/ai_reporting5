@@ -15,7 +15,8 @@ import { toast } from 'sonner';
 import { useAgencySettings, useUpdateAgencySettings } from '@/hooks/useAgencySettings';
 import { useSyncMeetings } from '@/hooks/useMeetings';
 import { TeamManagementTab } from './TeamManagementTab';
-import { Brain, Settings2, Key, DollarSign, Eye, EyeOff, Video, Copy, RefreshCw, Users } from 'lucide-react';
+import { SyncQueueStatus } from './SyncQueueStatus';
+import { Brain, Settings2, Key, DollarSign, Eye, EyeOff, Video, Copy, RefreshCw, Users, Database } from 'lucide-react';
 
 interface AgencySettingsModalProps {
   open: boolean;
@@ -99,10 +100,14 @@ export function AgencySettingsModal({ open, onOpenChange }: AgencySettingsModalP
         </DialogHeader>
 
         <Tabs defaultValue="team" className="mt-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="team" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Team
+            </TabsTrigger>
+            <TabsTrigger value="sync-queue" className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Sync Queue
             </TabsTrigger>
             <TabsTrigger value="ai-prompts" className="flex items-center gap-2">
               <Brain className="h-4 w-4" />
@@ -120,6 +125,10 @@ export function AgencySettingsModal({ open, onOpenChange }: AgencySettingsModalP
           
           <TabsContent value="team" className="mt-4">
             <TeamManagementTab />
+          </TabsContent>
+
+          <TabsContent value="sync-queue" className="mt-4">
+            <SyncQueueStatus />
           </TabsContent>
           
           <TabsContent value="ai-prompts" className="space-y-6 mt-4">

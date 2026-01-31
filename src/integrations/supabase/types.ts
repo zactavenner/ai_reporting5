@@ -2201,6 +2201,65 @@ export type Database = {
           },
         ]
       }
+      sync_queue: {
+        Row: {
+          batch_number: number | null
+          client_id: string
+          completed_at: string | null
+          created_at: string | null
+          date_range_end: string | null
+          date_range_start: string | null
+          error_message: string | null
+          id: string
+          priority: number | null
+          records_processed: number | null
+          started_at: string | null
+          status: string | null
+          sync_type: string
+          total_batches: number | null
+        }
+        Insert: {
+          batch_number?: number | null
+          client_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          date_range_end?: string | null
+          date_range_start?: string | null
+          error_message?: string | null
+          id?: string
+          priority?: number | null
+          records_processed?: number | null
+          started_at?: string | null
+          status?: string | null
+          sync_type: string
+          total_batches?: number | null
+        }
+        Update: {
+          batch_number?: number | null
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          date_range_end?: string | null
+          date_range_start?: string | null
+          error_message?: string | null
+          id?: string
+          priority?: number | null
+          records_processed?: number | null
+          started_at?: string | null
+          status?: string | null
+          sync_type?: string
+          total_batches?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_assignees: {
         Row: {
           created_at: string
@@ -2487,6 +2546,24 @@ export type Database = {
     }
     Functions: {
       generate_client_slug: { Args: { client_name: string }; Returns: string }
+      get_sync_queue_stats: {
+        Args: never
+        Returns: {
+          completed_count: number
+          failed_count: number
+          pending_count: number
+          processing_count: number
+          total_records_processed: number
+        }[]
+      }
+      queue_client_sync: {
+        Args: { p_client_id: string; p_days_back?: number }
+        Returns: number
+      }
+      queue_full_sync_all_clients: {
+        Args: { p_days_back?: number }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
