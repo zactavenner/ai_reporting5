@@ -19,7 +19,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { WebhookSettingsTab } from './WebhookSettingsTab';
 import { EmailParsingTab } from './EmailParsingTab';
 import { PodAssignmentSection } from './PodAssignmentSection';
-import { DollarSign, Target, Plug, Loader2, RefreshCw, CheckCircle, XCircle, Users, Lock, Eye, EyeOff } from 'lucide-react';
+import { CalendarTrackingSection } from './CalendarTrackingSection';
+import { PipelineMappingSection } from './PipelineMappingSection';
+import { SyncHealthIndicator, getSyncStatus } from './SyncHealthIndicator';
+import { DollarSign, Target, Plug, Loader2, RefreshCw, CheckCircle, XCircle, Users, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
 interface ClientSettingsModalProps {
   client: Client | null;
@@ -72,6 +75,13 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
   const [historicalSyncRange, setHistoricalSyncRange] = useState<'7' | '30' | '90' | '365'>('7');
 
+  // Calendar and pipeline tracking state
+  const [trackedCalendarIds, setTrackedCalendarIds] = useState<string[]>([]);
+  const [reconnectCalendarIds, setReconnectCalendarIds] = useState<string[]>([]);
+  const [fundedPipelineId, setFundedPipelineId] = useState<string | null>(null);
+  const [fundedStageIds, setFundedStageIds] = useState<string[]>([]);
+  const [committedStageIds, setCommittedStageIds] = useState<string[]>([]);
+
   // Public link password state
   const [publicLinkPassword, setPublicLinkPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -108,6 +118,23 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
     }
     if (settings?.public_link_password !== undefined) {
       setPublicLinkPassword(settings.public_link_password || '');
+    }
+    // Load calendar and pipeline settings
+    const settingsAny = settings as any;
+    if (settingsAny?.tracked_calendar_ids) {
+      setTrackedCalendarIds(settingsAny.tracked_calendar_ids || []);
+    }
+    if (settingsAny?.reconnect_calendar_ids) {
+      setReconnectCalendarIds(settingsAny.reconnect_calendar_ids || []);
+    }
+    if (settingsAny?.funded_pipeline_id) {
+      setFundedPipelineId(settingsAny.funded_pipeline_id);
+    }
+    if (settingsAny?.funded_stage_ids) {
+      setFundedStageIds(settingsAny.funded_stage_ids || []);
+    }
+    if (settingsAny?.committed_stage_ids) {
+      setCommittedStageIds(settingsAny.committed_stage_ids || []);
     }
   }, [settings]);
 
@@ -187,7 +214,13 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
         daily_ad_spend_target: adSpendInputMode === 'daily' ? (parseFloat(dailyAdSpendTarget) || null) : null,
         total_raise_amount: parseFloat(totalRaiseAmount) || 0,
         public_link_password: publicLinkPassword.trim() || null,
-      });
+        // Calendar and pipeline settings
+        tracked_calendar_ids: trackedCalendarIds,
+        reconnect_calendar_ids: reconnectCalendarIds,
+        funded_pipeline_id: fundedPipelineId,
+        funded_stage_ids: fundedStageIds,
+        committed_stage_ids: committedStageIds,
+      } as any);
 
       // Save alert configs if slack webhook provided
       if (slackWebhook) {
@@ -697,6 +730,51 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
                   </Button>
                 </div>
               </div>
+            </div>
+
+            {/* Sync Health Indicator */}
+            <SyncHealthIndicator
+              status={getSyncStatus(
+                (client as any).last_ghl_sync_at,
+                !!(client?.ghl_api_key && client?.ghl_location_id)
+              )}
+              lastSyncAt={(client as any).last_ghl_sync_at}
+              syncError={(client as any).ghl_sync_error}
+            />
+
+            {/* Calendar Tracking Section */}
+            <CalendarTrackingSection
+              clientId={client.id}
+              ghlApiKey={client?.ghl_api_key || undefined}
+              ghlLocationId={client?.ghl_location_id || undefined}
+              trackedCalendarIds={trackedCalendarIds}
+              reconnectCalendarIds={reconnectCalendarIds}
+              onTrackedChange={setTrackedCalendarIds}
+              onReconnectChange={setReconnectCalendarIds}
+            />
+
+            {/* Pipeline Mapping Section */}
+            <PipelineMappingSection
+              clientId={client.id}
+              ghlApiKey={client?.ghl_api_key || undefined}
+              ghlLocationId={client?.ghl_location_id || undefined}
+              fundedPipelineId={fundedPipelineId}
+              fundedStageIds={fundedStageIds}
+              committedStageIds={committedStageIds}
+              onPipelineChange={setFundedPipelineId}
+              onFundedStagesChange={setFundedStageIds}
+              onCommittedStagesChange={setCommittedStageIds}
+            />
+
+            {/* Webhook Freeze Notice */}
+            <div className="border-2 border-yellow-500/50 bg-yellow-500/10 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-500">
+                <AlertTriangle className="h-4 w-4" />
+                <h4 className="font-medium">Webhooks Currently Frozen</h4>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                All data sync is now handled via hourly API sync. Webhooks are acknowledged but not processed to prevent duplicates and ensure data accuracy.
+              </p>
             </div>
 
             <div className="border-2 border-border p-4 space-y-3">

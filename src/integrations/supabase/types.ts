@@ -337,12 +337,16 @@ export type Database = {
       }
       calls: {
         Row: {
+          appointment_status: string | null
+          booked_at: string | null
           call_connected: boolean | null
           call_duration_seconds: number | null
           client_id: string
           created_at: string
           direction: string | null
           external_id: string
+          ghl_appointment_id: string | null
+          ghl_calendar_id: string | null
           ghl_synced_at: string | null
           id: string
           is_reconnect: boolean | null
@@ -357,12 +361,16 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          appointment_status?: string | null
+          booked_at?: string | null
           call_connected?: boolean | null
           call_duration_seconds?: number | null
           client_id: string
           created_at?: string
           direction?: string | null
           external_id: string
+          ghl_appointment_id?: string | null
+          ghl_calendar_id?: string | null
           ghl_synced_at?: string | null
           id?: string
           is_reconnect?: boolean | null
@@ -377,12 +385,16 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          appointment_status?: string | null
+          booked_at?: string | null
           call_connected?: boolean | null
           call_duration_seconds?: number | null
           client_id?: string
           created_at?: string
           direction?: string | null
           external_id?: string
+          ghl_appointment_id?: string | null
+          ghl_calendar_id?: string | null
           ghl_synced_at?: string | null
           id?: string
           is_reconnect?: boolean | null
@@ -746,6 +758,7 @@ export type Database = {
           ads_library_page_id: string | null
           ads_library_url: string | null
           client_id: string
+          committed_stage_ids: string[] | null
           cost_of_capital_threshold_red: number | null
           cost_of_capital_threshold_yellow: number | null
           cost_per_call_threshold_red: number | null
@@ -763,6 +776,8 @@ export type Database = {
           email_parsing_enabled: boolean | null
           email_trusted_domains: string[] | null
           funded_investor_label: string | null
+          funded_pipeline_id: string | null
+          funded_stage_ids: string[] | null
           ghl_last_calls_sync: string | null
           ghl_last_contacts_sync: string | null
           ghl_sync_calls_enabled: boolean | null
@@ -775,7 +790,9 @@ export type Database = {
           pixel_verification_enabled: boolean | null
           pixel_verification_frequency: string | null
           public_link_password: string | null
+          reconnect_calendar_ids: string[] | null
           total_raise_amount: number | null
+          tracked_calendar_ids: string[] | null
           updated_at: string
           webhook_mappings: Json | null
         }
@@ -785,6 +802,7 @@ export type Database = {
           ads_library_page_id?: string | null
           ads_library_url?: string | null
           client_id: string
+          committed_stage_ids?: string[] | null
           cost_of_capital_threshold_red?: number | null
           cost_of_capital_threshold_yellow?: number | null
           cost_per_call_threshold_red?: number | null
@@ -802,6 +820,8 @@ export type Database = {
           email_parsing_enabled?: boolean | null
           email_trusted_domains?: string[] | null
           funded_investor_label?: string | null
+          funded_pipeline_id?: string | null
+          funded_stage_ids?: string[] | null
           ghl_last_calls_sync?: string | null
           ghl_last_contacts_sync?: string | null
           ghl_sync_calls_enabled?: boolean | null
@@ -814,7 +834,9 @@ export type Database = {
           pixel_verification_enabled?: boolean | null
           pixel_verification_frequency?: string | null
           public_link_password?: string | null
+          reconnect_calendar_ids?: string[] | null
           total_raise_amount?: number | null
+          tracked_calendar_ids?: string[] | null
           updated_at?: string
           webhook_mappings?: Json | null
         }
@@ -824,6 +846,7 @@ export type Database = {
           ads_library_page_id?: string | null
           ads_library_url?: string | null
           client_id?: string
+          committed_stage_ids?: string[] | null
           cost_of_capital_threshold_red?: number | null
           cost_of_capital_threshold_yellow?: number | null
           cost_per_call_threshold_red?: number | null
@@ -841,6 +864,8 @@ export type Database = {
           email_parsing_enabled?: boolean | null
           email_trusted_domains?: string[] | null
           funded_investor_label?: string | null
+          funded_pipeline_id?: string | null
+          funded_stage_ids?: string[] | null
           ghl_last_calls_sync?: string | null
           ghl_last_contacts_sync?: string | null
           ghl_sync_calls_enabled?: boolean | null
@@ -853,7 +878,9 @@ export type Database = {
           pixel_verification_enabled?: boolean | null
           pixel_verification_frequency?: string | null
           public_link_password?: string | null
+          reconnect_calendar_ids?: string[] | null
           total_raise_amount?: number | null
+          tracked_calendar_ids?: string[] | null
           updated_at?: string
           webhook_mappings?: Json | null
         }
@@ -915,8 +942,11 @@ export type Database = {
           created_at: string
           ghl_api_key: string | null
           ghl_location_id: string | null
+          ghl_sync_error: string | null
+          ghl_sync_status: string | null
           id: string
           industry: string | null
+          last_ghl_sync_at: string | null
           meta_access_token: string | null
           meta_ad_account_id: string | null
           name: string
@@ -932,8 +962,11 @@ export type Database = {
           created_at?: string
           ghl_api_key?: string | null
           ghl_location_id?: string | null
+          ghl_sync_error?: string | null
+          ghl_sync_status?: string | null
           id?: string
           industry?: string | null
+          last_ghl_sync_at?: string | null
           meta_access_token?: string | null
           meta_ad_account_id?: string | null
           name: string
@@ -949,8 +982,11 @@ export type Database = {
           created_at?: string
           ghl_api_key?: string | null
           ghl_location_id?: string | null
+          ghl_sync_error?: string | null
+          ghl_sync_status?: string | null
           id?: string
           industry?: string | null
+          last_ghl_sync_at?: string | null
           meta_access_token?: string | null
           meta_ad_account_id?: string | null
           name?: string

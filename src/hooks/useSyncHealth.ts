@@ -16,9 +16,17 @@ export interface QuickCheckItem {
   type: 'calls_missing_lead' | 'funded_missing_lead';
 }
 
+export interface ClientSyncStatus {
+  status: 'healthy' | 'stale' | 'error' | 'not_configured';
+  lastSyncAt: string | null;
+  syncError: string | null;
+  hasCredentials: boolean;
+}
+
 export interface SyncHealthData {
   items: SyncHealthItem[];
   quickChecks: QuickCheckItem[];
+  clientSync: ClientSyncStatus;
 }
 
 function getSyncStatus(lastSynced: string | null): 'healthy' | 'stale' | 'critical' {
@@ -33,22 +41,95 @@ function getSyncStatus(lastSynced: string | null): 'healthy' | 'stale' | 'critic
   return 'critical';
 }
 
+function getClientSyncStatus(
+  lastGhlSyncAt: string | null,
+  ghlSyncStatus: string | null,
+  ghlSyncError: string | null,
+  hasCredentials: boolean
+): ClientSyncStatus {
+  if (!hasCredentials) {
+    return {
+      status: 'not_configured',
+      lastSyncAt: null,
+      syncError: null,
+      hasCredentials: false,
+    };
+  }
+  
+  // Use explicit status if available
+  if (ghlSyncStatus) {
+    return {
+      status: ghlSyncStatus as 'healthy' | 'stale' | 'error' | 'not_configured',
+      lastSyncAt: lastGhlSyncAt,
+      syncError: ghlSyncError,
+      hasCredentials: true,
+    };
+  }
+  
+  // Fall back to time-based calculation
+  if (!lastGhlSyncAt) {
+    return {
+      status: 'not_configured',
+      lastSyncAt: null,
+      syncError: null,
+      hasCredentials: true,
+    };
+  }
+  
+  const now = new Date();
+  const syncedAt = new Date(lastGhlSyncAt);
+  const hoursDiff = (now.getTime() - syncedAt.getTime()) / (1000 * 60 * 60);
+  
+  let status: 'healthy' | 'stale' | 'error';
+  if (hoursDiff <= 2) {
+    status = 'healthy';
+  } else if (hoursDiff <= 24) {
+    status = 'stale';
+  } else {
+    status = 'error';
+  }
+  
+  return {
+    status,
+    lastSyncAt: lastGhlSyncAt,
+    syncError: ghlSyncError,
+    hasCredentials: true,
+  };
+}
+
 export function useSyncHealth(clientId: string | undefined) {
   return useQuery({
     queryKey: ['sync-health', clientId],
     queryFn: async (): Promise<SyncHealthData> => {
       if (!clientId) {
-        return { items: [], quickChecks: [] };
+        return { 
+          items: [], 
+          quickChecks: [],
+          clientSync: {
+            status: 'not_configured',
+            lastSyncAt: null,
+            syncError: null,
+            hasCredentials: false,
+          }
+        };
       }
 
       // Fetch sync health data in parallel
       const [
+        clientResult,
         leadsResult,
         callsResult,
         fundedResult,
         callsMissingLeadResult,
         fundedMissingLeadResult,
       ] = await Promise.all([
+        // Get client sync status
+        supabase
+          .from('clients')
+          .select('ghl_api_key, ghl_location_id, last_ghl_sync_at, ghl_sync_status, ghl_sync_error')
+          .eq('id', clientId)
+          .single(),
+        
         // Leads count and last sync
         supabase
           .from('leads')
@@ -87,6 +168,16 @@ export function useSyncHealth(clientId: string | undefined) {
           .eq('client_id', clientId)
           .is('lead_id', null),
       ]);
+
+      const clientData = clientResult.data;
+      const hasCredentials = !!(clientData?.ghl_api_key && clientData?.ghl_location_id);
+      
+      const clientSync = getClientSyncStatus(
+        clientData?.last_ghl_sync_at,
+        clientData?.ghl_sync_status,
+        clientData?.ghl_sync_error,
+        hasCredentials
+      );
 
       const leadsLastSync = leadsResult.data?.[0]?.ghl_synced_at || null;
       const callsLastSync = callsResult.data?.[0]?.ghl_synced_at || null;
@@ -131,9 +222,10 @@ export function useSyncHealth(clientId: string | undefined) {
         },
       ];
 
-      return { items, quickChecks };
+      return { items, quickChecks, clientSync };
     },
     enabled: !!clientId,
     staleTime: 30000, // 30 seconds
   });
 }
+

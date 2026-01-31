@@ -20,11 +20,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3, TrendingUp, TrendingDown, Minus, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3, TrendingUp, TrendingDown, Minus, ArrowUp, ArrowDown, ArrowUpDown, AlertCircle, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { SortConfig, SortDirection } from './SortableTableHeader';
+import { formatDistanceToNow } from 'date-fns';
 
 interface DraggableClientTableProps {
   clients: Client[];
@@ -44,6 +51,49 @@ const STATUS_OPTIONS = [
   { value: 'on_hold', label: 'On Hold' },
   { value: 'inactive', label: 'Inactive' },
 ];
+
+// Helper function to get sync status from client data
+function getClientSyncStatus(client: Client): {
+  status: 'healthy' | 'stale' | 'error' | 'not_configured';
+  lastSyncAt: string | null;
+  error: string | null;
+} {
+  const hasCredentials = !!(client.ghl_api_key && client.ghl_location_id);
+  
+  // Use the new fields if available, otherwise fall back to checking credentials
+  const ghlSyncStatus = (client as any).ghl_sync_status;
+  const lastGhlSyncAt = (client as any).last_ghl_sync_at;
+  const ghlSyncError = (client as any).ghl_sync_error;
+  
+  if (ghlSyncStatus) {
+    return {
+      status: ghlSyncStatus as 'healthy' | 'stale' | 'error' | 'not_configured',
+      lastSyncAt: lastGhlSyncAt,
+      error: ghlSyncError,
+    };
+  }
+  
+  // Fallback logic based on credentials presence
+  if (!hasCredentials) {
+    return { status: 'not_configured', lastSyncAt: null, error: null };
+  }
+  
+  // If credentials exist but no sync status, assume it needs to be synced
+  return { status: 'stale', lastSyncAt: null, error: null };
+}
+
+// Get row border style based on sync status
+function getSyncBorderStyle(status: 'healthy' | 'stale' | 'error' | 'not_configured'): string {
+  switch (status) {
+    case 'error':
+    case 'not_configured':
+      return 'border-l-4 border-l-destructive';
+    case 'stale':
+      return 'border-l-4 border-l-yellow-500';
+    default:
+      return '';
+  }
+}
 
 export function DraggableClientTable({ 
   clients, 
@@ -402,13 +452,16 @@ export function DraggableClientTable({
             const s = fullSettings[client.id];
             const pacing = getPacingStatus(m.totalAdSpend || 0, s);
             const PacingIcon = pacing.icon;
+            const syncInfo = getClientSyncStatus(client);
+            const syncBorderStyle = getSyncBorderStyle(syncInfo.status);
             
             return (
+              <TooltipProvider key={client.id}>
               <TableRow
-                key={client.id}
                 className={cn(
                   "cursor-pointer hover:bg-muted/50 border-b h-14",
-                  draggedId === client.id && "opacity-50"
+                  draggedId === client.id && "opacity-50",
+                  syncBorderStyle
                 )}
                 draggable
                 onDragStart={(e) => handleDragStart(e, client.id)}
@@ -418,7 +471,45 @@ export function DraggableClientTable({
                 onClick={() => navigate(`/client/${client.id}`)}
               >
                 <TableCell className="cursor-grab sticky left-0 bg-card z-10" onClick={(e) => e.stopPropagation()}>
-                  <GripVertical className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex items-center gap-1">
+                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                    {/* Sync Status Icon */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className={cn(
+                          "ml-1",
+                          syncInfo.status === 'healthy' && 'text-chart-2',
+                          syncInfo.status === 'stale' && 'text-yellow-500',
+                          syncInfo.status === 'error' && 'text-destructive',
+                          syncInfo.status === 'not_configured' && 'text-muted-foreground'
+                        )}>
+                          {syncInfo.status === 'healthy' && <CheckCircle className="h-3 w-3" />}
+                          {syncInfo.status === 'stale' && <Clock className="h-3 w-3" />}
+                          {syncInfo.status === 'error' && <XCircle className="h-3 w-3" />}
+                          {syncInfo.status === 'not_configured' && <AlertCircle className="h-3 w-3" />}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs">
+                        <div className="text-sm">
+                          <strong>GHL Sync: </strong>
+                          {syncInfo.status === 'healthy' && 'Synced'}
+                          {syncInfo.status === 'stale' && 'Stale (>2 hours)'}
+                          {syncInfo.status === 'error' && 'Error'}
+                          {syncInfo.status === 'not_configured' && 'Not Configured'}
+                          {syncInfo.lastSyncAt && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Last: {formatDistanceToNow(new Date(syncInfo.lastSyncAt), { addSuffix: true })}
+                            </div>
+                          )}
+                          {syncInfo.error && (
+                            <div className="text-xs text-destructive mt-1">
+                              {syncInfo.error}
+                            </div>
+                          )}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                 </TableCell>
                 <TableCell className="font-semibold text-sm sticky left-10 bg-card z-10">{client.name}</TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
@@ -558,6 +649,7 @@ export function DraggableClientTable({
                   </div>
                 </TableCell>
               </TableRow>
+              </TooltipProvider>
             );
           })}
         </TableBody>
