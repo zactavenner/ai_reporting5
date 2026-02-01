@@ -1,346 +1,296 @@
 
-# Calls Sync Enhancement Plan
+# Comprehensive GoHighLevel Historical Sync Enhancement Plan
 
-## Problem Summary
+## Executive Summary
 
-The current database shows **only 3.55% of calls have linked leads** (12 out of 338 calls). This means:
-- 326 calls are missing contact information (name, email, phone)
-- Reports and filters based on lead data won't work for these calls
-- The UI shows blank rows for calls without lead associations
+This plan addresses a comprehensive historical data sync requirement to ensure all records from GoHighLevel (GHL) are accurately synchronized with the platform. Current state analysis shows:
+- **2,045 leads** in database
+- **195 calls** (104 orphaned without lead links - 53%)
+- **1 funded investor** (significantly underrepresented)
+- **0 pipeline opportunities** (sync not working)
+- **46 data discrepancies** (need cleanup)
 
-## Root Causes Identified
-
-1. **Orphaned Call Records**: Calls are created with `external_id` (GHL contact ID) but no `lead_id` is set
-2. **Missing Link Step**: The `syncCallToDatabase` function only enriches existing calls but doesn't link them to leads
-3. **No Appointment-to-Call Creation**: GHL appointments fetched during timeline sync aren't being converted to call records
-
-## Solution Overview
-
-Enhance the `sync-ghl-contacts` edge function to:
-1. **Link orphaned calls to leads** after contact sync
-2. **Create call records from GHL appointments** with proper lead linkage
-3. **Add a dedicated sync mode for calls** that fetches appointments and links them properly
+The goal is to implement a robust sync that:
+1. Syncs ALL GHL contacts using their `dateAdded` as the creation date
+2. Syncs ALL calls from configured calendars (tracked + reconnect)
+3. Creates committed/funded investor records from pipeline stages
+4. Links everything by GHL Contact ID for consistency
+5. Clears stale discrepancies and refreshes sync health
 
 ---
 
-## Technical Implementation
+## Phase 1: Enhance Contact Sync Logic
 
-### Phase 1: Add Call Linking Function
+### 1.1 Update `sync-ghl-contacts` Edge Function
 
-**File: `supabase/functions/sync-ghl-contacts/index.ts`**
+**Current Issue**: The sync fetches contacts but doesn't process beyond 1000 records efficiently. The `syncClientContacts` function has a `MAX_CONTACTS` limit.
 
-Add a new function after contact sync to link orphaned calls:
-
-```typescript
-async function linkOrphanedCallsToLeads(
-  supabase: any,
-  clientId: string
-): Promise<{ linked: number; errors: string[] }> {
-  const result = { linked: 0, errors: [] as string[] };
-  
-  // Find calls without lead_id where external_id matches a lead's external_id
-  const { data: orphanedCalls, error: fetchError } = await supabase
-    .from('calls')
-    .select('id, external_id, client_id')
-    .eq('client_id', clientId)
-    .is('lead_id', null);
-  
-  if (fetchError || !orphanedCalls) {
-    result.errors.push(`Failed to fetch orphaned calls: ${fetchError?.message}`);
-    return result;
-  }
-  
-  console.log(`Found ${orphanedCalls.length} orphaned calls for client ${clientId}`);
-  
-  for (const call of orphanedCalls) {
-    // Try to match call.external_id to a lead's external_id
-    const { data: matchingLead } = await supabase
-      .from('leads')
-      .select('id, name, email, phone')
-      .eq('client_id', clientId)
-      .eq('external_id', call.external_id)
-      .maybeSingle();
-    
-    if (matchingLead) {
-      const { error: updateError } = await supabase
-        .from('calls')
-        .update({ 
-          lead_id: matchingLead.id,
-          ghl_synced_at: new Date().toISOString()
-        })
-        .eq('id', call.id);
-      
-      if (!updateError) {
-        result.linked++;
-      } else {
-        result.errors.push(`Failed to link call ${call.id}: ${updateError.message}`);
-      }
-    }
-  }
-  
-  console.log(`Linked ${result.linked} calls to leads`);
-  return result;
-}
-```
-
-### Phase 2: Create Calls from GHL Appointments
-
-**File: `supabase/functions/sync-ghl-contacts/index.ts`**
-
-Add function to sync appointments as call records:
-
-```typescript
-async function syncAppointmentsAsCalls(
-  supabase: any,
-  clientId: string,
-  contactId: string,
-  leadId: string | null,
-  apiKey: string
-): Promise<{ created: number; updated: number }> {
-  const result = { created: 0, updated: 0 };
-  
-  // Fetch appointments for this contact
-  const appointments = await fetchGHLAppointments(apiKey, contactId);
-  
-  for (const appt of appointments) {
-    const appointmentId = appt.id;
-    const calendarId = appt.calendarId;
-    const status = (appt.status || appt.appointmentStatus || '').toLowerCase();
-    
-    // Map GHL appointment status to our call outcome
-    let outcome = 'booked';
-    let showed = false;
-    
-    if (status === 'showed' || status === 'completed') {
-      outcome = 'showed';
-      showed = true;
-    } else if (status === 'noshow' || status === 'no-show' || status === 'no_show') {
-      outcome = 'no_show';
-      showed = false;
-    } else if (status === 'cancelled' || status === 'canceled') {
-      outcome = 'cancelled';
-      showed = false;
-    } else if (status === 'confirmed') {
-      outcome = 'booked';
-      showed = false;
-    }
-    
-    const callData = {
-      client_id: clientId,
-      lead_id: leadId,
-      external_id: contactId, // Use contact ID as external_id for matching
-      ghl_appointment_id: appointmentId,
-      ghl_calendar_id: calendarId,
-      scheduled_at: appt.startTime || appt.dateAdded,
-      appointment_status: status,
-      showed,
-      outcome,
-      booked_at: appt.dateAdded || appt.createdAt,
-      ghl_synced_at: new Date().toISOString(),
-    };
-    
-    // Upsert using the partial unique index on (client_id, ghl_appointment_id)
-    const { data: existingCall } = await supabase
-      .from('calls')
-      .select('id')
-      .eq('client_id', clientId)
-      .eq('ghl_appointment_id', appointmentId)
-      .maybeSingle();
-    
-    if (existingCall) {
-      // Update existing call
-      await supabase
-        .from('calls')
-        .update({
-          lead_id: leadId, // Link to lead
-          scheduled_at: callData.scheduled_at,
-          appointment_status: callData.appointment_status,
-          showed: callData.showed,
-          outcome: callData.outcome,
-          ghl_synced_at: new Date().toISOString(),
-        })
-        .eq('id', existingCall.id);
-      result.updated++;
-    } else {
-      // Create new call record
-      await supabase
-        .from('calls')
-        .insert(callData);
-      result.created++;
-    }
-  }
-  
-  return result;
-}
-```
-
-### Phase 3: Integrate into Sync Flow
-
-**File: `supabase/functions/sync-ghl-contacts/index.ts`**
-
-Modify `syncContactToDatabase` to also sync appointments:
-
-```typescript
-// After syncing contact to lead, sync their appointments as calls
-if (syncResult.leadId) {
-  const appointmentResult = await syncAppointmentsAsCalls(
-    supabase,
-    clientId,
-    contact.id,
-    syncResult.leadId,
-    apiKey
-  );
-  // Track results
-}
-```
-
-Add call to `linkOrphanedCallsToLeads` at the end of `syncClientContacts`:
-
-```typescript
-// At the end of syncClientContacts, after all contacts are synced:
-const linkResult = await linkOrphanedCallsToLeads(supabase, client.id);
-console.log(`Linked ${linkResult.linked} orphaned calls to leads`);
-```
-
-### Phase 4: Add Dedicated Calls Sync Mode
-
-**File: `supabase/functions/sync-ghl-contacts/index.ts`**
-
-Add a new mode handler in the main serve function:
-
-```typescript
-// Handle calls enrichment mode
-if (mode === 'calls' && targetClientId) {
-  // 1. Link orphaned calls to leads
-  const linkResult = await linkOrphanedCallsToLeads(supabase, targetClientId);
-  
-  // 2. Sync appointments for all leads
-  const { data: leads } = await supabase
-    .from('leads')
-    .select('id, external_id')
-    .eq('client_id', targetClientId)
-    .not('external_id', 'is', null);
-  
-  let callsCreated = 0;
-  let callsUpdated = 0;
-  
-  for (const lead of (leads || [])) {
-    const apptResult = await syncAppointmentsAsCalls(
-      supabase,
-      targetClientId,
-      lead.external_id,
-      lead.id,
-      client.ghl_api_key
-    );
-    callsCreated += apptResult.created;
-    callsUpdated += apptResult.updated;
-  }
-  
-  return new Response(JSON.stringify({
-    success: true,
-    linked: linkResult.linked,
-    calls_created: callsCreated,
-    calls_updated: callsUpdated,
-  }), { headers: ... });
-}
-```
-
-### Phase 5: Update useSyncClient Hook
-
-**File: `src/hooks/useSyncClient.ts`**
-
-Update `syncCalls` to use the new dedicated mode:
-
-```typescript
-const syncCalls = useCallback(async (): Promise<SyncResult> => {
-  if (!clientId) return { success: false, error: 'No client ID' };
-
-  setProgress({ isLoading: true, type: 'calls', message: 'Syncing calls from GHL...' });
-  
-  try {
-    const { data, error } = await supabase.functions.invoke('sync-ghl-contacts', {
-      body: { client_id: clientId, mode: 'calls' }
-    });
-
-    if (error) throw new Error(error.message);
-    if (!data?.success) throw new Error(data?.error || 'Sync failed');
-
-    const linked = data?.linked || 0;
-    const created = data?.calls_created || 0;
-    const updated = data?.calls_updated || 0;
-
-    invalidateQueries();
-    toast.success(`Calls synced: ${linked} linked, ${created} created, ${updated} updated`);
-    
-    return { success: true, created, updated };
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    toast.error(`Call sync failed: ${errorMessage}`);
-    return { success: false, error: errorMessage };
-  } finally {
-    setProgress({ isLoading: false, type: null, message: null });
-  }
-}, [clientId, invalidateQueries]);
-```
-
----
-
-## Data Flow Summary
+**Changes Required**:
 
 ```text
-GHL Contact Sync Flow:
-┌─────────────────┐
-│ Fetch Contacts  │
-│ from GHL API    │
-└───────┬─────────┘
-        │
-        ▼
-┌─────────────────┐
-│ Upsert to leads │◄─── Uses external_id as unique key
-│ table           │
-└───────┬─────────┘
-        │
-        ▼
-┌─────────────────────────┐
-│ Fetch appointments for  │
-│ each contact from GHL   │
-└───────┬─────────────────┘
-        │
-        ▼
-┌─────────────────────────┐
-│ Upsert to calls table   │◄─── Links lead_id, uses ghl_appointment_id
-│ with lead_id linked     │
-└───────┬─────────────────┘
-        │
-        ▼
-┌─────────────────────────┐
-│ Link any remaining      │
-│ orphaned calls by       │
-│ matching external_id    │
-└─────────────────────────┘
+supabase/functions/sync-ghl-contacts/index.ts
+├── Remove MAX_CONTACTS limit for historical syncs
+├── Add pagination state preservation
+├── Ensure GHL dateAdded is ALWAYS used as created_at
+├── Add batch upsert for better performance
+└── Process opportunities during contact sync
+```
+
+Key modifications:
+- When `mode: 'historical_sync'` is passed, remove the 500/1000 contact limit
+- For each contact, also check if they exist in the configured funded/committed pipeline stages
+- Create `funded_investors` records for contacts in funded stages
+- Create `committed_investors` or flag leads for contacts in committed stages
+
+### 1.2 Add Pipeline Stage Detection During Contact Sync
+
+The client has configured:
+- **Committed Stages**: `6ea766b8-4613-464a-8d3d-4f8807a81cf7` (High Probability), `19bc4d32-20cc-4f1a-b73e-3f141803f368` (Medium Probability)
+- **Funded Stages**: `b21bd0ce-517f-4b93-87ff-5b74128aac68` (Funded This Month), `64d8ade1-dc94-444f-ac86-b7f865b43365` (Funds Received)
+- **Pipeline ID**: `t8OHTTkxbcKvfInhCuEb`
+
+New function to add:
+```typescript
+async function syncFundedFromPipelineStages(
+  supabase: any,
+  clientId: string,
+  apiKey: string,
+  settings: {
+    fundedPipelineId: string;
+    fundedStageIds: string[];
+    committedStageIds: string[];
+  }
+): Promise<{ funded: number; committed: number }>
+```
+
+This will:
+1. Fetch opportunities from the funded pipeline
+2. Match opportunities to configured funded/committed stage IDs
+3. Create `funded_investors` records with proper dates and values
+4. Update leads with `opportunity_status`, `opportunity_stage`, `opportunity_value`
+
+---
+
+## Phase 2: Calendar-Based Call Sync
+
+### 2.1 Add Calendar-Aware Appointment Fetching
+
+**Current Issue**: The `syncAppointmentsAsCalls` function fetches ALL appointments for a contact without filtering by calendar. Need to respect the configured calendars.
+
+**Client Configuration**:
+- **Tracked Calendars** (Initial Booked Calls): `nNRBXQt3nuU370VG72ct`, `p4WfUDVjSfrT6q2usxiP`, `fFbAT17Agbq39QbgNpIQ`, `0cN0jObFCwvqECAlUZFk`
+- **Reconnect Calendars**: `4V7RgTfh7jnFSA6ulNcJ`
+
+**New Sync Mode**: Add `mode: 'historical_calls'` that:
+1. Fetches client settings for calendar configuration
+2. Uses GHL Calendars API to fetch ALL appointments from tracked calendars
+3. Uses GHL Calendars API to fetch ALL appointments from reconnect calendars
+4. Creates/updates call records with:
+   - `ghl_calendar_id` for tracking which calendar
+   - `is_reconnect: true` for reconnect calendar appointments
+   - `scheduled_at` from appointment start time
+   - `booked_at` from appointment creation date
+   - Status mapping: showed, no_show, cancelled, confirmed
+
+### 2.2 New Function for Calendar-Based Sync
+
+```typescript
+async function syncAllCalendarAppointments(
+  supabase: any,
+  client: ClientWithCredentials,
+  trackedCalendarIds: string[],
+  reconnectCalendarIds: string[]
+): Promise<{ calls_created: number; calls_updated: number; reconnects: number }>
+```
+
+This fetches appointments differently - by calendar rather than by contact, which is more efficient for historical syncs:
+1. For each tracked calendar, fetch all appointments with pagination
+2. For each reconnect calendar, fetch all appointments
+3. Match each appointment to a lead by contact ID
+4. Upsert to calls table
+
+---
+
+## Phase 3: Pipeline Opportunities Sync
+
+### 3.1 Fix Pipeline Sync Function
+
+**Current Issue**: The `sync-ghl-pipelines` function exists but opportunities show 0 in database.
+
+**Investigation Needed**:
+- The `sync-ghl-pipelines` endpoint with `mode: 'sync'` and `pipeline_id` should work
+- Need to call it for both configured pipelines
+
+**Solution**: Create a new comprehensive sync mode that:
+1. Syncs pipeline structure (stages)
+2. Fetches ALL opportunities with full pagination
+3. Links opportunities to contacts/leads
+4. Creates funded_investors for opportunities in funded stages
+
+### 3.2 Integration with Historical Sync
+
+When running historical sync:
+1. First sync pipelines and stages
+2. Fetch all opportunities
+3. For each opportunity:
+   - Check if stage is in `funded_stage_ids` → Create funded_investor
+   - Check if stage is in `committed_stage_ids` → Update lead status
+   - Store `opportunity_value`, `opportunity_stage`, `opportunity_status` on lead
+
+---
+
+## Phase 4: Unified Historical Sync Command
+
+### 4.1 New `mode: 'master_sync'` Handler
+
+Create a master sync mode that orchestrates everything:
+
+```typescript
+if (mode === 'master_sync' && targetClientId) {
+  // 1. Fetch client settings (calendars, pipelines, stages)
+  
+  // 2. Sync ALL contacts (no date limit, preserve GHL dateAdded)
+  
+  // 3. Sync ALL pipeline opportunities
+  
+  // 4. Create funded_investors from pipeline stages
+  
+  // 5. Sync ALL calendar appointments as calls
+  
+  // 6. Link orphaned calls to leads
+  
+  // 7. Clear old discrepancies and recalculate
+  
+  return { success, summary }
+}
+```
+
+### 4.2 Add Hook for Master Sync
+
+New hook: `useMasterSync.ts`
+```typescript
+export function useMasterSync() {
+  return useMutation({
+    mutationFn: async (clientId: string) => {
+      return supabase.functions.invoke('sync-ghl-contacts', {
+        body: { 
+          client_id: clientId,
+          mode: 'master_sync'
+        }
+      });
+    },
+    // ... success/error handlers
+  });
+}
 ```
 
 ---
 
-## Files to Modify
+## Phase 5: Data Cleanup
+
+### 5.1 Discrepancy Reset
+
+After successful historical sync:
+1. Delete all existing discrepancies for the client:
+   ```sql
+   DELETE FROM data_discrepancies WHERE client_id = $clientId
+   ```
+2. Let normal sync cycle recalculate accurate discrepancies
+
+### 5.2 Sync Health Accuracy
+
+Update `useSyncHealth` to:
+- Refresh after master sync completes
+- Show accurate counts for leads, calls, funded investors
+- Clear `ghl_sync_error` on client record
+
+---
+
+## Technical Implementation Details
+
+### Files to Modify
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/sync-ghl-contacts/index.ts` | Add `linkOrphanedCallsToLeads`, `syncAppointmentsAsCalls` functions; add `mode: 'calls'` handler; integrate into sync flow |
-| `src/hooks/useSyncClient.ts` | Update `syncCalls` to use `mode: 'calls'` |
+| `supabase/functions/sync-ghl-contacts/index.ts` | Add `master_sync` mode, `historical_calls` mode, pipeline stage detection, remove contact limits for historical |
+| `supabase/functions/sync-ghl-pipelines/index.ts` | Fix opportunity sync, add funded_investor creation |
+| `src/hooks/useMasterSync.ts` | **NEW** - Hook for triggering comprehensive sync |
+| `src/hooks/useSyncClient.ts` | Add master sync option |
+| `src/components/settings/ClientSettingsModal.tsx` | Add "Run Complete Historical Sync" button |
+| `src/components/dashboard/DataAuditSection.tsx` | Add master sync trigger option |
+
+### New API Modes
+
+1. **`mode: 'master_sync'`** - Full historical sync of all data types
+2. **`mode: 'historical_calls'`** - Calendar-based appointment sync
+3. **`mode: 'sync_funded'`** - Create funded investors from pipeline stages
+
+### Expected Outcomes
+
+After implementation:
+- ALL GHL contacts synced with correct `created_at` dates
+- ALL calendar appointments synced as call records
+- ALL funded/committed investors created from pipeline stages
+- ALL calls linked to leads (0 orphans)
+- ALL opportunities showing in pipeline view
+- Discrepancies cleared and recalculated accurately
+- Sync health showing green/healthy status
 
 ---
 
-## Expected Outcomes
+## Execution Order
 
-After implementation:
-- **All existing orphaned calls will be linked** to their corresponding leads
-- **New appointments will create call records** with proper lead associations
-- **Call records will display contact info** (name, email, phone) in the UI
-- **The Calls table in InlineRecordsView** will show complete data instead of empty rows
+1. **Deploy updated edge functions** with new sync modes
+2. **Run master sync** for client `f414feaa-c68e-4e68-b35d-fcefb8ff86e1`
+3. **Verify results**:
+   - Lead count increased (all GHL contacts)
+   - Call count increased with 0 orphans
+   - Funded investors populated from pipeline stages
+   - Pipeline opportunities visible in UI
+   - Discrepancies cleared
+4. **Update UI** with master sync button for future use
 
-## Rollout Considerations
+---
 
-- The orphan linking is idempotent and safe to run multiple times
-- Appointment sync uses upsert logic to avoid duplicates
-- No breaking changes to existing data or functionality
+## Data Flow Diagram
+
+```text
+Master Sync Flow:
+┌──────────────────────────────────────────────────────────────────┐
+│                        MASTER SYNC START                          │
+└────────────────────────────┬─────────────────────────────────────┘
+                             │
+    ┌────────────────────────┼────────────────────────┐
+    ▼                        ▼                        ▼
+┌─────────────┐    ┌─────────────────┐    ┌─────────────────────┐
+│ CONTACTS    │    │ CALENDARS       │    │ PIPELINES           │
+│ Full sync   │    │ Appointment     │    │ Opportunity sync    │
+│ No limit    │    │ sync by         │    │ + funded investor   │
+└──────┬──────┘    │ calendar ID     │    │ creation            │
+       │           └────────┬────────┘    └──────────┬──────────┘
+       │                    │                        │
+       ▼                    ▼                        ▼
+┌─────────────┐    ┌─────────────────┐    ┌─────────────────────┐
+│ LEADS       │◄───│ CALLS           │    │ FUNDED_INVESTORS    │
+│ Table       │    │ Table           │    │ Table               │
+│ external_id │    │ ghl_calendar_id │    │ pipeline stage      │
+└──────┬──────┘    │ is_reconnect    │    │ based creation      │
+       │           └─────────────────┘    └─────────────────────┘
+       │
+       ▼
+┌──────────────────────────────────────────────────────────────────┐
+│              LINK ORPHANED CALLS → LEADS                          │
+│              CLEAR DISCREPANCIES                                  │
+│              UPDATE SYNC HEALTH                                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Risk Mitigation
+
+1. **API Rate Limits**: Add delays between batches (300ms)
+2. **Timeout Prevention**: Process in batches, use background tasks
+3. **Data Integrity**: Use upserts with conflict resolution
+4. **Rollback**: No destructive operations on existing data
+5. **Progress Tracking**: Log progress to `sync_logs` table
