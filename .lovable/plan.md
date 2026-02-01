@@ -1,336 +1,296 @@
 
 
-# Comprehensive Sync Queue Implementation Plan
-
-## Overview
-
-This plan implements a robust sync queue system that processes all leads, calls, appointments, and timeline data from GoHighLevel (GHL) API for all clients. Since we cannot call all clients at once due to API rate limits and edge function timeouts, we'll implement a job queue with staggered processing.
-
-## Current State Analysis
-
-**What exists:**
-- 17 active clients (3 healthy, 13 with errors, 1 not configured)
-- 1,328 leads already synced
-- 338 calls in database
-- 89 timeline events
-- Edge function with 500ms delays between batches
-- MAX_CONTACTS limit of 500-1000 per run
-- No dedicated job queue table
-
-**Constraints:**
-- Edge function timeout: ~30 seconds max
-- GHL API rate limits require 200-500ms delays between requests
-- Cannot process all 17 clients in a single function call
-- Historical sync (365 days) requires multiple passes per client
-
----
-
-## Implementation Plan
-
-### Phase 1: Create Sync Queue Infrastructure
-
-#### 1.1 New Database Table: `sync_queue`
-
-Create a job queue table to track pending sync operations:
-
-```sql
-CREATE TABLE public.sync_queue (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_id UUID NOT NULL REFERENCES clients(id),
-  sync_type TEXT NOT NULL, -- 'contacts', 'appointments', 'timeline', 'full'
-  priority INTEGER DEFAULT 5, -- 1=highest, 10=lowest
-  status TEXT DEFAULT 'pending', -- 'pending', 'processing', 'completed', 'failed'
-  date_range_start DATE,
-  date_range_end DATE,
-  batch_number INTEGER DEFAULT 1,
-  total_batches INTEGER DEFAULT 1,
-  records_processed INTEGER DEFAULT 0,
-  error_message TEXT,
-  started_at TIMESTAMPTZ,
-  completed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX idx_sync_queue_pending ON sync_queue(status, priority, created_at) 
-  WHERE status = 'pending';
-```
-
-#### 1.2 Helper Function: Queue All Clients
-
-Create a database function to enqueue sync jobs for all clients:
-
-```sql
-CREATE OR REPLACE FUNCTION queue_full_sync_all_clients(days_back INTEGER DEFAULT 365)
-RETURNS INTEGER AS $$
-DECLARE
-  client_record RECORD;
-  jobs_created INTEGER := 0;
-  batch_size INTEGER := 90; -- Days per batch
-  num_batches INTEGER;
-  i INTEGER;
-BEGIN
-  num_batches := CEIL(days_back::DECIMAL / batch_size);
-  
-  FOR client_record IN 
-    SELECT id FROM clients 
-    WHERE status = 'active' 
-      AND ghl_api_key IS NOT NULL 
-      AND ghl_location_id IS NOT NULL
-  LOOP
-    -- Create batched jobs for each 90-day period
-    FOR i IN 1..num_batches LOOP
-      INSERT INTO sync_queue (
-        client_id, sync_type, priority, 
-        date_range_start, date_range_end,
-        batch_number, total_batches
-      ) VALUES (
-        client_record.id, 'full',
-        CASE WHEN i = 1 THEN 1 ELSE 5 END, -- Recent data first
-        CURRENT_DATE - (i * batch_size),
-        CURRENT_DATE - ((i - 1) * batch_size),
-        i, num_batches
-      );
-      jobs_created := jobs_created + 1;
-    END LOOP;
-  END LOOP;
-  
-  RETURN jobs_created;
-END;
-$$ LANGUAGE plpgsql;
-```
-
----
-
-### Phase 2: Create Sync Worker Edge Function
-
-#### 2.1 New Edge Function: `sync-queue-worker`
-
-This function processes one job at a time from the queue:
-
-```typescript
-// supabase/functions/sync-queue-worker/index.ts
-serve(async (req) => {
-  // 1. Claim the next pending job (atomic update)
-  const { data: job } = await supabase
-    .from('sync_queue')
-    .update({ status: 'processing', started_at: new Date().toISOString() })
-    .eq('status', 'pending')
-    .order('priority', { ascending: true })
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .select()
-    .single();
-
-  if (!job) {
-    return { success: true, message: 'No pending jobs' };
-  }
-
-  // 2. Get client credentials
-  const { data: client } = await supabase
-    .from('clients')
-    .select('id, name, ghl_api_key, ghl_location_id')
-    .eq('id', job.client_id)
-    .single();
-
-  // 3. Process based on sync_type
-  let result;
-  try {
-    if (job.sync_type === 'contacts' || job.sync_type === 'full') {
-      result = await syncContactsBatch(client, job.date_range_start, job.date_range_end);
-    }
-    if (job.sync_type === 'appointments' || job.sync_type === 'full') {
-      result = await syncAppointmentsBatch(client, job.date_range_start, job.date_range_end);
-    }
-    if (job.sync_type === 'timeline' || job.sync_type === 'full') {
-      result = await syncTimelineBatch(client, job.date_range_start, job.date_range_end);
-    }
-
-    // 4. Mark job complete
-    await supabase.from('sync_queue').update({
-      status: 'completed',
-      records_processed: result.total,
-      completed_at: new Date().toISOString()
-    }).eq('id', job.id);
-
-  } catch (error) {
-    // 5. Mark job failed with error
-    await supabase.from('sync_queue').update({
-      status: 'failed',
-      error_message: error.message,
-      completed_at: new Date().toISOString()
-    }).eq('id', job.id);
-  }
-});
-```
-
-#### 2.2 Sync Logic by Type
-
-**Contacts Sync:**
-- Fetch contacts from GHL API with pagination
-- Filter by `dateAdded` within date range
-- Upsert to `leads` table using `(client_id, external_id)` constraint
-- Preserve GHL `dateAdded` as `created_at` for reporting
-
-**Appointments Sync:**
-- Fetch from `/calendars/{calendarId}/events` for tracked calendars
-- Upsert to `calls` table with `appointment_status`
-- Map calendar IDs to `is_reconnect` flag
-- Link to `lead_id` via contact matching
-
-**Timeline Sync:**
-- For each contact in date range, fetch notes/tasks/appointments/messages
-- Insert into `contact_timeline_events` table
-- Process in batches of 10 contacts with 500ms delays
-
----
-
-### Phase 3: Scheduled Queue Processing
-
-#### 3.1 Update pg_cron Jobs
-
-Configure cron to process the queue every 5 minutes:
-
-```sql
--- Process queue every 5 minutes
-SELECT cron.schedule(
-  'process-sync-queue',
-  '*/5 * * * *',
-  $$
-  SELECT net.http_post(
-    url := 'https://jgwwmtuvjlmzapwqiabu.supabase.co/functions/v1/sync-queue-worker',
-    headers := '{"Authorization": "Bearer ' || current_setting('app.settings.service_role_key') || '"}'::jsonb
-  );
-  $$
-);
-```
-
-This means:
-- 1 job processed every 5 minutes
-- 12 jobs per hour
-- 288 jobs per day
-- Full sync of 17 clients x 4 batches = 68 jobs = ~6 hours
-
-#### 3.2 Hourly Incremental Sync
-
-Keep the existing hourly sync for recent data (last 24 hours):
-
-```sql
--- Hourly sync for recent data (existing job)
-SELECT cron.schedule(
-  'hourly-ghl-sync',
-  '0 * * * *',
-  $$SELECT net.http_post(..., body := '{"sync_type": "contacts", "days": 1}')$$
-);
-```
-
----
-
-### Phase 4: Manual Trigger UI
-
-#### 4.1 Add "Queue Full Sync" Button
-
-In `ClientSettingsModal.tsx` → Integrations tab:
-
-```tsx
-const handleQueueFullSync = async () => {
-  // Queue sync jobs for this client
-  await supabase.rpc('queue_client_sync', { 
-    p_client_id: clientId, 
-    p_days_back: 365 
-  });
-  toast.success('Sync jobs queued. Processing will begin shortly.');
-};
-```
-
-#### 4.2 Add "Sync All Clients" Button
-
-In agency settings or admin panel:
-
-```tsx
-const handleQueueAllClients = async () => {
-  const { data: jobsCreated } = await supabase.rpc('queue_full_sync_all_clients', { 
-    days_back: 365 
-  });
-  toast.success(`Queued ${jobsCreated} sync jobs for all clients.`);
-};
-```
-
----
-
-### Phase 5: Queue Monitoring Dashboard
-
-#### 5.1 Sync Queue Status Component
-
-Add a component to show queue progress:
-
-```tsx
-// src/components/settings/SyncQueueStatus.tsx
-const SyncQueueStatus = () => {
-  const { data: queueStats } = useQuery({
-    queryKey: ['sync-queue-stats'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('sync_queue')
-        .select('status, count(*)')
-        .group('status');
-      return data;
-    }
-  });
-
-  return (
-    <div>
-      <h3>Sync Queue</h3>
-      <div>Pending: {queueStats?.pending || 0}</div>
-      <div>Processing: {queueStats?.processing || 0}</div>
-      <div>Completed: {queueStats?.completed || 0}</div>
-      <div>Failed: {queueStats?.failed || 0}</div>
-    </div>
-  );
-};
-```
-
----
-
-## Processing Timeline
-
-For a full sync of all clients (17 clients x 365 days):
-
-| Phase | Jobs | Processing Time |
-|-------|------|-----------------|
-| Recent data (0-90 days) | 17 jobs | ~1.5 hours |
-| Historical (90-180 days) | 17 jobs | ~1.5 hours |
-| Historical (180-270 days) | 17 jobs | ~1.5 hours |
-| Historical (270-365 days) | 17 jobs | ~1.5 hours |
-| **Total** | **68 jobs** | **~6 hours** |
-
-Timeline sync adds an additional pass but can run concurrently.
-
----
-
-## Files to Create/Modify
-
-### New Files
-- `supabase/functions/sync-queue-worker/index.ts` - Queue worker function
-- `src/components/settings/SyncQueueStatus.tsx` - Queue monitoring UI
-
-### Modified Files
-- Database migration for `sync_queue` table and helper functions
-- `src/components/settings/ClientSettingsModal.tsx` - Add queue button
-- `src/components/settings/AgencySettingsModal.tsx` - Add "Sync All" button
-- `supabase/config.toml` - Register new edge function
-
----
+# Lead Records UI Upgrade Plan
 
 ## Summary
 
-This queue-based architecture ensures:
+This plan upgrades the leads/records table UI to be cleaner and more functional, with a new blue-based color scheme and additional data columns for enhanced lead tracking.
 
-1. **No API rate limit violations** - 5-minute gaps between jobs
-2. **No edge function timeouts** - Each job processes one client + one date range
-3. **Resumable syncs** - Failed jobs can be retried
-4. **Prioritized processing** - Recent data synced first
-5. **Full visibility** - Queue status shown in UI
-6. **Automated background processing** - pg_cron triggers every 5 minutes
+## What's Changing
 
-The system will sync all 17 clients' historical data (365 days) in approximately 6 hours, with real-time updates continuing every hour for new data.
+### 1. Color Scheme: Green to Blue
+
+The current design uses green as the primary accent color. We'll shift to a professional blue palette while maintaining theme consistency.
+
+**Light Mode Changes:**
+- Primary: `161 93% 30%` (green) → `217 91% 60%` (blue)
+- Accent: `166 76% 96%` → `214 100% 97%`
+- Chart colors: Shift to blue-purple spectrum
+
+**Dark Mode Changes:**
+- Primary: `158 64% 51%` → `213 94% 68%`
+- Accent colors adjusted to match
+
+### 2. New Data Columns for Leads Table
+
+| Column | Description | Data Source |
+|--------|-------------|-------------|
+| **Days Since Created** | Shows "X days ago" or "Today" | Calculate from `created_at` field |
+| **Survey Responses** | Shows survey answers inline with labels | Parse `questions` JSON field |
+| **Engagement Stats** | Email/SMS/Calls sent counts | Query `contact_timeline_events` table |
+| **Call Recordings** | Icon indicator if recordings exist | Check `calls.recording_url` for linked calls |
+
+### 3. UI Visual Improvements
+
+**Inspired by the reference image:**
+- Cleaner row spacing with subtle hover states
+- Expandable row design (chevron to expand for more details)
+- Status dropdown integrated into the row (like the "Booked" dropdown shown)
+- Relative timestamps with icons ("about 13 hours ago" format)
+- Better badge styling for statuses
+- Action icons (sync, external link) grouped on the right
+
+### 4. Enhanced Survey Response Display
+
+Currently shows "X Q&A" badge. Will expand to show:
+- Accredited status as a pill badge (Yes/No)
+- Investment range inline
+- Other key fields as hover tooltip or expandable section
+
+---
+
+## Technical Implementation
+
+### Phase 1: Color Scheme Update
+
+**File: `src/index.css`**
+
+Update CSS variables for both light and dark modes to use blue-based HSL values.
+
+```text
+Light mode primary:   217 91% 60%   (bright blue)
+Light mode accent:    214 100% 97%  (light blue tint)
+Dark mode primary:    213 94% 68%   (lighter blue)
+```
+
+Also update `chart-1`, `chart-2`, etc. to blue-purple spectrum for visual consistency.
+
+### Phase 2: Enhanced Lead Type Definition
+
+**File: `src/hooks/useLeadsAndCalls.ts`**
+
+No schema changes needed - we already have all required fields:
+- `created_at` - for days calculation
+- `questions` - for survey responses
+- `external_id` - for linking timeline events
+
+### Phase 3: Create Engagement Stats Hook
+
+**New file: `src/hooks/useLeadEngagementStats.ts`**
+
+```typescript
+// Fetches aggregated engagement stats for leads
+// Counts emails, SMS, calls from contact_timeline_events
+// Checks for call recordings from calls table
+```
+
+Returns:
+```typescript
+{
+  [leadId: string]: {
+    emailsSent: number;
+    smsSent: number;
+    callsMade: number;
+    hasRecording: boolean;
+  }
+}
+```
+
+### Phase 4: Update InlineRecordsView Component
+
+**File: `src/components/dashboard/InlineRecordsView.tsx`**
+
+**Table Header Changes (around line 1350-1370):**
+- Remove Ad Set, Ad ID columns (move to expandable row)
+- Add: Days, Accredited, Investment, Engagement, Recording
+- Reorganize column order for better flow
+
+**Table Row Changes (around line 1370-1510):**
+
+1. **Days Since Created Column:**
+```tsx
+<TableCell>
+  <span className="text-sm text-muted-foreground">
+    {formatDistanceToNow(new Date(lead.created_at), { addSuffix: false })}
+  </span>
+</TableCell>
+```
+
+2. **Accredited Badge Column:**
+```tsx
+<TableCell>
+  {getAccreditedStatus(lead.questions) === 'yes' ? (
+    <Badge className="bg-blue-500 text-white">Yes</Badge>
+  ) : getAccreditedStatus(lead.questions) === 'no' ? (
+    <Badge variant="secondary">No</Badge>
+  ) : null}
+</TableCell>
+```
+
+3. **Investment Range Column:**
+```tsx
+<TableCell className="text-sm">
+  {getInvestmentRange(lead.questions) || '-'}
+</TableCell>
+```
+
+4. **Engagement Stats Column:**
+```tsx
+<TableCell>
+  <div className="flex items-center gap-2 text-xs">
+    <span title="Emails"><Mail className="h-3 w-3" /> {stats.emailsSent}</span>
+    <span title="SMS"><MessageSquare className="h-3 w-3" /> {stats.smsSent}</span>
+    <span title="Calls"><Phone className="h-3 w-3" /> {stats.callsMade}</span>
+  </div>
+</TableCell>
+```
+
+5. **Recording Indicator Column:**
+```tsx
+<TableCell>
+  {stats.hasRecording && (
+    <Button variant="ghost" size="icon" className="h-6 w-6">
+      <Play className="h-3 w-3 text-blue-500" />
+    </Button>
+  )}
+</TableCell>
+```
+
+**Row Expansion Feature:**
+- Add expandable section showing full survey responses
+- Show attribution details (Campaign, Ad Set, Ad ID)
+- Display engagement timeline preview
+
+### Phase 5: Status Dropdown Integration
+
+**Inspired by reference image's "Booked" dropdown:**
+
+Replace static status badge with an interactive dropdown that allows status updates inline:
+
+```tsx
+<Select value={lead.status || 'new'} onValueChange={(val) => updateLeadStatus(lead.id, val)}>
+  <SelectTrigger className="w-28 h-8">
+    <SelectValue />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="new">New</SelectItem>
+    <SelectItem value="potential">Potential</SelectItem>
+    <SelectItem value="qualified">Qualified</SelectItem>
+    <SelectItem value="booked">Booked</SelectItem>
+    <SelectItem value="completed">Completed</SelectItem>
+    <SelectItem value="no_show">No Show</SelectItem>
+  </SelectContent>
+</Select>
+```
+
+### Phase 6: Sync Status Improvements
+
+**Enhance the GHL Sync column (reference shows relative time with refresh icon):**
+
+```tsx
+<TableCell>
+  <div className="flex items-center gap-2">
+    <CheckCircle className="h-3 w-3 text-green-500" />
+    <span className="text-xs text-muted-foreground">
+      {formatDistanceToNow(new Date(lead.ghl_synced_at), { addSuffix: true })}
+    </span>
+    <Button variant="ghost" size="icon" className="h-5 w-5">
+      <RefreshCw className="h-3 w-3" />
+    </Button>
+    <a href={ghlUrl} target="_blank">
+      <ExternalLink className="h-3 w-3" />
+    </a>
+  </div>
+</TableCell>
+```
+
+---
+
+## Helper Functions to Add
+
+**In InlineRecordsView.tsx:**
+
+```typescript
+// Extract accredited status from questions array
+const getAccreditedStatus = (questions: any[] | null): 'yes' | 'no' | null => {
+  if (!questions) return null;
+  const accreditedQ = questions.find(q => 
+    q.question === 'UKtZxKiQgUDUa2wpb7SS' || 
+    String(q.question).toLowerCase().includes('accredited')
+  );
+  if (!accreditedQ) return null;
+  const answer = String(accreditedQ.answer).toLowerCase();
+  if (answer === 'yes' || answer.includes('yes')) return 'yes';
+  if (answer === 'no' || answer.includes('no')) return 'no';
+  return null;
+};
+
+// Extract investment range from questions array
+const getInvestmentRange = (questions: any[] | null): string | null => {
+  if (!questions) return null;
+  const investmentQ = questions.find(q => 
+    q.question === 'DHkLtULj05sgxm3H8RET' ||
+    String(q.question).toLowerCase().includes('investment')
+  );
+  return investmentQ ? String(investmentQ.answer) : null;
+};
+```
+
+---
+
+## Visual Design Specifications
+
+### Table Row Styling
+- Row height: 52px (comfortable for data density)
+- Hover: `bg-muted/30` with subtle transition
+- Selected: `bg-primary/10` with left border accent
+- Expandable indicator: Chevron that rotates on expand
+
+### Badge Styles
+- Status badges: Rounded, 24px height
+- "Yes" accredited: Blue background (`bg-blue-500`)
+- "Booked" status: Yellow/amber background
+- "Showed" status: Green background
+- "No Show" status: Red/destructive background
+
+### Typography
+- Name: `font-medium text-sm`
+- Contact info: `text-sm text-muted-foreground`
+- Stats: `text-xs` with subtle icons
+- Relative times: `text-xs text-muted-foreground`
+
+---
+
+## Files to Modify
+
+1. **`src/index.css`** - Color scheme (green → blue)
+2. **`src/hooks/useLeadEngagementStats.ts`** - New hook (create)
+3. **`src/components/dashboard/InlineRecordsView.tsx`** - Table columns and row styling
+4. **`src/components/dashboard/RecordDetailsGHLSection.tsx`** - Minor styling updates
+5. **`src/hooks/useLeadsAndCalls.ts`** - Add lead status update mutation
+
+---
+
+## Data Requirements
+
+**Current Database Schema Supports:**
+- Days calculation: Uses existing `created_at`
+- Survey responses: Uses existing `questions` JSONB field
+- Investment range: Already in `questions` (field ID: `DHkLtULj05sgxm3H8RET`)
+- Accredited status: Already in `questions` (field ID: `UKtZxKiQgUDUa2wpb7SS`)
+
+**Engagement Stats Query:**
+The `contact_timeline_events` table has `event_type` values for 'email', 'sms', 'call' - though currently sparse data. The UI will show counts even if zero.
+
+**Call Recordings:**
+The `calls` table has `recording_url` field but current data shows no recordings synced yet. The UI will display the indicator when available.
+
+---
+
+## Rollout Considerations
+
+- No breaking changes to existing functionality
+- Color changes are global but theme-consistent
+- New columns can be hidden via column visibility toggle if needed
+- Engagement stats lazy-load to avoid performance impact
 
