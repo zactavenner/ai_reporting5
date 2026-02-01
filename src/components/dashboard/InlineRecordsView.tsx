@@ -28,6 +28,7 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Download,
   Calendar,
   Mail,
@@ -49,6 +50,8 @@ import {
   Pencil,
   Layers,
   Target,
+  MessageSquare,
+  Play,
 } from 'lucide-react';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
 // TooltipProvider imported below with other tooltip imports
@@ -56,6 +59,7 @@ import { exportToCSV } from '@/lib/exportUtils';
 import { DailyMetric } from '@/hooks/useMetrics';
 import { Lead, Call } from '@/hooks/useLeadsAndCalls';
 import { useClientOpportunities, EnrichedOpportunity } from '@/hooks/usePipelines';
+import { useLeadCallRecordings } from '@/hooks/useLeadEngagementStats';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -147,6 +151,12 @@ export function InlineRecordsView({
   
   // Fetch opportunities for this client
   const { data: opportunities = [] } = useClientOpportunities(clientId);
+  
+  // Fetch call recordings map
+  const { data: callRecordingsMap = {} } = useLeadCallRecordings(clientId);
+  
+  // Track expanded rows for lead details
+  const [expandedLeadIds, setExpandedLeadIds] = useState<Set<string>>(new Set());
 
   // Modal states
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -172,6 +182,53 @@ export function InlineRecordsView({
     } catch {
       return 'Never';
     }
+  };
+  
+  // Format relative time for lead created date
+  const formatDaysSince = (createdAt: string): string => {
+    try {
+      return formatDistanceToNow(new Date(createdAt), { addSuffix: false });
+    } catch {
+      return '-';
+    }
+  };
+  
+  // Extract accredited status from questions array
+  const getAccreditedStatus = (questions: any[] | null): 'yes' | 'no' | null => {
+    if (!questions || !Array.isArray(questions)) return null;
+    const accreditedQ = questions.find(q => 
+      q.question === 'UKtZxKiQgUDUa2wpb7SS' || 
+      String(q.question || '').toLowerCase().includes('accredited')
+    );
+    if (!accreditedQ) return null;
+    const answer = String(accreditedQ.answer || '').toLowerCase();
+    if (answer === 'yes' || answer.includes('yes')) return 'yes';
+    if (answer === 'no' || answer.includes('no')) return 'no';
+    return null;
+  };
+
+  // Extract investment range from questions array
+  const getInvestmentRange = (questions: any[] | null): string | null => {
+    if (!questions || !Array.isArray(questions)) return null;
+    const investmentQ = questions.find(q => 
+      q.question === 'DHkLtULj05sgxm3H8RET' ||
+      String(q.question || '').toLowerCase().includes('investment')
+    );
+    return investmentQ ? String(investmentQ.answer) : null;
+  };
+  
+  // Toggle expanded row
+  const toggleLeadExpansion = (leadId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedLeadIds(prev => {
+      const next = new Set(prev);
+      if (next.has(leadId)) {
+        next.delete(leadId);
+      } else {
+        next.add(leadId);
+      }
+      return next;
+    });
   };
   
   // Handle sync button click
@@ -1350,164 +1407,292 @@ export function InlineRecordsView({
                   <Table>
                     <TableHeader>
                       <TableRow className="border-b-2">
-                        <TableHead>Date</TableHead>
+                        <TableHead className="w-8"></TableHead>
+                        <TableHead>Age</TableHead>
                         <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
+                        <TableHead>Contact</TableHead>
                         <TableHead>Source</TableHead>
                         <TableHead>Campaign</TableHead>
-                        <TableHead>Ad Set</TableHead>
-                        <TableHead>Ad ID</TableHead>
-                        <TableHead>Rep</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Accredited</TableHead>
+                        <TableHead>Investment</TableHead>
                         <TableHead>Questions</TableHead>
-                        {ghlLocationId && <TableHead>GHL</TableHead>}
-                        {ghlLocationId && <TableHead>Last Sync</TableHead>}
-                        {ghlLocationId && clientId && <TableHead>Sync</TableHead>}
-                        {clientId && <TableHead className="text-right">Actions</TableHead>}
+                        {ghlLocationId && <TableHead>GHL Sync</TableHead>}
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginatedLeads.map((lead) => (
-                        <TableRow
-                          key={lead.id}
-                          className={`cursor-pointer hover:bg-muted/50 ${
-                            selectedRecord?.id === lead.id && selectedType === 'lead'
-                              ? 'bg-primary/10'
-                              : ''
-                          }`}
-                          onClick={() => onRecordSelect?.(lead, 'lead')}
-                        >
-                          <TableCell className="font-mono text-sm">
-                            {new Date(lead.created_at).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell className="font-medium">{lead.name || 'Unknown'}</TableCell>
-                          <TableCell>{lead.email || '-'}</TableCell>
-                          <TableCell>{lead.phone || '-'}</TableCell>
-                          <TableCell><Badge variant="outline">{lead.source}</Badge></TableCell>
-                          <TableCell className="max-w-[120px] truncate text-xs" title={lead.campaign_name || ''}>
-                            {lead.campaign_name || '-'}
-                          </TableCell>
-                          <TableCell className="max-w-[120px] truncate text-xs" title={lead.ad_set_name || ''}>
-                            {lead.ad_set_name || '-'}
-                          </TableCell>
-                          <TableCell className="max-w-[80px] truncate text-xs" title={lead.ad_id || ''}>
-                            {lead.ad_id || '-'}
-                          </TableCell>
-                          <TableCell>{lead.assigned_user || '-'}</TableCell>
-                          <TableCell>
-                            {lead.is_spam ? (
-                              <Badge variant="destructive">Spam</Badge>
-                            ) : (
-                              <Badge className="bg-chart-2 text-chart-2-foreground">{lead.status || 'new'}</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {lead.questions && Array.isArray(lead.questions) && lead.questions.length > 0 ? (
-                              <Badge variant="secondary" className="text-xs">
-                                {lead.questions.length} Q&A
-                              </Badge>
-                            ) : '-'}
-                          </TableCell>
-                          {ghlLocationId && (
-                            <TableCell>
-                              {lead.external_id && !lead.external_id.startsWith('wh_') && !lead.external_id.startsWith('manual-') ? (
-                                <a 
-                                  href={getGHLContactUrl(ghlLocationId, lead.external_id)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-primary hover:underline flex items-center gap-1"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                </a>
-                              ) : '-'}
-                            </TableCell>
-                          )}
-                          {ghlLocationId && (
-                            <TableCell>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className={`text-xs ${
-                                    !lead.ghl_synced_at 
-                                      ? 'text-muted-foreground' 
-                                      : new Date(lead.ghl_synced_at) < new Date(Date.now() - 24 * 60 * 60 * 1000)
-                                        ? 'text-amber-500'
-                                        : 'text-chart-2'
-                                  }`}>
-                                    {formatLastSync(lead.ghl_synced_at)}
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <div className="text-xs space-y-1">
-                                    <p><strong>Last Sync:</strong> {lead.ghl_synced_at ? new Date(lead.ghl_synced_at).toLocaleString() : 'Never'}</p>
-                                    <p><strong>GHL ID:</strong> {lead.external_id || 'N/A'}</p>
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TableCell>
-                          )}
-                          {ghlLocationId && clientId && (
-                            <TableCell>
-                              {canSyncFromGHL(lead.external_id, !!ghlLocationId) ? (
+                      {paginatedLeads.map((lead) => {
+                        const isExpanded = expandedLeadIds.has(lead.id);
+                        const accreditedStatus = getAccreditedStatus(lead.questions as any[] | null);
+                        const investmentRange = getInvestmentRange(lead.questions as any[] | null);
+                        const hasRecording = callRecordingsMap[lead.id] || false;
+                        
+                        return (
+                          <>
+                            <TableRow
+                              key={lead.id}
+                              className={`cursor-pointer transition-colors hover:bg-muted/30 ${
+                                selectedRecord?.id === lead.id && selectedType === 'lead'
+                                  ? 'bg-primary/10 border-l-2 border-l-primary'
+                                  : ''
+                              }`}
+                              onClick={() => onRecordSelect?.(lead, 'lead')}
+                            >
+                              <TableCell className="w-8 p-2">
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-7 w-7"
-                                  disabled={isSyncing(lead.external_id)}
-                                  onClick={(e) => handleSyncClick(e, lead.external_id, 'lead')}
+                                  className="h-6 w-6"
+                                  onClick={(e) => toggleLeadExpansion(lead.id, e)}
                                 >
-                                  {isSyncing(lead.external_id) ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <RefreshCw className="h-3.5 w-3.5" />
+                                  <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                </Button>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDaysSince(lead.created_at)}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-sm">{lead.name || 'Unknown'}</span>
+                                  {lead.assigned_user && (
+                                    <span className="text-xs text-muted-foreground">{lead.assigned_user}</span>
                                   )}
-                                </Button>
-                              ) : '-'}
-                            </TableCell>
-                          )}
-                          {clientId && (
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={(e) => { e.stopPropagation(); openEditModal(lead); }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-destructive"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Lead?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        This will permanently delete this lead and all associated data.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDeleteRecord(lead, 'leads')}>
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      ))}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col text-sm">
+                                  {lead.email && (
+                                    <span className="text-muted-foreground truncate max-w-[180px]" title={lead.email}>
+                                      {lead.email}
+                                    </span>
+                                  )}
+                                  {lead.phone && (
+                                    <span className="text-muted-foreground text-xs">{lead.phone}</span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="text-xs">{lead.source}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-xs text-muted-foreground truncate max-w-[120px] block" title={lead.campaign_name || ''}>
+                                  {lead.campaign_name || '-'}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                {lead.is_spam ? (
+                                  <Badge variant="destructive" className="text-xs">Spam</Badge>
+                                ) : (
+                                  <Badge 
+                                    className={`text-xs ${
+                                      lead.status === 'booked' || lead.status === 'qualified' 
+                                        ? 'bg-amber-500 text-amber-50' 
+                                        : lead.status === 'showed' || lead.status === 'completed'
+                                          ? 'bg-chart-4 text-background'
+                                          : lead.status === 'no_show'
+                                            ? 'bg-destructive text-destructive-foreground'
+                                            : 'bg-chart-1 text-background'
+                                    }`}
+                                  >
+                                    {lead.status || 'new'}
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {accreditedStatus === 'yes' ? (
+                                  <Badge className="bg-primary text-primary-foreground text-xs">Yes</Badge>
+                                ) : accreditedStatus === 'no' ? (
+                                  <Badge variant="secondary" className="text-xs">No</Badge>
+                                ) : (
+                                  <span className="text-muted-foreground text-xs">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-sm">{investmentRange || '-'}</span>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  {lead.questions && Array.isArray(lead.questions) && lead.questions.length > 0 ? (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {lead.questions.length} Q&A
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground text-xs">-</span>
+                                  )}
+                                  {hasRecording && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                                          <Play className="h-3 w-3 text-primary" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Call recording available</TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </div>
+                              </TableCell>
+                              {ghlLocationId && (
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    {lead.ghl_synced_at ? (
+                                      <CheckCircle className="h-3 w-3 text-chart-4" />
+                                    ) : null}
+                                    <span className={`text-xs ${
+                                      !lead.ghl_synced_at 
+                                        ? 'text-muted-foreground' 
+                                        : new Date(lead.ghl_synced_at) < new Date(Date.now() - 24 * 60 * 60 * 1000)
+                                          ? 'text-amber-500'
+                                          : 'text-chart-4'
+                                    }`}>
+                                      {formatLastSync(lead.ghl_synced_at)}
+                                    </span>
+                                    {canSyncFromGHL(lead.external_id, !!ghlLocationId) && clientId && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-5 w-5"
+                                        disabled={isSyncing(lead.external_id)}
+                                        onClick={(e) => handleSyncClick(e, lead.external_id, 'lead')}
+                                      >
+                                        {isSyncing(lead.external_id) ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <RefreshCw className="h-3 w-3" />
+                                        )}
+                                      </Button>
+                                    )}
+                                    {lead.external_id && !lead.external_id.startsWith('wh_') && !lead.external_id.startsWith('manual-') && (
+                                      <a 
+                                        href={getGHLContactUrl(ghlLocationId, lead.external_id)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-primary hover:text-primary/80"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <ExternalLink className="h-3 w-3" />
+                                      </a>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              )}
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-1">
+                                  {clientId && (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7"
+                                        onClick={(e) => { e.stopPropagation(); openEditModal(lead); }}
+                                      >
+                                        <Edit className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-destructive"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>Delete Lead?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              This will permanently delete this lead and all associated data.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteRecord(lead, 'leads')}>
+                                              Delete
+                                            </AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                            {/* Expandable row for full details */}
+                            {isExpanded && (
+                              <TableRow key={`${lead.id}-expanded`} className="bg-muted/20">
+                                <TableCell colSpan={12} className="p-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                    {/* Attribution Details */}
+                                    <div className="space-y-2">
+                                      <h4 className="font-medium text-xs text-muted-foreground uppercase tracking-wide">Attribution</h4>
+                                      <div className="space-y-1">
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Campaign:</span>
+                                          <span className="font-mono text-xs">{lead.campaign_name || '-'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Ad Set:</span>
+                                          <span className="font-mono text-xs">{lead.ad_set_name || '-'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Ad ID:</span>
+                                          <span className="font-mono text-xs">{lead.ad_id || '-'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Created:</span>
+                                          <span className="font-mono text-xs">{new Date(lead.created_at).toLocaleString()}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* UTM Parameters */}
+                                    <div className="space-y-2">
+                                      <h4 className="font-medium text-xs text-muted-foreground uppercase tracking-wide">UTM Parameters</h4>
+                                      <div className="space-y-1">
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Source:</span>
+                                          <span className="font-mono text-xs">{lead.utm_source || '-'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Medium:</span>
+                                          <span className="font-mono text-xs">{lead.utm_medium || '-'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Campaign:</span>
+                                          <span className="font-mono text-xs">{lead.utm_campaign || '-'}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Survey Responses */}
+                                    <div className="space-y-2">
+                                      <h4 className="font-medium text-xs text-muted-foreground uppercase tracking-wide">Survey Responses</h4>
+                                      {lead.questions && Array.isArray(lead.questions) && lead.questions.length > 0 ? (
+                                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                                          {(lead.questions as any[]).map((q, i) => (
+                                            <div key={i} className="flex justify-between text-xs">
+                                              <span className="text-muted-foreground truncate max-w-[60%]" title={String(q.question || q.id || `Q${i + 1}`)}>
+                                                {String(q.question || q.id || `Q${i + 1}`).substring(0, 30)}...
+                                              </span>
+                                              <span className="font-medium">{String(q.answer || '-')}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <span className="text-muted-foreground text-xs">No survey responses</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </ScrollArea>
