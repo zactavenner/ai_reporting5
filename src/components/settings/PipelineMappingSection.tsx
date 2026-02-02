@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select';
 import { Loader2, GitBranch, RefreshCw, AlertCircle, DollarSign, Target } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSyncPipeline } from '@/hooks/usePipelines';
 
 interface GHLPipeline {
   id: string;
@@ -52,6 +53,8 @@ export function PipelineMappingSection({
   const [stages, setStages] = useState<GHLStage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const syncPipeline = useSyncPipeline();
 
   const fetchPipelines = async () => {
     if (!ghlApiKey || !ghlLocationId) {
@@ -95,6 +98,17 @@ export function PipelineMappingSection({
       toast.error('Failed to load pipelines from GHL');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncClick = async () => {
+    // First refresh pipeline list
+    await fetchPipelines();
+    
+    // Then sync the selected pipeline to fetch committed/funded opportunities
+    if (fundedPipelineId && clientId) {
+      toast.info('Syncing pipeline opportunities...');
+      syncPipeline.mutate({ clientId, pipelineId: fundedPipelineId });
     }
   };
 
@@ -160,10 +174,11 @@ export function PipelineMappingSection({
           type="button"
           variant="ghost"
           size="sm"
-          onClick={fetchPipelines}
-          disabled={loading}
+          onClick={handleSyncClick}
+          disabled={loading || syncPipeline.isPending}
+          title={fundedPipelineId ? "Refresh pipelines & sync opportunities" : "Refresh pipelines"}
         >
-          {loading ? (
+          {loading || syncPipeline.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <RefreshCw className="h-4 w-4" />
