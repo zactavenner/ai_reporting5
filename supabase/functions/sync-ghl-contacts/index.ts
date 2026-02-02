@@ -2084,11 +2084,11 @@ serve(async (req) => {
         calendarsResult = { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
       }
       
-      // Test opportunities endpoint
+      // Test opportunities endpoint using the search endpoint (doesn't require pipelineId)
       let opportunitiesResult = { success: false, error: '' };
       try {
         const oppsRes = await fetch(
-          `${GHL_BASE_URL}/opportunities/?locationId=${client.ghl_location_id}&limit=1`,
+          `${GHL_BASE_URL}/opportunities/search?location_id=${client.ghl_location_id}&limit=1`,
           { method: 'GET', headers }
         );
         if (oppsRes.ok) {
