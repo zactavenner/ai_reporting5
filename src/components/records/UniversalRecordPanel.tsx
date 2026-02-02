@@ -98,7 +98,7 @@ export function UniversalRecordPanel({
   const { data: client } = useClient(clientId);
   
   // Sync hook for manual sync
-  const { syncContact, isSyncing } = useSingleContactSync();
+  const { syncContact, isSyncing, syncAllPipelines, isSyncingPipelines } = useSingleContactSync();
   
   // Get GHL Contact ID based on record type
   const ghlContactId = recordType === 'opportunity' 
@@ -141,11 +141,18 @@ export function UniversalRecordPanel({
     return 'text-amber-500';
   };
   
-  // Handle sync button click
+  // Handle sync button click - syncs contact AND all pipelines
   const handleSync = async () => {
     if (!canSync || !ghlContactId) return;
-    await syncContact(clientId, ghlContactId, 'lead');
+    
+    // Run both syncs in parallel
+    await Promise.all([
+      syncContact(clientId, ghlContactId, 'lead'),
+      syncAllPipelines(clientId),
+    ]);
   };
+  
+  const isSyncInProgress = isSyncing(ghlContactId || '') || isSyncingPipelines;
 
   // Extract common data
   const contactName = record.contact_name || record.name || linkedLead?.name || 'Unknown Contact';
@@ -212,19 +219,26 @@ export function UniversalRecordPanel({
               </Tooltip>
               
               {canSync && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  disabled={isSyncing(ghlContactId || '')}
-                  onClick={handleSync}
-                >
-                  {isSyncing(ghlContactId || '') ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      disabled={isSyncInProgress}
+                      onClick={handleSync}
+                    >
+                      {isSyncInProgress ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Sync contact & all pipelines</p>
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
           )}
