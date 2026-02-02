@@ -29,6 +29,7 @@ import { format } from 'date-fns';
 import { cn, addBusinessDays } from '@/lib/utils';
 import { useCreateTask, useAgencyMembers, AgencyMember } from '@/hooks/useTasks';
 import { useAgencyPods } from '@/hooks/useAgencyPods';
+import { useSetTaskAssignees } from '@/hooks/useTaskAssignees';
 import { Client } from '@/hooks/useClients';
 import { Badge } from '@/components/ui/badge';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
@@ -43,6 +44,7 @@ interface CreateTaskModalProps {
 
 export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, isPublicView = false }: CreateTaskModalProps) {
   const createTask = useCreateTask();
+  const setTaskAssignees = useSetTaskAssignees();
   const { data: agencyMembers = [] } = useAgencyMembers();
   const { data: pods = [] } = useAgencyPods();
   const { currentMember } = useTeamMember();
@@ -57,6 +59,7 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
   const [dueDate, setDueDate] = useState<Date | undefined>(defaultDueDate);
   const [dueDateManuallySet, setDueDateManuallySet] = useState(false);
   const [assignedTo, setAssignedTo] = useState('');
+  const [selectedPodId, setSelectedPodId] = useState<string>('');
   const [assignedClientName, setAssignedClientName] = useState('');
   const [stage, setStage] = useState('todo');
   
@@ -74,11 +77,24 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
       setDueDateManuallySet(false);
     }
   }, [open]);
+
+  // Get members for a specific pod
+  const getMembersForPod = (podId: string) => {
+    return agencyMembers.filter(m => m.pod_id === podId);
+  };
   
   const handleCreate = async () => {
     if (!title.trim()) return;
     
-    await createTask.mutateAsync({
+    // Determine the display name for assigned_to field
+    let displayAssignedTo = assignedTo || null;
+    if (selectedPodId) {
+      // When a pod is selected, show the team name
+      const pod = pods.find(p => p.id === selectedPodId);
+      displayAssignedTo = pod ? `${pod.name} Team` : null;
+    }
+    
+    const taskData = await createTask.mutateAsync({
       title: title.trim(),
       description: description.trim() || null,
       client_id: clientId || null,
@@ -86,10 +102,24 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
       due_date: dueDate ? format(dueDate, 'yyyy-MM-dd') : null,
       status: 'todo',
       stage,
-      assigned_to: assignedTo || null,
+      assigned_to: displayAssignedTo,
       assigned_client_name: assignedClientName || null,
-      created_by: currentMember?.name || null,
+      created_by: currentMember?.name || (isPublicView ? 'Client' : null),
     });
+    
+    // If a pod was selected, assign all members of that pod via task_assignees
+    if (selectedPodId && taskData?.id) {
+      const podMembers = getMembersForPod(selectedPodId);
+      const memberIds = podMembers.map(m => m.id);
+      
+      if (memberIds.length > 0) {
+        await setTaskAssignees.mutateAsync({
+          taskId: taskData.id,
+          memberIds,
+          podIds: [selectedPodId],
+        });
+      }
+    }
     
     // Reset form
     setTitle('');
@@ -99,6 +129,7 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
     setDueDate(addBusinessDays(new Date(), 2));
     setDueDateManuallySet(false);
     setAssignedTo('');
+    setSelectedPodId('');
     setAssignedClientName('');
     setStage('todo');
     onOpenChange(false);
@@ -250,50 +281,85 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
           <div>
             <Label>Assign To</Label>
             <div className="space-y-2">
-              <Select value={assignedTo || 'none'} onValueChange={(v) => { setAssignedTo(v === 'none' ? '' : v); setAssignedClientName(''); }}>
-                <SelectTrigger>
-                  <SelectValue placeholder={isPublicView ? "Select team..." : "Select agency member..."} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Unassigned</SelectItem>
-                  {isPublicView ? (
-                    // Public view: show only pods (teams), not individual names
-                    pods.map(pod => (
-                      <SelectItem key={pod.id} value={`${pod.name} Team`}>
+              {isPublicView ? (
+                // Public view: show only pods (teams), not individual names
+                <Select 
+                  value={selectedPodId || 'none'} 
+                  onValueChange={(v) => { 
+                    setSelectedPodId(v === 'none' ? '' : v); 
+                    setAssignedTo('');
+                    setAssignedClientName(''); 
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select team..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Unassigned</SelectItem>
+                    {pods.map(pod => (
+                      <SelectItem key={pod.id} value={pod.id}>
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full" style={{ backgroundColor: pod.color || '#888' }} />
                           <Building2 className="h-3 w-3" />
                           <span>{pod.name} Team</span>
                         </div>
                       </SelectItem>
-                    ))
-                  ) : (
-                    // Internal view: show members grouped by pods
-                    <>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                // Internal view: show pods to assign all members, or individual members
+                <Select 
+                  value={selectedPodId ? `pod:${selectedPodId}` : (assignedTo || 'none')} 
+                  onValueChange={(v) => { 
+                    if (v === 'none') {
+                      setAssignedTo('');
+                      setSelectedPodId('');
+                    } else if (v.startsWith('pod:')) {
+                      setSelectedPodId(v.replace('pod:', ''));
+                      setAssignedTo('');
+                    } else {
+                      setAssignedTo(v);
+                      setSelectedPodId('');
+                    }
+                    setAssignedClientName(''); 
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select team or member..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Unassigned</SelectItem>
+                    
+                    {/* Pod assignments - assign to entire team */}
+                    <SelectGroup>
+                      <SelectLabel className="text-xs text-muted-foreground">Assign to Entire Team</SelectLabel>
                       {pods.map(pod => {
-                        const podMembers = membersByPod[pod.id] || [];
-                        if (podMembers.length === 0) return null;
+                        const memberCount = getMembersForPod(pod.id).length;
                         return (
-                          <SelectGroup key={pod.id}>
-                            <SelectLabel className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: pod.color }} />
-                              {pod.name}
-                            </SelectLabel>
-                            {podMembers.map(member => (
-                              <SelectItem key={member.id} value={member.name}>
-                                <div className="flex items-center gap-2 pl-4">
-                                  <User className="h-3 w-3" />
-                                  <span>{member.name}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
+                          <SelectItem key={`pod:${pod.id}`} value={`pod:${pod.id}`}>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: pod.color || '#888' }} />
+                              <Building2 className="h-3 w-3" />
+                              <span>{pod.name} Team</span>
+                              <Badge variant="outline" className="text-xs ml-1">{memberCount}</Badge>
+                            </div>
+                          </SelectItem>
                         );
                       })}
-                      {membersByPod.unassigned?.length > 0 && (
-                        <SelectGroup>
-                          <SelectLabel>Unassigned Members</SelectLabel>
-                          {membersByPod.unassigned.map(member => (
+                    </SelectGroup>
+                    
+                    {/* Individual member assignments */}
+                    {pods.map(pod => {
+                      const podMembers = membersByPod[pod.id] || [];
+                      if (podMembers.length === 0) return null;
+                      return (
+                        <SelectGroup key={pod.id}>
+                          <SelectLabel className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: pod.color }} />
+                            {pod.name}
+                          </SelectLabel>
+                          {podMembers.map(member => (
                             <SelectItem key={member.id} value={member.name}>
                               <div className="flex items-center gap-2 pl-4">
                                 <User className="h-3 w-3" />
@@ -302,18 +368,31 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
                             </SelectItem>
                           ))}
                         </SelectGroup>
-                      )}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
+                      );
+                    })}
+                    {membersByPod.unassigned?.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Unassigned Members</SelectLabel>
+                        {membersByPod.unassigned.map(member => (
+                          <SelectItem key={member.id} value={member.name}>
+                            <div className="flex items-center gap-2 pl-4">
+                              <User className="h-3 w-3" />
+                              <span>{member.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
               
               {selectedClient && !isPublicView && (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">Or assign to client:</span>
                   <Input
                     value={assignedClientName}
-                    onChange={(e) => { setAssignedClientName(e.target.value); setAssignedTo(''); }}
+                    onChange={(e) => { setAssignedClientName(e.target.value); setAssignedTo(''); setSelectedPodId(''); }}
                     placeholder={`${selectedClient.name} contact...`}
                     className="flex-1 h-8 text-sm"
                   />
