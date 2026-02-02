@@ -1061,13 +1061,6 @@ export function InlineRecordsView({
       </TableCell>
       <TableCell className="font-medium">{getLeadName(call.lead_id)}</TableCell>
       <TableCell>
-        {call.direction === 'inbound' ? (
-          <PhoneIncoming className="h-4 w-4 text-chart-2" />
-        ) : (
-          <PhoneOutgoing className="h-4 w-4 text-chart-1" />
-        )}
-      </TableCell>
-      <TableCell>
         {call.showed ? (
           <Badge className="bg-chart-2 text-chart-2-foreground">Showed</Badge>
         ) : (
@@ -1186,7 +1179,6 @@ export function InlineRecordsView({
           <TableRow className="border-b-2">
             <TableHead>Scheduled</TableHead>
             <TableHead>Contact</TableHead>
-            <TableHead>Dir</TableHead>
             <TableHead>Showed</TableHead>
             <TableHead>Outcome</TableHead>
             <TableHead>Created</TableHead>
