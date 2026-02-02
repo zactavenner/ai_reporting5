@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Declare EdgeRuntime for background tasks
+declare const EdgeRuntime: {
+  waitUntil: (promise: Promise<any>) => void;
+};
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -629,11 +634,11 @@ serve(async (req) => {
       );
     }
 
-    // Mode: sync - Sync a specific pipeline with contacts and timeline
+    // Mode: sync - Sync a specific pipeline with background processing for large datasets
     if (mode === 'sync' && pipeline_id) {
-      console.log('Syncing pipeline:', pipeline_id, 'sync_contacts:', sync_contacts);
+      console.log('Syncing pipeline:', pipeline_id);
 
-      // Fetch pipeline details
+      // Fetch pipeline details first (quick operation)
       const pipelinesResponse = await fetch(
         `${GHL_BASE_URL}/opportunities/pipelines?locationId=${client.ghl_location_id}`,
         { headers: ghlHeaders }
@@ -665,7 +670,7 @@ serve(async (req) => {
           client_id,
           ghl_pipeline_id: pipeline_id,
           name: targetPipeline.name,
-          last_synced_at: new Date().toISOString(),
+          last_synced_at: null, // Will be set when sync completes
         }, { onConflict: 'client_id,ghl_pipeline_id' })
         .select()
         .single();
@@ -678,9 +683,7 @@ serve(async (req) => {
         );
       }
 
-      console.log('Pipeline saved:', dbPipeline.id);
-
-      // Sync stages
+      // Sync stages synchronously (quick operation)
       const stages = targetPipeline.stages || [];
       for (const stage of stages) {
         await supabase
@@ -695,177 +698,140 @@ serve(async (req) => {
 
       console.log('Stages synced:', stages.length);
 
-      // Fetch stages from DB to get their IDs
-      const { data: dbStages } = await supabase
-        .from('pipeline_stages')
-        .select('id, ghl_stage_id')
-        .eq('pipeline_id', dbPipeline.id);
+      // Background task for opportunity sync - with chunking to avoid CPU limits
+      const backgroundSync = async () => {
+        try {
+          console.log('Starting background opportunity sync for pipeline:', pipeline_id);
 
-      const stageIdMap = new Map(dbStages?.map(s => [s.ghl_stage_id, s.id]) || []);
+          // Fetch stages from DB to get their IDs
+          const { data: dbStages } = await supabase
+            .from('pipeline_stages')
+            .select('id, ghl_stage_id')
+            .eq('pipeline_id', dbPipeline.id);
 
-      // Fetch opportunities with pagination
-      let allOpportunities: GHLOpportunity[] = [];
-      let hasMore = true;
-      let startAfterId: string | null = null;
+          const stageIdMap = new Map(dbStages?.map(s => [s.ghl_stage_id, s.id]) || []);
+          console.log('Stage map has', stageIdMap.size, 'entries');
 
-      while (hasMore) {
-        // GHL API v2 requires location_id with underscore in query string
-        let url = `${GHL_BASE_URL}/opportunities/search?location_id=${client.ghl_location_id}&pipeline_id=${pipeline_id}&limit=100`;
-        if (startAfterId) {
-          url += `&startAfterId=${startAfterId}`;
-        }
+          // Clear existing opportunities for this pipeline
+          await supabase
+            .from('pipeline_opportunities')
+            .delete()
+            .eq('pipeline_id', dbPipeline.id);
 
-        console.log('Fetching opportunities from:', url);
-        const oppsResponse: Response = await fetch(url, { 
-          method: 'GET',
-          headers: ghlHeaders,
-        });
+          // Fetch and insert opportunities in chunks
+          let hasMore = true;
+          let startAfterId: string | null = null;
+          let fetchCount = 0;
+          let totalSynced = 0;
+          const MAX_BATCHES = 200; // 200 * 100 = 20k max
+          const INSERT_BATCH_SIZE = 100;
 
-        if (!oppsResponse.ok) {
-          const errorText = await oppsResponse.text();
-          console.error('Failed to fetch opportunities (GET with underscore):', errorText);
-          
-          // Fallback: Try with locationId (camelCase)
-          const altUrl = `${GHL_BASE_URL}/opportunities/search?locationId=${client.ghl_location_id}&pipelineId=${pipeline_id}&limit=100`;
-          console.log('Trying camelCase params:', altUrl);
-          const altResponse: Response = await fetch(altUrl, { method: 'GET', headers: ghlHeaders });
-          
-          if (altResponse.ok) {
-            const altData: { opportunities?: GHLOpportunity[] } = await altResponse.json();
-            allOpportunities = altData.opportunities || [];
-            console.log('CamelCase endpoint returned:', allOpportunities.length, 'opportunities');
-          } else {
-            // Final fallback: List all opportunities and filter by pipeline
-            console.log('Trying list all opportunities...');
-            const listUrl = `${GHL_BASE_URL}/opportunities/?locationId=${client.ghl_location_id}&limit=100`;
-            const listResponse: Response = await fetch(listUrl, { method: 'GET', headers: ghlHeaders });
+          while (hasMore && fetchCount < MAX_BATCHES) {
+            fetchCount++;
+            let url = `${GHL_BASE_URL}/opportunities/search?location_id=${client.ghl_location_id}&pipeline_id=${pipeline_id}&limit=100`;
+            if (startAfterId) {
+              url += `&startAfterId=${startAfterId}`;
+            }
+
+            const oppsResponse = await fetch(url, { 
+              method: 'GET',
+              headers: ghlHeaders,
+            });
+
+            if (!oppsResponse.ok) {
+              console.error('Failed to fetch opportunities:', await oppsResponse.text());
+              break;
+            }
+
+            const oppsData: { opportunities?: GHLOpportunity[], meta?: { startAfterId?: string } } = await oppsResponse.json();
+            const opportunities: GHLOpportunity[] = oppsData.opportunities || [];
             
-            if (listResponse.ok) {
-              const listData: { opportunities?: GHLOpportunity[] } = await listResponse.json();
-              const allOpps = listData.opportunities || [];
-              // Filter by pipeline
-              allOpportunities = allOpps.filter((o: GHLOpportunity) => o.pipelineId === pipeline_id);
-              console.log('List endpoint returned:', allOpps.length, 'total,', allOpportunities.length, 'for this pipeline');
+            if (opportunities.length === 0) {
+              hasMore = false;
+              break;
+            }
+
+            console.log(`Fetch ${fetchCount}: got ${opportunities.length} opps`);
+
+            // Immediately insert this batch
+            const opportunityRecords: any[] = [];
+            for (const opp of opportunities) {
+              const stageId = stageIdMap.get(opp.pipelineStageId);
+              if (!stageId) continue;
+
+              opportunityRecords.push({
+                pipeline_id: dbPipeline.id,
+                stage_id: stageId,
+                ghl_opportunity_id: opp.id,
+                ghl_contact_id: opp.contact?.id || null,
+                contact_name: opp.contact?.name || opp.name || null,
+                contact_email: opp.contact?.email || null,
+                contact_phone: opp.contact?.phone || null,
+                monetary_value: opp.monetaryValue || 0,
+                source: opp.source || null,
+                status: opp.status || 'open',
+                last_stage_change_at: opp.lastStageChangeAt || null,
+              });
+            }
+
+            if (opportunityRecords.length > 0) {
+              const { error: batchError } = await supabase
+                .from('pipeline_opportunities')
+                .insert(opportunityRecords);
+
+              if (batchError) {
+                console.error('Batch insert error:', batchError);
+              } else {
+                totalSynced += opportunityRecords.length;
+              }
+            }
+
+            // Pagination
+            if (oppsData.meta?.startAfterId) {
+              startAfterId = oppsData.meta.startAfterId;
+            } else if (opportunities.length === 100) {
+              startAfterId = opportunities[opportunities.length - 1]?.id;
             } else {
-              console.error('All endpoints failed:', await listResponse.text());
+              hasMore = false;
             }
-          }
-          break;
-        }
 
-        const oppsData: { opportunities?: GHLOpportunity[] } = await oppsResponse.json();
-        const opportunities: GHLOpportunity[] = oppsData.opportunities || [];
-        allOpportunities = allOpportunities.concat(opportunities);
-        console.log('Fetched batch of', opportunities.length, 'opportunities, total:', allOpportunities.length);
-
-        if (opportunities.length < 100) {
-          hasMore = false;
-        } else {
-          startAfterId = opportunities[opportunities.length - 1]?.id;
-        }
-      }
-
-      console.log('Total opportunities fetched:', allOpportunities.length);
-
-      // Clear existing opportunities for this pipeline before inserting new ones
-      await supabase
-        .from('pipeline_opportunities')
-        .delete()
-        .eq('pipeline_id', dbPipeline.id);
-
-      // Process opportunities and sync contacts
-      let syncedCount = 0;
-      let leadsCreated = 0;
-      let leadsUpdated = 0;
-      let timelineEventsCount = 0;
-      const processedContacts = new Set<string>();
-
-      for (const opp of allOpportunities) {
-        const stageId = stageIdMap.get(opp.pipelineStageId);
-        if (!stageId) {
-          console.warn('Stage not found for opportunity:', opp.id, opp.pipelineStageId);
-          continue;
-        }
-
-        const contactId = opp.contact?.id;
-
-        // Insert opportunity
-        const { error: oppError } = await supabase
-          .from('pipeline_opportunities')
-          .insert({
-            pipeline_id: dbPipeline.id,
-            stage_id: stageId,
-            ghl_opportunity_id: opp.id,
-            ghl_contact_id: contactId,
-            contact_name: opp.contact?.name || opp.name,
-            contact_email: opp.contact?.email,
-            contact_phone: opp.contact?.phone,
-            monetary_value: opp.monetaryValue || 0,
-            source: opp.source,
-            status: opp.status || 'open',
-            last_stage_change_at: opp.lastStageChangeAt,
-          });
-
-        if (!oppError) {
-          syncedCount++;
-        } else {
-          console.error('Error inserting opportunity:', oppError);
-        }
-
-        // Sync contact if we have a contact ID and haven't processed it yet
-        if (contactId && !processedContacts.has(contactId)) {
-          processedContacts.add(contactId);
-          
-          try {
-            // Fetch full contact details
-            const fullContact = await fetchGHLContact(client.ghl_api_key, contactId);
-            
-            if (fullContact) {
-              // Sync to leads table
-              const { leadId, action } = await syncContactToLead(
-                supabase, 
-                client_id, 
-                fullContact, 
-                opp
-              );
-              
-              if (action === 'created') leadsCreated++;
-              else if (action === 'updated') leadsUpdated++;
-              
-              // Sync timeline events
-              const eventCount = await syncContactTimeline(
-                supabase,
-                client_id,
-                contactId,
-                leadId,
-                client.ghl_api_key,
-                client.ghl_location_id
-              );
-              timelineEventsCount += eventCount;
-              
-              console.log(`Synced contact ${contactId}: lead=${action}, events=${eventCount}`);
-            }
-            
             // Small delay to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 200));
-          } catch (err) {
-            console.error(`Error syncing contact ${contactId}:`, err);
+            await new Promise(resolve => setTimeout(resolve, 50));
           }
-        }
-      }
 
-      console.log(`Pipeline sync complete: opportunities=${syncedCount}, leads_created=${leadsCreated}, leads_updated=${leadsUpdated}, timeline_events=${timelineEventsCount}`);
+          // Update last_synced_at
+          await supabase
+            .from('client_pipelines')
+            .update({ last_synced_at: new Date().toISOString() })
+            .eq('id', dbPipeline.id);
+
+          console.log(`Pipeline sync complete: ${totalSynced} opportunities synced`);
+        } catch (err) {
+          console.error('Background sync error:', err);
+          // Still mark as synced even on error to show partial data
+          await supabase
+            .from('client_pipelines')
+            .update({ last_synced_at: new Date().toISOString() })
+            .eq('id', dbPipeline.id);
+        }
+      };
+
+      // Execute in background if possible
+      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+        EdgeRuntime.waitUntil(backgroundSync());
+        console.log('Started background sync task');
+      } else {
+        // Fallback: run synchronously (will timeout for large datasets)
+        await backgroundSync();
+      }
 
       return new Response(
         JSON.stringify({
           success: true,
+          message: 'Pipeline sync started',
           pipeline: dbPipeline,
           stages_count: stages.length,
-          opportunities_count: syncedCount,
-          leads_created: leadsCreated,
-          leads_updated: leadsUpdated,
-          timeline_events: timelineEventsCount,
-          contacts_processed: processedContacts.size,
+          background: typeof EdgeRuntime !== 'undefined',
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

@@ -183,31 +183,61 @@ export function useAvailableGHLPipelines(clientId: string | undefined) {
   });
 }
 
-// Sync a pipeline from GHL (with contacts and timeline)
+// Sync a pipeline from GHL (uses background processing for large datasets)
 export function useSyncPipeline() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ clientId, pipelineId }: { clientId: string; pipelineId: string }) => {
       const { data, error } = await supabase.functions.invoke('sync-ghl-pipelines', {
-        body: { client_id: clientId, mode: 'sync', pipeline_id: pipelineId, sync_contacts: true },
+        body: { client_id: clientId, mode: 'sync', pipeline_id: pipelineId },
       });
 
       if (error) throw error;
+      
+      // If background sync started, poll for completion
+      if (data.background) {
+        toast.info('Syncing pipeline in background...');
+        
+        // Poll for completion by checking last_synced_at
+        const pipelineDbId = data.pipeline?.id;
+        if (pipelineDbId) {
+          let attempts = 0;
+          const maxAttempts = 60; // 5 minutes max
+          
+          while (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            attempts++;
+            
+            const { data: pipeline } = await supabase
+              .from('client_pipelines')
+              .select('last_synced_at')
+              .eq('id', pipelineDbId)
+              .single();
+            
+            if (pipeline?.last_synced_at) {
+              // Check opportunity count
+              const { count } = await supabase
+                .from('pipeline_opportunities')
+                .select('*', { count: 'exact', head: true })
+                .eq('pipeline_id', pipelineDbId);
+              
+              return { ...data, opportunities_count: count || 0, completed: true };
+            }
+          }
+        }
+      }
+      
       return data;
     },
     onSuccess: (data, variables) => {
-      const parts = [`${data.opportunities_count} opportunities`];
-      if (data.leads_created > 0) parts.push(`${data.leads_created} leads created`);
-      if (data.leads_updated > 0) parts.push(`${data.leads_updated} leads updated`);
-      if (data.timeline_events > 0) parts.push(`${data.timeline_events} timeline events`);
-      
-      toast.success(`Pipeline synced: ${parts.join(', ')}`);
+      if (data.completed || !data.background) {
+        toast.success(`Pipeline synced: ${data.opportunities_count || 0} opportunities`);
+      }
       queryClient.invalidateQueries({ queryKey: ['client-pipelines', variables.clientId] });
       queryClient.invalidateQueries({ queryKey: ['pipeline-stages'] });
       queryClient.invalidateQueries({ queryKey: ['pipeline-opportunities'] });
-      queryClient.invalidateQueries({ queryKey: ['leads', variables.clientId] });
-      queryClient.invalidateQueries({ queryKey: ['contact-timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['client-opportunities', variables.clientId] });
     },
     onError: (error: Error) => {
       const errorMsg = error.message || 'Unknown error';
