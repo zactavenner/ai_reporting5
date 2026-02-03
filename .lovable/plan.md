@@ -1,121 +1,222 @@
 
-# Universal Record Side Panel Enhancement Plan
+# Comprehensive Data Sync & API Status Plan
 
-## Overview
+## Summary
+This plan addresses three critical issues:
+1. **API Connection Status**: Implement a unified "green indicator" when all three API modules (Contacts, Calendars, Opportunities) are connected
+2. **Contact Record Details**: Fix records showing random IDs instead of actual contact names/details
+3. **Data Sync Based on Settings**: Ensure leads, calls, commitments, and funded investors are properly synced using configured calendar and pipeline mappings
 
-This plan implements a consistent contact viewing experience across the entire platform by:
-1. Adding a **Sync button and "Last Synced" timestamp** to the header of the `UniversalRecordPanel`
-2. Replacing the **inline row expansion with dropdown** in the Leads table with a click-to-open side panel pattern
-3. Ensuring **all record types** (leads, calls, opportunities, funded, commitments) open in the same universal side panel
+---
 
-## Current State Analysis
+## Issue Analysis
 
-- **UniversalRecordPanel**: Already exists with all required sections (Contact Info, Opportunity Details, Attribution, Form Responses, GHL Details, Timeline) but is missing a header sync button and last sync timestamp
-- **InlineRecordsView**: Uses an expandable row pattern for leads (chevron expands inline attribution/UTM/questions) rather than opening the side panel
-- **Leads table rows**: Have a status dropdown for inline editing and row expansion - this should be simplified to just click-to-open
-- **Other record types**: Already call `onRecordSelect` which should open the universal panel
+### Current State
+Based on database analysis:
+- Many clients have calls but **zero leads** (e.g., Lansing Capital: 15 calls, 0 leads)
+- Most clients have **empty calendar/pipeline settings** - only Blue Capital has proper configuration
+- Calls display external IDs instead of names because:
+  - `lead_id` is NULL on call records
+  - No leads exist to match with
+  - The `linkOrphanedCallsToLeads` function can't match because leads were never synced
 
-## Implementation Details
+### Root Cause
+The sync process isn't pulling contacts (leads) from GHL before syncing appointments. Without leads, calls can't be linked, and records show cryptic IDs.
 
-### 1. Enhance UniversalRecordPanel Header
+---
 
-**File**: `src/components/records/UniversalRecordPanel.tsx`
+## Implementation Plan
 
-Add to the Sheet header:
-- **Last Synced timestamp**: Display relative time (e.g., "5 minutes ago") with color coding for freshness
-- **Manual Sync button**: RefreshCw icon button in top-right that triggers single contact sync
-- Import and use the `useSingleContactSync` hook
+### Phase 1: Unified API Connection Status Indicator
+
+**What it does**: Shows a single green checkmark when all three APIs (Contacts, Calendars, Opportunities) are connected and working.
+
+**Changes Required**:
+
+**1. Update ApiConnectionStatus Component** (`src/components/settings/ApiConnectionStatus.tsx`)
+- Add an "overall status" mode that shows:
+  - Green checkmark if ALL three are successful
+  - Yellow warning if any are pending/not configured
+  - Red X if any have errors
+- Keep compact mode for detailed breakdown
+
+**2. Update DraggableClientTable** (`src/components/dashboard/DraggableClientTable.tsx`)
+- Replace the current C/Cal/O indicators with a single unified status icon
+- Add tooltip showing detailed breakdown on hover
 
 ```text
-Header Layout:
-┌─────────────────────────────────────────────────────────────┐
-│ 👤 Steve M                           Synced 5m ago  [🔄]  X │
-└─────────────────────────────────────────────────────────────┘
++------------------+     +-----------+
+| Test API Button  | --> | Per-client|
++------------------+     | Results   |
+                         +-----------+
+                               |
+                         +-----v-----+
+                         | Overall   |
+                         | Green/Red |
+                         +-----------+
 ```
 
-Changes:
-- Add `useSingleContactSync` hook
-- Add sync button with loading state
-- Display `ghl_synced_at` from linked lead with color coding (green = fresh, amber = stale >24h)
+---
 
-### 2. Simplify Leads Table Rows
+### Phase 2: Fix Contact Record Details (No More Random Numbers)
 
-**File**: `src/components/dashboard/InlineRecordsView.tsx`
+**What it does**: Ensures call records display actual contact names, emails, and phone numbers instead of cryptic IDs.
 
-Remove from leads table:
-- Remove the expand/collapse button (chevron) column
-- Remove the inline expandable row content (attribution/UTM/questions grid)
-- Remove the `expandedLeadIds` state and `toggleLeadExpansion` function
+**Changes Required**:
 
-Modify row click behavior:
-- Keep the existing `onClick={() => onRecordSelect?.(lead, 'lead')}` behavior
-- This already works to select the record for the side panel
+**1. Enhance Sync Function** (`supabase/functions/sync-ghl-contacts/index.ts`)
+- In `syncAppointmentToCall`, fetch contact details from GHL when creating/updating calls
+- Store contact name, email, phone directly on call records
+- This ensures calls have data even without a linked lead
 
-The table will now be a clean list where clicking any row opens the full UniversalRecordPanel.
+**2. Add Contact Fields to Calls Table**
+```sql
+ALTER TABLE calls ADD COLUMN IF NOT EXISTS contact_name TEXT;
+ALTER TABLE calls ADD COLUMN IF NOT EXISTS contact_email TEXT;
+ALTER TABLE calls ADD COLUMN IF NOT EXISTS contact_phone TEXT;
+```
 
-### 3. Integrate UniversalRecordPanel in InlineRecordsView
+**3. Update UI to Use Embedded Contact Data** (`src/components/dashboard/InlineRecordsView.tsx`)
+- Update `getLeadName` function to fallback to call's embedded contact fields
+- Display: `call.contact_name || getLeadName(call.lead_id) || call.external_id`
 
-**File**: `src/components/dashboard/InlineRecordsView.tsx`
+**4. Improve linkOrphanedCallsToLeads Function**
+- After linking calls to leads, copy the lead's contact details to the call record
+- This creates denormalized but reliable display data
 
-Add state and panel:
-- Add state to track which record is open: `const [panelOpen, setPanelOpen] = useState(false)`
-- Add the `UniversalRecordPanel` component at the end of the component
-- Modify `onRecordSelect` callback to set both `selectedRecord` and open the panel
+---
 
+### Phase 3: Data Sync Based on Settings
+
+**What it does**: Ensures leads, calls (booked/showed), commitments, and funded investors are pulled based on client settings.
+
+**Changes Required**:
+
+**1. Master Sync Enhancement** (`supabase/functions/sync-ghl-contacts/index.ts`)
+
+Ensure the sync process follows this order:
+```text
+Phase 1: Contacts → Creates leads in database
+Phase 2: Calendars → Creates calls, links to leads
+Phase 3: Pipelines → Creates funded_investors, commitments
+Phase 4: Link orphans → Ensures all records are connected
+```
+
+**2. Update Sync to Use Calendar Settings**
 ```typescript
-const handleRecordClick = (record: any, type: string) => {
-  setSelectedRecord(record);
-  setSelectedType(type);
-  setPanelOpen(true);
-};
+// Fetch client settings BEFORE syncing
+const { data: settings } = await supabase
+  .from('client_settings')
+  .select('tracked_calendar_ids, reconnect_calendar_ids, funded_pipeline_id, funded_stage_ids, committed_stage_ids')
+  .eq('client_id', clientId)
+  .single();
+
+// Only sync calendars that are configured
+if (settings?.tracked_calendar_ids?.length > 0) {
+  await syncAllCalendarAppointments(supabase, client, 
+    settings.tracked_calendar_ids, 
+    settings.reconnect_calendar_ids || []);
+}
 ```
 
-### 4. Map Record Types Correctly
+**3. Use Correct Timestamps**
+- Leads: Use GHL's `dateAdded` field for `created_at`
+- Calls: Use appointment's `startTime` for `scheduled_at`, `dateAdded` for `booked_at`
+- Funded Investors: Use `lastStageChangeAt` or `dateUpdated` for `funded_at`
 
-Ensure all record types map to the correct `recordType` prop:
-- `'lead'` → `recordType="lead"`
-- `'call'`, `'booked'`, `'showed'`, `'reconnect'` → `recordType="call"`  
-- `'funded'`, `'commitment'` → `recordType="funded"`
-- `'opportunity'` → `recordType="opportunity"`
+**4. Add Date/Time Display Fix** (`src/components/dashboard/InlineRecordsView.tsx`)
+- Ensure all record tables show both date AND time
+- Format: `Jan 15, 2026 2:30 PM` (not just `Jan 15, 2026`)
 
-### 5. Pass Linked Lead for Optimization
+---
 
-When opening calls/funded records, pass the linked lead as `linkedLead` prop to avoid an extra database fetch:
-```typescript
-<UniversalRecordPanel
-  record={selectedRecord}
-  recordType={mappedType}
-  clientId={clientId}
-  linkedLead={getLinkedLead(selectedRecord, selectedType)}
-  open={panelOpen}
-  onOpenChange={setPanelOpen}
-/>
-```
+### Phase 4: Pipeline-Based Commitment & Funded Tracking
+
+**What it does**: Correctly pulls commitments and funded investors based on configured pipeline stage mappings.
+
+**Changes Required**:
+
+**1. Commitment Detection** (`supabase/functions/sync-ghl-contacts/index.ts`)
+- When opportunity moves to a stage in `committed_stage_ids`:
+  - Create `funded_investors` record with `commitment_amount` = monetary value
+  - Set `funded_amount` = 0
+
+**2. Funded Detection**
+- When opportunity moves to a stage in `funded_stage_ids`:
+  - Update `funded_investors` record with `funded_amount` = monetary value
+  - Use `lastStageChangeAt` as `funded_at` date
+
+---
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/records/UniversalRecordPanel.tsx` | Add sync button + last synced to header, use `useSingleContactSync` hook |
-| `src/components/dashboard/InlineRecordsView.tsx` | Remove expandable rows, add UniversalRecordPanel, simplify row clicks |
+| `src/components/settings/ApiConnectionStatus.tsx` | Add unified overall status mode |
+| `src/components/dashboard/DraggableClientTable.tsx` | Use unified status indicator |
+| `supabase/functions/sync-ghl-contacts/index.ts` | Enhanced contact sync, calendar settings usage |
+| `src/components/dashboard/InlineRecordsView.tsx` | Fallback to embedded contact data, date/time formatting |
+| `supabase/migrations/` | Add contact fields to calls table |
 
-## Visual Reference
+---
 
-Based on the screenshots provided, the final side panel will show:
-- **Header**: Contact name with sync button and last synced time in top right
-- **Contact Information**: Email, phone, GHL ID with "View in GHL" link
-- **Opportunity Details**: Value, status, source, last updated
-- **Attribution**: Campaign, Ad Set, Source, Medium, Content, Term, Ad ID
-- **Form Responses**: All survey questions with human-readable labels
-- **GHL Details**: Notes with timestamps (collapsible, closed by default)
-- **Activity Timeline**: Full chronological timeline with sync button
+## Technical Details
 
-## Technical Considerations
+### Database Migration
+```sql
+-- Add contact fields to calls for denormalized display
+ALTER TABLE calls 
+  ADD COLUMN IF NOT EXISTS contact_name TEXT,
+  ADD COLUMN IF NOT EXISTS contact_email TEXT,
+  ADD COLUMN IF NOT EXISTS contact_phone TEXT;
 
-1. **Query Invalidation**: After sync, invalidate `['leads', clientId]` and `['lead-by-contact-id', ...]` queries to refresh panel data
-2. **Loading States**: Show spinner on sync button during sync operation
-3. **Staleness Colors**: 
-   - Green (`text-chart-4`): synced within 24 hours
-   - Amber (`text-amber-500`): synced >24 hours ago
-   - Gray (`text-muted-foreground`): never synced
-4. **Public View**: Hide sync button when `isPublicView` is true
+-- Create index for faster orphan linking
+CREATE INDEX IF NOT EXISTS idx_calls_external_id ON calls(external_id);
+CREATE INDEX IF NOT EXISTS idx_leads_external_id ON leads(external_id);
+```
+
+### Sync Flow Diagram
+```text
+Master Sync Triggered
+        |
+        v
++-------------------+
+| 1. Sync Contacts  |-----> Creates/Updates LEADS table
++-------------------+
+        |
+        v
++-------------------+
+| 2. Sync Calendars |-----> Creates CALLS linked to leads
+| (tracked + recon) |       Uses tracked_calendar_ids setting
++-------------------+
+        |
+        v
++-------------------+
+| 3. Sync Pipelines |-----> Creates FUNDED_INVESTORS
+| (committed+funded)|       Uses funded_stage_ids setting
++-------------------+
+        |
+        v
++-------------------+
+| 4. Link Orphans   |-----> Links unlinked calls to leads
++-------------------+
+        |
+        v
++-------------------+
+| 5. Update Status  |-----> Sets ghl_sync_status = 'healthy'
++-------------------+
+```
+
+---
+
+## Expected Outcomes
+
+After implementation:
+1. **Client Summary Table**: Single green/red indicator per client showing overall API health
+2. **Record Details**: All calls show actual contact names (e.g., "John Smith") instead of IDs
+3. **Proper Dating**: Records show correct dates/times based on when they actually occurred in GHL
+4. **Settings-Based Sync**: 
+   - Booked calls from configured tracked calendars
+   - Reconnect calls from configured reconnect calendars
+   - Commitments from configured commitment pipeline stages
+   - Funded investors from configured funded pipeline stages
