@@ -1159,6 +1159,7 @@ async function fetchGHLConversationMessages(
 }
 
 // Link orphaned calls to their corresponding leads by matching external_id
+// Also copies contact details from the lead to the call for display
 async function linkOrphanedCallsToLeads(
   supabase: any,
   clientId: string
@@ -1182,25 +1183,34 @@ async function linkOrphanedCallsToLeads(
   // Batch fetch all leads for this client to avoid N+1 queries
   const { data: leads } = await supabase
     .from('leads')
-    .select('id, external_id')
+    .select('id, external_id, name, email, phone')
     .eq('client_id', clientId)
     .not('external_id', 'is', null);
   
-  const leadsByExternalId = new Map<string, string>();
+  const leadsByExternalId = new Map<string, { id: string; name: string | null; email: string | null; phone: string | null }>();
   for (const lead of leads || []) {
     if (lead.external_id) {
-      leadsByExternalId.set(lead.external_id, lead.id);
+      leadsByExternalId.set(lead.external_id, {
+        id: lead.id,
+        name: lead.name,
+        email: lead.email,
+        phone: lead.phone,
+      });
     }
   }
   
   for (const call of orphanedCalls) {
-    const matchingLeadId = leadsByExternalId.get(call.external_id);
+    const matchingLead = leadsByExternalId.get(call.external_id);
     
-    if (matchingLeadId) {
+    if (matchingLead) {
+      // Update call with lead_id AND copy contact details for display
       const { error: updateError } = await supabase
         .from('calls')
         .update({ 
-          lead_id: matchingLeadId,
+          lead_id: matchingLead.id,
+          contact_name: matchingLead.name,
+          contact_email: matchingLead.email,
+          contact_phone: matchingLead.phone,
           ghl_synced_at: new Date().toISOString()
         })
         .eq('id', call.id);
@@ -1888,13 +1898,14 @@ async function syncAllCalendarAppointments(
   return result;
 }
 
-// Sync a single appointment to a call record
+// Sync a single appointment to a call record with embedded contact info
 async function syncAppointmentToCall(
   supabase: any,
   clientId: string,
   appt: any,
   leadsByContactId: Map<string, string>,
-  isReconnect: boolean
+  isReconnect: boolean,
+  contactDetailsCache?: Map<string, { name: string; email: string | null; phone: string | null }>
 ): Promise<{ action: 'created' | 'updated' | 'skipped' }> {
   const appointmentId = appt.id;
   const calendarId = appt.calendarId;
@@ -1922,6 +1933,43 @@ async function syncAppointmentToCall(
   // Find lead by contact ID
   const leadId = contactId ? leadsByContactId.get(contactId) || null : null;
   
+  // Get contact details - from appointment, cache, or database
+  let contactName: string | null = null;
+  let contactEmail: string | null = null;
+  let contactPhone: string | null = null;
+  
+  // First try to get from appointment data itself
+  if (appt.contact) {
+    contactName = appt.contact.name || `${appt.contact.firstName || ''} ${appt.contact.lastName || ''}`.trim() || null;
+    contactEmail = appt.contact.email || null;
+    contactPhone = appt.contact.phone || null;
+  }
+  
+  // If not in appointment, try cache
+  if (!contactName && contactDetailsCache && contactId) {
+    const cached = contactDetailsCache.get(contactId);
+    if (cached) {
+      contactName = cached.name;
+      contactEmail = cached.email;
+      contactPhone = cached.phone;
+    }
+  }
+  
+  // If still no name, try to get from leads table
+  if (!contactName && leadId) {
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('name, email, phone')
+      .eq('id', leadId)
+      .maybeSingle();
+    
+    if (lead) {
+      contactName = lead.name;
+      contactEmail = lead.email;
+      contactPhone = lead.phone;
+    }
+  }
+  
   const callData = {
     client_id: clientId,
     lead_id: leadId,
@@ -1935,6 +1983,9 @@ async function syncAppointmentToCall(
     is_reconnect: isReconnect,
     booked_at: appt.dateAdded || appt.createdAt,
     ghl_synced_at: new Date().toISOString(),
+    contact_name: contactName,
+    contact_email: contactEmail,
+    contact_phone: contactPhone,
   };
   
   // Check if call already exists by appointment ID
@@ -1957,6 +2008,9 @@ async function syncAppointmentToCall(
         outcome: callData.outcome,
         is_reconnect: isReconnect,
         ghl_synced_at: new Date().toISOString(),
+        contact_name: contactName,
+        contact_email: contactEmail,
+        contact_phone: contactPhone,
       })
       .eq('id', existingCall.id);
     

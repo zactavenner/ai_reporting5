@@ -64,6 +64,10 @@ export interface Call {
   transcript?: string | null;
   direction?: 'inbound' | 'outbound' | null;
   ghl_synced_at?: string | null;
+  // Embedded contact info for display (denormalized from leads)
+  contact_name?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
 }
 
 export function useLeads(clientId?: string, startDate?: string, endDate?: string) {
