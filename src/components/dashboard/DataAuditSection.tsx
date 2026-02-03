@@ -13,6 +13,7 @@ import {
   Search,
   ArrowDownToLine,
   Zap,
+  Settings,
 } from 'lucide-react';
 import { useSyncHealth, SyncHealthItem, QuickCheckItem } from '@/hooks/useSyncHealth';
 import { useSyncClient } from '@/hooks/useSyncClient';
@@ -28,6 +29,8 @@ import {
 } from '@/components/ui/table';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Link } from 'react-router-dom';
 
 interface DataAuditSectionProps {
   clientId: string;
@@ -70,7 +73,7 @@ export function DataAuditSection({ clientId }: DataAuditSectionProps) {
   const { data: syncHealth, isLoading: syncLoading, refetch: refetchSync } = useSyncHealth(clientId);
   
   const { progress, syncLeads, syncCalls } = useSyncClient(clientId);
-  const { progress: masterProgress, runMasterSync } = useMasterSync(clientId);
+  const { progress: masterProgress, configWarnings, runMasterSync } = useMasterSync(clientId);
   
   const handleRefresh = () => {
     refetchSync();
@@ -123,6 +126,28 @@ export function DataAuditSection({ clientId }: DataAuditSectionProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Config Warnings Banner */}
+        {configWarnings.length > 0 && !masterProgress.isLoading && (
+          <Alert className="border-chart-4/50 bg-chart-4/10">
+            <AlertTriangle className="h-4 w-4 text-chart-4" />
+            <AlertTitle className="text-chart-4">Configuration Incomplete</AlertTitle>
+            <AlertDescription className="space-y-2">
+              <ul className="list-disc pl-4 text-sm text-muted-foreground space-y-1">
+                {configWarnings.map((warning, i) => (
+                  <li key={i}>{warning}</li>
+                ))}
+              </ul>
+              <Link 
+                to={`/client/${clientId}?tab=settings`}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+              >
+                <Settings className="h-3.5 w-3.5" />
+                Open Settings to Configure
+              </Link>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Sync Progress Banner */}
         {(progress.isLoading || masterProgress.isLoading) && (
           <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 space-y-2">

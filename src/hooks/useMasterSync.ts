@@ -22,11 +22,21 @@ export interface MasterSyncSummary {
   errors: string[];
 }
 
+export interface SettingsSummary {
+  tracked_calendars: number;
+  reconnect_calendars: number;
+  funded_pipeline_configured: boolean;
+  funded_stages: number;
+  committed_stages: number;
+}
+
 export interface MasterSyncResult {
   success: boolean;
   message?: string;
   started_at?: string;
   summary?: MasterSyncSummary;
+  config_warnings?: string[];
+  settings_summary?: SettingsSummary;
   error?: string;
 }
 
@@ -37,6 +47,7 @@ export function useMasterSync(clientId: string | undefined) {
     phase: null,
     message: null,
   });
+  const [configWarnings, setConfigWarnings] = useState<string[]>([]);
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
 
   const invalidateAllQueries = useCallback(() => {
@@ -89,6 +100,7 @@ export function useMasterSync(clientId: string | undefined) {
       phase: 'Starting', 
       message: 'Initializing comprehensive GHL sync (runs in background)...' 
     });
+    setConfigWarnings([]);
     
     try {
       const { data, error } = await supabase.functions.invoke('sync-ghl-contacts', {
@@ -101,8 +113,19 @@ export function useMasterSync(clientId: string | undefined) {
       if (error) throw new Error(error.message);
       if (!data?.success) throw new Error(data?.error || 'Master sync failed');
 
-      // Sync started in background
-      toast.success('Master sync started! Processing contacts, calls, and opportunities in background...');
+      // Check for configuration warnings
+      const warnings = data.config_warnings || [];
+      setConfigWarnings(warnings);
+      
+      if (warnings.length > 0) {
+        // Show each warning as a toast
+        for (const warning of warnings) {
+          toast.warning(warning, { duration: 8000 });
+        }
+        toast.info('Master sync started, but some data types may not sync due to missing configuration.');
+      } else {
+        toast.success('Master sync started! Processing contacts, calls, and opportunities in background...');
+      }
       
       setProgress({ 
         isLoading: true, 
@@ -143,7 +166,12 @@ export function useMasterSync(clientId: string | undefined) {
         }
       }, 600000);
       
-      return { success: true, message: data.message };
+      return { 
+        success: true, 
+        message: data.message,
+        config_warnings: warnings,
+        settings_summary: data.settings_summary,
+      };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       toast.error(`Master sync failed: ${errorMessage}`);
@@ -154,6 +182,7 @@ export function useMasterSync(clientId: string | undefined) {
 
   return {
     progress,
+    configWarnings,
     runMasterSync,
   };
 }

@@ -2326,7 +2326,30 @@ serve(async (req) => {
       const fundedStageIds: string[] = settings?.funded_stage_ids || [];
       const committedStageIds: string[] = settings?.committed_stage_ids || [];
       
+      // Build warnings for missing configuration
+      const configWarnings: string[] = [];
+      
+      if (trackedCalendarIds.length === 0) {
+        configWarnings.push('No tracked calendars configured - booked calls will not be synced. Configure calendars in Settings > Calendar Tracking.');
+      }
+      
+      if (reconnectCalendarIds.length === 0) {
+        configWarnings.push('No reconnect calendars configured - reconnect calls will not be synced.');
+      }
+      
+      if (!fundedPipelineId) {
+        configWarnings.push('No funded pipeline configured - funded investors and commitments will not be synced from pipeline stages. Configure in Settings > Pipeline Mapping.');
+      } else {
+        if (fundedStageIds.length === 0) {
+          configWarnings.push('Funded pipeline set but no funded stages configured - funded investors will not be tracked from pipeline stages.');
+        }
+        if (committedStageIds.length === 0) {
+          configWarnings.push('Funded pipeline set but no committed stages configured - commitments will not be tracked from pipeline stages.');
+        }
+      }
+      
       console.log(`Client settings loaded: tracked=${trackedCalendarIds.length}, reconnect=${reconnectCalendarIds.length}, fundedPipeline=${fundedPipelineId}, fundedStages=${fundedStageIds.length}`);
+      console.log(`Config warnings: ${configWarnings.length > 0 ? configWarnings.join(' | ') : 'None'}`);
       
       // Mark sync as started
       await supabase
@@ -2475,12 +2498,22 @@ serve(async (req) => {
         await backgroundSyncTask();
       }
       
-      // Return immediately to avoid timeout
+      // Return immediately to avoid timeout - include config warnings
       return new Response(
         JSON.stringify({
           success: true,
-          message: 'Master sync started in background. Check sync status for progress.',
+          message: configWarnings.length > 0 
+            ? `Master sync started with ${configWarnings.length} configuration warning(s). Some data may not sync.`
+            : 'Master sync started in background. Check sync status for progress.',
           started_at: new Date().toISOString(),
+          config_warnings: configWarnings,
+          settings_summary: {
+            tracked_calendars: trackedCalendarIds.length,
+            reconnect_calendars: reconnectCalendarIds.length,
+            funded_pipeline_configured: !!fundedPipelineId,
+            funded_stages: fundedStageIds.length,
+            committed_stages: committedStageIds.length,
+          },
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
