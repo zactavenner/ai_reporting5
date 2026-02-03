@@ -23,7 +23,7 @@ import { ShareableLinkButton } from '@/components/dashboard/ShareableLinkButton'
 import { CSVImportModal, ImportType } from '@/components/import/CSVImportModal';
 import { ImportHistoryModal } from '@/components/import/ImportHistoryModal';
 import { AddCustomTabModal } from '@/components/import/AddCustomTabModal';
-import { CreativeApproval } from '@/components/creative/CreativeApproval';
+import { CreativesSection } from '@/components/creative/CreativesSection';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { AIAnalysisChat } from '@/components/ai/AIAnalysisChat';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
@@ -480,7 +480,7 @@ export default function ClientDetail() {
 
         {/* Creatives Tab */}
         {activeTab === 'creatives' && (
-          <CreativeApproval 
+          <CreativesSection 
             clientId={client.id} 
             clientName={client.name} 
             isPublicView={false}
