@@ -1263,6 +1263,9 @@ async function syncAppointmentsAsCalls(
       showed = false;
     }
     
+    // Use GHL dateAdded as the creation date for proper chronological ordering
+    const ghlCreatedAt = appt.dateAdded || appt.createdAt || new Date().toISOString();
+    
     const callData = {
       client_id: clientId,
       lead_id: leadId,
@@ -1273,7 +1276,8 @@ async function syncAppointmentsAsCalls(
       appointment_status: status,
       showed,
       outcome,
-      booked_at: appt.dateAdded || appt.createdAt,
+      booked_at: ghlCreatedAt,
+      created_at: ghlCreatedAt, // Use GHL creation date, NOT current time
       ghl_synced_at: new Date().toISOString(),
     };
     
@@ -1970,6 +1974,10 @@ async function syncAppointmentToCall(
     }
   }
   
+  // Use GHL dateAdded/createdAt as the original creation date for the call record
+  // This ensures historical records appear in the correct chronological order
+  const ghlCreatedAt = appt.dateAdded || appt.createdAt || new Date().toISOString();
+  
   const callData = {
     client_id: clientId,
     lead_id: leadId,
@@ -1981,7 +1989,8 @@ async function syncAppointmentToCall(
     showed,
     outcome,
     is_reconnect: isReconnect,
-    booked_at: appt.dateAdded || appt.createdAt,
+    booked_at: ghlCreatedAt,
+    created_at: ghlCreatedAt, // Use GHL creation date, NOT current time
     ghl_synced_at: new Date().toISOString(),
     contact_name: contactName,
     contact_email: contactEmail,
