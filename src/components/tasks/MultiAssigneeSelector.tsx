@@ -63,13 +63,28 @@ export function MultiAssigneeSelector({
   };
 
   const togglePod = async (podId: string) => {
-    const newPodIds = selectedPodIds.includes(podId)
+    const isCurrentlySelected = selectedPodIds.includes(podId);
+    const newPodIds = isCurrentlySelected
       ? selectedPodIds.filter(id => id !== podId)
       : [...selectedPodIds, podId];
     
+    // Get all members in this pod
+    const podMembers = membersByPod[podId] || [];
+    const podMemberIds = podMembers.map(m => m.id);
+    
+    // When adding a pod, also add all its members; when removing, remove pod members too
+    let newMemberIds: string[];
+    if (isCurrentlySelected) {
+      // Removing pod - also remove all pod members
+      newMemberIds = selectedMemberIds.filter(id => !podMemberIds.includes(id));
+    } else {
+      // Adding pod - also add all pod members (avoid duplicates)
+      newMemberIds = [...new Set([...selectedMemberIds, ...podMemberIds])];
+    }
+    
     await setAssignees.mutateAsync({
       taskId,
-      memberIds: selectedMemberIds,
+      memberIds: newMemberIds,
       podIds: newPodIds,
     });
     onAssignmentChange?.();

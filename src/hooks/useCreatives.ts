@@ -2,8 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Json } from '@/integrations/supabase/types';
-import { addBusinessDays } from '@/lib/utils';
-import { format } from 'date-fns';
 import { detectAspectRatio } from '@/lib/aspectRatioUtils';
 
 export interface CreativeComment {
@@ -192,35 +190,11 @@ export function useCreateCreative() {
         }
       }
       
-      // Auto-create task for client to review the creative with due date
-      const previewLink = creative.file_url ? `\n\n**Preview:** ${creative.file_url}` : '';
-      const dueDate = addBusinessDays(new Date(), 2);
-      
-      const { error: taskError } = await supabase
-        .from('tasks')
-        .insert({
-          client_id: creative.client_id,
-          title: `Review creative: ${creative.title}`,
-          description: `Please review the new ${creative.type || 'image'} creative "${creative.title}" for ${creative.platform || 'meta'}.${previewLink}`,
-          status: 'todo',
-          stage: 'todo',
-          priority: 'medium',
-          created_by: 'System',
-          assigned_client_name: creative.client_name || null,
-          due_date: format(dueDate, 'yyyy-MM-dd'),
-        });
-      
-      if (taskError) {
-        console.error('Failed to create review task for creative:', taskError);
-      }
-      
       return data;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['creatives', variables.client_id] });
-      queryClient.invalidateQueries({ queryKey: ['tasks', variables.client_id] });
-      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
-      toast.success('Creative uploaded and review task created');
+      toast.success('Creative uploaded successfully');
     },
     onError: (error: Error) => {
       toast.error('Failed to upload creative: ' + error.message);
@@ -252,35 +226,10 @@ export function useUpdateCreativeStatus() {
       
       if (error) throw error;
       
-      // Auto-create task when creative is approved
-      if (status === 'approved' && data) {
-        const title = creativeTitle || data.title || 'Untitled Creative';
-        const dueDate = addBusinessDays(new Date(), 2);
-        
-        const { error: taskError } = await supabase
-          .from('tasks')
-          .insert({
-            client_id: clientId,
-            title: `Launch approved creative: ${title}`,
-            description: `Creative "${title}" has been approved and is ready to launch.`,
-            status: 'todo',
-            stage: 'todo',
-            priority: 'high',
-            created_by: 'System',
-            due_date: format(dueDate, 'yyyy-MM-dd'),
-          });
-        
-        if (taskError) {
-          console.error('Failed to create task for approved creative:', taskError);
-        }
-      }
-      
       return data;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['creatives', variables.clientId] });
-      queryClient.invalidateQueries({ queryKey: ['tasks', variables.clientId] });
-      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
       toast.success(`Creative ${variables.status}`);
     },
     onError: (error: Error) => {

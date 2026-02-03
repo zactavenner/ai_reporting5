@@ -83,6 +83,7 @@ type TimelineEntry =
 
 // All workflow stages matching KanbanBoard
 const STAGES = [
+  { id: 'client_tasks', label: 'Client Tasks' },
   { id: 'todo', label: 'To Do' },
   { id: 'stuck', label: 'Stuck' },
   { id: 'review', label: 'Review' },
@@ -775,21 +776,22 @@ export function TaskDetailModal({ task, open, onOpenChange, clientName, clientId
                                   {format(entry.timestamp, 'MMM d, h:mm a')}
                                 </span>
                               </div>
-                              {/* Voice Note Player */}
+                              {/* Voice Note Player with inline transcript */}
                               {entry.data.comment_type === 'voice' && entry.data.audio_url && (
                                 <div className="mt-2">
                                   <VoiceNotePlayer 
                                     audioUrl={entry.data.audio_url} 
-                                    duration={entry.data.duration_seconds || undefined} 
+                                    duration={entry.data.duration_seconds || undefined}
+                                    transcript={entry.data.transcript}
                                   />
                                 </div>
                               )}
-                              {/* Text content - render markdown-like formatting */}
-                              <div className="text-sm mt-1 whitespace-pre-wrap">
-                                {entry.data.comment_type === 'voice' && entry.data.transcript 
-                                  ? entry.data.transcript 
-                                  : entry.data.content}
-                              </div>
+                              {/* Text content - only show for non-voice comments */}
+                              {entry.data.comment_type !== 'voice' && (
+                                <div className="text-sm mt-1 whitespace-pre-wrap">
+                                  {entry.data.content}
+                                </div>
+                              )}
                             </div>
                           </div>
                         ) : (

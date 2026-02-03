@@ -232,11 +232,12 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="backlog">Backlog</SelectItem>
+                  <SelectItem value="client_tasks">Client Tasks</SelectItem>
                   <SelectItem value="todo">To-Do</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="stuck">Stuck</SelectItem>
                   <SelectItem value="review">Review</SelectItem>
-                  <SelectItem value="done">Done</SelectItem>
+                  <SelectItem value="revisions">Revisions</SelectItem>
+                  <SelectItem value="done">Completed</SelectItem>
                 </SelectContent>
               </Select>
             </div>

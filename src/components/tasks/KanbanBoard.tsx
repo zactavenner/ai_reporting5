@@ -64,6 +64,7 @@ interface KanbanBoardProps {
 }
 
 const STAGES = [
+  { id: 'client_tasks', label: 'Client Tasks', color: 'bg-cyan-500/20' },
   { id: 'todo', label: 'To-Do', color: 'bg-blue-500/20' },
   { id: 'stuck', label: 'Stuck', color: 'bg-destructive/20' },
   { id: 'review', label: 'Review', color: 'bg-purple-500/20' },

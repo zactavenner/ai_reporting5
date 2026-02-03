@@ -162,9 +162,10 @@ export function TaskDiscussionVoiceNote({ taskId, authorName }: TaskDiscussionVo
   );
 }
 
-// Component to play back voice notes
-export function VoiceNotePlayer({ audioUrl, duration }: { audioUrl: string; duration?: number }) {
+// Component to play back voice notes with inline transcript
+export function VoiceNotePlayer({ audioUrl, duration, transcript }: { audioUrl: string; duration?: number; transcript?: string | null }) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const togglePlay = () => {
@@ -188,27 +189,37 @@ export function VoiceNotePlayer({ audioUrl, duration }: { audioUrl: string; dura
   };
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg">
-      <Button size="sm" variant="ghost" onClick={togglePlay} className="h-8 w-8 p-0">
-        {isPlaying ? (
-          <Pause className="h-4 w-4" />
-        ) : (
-          <Play className="h-4 w-4" />
-        )}
-      </Button>
-      <div className="flex items-center gap-1">
-        <div className="flex gap-0.5">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div 
-              key={i} 
-              className="w-1 bg-primary/60 rounded-full" 
-              style={{ height: `${Math.random() * 12 + 4}px` }}
-            />
-          ))}
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg">
+        <Button size="sm" variant="ghost" onClick={togglePlay} className="h-8 w-8 p-0">
+          {isPlaying ? (
+            <Pause className="h-4 w-4" />
+          ) : (
+            <Play className="h-4 w-4" />
+          )}
+        </Button>
+        <div className="flex items-center gap-1">
+          <div className="flex gap-0.5">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div 
+                key={i} 
+                className="w-1 bg-primary/60 rounded-full" 
+                style={{ height: `${Math.random() * 12 + 4}px` }}
+              />
+            ))}
+          </div>
         </div>
+        {duration && (
+          <span className="text-xs text-muted-foreground">{formatTime(duration)}</span>
+        )}
       </div>
-      {duration && (
-        <span className="text-xs text-muted-foreground">{formatTime(duration)}</span>
+      
+      {/* Inline transcript */}
+      {transcript && (
+        <div className="px-3 py-2 bg-muted/30 rounded-lg border border-border/50">
+          <p className="text-xs text-muted-foreground mb-1 font-medium">Transcript:</p>
+          <p className="text-sm text-foreground whitespace-pre-wrap">{transcript}</p>
+        </div>
       )}
     </div>
   );
