@@ -268,6 +268,27 @@ export function InlineRecordsView({
     return map;
   }, [leads]);
 
+  // Get display name for a call - uses embedded contact data with fallback to lead lookup
+  const getCallDisplayName = (call: Call): string => {
+    // Priority 1: Use embedded contact_name on the call record
+    if (call.contact_name) {
+      return call.contact_name;
+    }
+    // Priority 2: Look up from lead via lead_id
+    if (call.lead_id && leadNameMap[call.lead_id]) {
+      return leadNameMap[call.lead_id];
+    }
+    // Priority 3: Use contact_email as fallback
+    if (call.contact_email) {
+      return call.contact_email;
+    }
+    // Priority 4: Show external_id if it looks like a real contact ID (not webhook ID)
+    if (call.external_id && !call.external_id.startsWith('wh_') && !call.external_id.startsWith('manual-')) {
+      return call.external_id;
+    }
+    return '-';
+  };
+
   const getLeadName = (leadId: string | null) => {
     if (!leadId) return '-';
     return leadNameMap[leadId] || '-';
@@ -1056,10 +1077,17 @@ export function InlineRecordsView({
     >
       <TableCell className="font-mono text-sm">
         {call.scheduled_at
-          ? new Date(call.scheduled_at).toLocaleString()
+          ? new Date(call.scheduled_at).toLocaleString('en-US', { 
+              month: 'short', 
+              day: 'numeric', 
+              year: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            })
           : '-'}
       </TableCell>
-      <TableCell className="font-medium">{getLeadName(call.lead_id)}</TableCell>
+      <TableCell className="font-medium">{getCallDisplayName(call)}</TableCell>
       <TableCell>
         {call.showed ? (
           <Badge className="bg-chart-2 text-chart-2-foreground">Showed</Badge>
@@ -1069,8 +1097,14 @@ export function InlineRecordsView({
       </TableCell>
       <TableCell>{call.outcome || '-'}</TableCell>
       <TableCell className="font-mono text-sm">
-        {new Date(call.created_at).toLocaleDateString()}
-      </TableCell>
+        {new Date(call.created_at).toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        })}</TableCell>
       {ghlLocationId && (
         <TableCell>
           {call.external_id && !call.external_id.startsWith('wh_') && !call.external_id.startsWith('manual-') ? (

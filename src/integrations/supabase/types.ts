@@ -342,6 +342,9 @@ export type Database = {
           call_connected: boolean | null
           call_duration_seconds: number | null
           client_id: string
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
           created_at: string
           direction: string | null
           external_id: string
@@ -366,6 +369,9 @@ export type Database = {
           call_connected?: boolean | null
           call_duration_seconds?: number | null
           client_id: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
           created_at?: string
           direction?: string | null
           external_id: string
@@ -390,6 +396,9 @@ export type Database = {
           call_connected?: boolean | null
           call_duration_seconds?: number | null
           client_id?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
           created_at?: string
           direction?: string | null
           external_id?: string

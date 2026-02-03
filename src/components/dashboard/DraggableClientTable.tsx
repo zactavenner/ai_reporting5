@@ -477,14 +477,14 @@ export function DraggableClientTable({
                 <TableCell className="cursor-grab sticky left-0 bg-card z-10" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1">
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
-                    {/* API Test Status or Sync Status Icon */}
+                    {/* Unified API Test Status - single green/red indicator */}
                     {apiTestResults[client.id] ? (
                       <ApiConnectionStatus
                         contacts={apiTestResults[client.id].contacts}
                         calendars={apiTestResults[client.id].calendars}
                         opportunities={apiTestResults[client.id].opportunities}
                         errors={apiTestResults[client.id].errors}
-                        compact
+                        unified
                       />
                     ) : (
                       <Tooltip>
@@ -496,10 +496,10 @@ export function DraggableClientTable({
                             syncInfo.status === 'error' && 'text-destructive',
                             syncInfo.status === 'not_configured' && 'text-muted-foreground'
                           )}>
-                            {syncInfo.status === 'healthy' && <CheckCircle className="h-3 w-3" />}
-                            {syncInfo.status === 'stale' && <Clock className="h-3 w-3" />}
-                            {syncInfo.status === 'error' && <XCircle className="h-3 w-3" />}
-                            {syncInfo.status === 'not_configured' && <AlertCircle className="h-3 w-3" />}
+                            {syncInfo.status === 'healthy' && <CheckCircle className="h-4 w-4" />}
+                            {syncInfo.status === 'stale' && <Clock className="h-4 w-4" />}
+                            {syncInfo.status === 'error' && <XCircle className="h-4 w-4" />}
+                            {syncInfo.status === 'not_configured' && <AlertCircle className="h-4 w-4" />}
                           </div>
                         </TooltipTrigger>
                         <TooltipContent side="right" className="max-w-xs">
