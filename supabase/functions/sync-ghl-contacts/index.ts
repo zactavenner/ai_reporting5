@@ -2034,6 +2034,191 @@ async function syncAppointmentToCall(
   }
 }
 
+// =======================================
+// HISTORICAL METRICS RECALCULATION
+// Aggregates leads, calls, and funded_investors into daily_metrics
+// =======================================
+async function recalculateHistoricalMetrics(
+  supabase: any,
+  clientId: string
+): Promise<{ daysUpdated: number; errors: string[] }> {
+  const result = { daysUpdated: 0, errors: [] as string[] };
+  
+  console.log(`Starting historical metrics recalculation for client ${clientId}`);
+  
+  try {
+    // Find the date range from source tables
+    // Get earliest and latest dates from leads, calls, and funded_investors
+    const { data: leadRange } = await supabase
+      .from('leads')
+      .select('created_at')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: true })
+      .limit(1);
+    
+    const { data: callRange } = await supabase
+      .from('calls')
+      .select('booked_at')
+      .eq('client_id', clientId)
+      .not('booked_at', 'is', null)
+      .order('booked_at', { ascending: true })
+      .limit(1);
+    
+    const { data: fundedRange } = await supabase
+      .from('funded_investors')
+      .select('funded_at')
+      .eq('client_id', clientId)
+      .order('funded_at', { ascending: true })
+      .limit(1);
+    
+    // Find the earliest date across all sources
+    const dates: Date[] = [];
+    if (leadRange?.[0]?.created_at) dates.push(new Date(leadRange[0].created_at));
+    if (callRange?.[0]?.booked_at) dates.push(new Date(callRange[0].booked_at));
+    if (fundedRange?.[0]?.funded_at) dates.push(new Date(fundedRange[0].funded_at));
+    
+    if (dates.length === 0) {
+      console.log('No data found for metrics recalculation');
+      return result;
+    }
+    
+    const earliestDate = new Date(Math.min(...dates.map(d => d.getTime())));
+    const today = new Date();
+    
+    // Iterate through each day from earliest to today
+    const currentDate = new Date(earliestDate);
+    currentDate.setHours(0, 0, 0, 0);
+    
+    // Batch upserts for efficiency
+    const metricsToUpsert: any[] = [];
+    
+    while (currentDate <= today) {
+      const dateStr = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+      const nextDate = new Date(currentDate);
+      nextDate.setDate(nextDate.getDate() + 1);
+      
+      const dayStart = currentDate.toISOString();
+      const dayEnd = nextDate.toISOString();
+      
+      try {
+        // Count leads created on this date
+        const { count: leadsCount } = await supabase
+          .from('leads')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .gte('created_at', dayStart)
+          .lt('created_at', dayEnd);
+        
+        // Count spam leads created on this date
+        const { count: spamCount } = await supabase
+          .from('leads')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .eq('is_spam', true)
+          .gte('created_at', dayStart)
+          .lt('created_at', dayEnd);
+        
+        // Count calls BOOKED on this date (not reconnects)
+        const { count: callsCount } = await supabase
+          .from('calls')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .or('is_reconnect.is.null,is_reconnect.eq.false')
+          .gte('booked_at', dayStart)
+          .lt('booked_at', dayEnd);
+        
+        // Count showed calls BOOKED on this date (not reconnects)
+        const { count: showedCount } = await supabase
+          .from('calls')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .eq('showed', true)
+          .or('is_reconnect.is.null,is_reconnect.eq.false')
+          .gte('booked_at', dayStart)
+          .lt('booked_at', dayEnd);
+        
+        // Count reconnect calls BOOKED on this date
+        const { count: reconnectCount } = await supabase
+          .from('calls')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .eq('is_reconnect', true)
+          .gte('booked_at', dayStart)
+          .lt('booked_at', dayEnd);
+        
+        // Count reconnect showed calls BOOKED on this date
+        const { count: reconnectShowedCount } = await supabase
+          .from('calls')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .eq('is_reconnect', true)
+          .eq('showed', true)
+          .gte('booked_at', dayStart)
+          .lt('booked_at', dayEnd);
+        
+        // Get funded investors for this date
+        const { data: fundedData, count: fundedCount } = await supabase
+          .from('funded_investors')
+          .select('funded_amount, commitment_amount', { count: 'exact' })
+          .eq('client_id', clientId)
+          .gte('funded_at', dayStart)
+          .lt('funded_at', dayEnd);
+        
+        const fundedDollars = (fundedData || []).reduce((sum: number, f: any) => sum + (f.funded_amount || 0), 0);
+        const commitmentDollars = (fundedData || []).reduce((sum: number, f: any) => sum + (f.commitment_amount || 0), 0);
+        const commitmentCount = (fundedData || []).filter((f: any) => f.commitment_amount && f.commitment_amount > 0).length;
+        
+        // Only add if there's any activity
+        if ((leadsCount || 0) > 0 || (callsCount || 0) > 0 || (fundedCount || 0) > 0) {
+          metricsToUpsert.push({
+            client_id: clientId,
+            date: dateStr,
+            leads: leadsCount || 0,
+            spam_leads: spamCount || 0,
+            calls: callsCount || 0,
+            showed_calls: showedCount || 0,
+            reconnect_calls: reconnectCount || 0,
+            reconnect_showed: reconnectShowedCount || 0,
+            funded_investors: fundedCount || 0,
+            funded_dollars: fundedDollars,
+            commitments: commitmentCount,
+            commitment_dollars: commitmentDollars,
+            updated_at: new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        result.errors.push(`Date ${dateStr}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Upsert in batches
+    if (metricsToUpsert.length > 0) {
+      const batchSize = 50;
+      for (let i = 0; i < metricsToUpsert.length; i += batchSize) {
+        const batch = metricsToUpsert.slice(i, i + batchSize);
+        const { error: upsertError } = await supabase
+          .from('daily_metrics')
+          .upsert(batch, { onConflict: 'client_id,date' });
+        
+        if (upsertError) {
+          result.errors.push(`Batch upsert error: ${upsertError.message}`);
+        } else {
+          result.daysUpdated += batch.length;
+        }
+      }
+    }
+    
+    console.log(`Historical metrics recalculation complete: ${result.daysUpdated} days updated`);
+  } catch (err) {
+    result.errors.push(`Metrics recalculation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    console.error('Error in recalculateHistoricalMetrics:', err);
+  }
+  
+  return result;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -2381,6 +2566,7 @@ serve(async (req) => {
           opportunities_synced: 0,
           orphaned_calls_linked: 0,
           discrepancies_cleared: 0,
+          metrics_days_updated: 0,
           errors: [] as string[],
         };
         
@@ -2462,6 +2648,19 @@ serve(async (req) => {
             summary.discrepancies_cleared = 1;
           } catch (err) {
             console.error('Error clearing discrepancies:', err);
+          }
+          
+          // PHASE 6: Recalculate historical daily_metrics
+          // This ensures all daily metrics are accurate based on booked_at dates
+          console.log('PHASE 6: Recalculating historical metrics...');
+          try {
+            const metricsResult = await recalculateHistoricalMetrics(supabase, targetClientId);
+            summary.metrics_days_updated = metricsResult.daysUpdated;
+            if (metricsResult.errors.length > 0) {
+              summary.errors.push(...metricsResult.errors.slice(0, 3));
+            }
+          } catch (err) {
+            summary.errors.push(`Metrics recalculation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
           }
           
           // Update client sync status with success

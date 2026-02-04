@@ -1097,14 +1097,14 @@ export function InlineRecordsView({
       </TableCell>
       <TableCell>{call.outcome || '-'}</TableCell>
       <TableCell className="font-mono text-sm">
-        {new Date(call.created_at).toLocaleString('en-US', {
+        {(call.booked_at || call.created_at) ? new Date(call.booked_at || call.created_at).toLocaleString('en-US', {
           month: 'short',
           day: 'numeric',
           year: 'numeric',
           hour: 'numeric',
           minute: '2-digit',
           hour12: true
-        })}</TableCell>
+        }) : '-'}</TableCell>
       {ghlLocationId && (
         <TableCell>
           {call.external_id && !call.external_id.startsWith('wh_') && !call.external_id.startsWith('manual-') ? (
@@ -1215,7 +1215,7 @@ export function InlineRecordsView({
             <TableHead>Contact</TableHead>
             <TableHead>Showed</TableHead>
             <TableHead>Outcome</TableHead>
-            <TableHead>Created</TableHead>
+            <TableHead>Booked</TableHead>
             {ghlLocationId && <TableHead>GHL</TableHead>}
             {ghlLocationId && <TableHead>Last Sync</TableHead>}
             {ghlLocationId && clientId && <TableHead>Sync</TableHead>}
