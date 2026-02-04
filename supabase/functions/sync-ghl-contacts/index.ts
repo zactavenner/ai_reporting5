@@ -2036,7 +2036,10 @@ async function syncAppointmentToCall(
 
 // =======================================
 // HISTORICAL METRICS RECALCULATION
+// =======================================
+// PHASE 6: Recalculate Historical Daily Metrics
 // Aggregates leads, calls, and funded_investors into daily_metrics
+// This function DELETES existing metrics and recalculates from source tables
 // =======================================
 async function recalculateHistoricalMetrics(
   supabase: any,
@@ -2085,29 +2088,43 @@ async function recalculateHistoricalMetrics(
     const earliestDate = new Date(Math.min(...dates.map(d => d.getTime())));
     const today = new Date();
     
+    // CRITICAL FIX: Delete existing daily_metrics for this client
+    // This ensures we don't have stale data conflicting with new calculations
+    console.log(`Clearing existing daily_metrics for client ${clientId}...`);
+    const { error: deleteError } = await supabase
+      .from('daily_metrics')
+      .delete()
+      .eq('client_id', clientId);
+    
+    if (deleteError) {
+      console.error('Error clearing daily_metrics:', deleteError);
+      result.errors.push(`Failed to clear existing metrics: ${deleteError.message}`);
+      // Continue anyway - upsert should still work
+    }
+    
     // Iterate through each day from earliest to today
     const currentDate = new Date(earliestDate);
-    currentDate.setHours(0, 0, 0, 0);
+    currentDate.setUTCHours(0, 0, 0, 0);
     
-    // Batch upserts for efficiency
-    const metricsToUpsert: any[] = [];
+    // Batch inserts for efficiency
+    const metricsToInsert: any[] = [];
     
     while (currentDate <= today) {
       const dateStr = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
-      const nextDate = new Date(currentDate);
-      nextDate.setDate(nextDate.getDate() + 1);
       
-      const dayStart = currentDate.toISOString();
-      const dayEnd = nextDate.toISOString();
+      // Use UTC boundaries to avoid timezone issues
+      const dayStart = `${dateStr}T00:00:00.000Z`;
+      const dayEnd = `${dateStr}T23:59:59.999Z`;
       
       try {
-        // Count leads created on this date
+        // Count leads created on this date (using is_spam for non-spam count later)
         const { count: leadsCount } = await supabase
           .from('leads')
           .select('*', { count: 'exact', head: true })
           .eq('client_id', clientId)
+          .eq('is_spam', false)
           .gte('created_at', dayStart)
-          .lt('created_at', dayEnd);
+          .lte('created_at', dayEnd);
         
         // Count spam leads created on this date
         const { count: spamCount } = await supabase
@@ -2116,16 +2133,28 @@ async function recalculateHistoricalMetrics(
           .eq('client_id', clientId)
           .eq('is_spam', true)
           .gte('created_at', dayStart)
-          .lt('created_at', dayEnd);
+          .lte('created_at', dayEnd);
+        
+        // Also count leads where is_spam is null (treat as non-spam)
+        const { count: nullSpamCount } = await supabase
+          .from('leads')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .is('is_spam', null)
+          .gte('created_at', dayStart)
+          .lte('created_at', dayEnd);
+        
+        const totalValidLeads = (leadsCount || 0) + (nullSpamCount || 0);
         
         // Count calls BOOKED on this date (not reconnects)
+        // Use .neq instead of .or for clarity
         const { count: callsCount } = await supabase
           .from('calls')
           .select('*', { count: 'exact', head: true })
           .eq('client_id', clientId)
-          .or('is_reconnect.is.null,is_reconnect.eq.false')
+          .neq('is_reconnect', true)
           .gte('booked_at', dayStart)
-          .lt('booked_at', dayEnd);
+          .lte('booked_at', dayEnd);
         
         // Count showed calls BOOKED on this date (not reconnects)
         const { count: showedCount } = await supabase
@@ -2133,9 +2162,9 @@ async function recalculateHistoricalMetrics(
           .select('*', { count: 'exact', head: true })
           .eq('client_id', clientId)
           .eq('showed', true)
-          .or('is_reconnect.is.null,is_reconnect.eq.false')
+          .neq('is_reconnect', true)
           .gte('booked_at', dayStart)
-          .lt('booked_at', dayEnd);
+          .lte('booked_at', dayEnd);
         
         // Count reconnect calls BOOKED on this date
         const { count: reconnectCount } = await supabase
@@ -2144,7 +2173,7 @@ async function recalculateHistoricalMetrics(
           .eq('client_id', clientId)
           .eq('is_reconnect', true)
           .gte('booked_at', dayStart)
-          .lt('booked_at', dayEnd);
+          .lte('booked_at', dayEnd);
         
         // Count reconnect showed calls BOOKED on this date
         const { count: reconnectShowedCount } = await supabase
@@ -2154,7 +2183,7 @@ async function recalculateHistoricalMetrics(
           .eq('is_reconnect', true)
           .eq('showed', true)
           .gte('booked_at', dayStart)
-          .lt('booked_at', dayEnd);
+          .lte('booked_at', dayEnd);
         
         // Get funded investors for this date
         const { data: fundedData, count: fundedCount } = await supabase
@@ -2162,18 +2191,18 @@ async function recalculateHistoricalMetrics(
           .select('funded_amount, commitment_amount', { count: 'exact' })
           .eq('client_id', clientId)
           .gte('funded_at', dayStart)
-          .lt('funded_at', dayEnd);
+          .lte('funded_at', dayEnd);
         
         const fundedDollars = (fundedData || []).reduce((sum: number, f: any) => sum + (f.funded_amount || 0), 0);
         const commitmentDollars = (fundedData || []).reduce((sum: number, f: any) => sum + (f.commitment_amount || 0), 0);
         const commitmentCount = (fundedData || []).filter((f: any) => f.commitment_amount && f.commitment_amount > 0).length;
         
-        // Only add if there's any activity
-        if ((leadsCount || 0) > 0 || (callsCount || 0) > 0 || (fundedCount || 0) > 0) {
-          metricsToUpsert.push({
+        // Add row if there's any activity at all
+        if (totalValidLeads > 0 || (spamCount || 0) > 0 || (callsCount || 0) > 0 || (reconnectCount || 0) > 0 || (fundedCount || 0) > 0) {
+          metricsToInsert.push({
             client_id: clientId,
             date: dateStr,
-            leads: leadsCount || 0,
+            leads: totalValidLeads,
             spam_leads: spamCount || 0,
             calls: callsCount || 0,
             showed_calls: showedCount || 0,
@@ -2190,27 +2219,29 @@ async function recalculateHistoricalMetrics(
         result.errors.push(`Date ${dateStr}: ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
       
-      currentDate.setDate(currentDate.getDate() + 1);
+      currentDate.setUTCDate(currentDate.getUTCDate() + 1);
     }
     
-    // Upsert in batches
-    if (metricsToUpsert.length > 0) {
+    // Insert in batches (since we deleted first, just insert - no conflict)
+    if (metricsToInsert.length > 0) {
+      console.log(`Inserting ${metricsToInsert.length} daily_metrics records...`);
       const batchSize = 50;
-      for (let i = 0; i < metricsToUpsert.length; i += batchSize) {
-        const batch = metricsToUpsert.slice(i, i + batchSize);
-        const { error: upsertError } = await supabase
+      for (let i = 0; i < metricsToInsert.length; i += batchSize) {
+        const batch = metricsToInsert.slice(i, i + batchSize);
+        const { error: insertError } = await supabase
           .from('daily_metrics')
-          .upsert(batch, { onConflict: 'client_id,date' });
+          .insert(batch);
         
-        if (upsertError) {
-          result.errors.push(`Batch upsert error: ${upsertError.message}`);
+        if (insertError) {
+          result.errors.push(`Batch insert error: ${insertError.message}`);
+          console.error('Batch insert error:', insertError);
         } else {
           result.daysUpdated += batch.length;
         }
       }
     }
     
-    console.log(`Historical metrics recalculation complete: ${result.daysUpdated} days updated`);
+    console.log(`Historical metrics recalculation complete: ${result.daysUpdated} days created`);
   } catch (err) {
     result.errors.push(`Metrics recalculation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     console.error('Error in recalculateHistoricalMetrics:', err);
