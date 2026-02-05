@@ -2,15 +2,15 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Calendar as CalendarIcon,
   Paperclip,
   AlertTriangle,
   Check,
+  CheckCircle2,
 } from 'lucide-react';
 import { Task, AgencyMember, useUpdateTask, useTaskFiles } from '@/hooks/useTasks';
-import { format, isToday, isPast, formatDistanceToNow } from 'date-fns';
+import { format, isToday, isPast } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -26,8 +26,8 @@ interface KanbanTaskCardProps {
   onClick?: () => void;
   isDragging?: boolean;
   isPublicView?: boolean;
-   isSelected?: boolean;
-   onSelectChange?: (selected: boolean) => void;
+  isSelected?: boolean;
+  onSelectChange?: (selected: boolean) => void;
 }
 
 export function KanbanTaskCard({ 
@@ -37,8 +37,8 @@ export function KanbanTaskCard({
   onClick,
   isDragging,
   isPublicView = false,
-   isSelected = false,
-   onSelectChange,
+  isSelected = false,
+  onSelectChange,
 }: KanbanTaskCardProps) {
   const {
     attributes,
@@ -71,21 +71,23 @@ export function KanbanTaskCard({
   const isCompleted = task.stage === 'done' || task.status === 'completed';
   const isSelectionMode = !!onSelectChange;
 
-  const handleCheckboxChange = async (checked: boolean) => {
+  const handleCompleteTask = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     await updateTask.mutateAsync({
       id: task.id,
-      stage: checked ? 'done' : 'todo',
-      status: checked ? 'completed' : 'todo',
-      completed_at: checked ? new Date().toISOString() : null,
+      stage: isCompleted ? 'todo' : 'done',
+      status: isCompleted ? 'todo' : 'completed',
+      completed_at: isCompleted ? null : new Date().toISOString(),
     });
   };
 
-   const handleSelectionChange = (checked: boolean) => {
-     if (onSelectChange) {
-       onSelectChange(checked);
-     }
-   };
- 
+  const handleSelectionChange = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onSelectChange) {
+      onSelectChange(!isSelected);
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -93,7 +95,7 @@ export function KanbanTaskCard({
       {...attributes}
       {...listeners}
       className={cn(
-        'group relative p-3 rounded-lg cursor-grab active:cursor-grabbing transition-all duration-200',
+        'group relative p-3 rounded-lg cursor-grab active:cursor-grabbing transition-all duration-200 overflow-hidden',
         // Base styling
         'bg-card border shadow-sm',
         // Default hover - subtle lift
@@ -102,77 +104,71 @@ export function KanbanTaskCard({
         (isDragging || isSortableDragging) && 'opacity-60 shadow-xl rotate-1 scale-105',
         // Overdue styling
         isOverdue && !isCompleted && 'border-destructive/40 bg-destructive/5',
-        // Completed styling - subtle, elegant strike-through effect
+        // Completed styling
         isCompleted && 'bg-muted/40 border-border/50',
-        // Selection styling - clean primary ring
-        isSelected && 'ring-2 ring-primary ring-offset-2 ring-offset-background border-primary shadow-md'
+        // Selection styling
+        isSelected && 'ring-2 ring-primary ring-offset-1 ring-offset-background border-primary shadow-md'
       )}
     >
-      {/* Selection/Completion Checkbox */}
-      <div 
-        className={cn(
-          'absolute -left-1.5 top-3 z-10 transition-all duration-200',
-          // Show checkbox on hover, when selected, when completed, or in selection mode
-          isSelectionMode || isSelected || isCompleted 
-            ? 'opacity-100 scale-100' 
-            : 'opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100'
-        )}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div 
-          className={cn(
-            'flex items-center justify-center w-5 h-5 rounded-full shadow-sm transition-all duration-200 cursor-pointer',
-            // Completed state
-            isCompleted && !isSelectionMode && 'bg-success text-success-foreground',
-            // Selected state in selection mode
-            isSelected && isSelectionMode && 'bg-primary text-primary-foreground',
-            // Default unchecked state
-            !isCompleted && !isSelected && 'bg-background border-2 border-border hover:border-primary/50'
-          )}
-          onClick={() => {
-            if (isSelectionMode) {
-              handleSelectionChange(!isSelected);
-            } else {
-              handleCheckboxChange(!isCompleted);
+      {/* Complete Button - Always visible on hover */}
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className={cn(
+                'absolute -left-1 top-3 z-10 flex items-center justify-center w-6 h-6 rounded-full shadow-sm transition-all duration-200 cursor-pointer',
+                // Show on hover, when selected, or when completed
+                isSelected || isCompleted 
+                  ? 'opacity-100 scale-100' 
+                  : 'opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100',
+                // Completed state
+                isCompleted && 'bg-success text-success-foreground hover:bg-success/80',
+                // Selected state
+                isSelected && !isCompleted && 'bg-primary text-primary-foreground hover:bg-primary/80',
+                // Default unchecked state
+                !isCompleted && !isSelected && 'bg-background border-2 border-muted-foreground/30 hover:border-primary hover:bg-primary/10'
+              )}
+              onClick={isSelectionMode ? handleSelectionChange : handleCompleteTask}
+            >
+              {isCompleted ? (
+                <CheckCircle2 className="h-4 w-4" strokeWidth={2.5} />
+              ) : isSelected ? (
+                <Check className="h-3.5 w-3.5" strokeWidth={3} />
+              ) : (
+                <Check className="h-3.5 w-3.5 text-muted-foreground/50" strokeWidth={2} />
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="text-xs">
+            {isSelectionMode 
+              ? (isSelected ? 'Deselect' : 'Select for bulk action')
+              : (isCompleted ? 'Mark incomplete' : 'Mark complete')
             }
-          }}
-        >
-          {(isCompleted || isSelected) && (
-            <Check className="h-3 w-3" strokeWidth={3} />
-          )}
-        </div>
-      </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
-      <div onClick={onClick} className={cn(isCompleted && 'opacity-60')}>
+      <div onClick={onClick} className={cn('pl-3', isCompleted && 'opacity-60')}>
         {/* Priority Badge & Client Tag */}
-        <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center justify-between gap-1.5 mb-2">
           <Badge 
             variant={getPriorityColor(task.priority)} 
             className={cn(
-              'text-xs uppercase font-medium',
+              'text-[10px] uppercase font-semibold px-1.5 py-0',
               isCompleted && 'opacity-50'
             )}
           >
             {task.priority}
           </Badge>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 flex-shrink-0">
             {files.length > 0 && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-0.5 text-muted-foreground/70">
-                      <Paperclip className="h-3 w-3" />
-                      <span className="text-xs">{files.length}</span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{files.length} file{files.length > 1 ? 's' : ''} attached</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <div className="flex items-center gap-0.5 text-muted-foreground/70">
+                <Paperclip className="h-3 w-3" />
+                <span className="text-[10px]">{files.length}</span>
+              </div>
             )}
             {clientName && (
-              <span className="text-xs text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded truncate max-w-20">
+              <span className="text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded truncate max-w-16">
                 {clientName}
               </span>
             )}
@@ -181,7 +177,7 @@ export function KanbanTaskCard({
 
         {/* Title */}
         <h4 className={cn(
-          'font-medium text-sm mb-2 line-clamp-2 transition-colors',
+          'font-medium text-sm leading-tight mb-1.5 line-clamp-2 break-words',
           isCompleted && 'line-through text-muted-foreground'
         )}>
           {task.title}
@@ -190,7 +186,7 @@ export function KanbanTaskCard({
         {/* Description Preview */}
         {task.description && (
           <p className={cn(
-            'text-xs text-muted-foreground line-clamp-2 mb-3',
+            'text-xs text-muted-foreground line-clamp-2 mb-2 break-words',
             isCompleted && 'opacity-70'
           )}>
             {task.description}
@@ -198,28 +194,30 @@ export function KanbanTaskCard({
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-1">
+        <div className="flex items-center justify-between pt-1 gap-2">
           {/* Due Date */}
           {task.due_date && (
             <div className={cn(
-              'flex items-center gap-1 text-xs font-medium',
+              'flex items-center gap-1 text-[11px] font-medium flex-shrink-0',
               isOverdue && !isCompleted && 'text-destructive',
-              isDueToday && !isCompleted && 'text-amber-600 dark:text-amber-400',
+              isDueToday && !isCompleted && 'text-warning',
               isCompleted && 'text-muted-foreground line-through'
             )}>
-              {isOverdue && !isCompleted && <AlertTriangle className="h-3 w-3" />}
-              <CalendarIcon className="h-3 w-3" />
+              {isOverdue && !isCompleted && <AlertTriangle className="h-3 w-3 flex-shrink-0" />}
+              <CalendarIcon className="h-3 w-3 flex-shrink-0" />
               <span>{format(new Date(task.due_date), 'MMM d')}</span>
             </div>
           )}
           
+          <div className="flex-1" />
+          
           {/* Assignee */}
           {assignee && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-shrink-0">
               {isPublicView ? (
                 <Badge 
                   variant="outline" 
-                  className="text-xs font-normal border-border/60"
+                  className="text-[10px] font-normal border-border/60 px-1.5 py-0"
                   style={assignee.pod?.color ? { 
                     backgroundColor: `${assignee.pod.color}15`,
                     borderColor: `${assignee.pod.color}40`,
@@ -232,8 +230,8 @@ export function KanbanTaskCard({
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Avatar className="h-6 w-6 border border-border/50">
-                        <AvatarFallback className="text-[10px] font-medium bg-muted/80 text-muted-foreground">
+                      <Avatar className="h-5 w-5 border border-border/50">
+                        <AvatarFallback className="text-[9px] font-medium bg-muted/80 text-muted-foreground">
                           {(assignee.name || 'N/A').slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
@@ -246,19 +244,8 @@ export function KanbanTaskCard({
               )}
             </div>
           )}
-          
-          {!task.due_date && !assignee && <div className="flex-1" />}
         </div>
       </div>
-
-      {/* Completed overlay indicator */}
-      {isCompleted && (
-        <div className="absolute top-2 right-2">
-          <div className="flex items-center justify-center w-5 h-5 rounded-full bg-success/20 text-success">
-            <Check className="h-3 w-3" strokeWidth={3} />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
