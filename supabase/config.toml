@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.sync-queue-worker]
 verify_jwt = false
+
+[functions.sync-outbound-ghl]
+verify_jwt = false
