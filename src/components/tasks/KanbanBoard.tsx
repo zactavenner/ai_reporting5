@@ -309,6 +309,19 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
      await bulkDeleteTasks.mutateAsync(ids);
      setSelectedTaskIds(new Set());
    };
+   
+   const handleBulkMarkComplete = async () => {
+     const ids = Array.from(selectedTaskIds);
+     await bulkUpdateTasks.mutateAsync({
+       ids,
+       updates: { 
+         stage: 'done',
+         status: 'completed',
+         completed_at: new Date().toISOString(),
+       },
+     });
+     setSelectedTaskIds(new Set());
+   };
  
    // Clear selection on Escape key
    useEffect(() => {
@@ -486,10 +499,12 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
        <BulkActionBar
          selectedCount={selectedTaskIds.size}
          onChangeDueDate={handleBulkDueDateChange}
+         onMarkComplete={handleBulkMarkComplete}
          onDelete={handleBulkDelete}
          onClearSelection={handleClearSelection}
          isUpdating={bulkUpdateTasks.isPending}
          isDeleting={bulkDeleteTasks.isPending}
+         isCompleting={bulkUpdateTasks.isPending}
        />
     </>
   );

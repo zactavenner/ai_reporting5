@@ -110,56 +110,61 @@ export function KanbanTaskCard({
         isSelected && 'ring-2 ring-primary ring-offset-1 ring-offset-background border-primary shadow-md'
       )}
     >
-      {/* Complete Button - Always visible on hover */}
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              className={cn(
-                'absolute -left-1 top-3 z-10 flex items-center justify-center w-6 h-6 rounded-full shadow-sm transition-all duration-200 cursor-pointer',
-                // Show on hover, when selected, or when completed
-                isSelected || isCompleted 
-                  ? 'opacity-100 scale-100' 
-                  : 'opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100',
-                // Completed state
-                isCompleted && 'bg-success text-success-foreground hover:bg-success/80',
-                // Selected state
-                isSelected && !isCompleted && 'bg-primary text-primary-foreground hover:bg-primary/80',
-                // Default unchecked state
-                !isCompleted && !isSelected && 'bg-background border-2 border-muted-foreground/30 hover:border-primary hover:bg-primary/10'
-              )}
-              onClick={isSelectionMode ? handleSelectionChange : handleCompleteTask}
-            >
-              {isCompleted ? (
-                <CheckCircle2 className="h-4 w-4" strokeWidth={2.5} />
-              ) : isSelected ? (
-                <Check className="h-3.5 w-3.5" strokeWidth={3} />
-              ) : (
-                <Check className="h-3.5 w-3.5 text-muted-foreground/50" strokeWidth={2} />
-              )}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" className="text-xs">
-            {isSelectionMode 
-              ? (isSelected ? 'Deselect' : 'Select for bulk action')
-              : (isCompleted ? 'Mark incomplete' : 'Mark complete')
-            }
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
-      <div onClick={onClick} className={cn('pl-3', isCompleted && 'opacity-60')}>
-        {/* Priority Badge & Client Tag */}
+      <div onClick={onClick} className={cn(isCompleted && 'opacity-60')}>
+        {/* Priority Badge & Quick Complete Button */}
         <div className="flex items-center justify-between gap-1.5 mb-2">
-          <Badge 
-            variant={getPriorityColor(task.priority)} 
-            className={cn(
-              'text-[10px] uppercase font-semibold px-1.5 py-0',
-              isCompleted && 'opacity-50'
-            )}
-          >
-            {task.priority}
-          </Badge>
+          <div className="flex items-center gap-2">
+            {/* Quick Complete Button - Always visible, styled based on state */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className={cn(
+                      'flex items-center justify-center w-5 h-5 rounded-full transition-all duration-200 cursor-pointer flex-shrink-0',
+                      // Completed state
+                      isCompleted && 'bg-success text-success-foreground',
+                      // Selected state (for bulk selection)
+                      isSelected && !isCompleted && 'bg-primary text-primary-foreground',
+                      // Default unchecked state with hover effect
+                      !isCompleted && !isSelected && 'border-2 border-muted-foreground/30 hover:border-success hover:bg-success/10 group-hover:border-success/50'
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isSelectionMode) {
+                        handleSelectionChange(e);
+                      } else {
+                        handleCompleteTask(e);
+                      }
+                    }}
+                  >
+                    {isCompleted ? (
+                      <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2.5} />
+                    ) : isSelected ? (
+                      <Check className="h-3 w-3" strokeWidth={3} />
+                    ) : (
+                      <Check className="h-3 w-3 text-transparent group-hover:text-success/50" strokeWidth={2} />
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  {isSelectionMode 
+                    ? (isSelected ? 'Deselect' : 'Select for bulk action')
+                    : (isCompleted ? 'Mark incomplete' : 'Mark complete')
+                  }
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            <Badge 
+              variant={getPriorityColor(task.priority)} 
+              className={cn(
+                'text-[10px] uppercase font-semibold px-1.5 py-0',
+                isCompleted && 'opacity-50'
+              )}
+            >
+              {task.priority}
+            </Badge>
+          </div>
           <div className="flex items-center gap-1 flex-shrink-0">
             {files.length > 0 && (
               <div className="flex items-center gap-0.5 text-muted-foreground/70">

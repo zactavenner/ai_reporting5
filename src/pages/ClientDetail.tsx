@@ -17,7 +17,6 @@ import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { MetricChartsGrid } from '@/components/dashboard/MetricChartsGrid';
 import { PeriodicStatsTable } from '@/components/dashboard/PeriodicStatsTable';
 import { InlineRecordsView } from '@/components/dashboard/InlineRecordsView';
-import { AttributionDashboard } from '@/components/dashboard/AttributionDashboard';
 import { ClientSettingsModal } from '@/components/settings/ClientSettingsModal';
 import { ShareableLinkButton } from '@/components/dashboard/ShareableLinkButton';
 import { CSVImportModal, ImportType } from '@/components/import/CSVImportModal';
@@ -436,19 +435,9 @@ export default function ClientDetail() {
           </>
         )}
 
-        {/* Attribution & Records Tab */}
+        {/* Records Tab */}
         {activeTab === 'records' && (
           <div className="space-y-6">
-            {/* Attribution Section */}
-            <section>
-              <h2 className="text-lg font-bold mb-4">Attribution</h2>
-              <AttributionDashboard 
-                leads={leads} 
-                calls={calls} 
-                fundedInvestors={fundedInvestors} 
-              />
-            </section>
-
             {/* Detailed Records Section */}
             <section>
               <h2 className="text-lg font-bold mb-4">Detailed Records</h2>

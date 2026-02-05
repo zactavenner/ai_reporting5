@@ -328,24 +328,38 @@
                    <p className="text-sm text-muted-foreground mt-1">Client: {clientName}</p>
                  )}
                </div>
-               <div className="flex items-center gap-2">
-                 <Button
-                   variant="outline"
-                   size="sm"
-                   onClick={handleCopyTaskUrl}
-                 >
-                   <Copy className="h-4 w-4 mr-2" />
-                   Copy Link
-                 </Button>
-                 <Button 
-                   variant="destructive" 
-                   size="sm"
-                   onClick={handleDelete}
-                   disabled={deleteTask.isPending}
-                 >
-                   {deleteTask.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                 </Button>
-               </div>
+              <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyTaskUrl}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Link
+                  </Button>
+                  <Button
+                    variant={task.stage === 'done' ? 'secondary' : 'outline'}
+                    size="sm"
+                    onClick={() => handleStatusChange(task.stage === 'done' ? 'todo' : 'done')}
+                    className={task.stage !== 'done' ? 'border-success/50 text-success hover:bg-success/10' : ''}
+                    disabled={updateTask.isPending}
+                  >
+                    {updateTask.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                    )}
+                    {task.stage === 'done' ? 'Reopen' : 'Complete'}
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={handleDelete}
+                    disabled={deleteTask.isPending}
+                  >
+                    {deleteTask.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  </Button>
+                </div>
              </div>
              
              {linkedMeeting && (

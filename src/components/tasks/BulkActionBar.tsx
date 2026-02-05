@@ -1,37 +1,41 @@
- import { useState } from 'react';
- import { Button } from '@/components/ui/button';
- import { Calendar } from '@/components/ui/calendar';
- import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
- import {
-   AlertDialog,
-   AlertDialogAction,
-   AlertDialogCancel,
-   AlertDialogContent,
-   AlertDialogDescription,
-   AlertDialogFooter,
-   AlertDialogHeader,
-   AlertDialogTitle,
- } from '@/components/ui/alert-dialog';
- import { CalendarIcon, Trash2, X, Loader2 } from 'lucide-react';
- import { format } from 'date-fns';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { CalendarIcon, Trash2, X, Loader2, CheckCircle2 } from 'lucide-react';
+import { format } from 'date-fns';
+
+interface BulkActionBarProps {
+  selectedCount: number;
+  onChangeDueDate: (date: Date) => void;
+  onMarkComplete: () => void;
+  onDelete: () => void;
+  onClearSelection: () => void;
+  isUpdating?: boolean;
+  isDeleting?: boolean;
+  isCompleting?: boolean;
+}
  
- interface BulkActionBarProps {
-   selectedCount: number;
-   onChangeDueDate: (date: Date) => void;
-   onDelete: () => void;
-   onClearSelection: () => void;
-   isUpdating?: boolean;
-   isDeleting?: boolean;
- }
- 
- export function BulkActionBar({
-   selectedCount,
-   onChangeDueDate,
-   onDelete,
-   onClearSelection,
-   isUpdating = false,
-   isDeleting = false,
- }: BulkActionBarProps) {
+export function BulkActionBar({
+  selectedCount,
+  onChangeDueDate,
+  onMarkComplete,
+  onDelete,
+  onClearSelection,
+  isUpdating = false,
+  isDeleting = false,
+  isCompleting = false,
+}: BulkActionBarProps) {
    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
    const [calendarOpen, setCalendarOpen] = useState(false);
    
@@ -59,40 +63,55 @@
            
            <div className="h-4 w-px bg-border" />
            
-           <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-             <PopoverTrigger asChild>
-               <Button variant="outline" size="sm" disabled={isUpdating}>
-                 {isUpdating ? (
-                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                 ) : (
-                   <CalendarIcon className="h-4 w-4 mr-2" />
-                 )}
-                 Change Due Date
-               </Button>
-             </PopoverTrigger>
-             <PopoverContent className="w-auto p-0" align="center">
-               <Calendar
-                 mode="single"
-                 onSelect={handleDateSelect}
-                 initialFocus
-                 className="pointer-events-auto"
-               />
-             </PopoverContent>
-           </Popover>
-           
-           <Button 
-             variant="destructive" 
-             size="sm" 
-             onClick={() => setDeleteDialogOpen(true)}
-             disabled={isDeleting}
-           >
-             {isDeleting ? (
-               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-             ) : (
-               <Trash2 className="h-4 w-4 mr-2" />
-             )}
-             Delete
-           </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onMarkComplete}
+              disabled={isCompleting}
+              className="border-success/50 text-success hover:bg-success/10"
+            >
+              {isCompleting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+              )}
+              Mark Complete
+            </Button>
+            
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" disabled={isUpdating}>
+                  {isUpdating ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <CalendarIcon className="h-4 w-4 mr-2" />
+                  )}
+                  Change Due Date
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="center">
+                <Calendar
+                  mode="single"
+                  onSelect={handleDateSelect}
+                  initialFocus
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+            
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={() => setDeleteDialogOpen(true)}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Delete
+            </Button>
            
            <div className="h-4 w-px bg-border" />
            
