@@ -173,7 +173,7 @@ export function KanbanTaskCard({
               </div>
             )}
             {clientName && (
-              <span className="text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded truncate max-w-16">
+              <span className="text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
                 {clientName}
               </span>
             )}
@@ -182,16 +182,16 @@ export function KanbanTaskCard({
 
         {/* Title */}
         <h4 className={cn(
-          'font-medium text-sm leading-tight mb-1.5 line-clamp-2 break-words',
+          'font-medium text-sm leading-tight mb-1.5 break-words',
           isCompleted && 'line-through text-muted-foreground'
         )}>
           {task.title}
         </h4>
 
-        {/* Description Preview */}
+        {/* Description */}
         {task.description && (
           <p className={cn(
-            'text-xs text-muted-foreground line-clamp-2 mb-2 break-words',
+            'text-xs text-muted-foreground mb-2 break-words whitespace-pre-wrap',
             isCompleted && 'opacity-70'
           )}>
             {task.description}
