@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -243,9 +244,20 @@ serve(async (req) => {
       files?: FileContent[];
     };
 
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    // Fetch API key from agency_settings first, fallback to env var
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const { data: settings } = await supabase
+      .from('agency_settings')
+      .select('gemini_api_key')
+      .limit(1)
+      .maybeSingle();
+
+    const GEMINI_API_KEY = settings?.gemini_api_key || Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY is not configured");
+      throw new Error("GEMINI_API_KEY is not configured. Please add it in Agency Settings.");
     }
 
     const systemPrompt = buildSystemPrompt(context);
