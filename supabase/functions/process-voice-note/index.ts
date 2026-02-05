@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req) => {
@@ -12,7 +12,18 @@ serve(async (req) => {
   }
 
   try {
-    const { audioBase64, clientId, clientName, isPublicRecording, durationSeconds } = await req.json();
+     const body = await req.json();
+     const { action, audioUrl, audioBase64, clientId, clientName, isPublicRecording, durationSeconds, existingTaskContext, agencyMembers, agencyPods } = body;
+
+     // Handle transcribe_only action (for task voice notes)
+     if (action === "transcribe_only") {
+       return await handleTranscribeOnly(audioUrl);
+     }
+
+     // Handle extract_task_details action (for auto-extracting task info from voice)
+     if (action === "extract_task_details") {
+       return await handleExtractTaskDetails(audioUrl, existingTaskContext, agencyMembers, agencyPods);
+     }
 
     if (!audioBase64 || !clientId) {
       return new Response(
@@ -25,10 +36,10 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) {
+     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+     if (!LOVABLE_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "Gemini API key not configured" }),
+         JSON.stringify({ error: "AI API key not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -36,36 +47,35 @@ serve(async (req) => {
     console.log("Processing voice note for client:", clientId);
 
     // Step 1: Transcribe audio using Gemini API
-    const transcriptResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  inline_data: {
-                    mime_type: "audio/webm",
-                    data: audioBase64
-                  }
-                },
-                {
-                  text: "Transcribe this audio recording accurately. Only output the transcription text, nothing else. If you cannot hear any speech or the audio is unclear, respond with 'No speech detected'."
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 4096,
-          },
-        }),
-      }
-    );
+     const transcriptResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+       method: "POST",
+       headers: {
+         Authorization: `Bearer ${LOVABLE_API_KEY}`,
+         "Content-Type": "application/json",
+       },
+       body: JSON.stringify({
+         model: "google/gemini-2.5-flash",
+         messages: [
+           {
+             role: "user",
+             content: [
+               {
+                 type: "text",
+                 text: "Transcribe this audio recording accurately. Only output the transcription text, nothing else. If you cannot hear any speech or the audio is unclear, respond with 'No speech detected'."
+               },
+               {
+                 type: "image_url",
+                 image_url: {
+                   url: `data:audio/webm;base64,${audioBase64}`
+                 }
+               }
+             ]
+           }
+         ],
+         max_tokens: 4096,
+         temperature: 0.1,
+       }),
+     });
 
     if (!transcriptResponse.ok) {
       const errorText = await transcriptResponse.text();
@@ -85,7 +95,7 @@ serve(async (req) => {
     }
 
     const transcriptData = await transcriptResponse.json();
-    const transcript = transcriptData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+     const transcript = transcriptData.choices?.[0]?.message?.content || "";
 
     if (!transcript.trim() || transcript.toLowerCase().includes("no speech detected")) {
       return new Response(
@@ -97,21 +107,22 @@ serve(async (req) => {
     console.log("Transcript:", transcript.substring(0, 100) + "...");
 
     // Step 2: Generate summary and extract action items
-    const analysisResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `You are an expert at analyzing meeting transcripts and extracting actionable insights.
-
-You are analyzing a voice note recording from an agency meeting or call with a client${clientName ? ` named "${clientName}"` : ""}.
+     const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+       method: "POST",
+       headers: {
+         Authorization: `Bearer ${LOVABLE_API_KEY}`,
+         "Content-Type": "application/json",
+       },
+       body: JSON.stringify({
+         model: "google/gemini-2.5-flash",
+         messages: [
+           {
+             role: "system",
+             content: "You are an expert at analyzing meeting transcripts and extracting actionable insights. Return only valid JSON."
+           },
+           {
+             role: "user",
+             content: `You are analyzing a voice note recording from an agency meeting or call with a client${clientName ? ` named "${clientName}"` : ""}.
 
 Transcript:
 ${transcript}
@@ -131,17 +142,12 @@ Return your response in the following JSON format:
 }
 
 Only return valid JSON, no other text.`
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 4096,
-          },
-        }),
-      }
-    );
+           }
+         ],
+         max_tokens: 4096,
+         temperature: 0.7,
+       }),
+     });
 
     if (!analysisResponse.ok) {
       const errorText = await analysisResponse.text();
@@ -153,7 +159,7 @@ Only return valid JSON, no other text.`
     }
 
     const analysisData = await analysisResponse.json();
-    const analysisContent = analysisData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+     const analysisContent = analysisData.choices?.[0]?.message?.content || "";
     
     console.log("Analysis response:", analysisContent);
 
@@ -253,3 +259,241 @@ Only return valid JSON, no other text.`
     );
   }
 });
+
+// Helper function for transcribe_only action
+async function handleTranscribeOnly(audioUrl: string) {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    return new Response(
+      JSON.stringify({ error: "AI API key not configured" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  try {
+    // Fetch the audio file and convert to base64
+    const audioResponse = await fetch(audioUrl);
+    const audioBlob = await audioResponse.arrayBuffer();
+    const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBlob)));
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Transcribe this audio recording accurately. Only output the transcription text, nothing else."
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:audio/webm;base64,${base64Audio}`
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 4096,
+        temperature: 0.1,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Transcription error:", response.status, errorText);
+      return new Response(
+        JSON.stringify({ error: "Failed to transcribe audio", transcript: "" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const data = await response.json();
+    const transcript = data.choices?.[0]?.message?.content || "";
+
+    return new Response(
+      JSON.stringify({ transcript }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (error) {
+    console.error("Transcribe only error:", error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error", transcript: "" }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+}
+
+// Helper function for extract_task_details action
+async function handleExtractTaskDetails(
+  audioUrl: string,
+  existingTaskContext?: { clientName?: string; clientId?: string },
+  agencyMembers?: Array<{ id: string; name: string; pod_id?: string }>,
+  agencyPods?: Array<{ id: string; name: string }>
+) {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    return new Response(
+      JSON.stringify({ error: "AI API key not configured" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  try {
+    // Fetch the audio file and convert to base64
+    const audioResponse = await fetch(audioUrl);
+    const audioBlob = await audioResponse.arrayBuffer();
+    const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBlob)));
+
+    // Step 1: Transcribe
+    const transcribeResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Transcribe this audio recording accurately. Only output the transcription text, nothing else."
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:audio/webm;base64,${base64Audio}`
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 4096,
+        temperature: 0.1,
+      }),
+    });
+
+    if (!transcribeResponse.ok) {
+      const errorText = await transcribeResponse.text();
+      console.error("Transcription error:", transcribeResponse.status, errorText);
+      return new Response(
+        JSON.stringify({ error: "Failed to transcribe audio" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const transcribeData = await transcribeResponse.json();
+    const transcript = transcribeData.choices?.[0]?.message?.content || "";
+
+    if (!transcript.trim()) {
+      return new Response(
+        JSON.stringify({ error: "No speech detected", transcript: "" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Step 2: Extract task details with AI
+    const membersList = agencyMembers?.map(m => m.name).join(", ") || "";
+    const podsList = agencyPods?.map(p => p.name).join(", ") || "";
+
+    const extractResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert at extracting task details from voice recordings. Extract structured task information from the transcript.
+
+Available team members: ${membersList || "Not specified"}
+Available teams/pods: ${podsList || "Not specified"}
+Client context: ${existingTaskContext?.clientName || "Not specified"}
+
+Return only valid JSON, no markdown or other text.`
+          },
+          {
+            role: "user",
+            content: `Extract task details from this voice recording transcript:
+
+"${transcript}"
+
+Return a JSON object with these fields:
+{
+  "title": "A clear, action-oriented task title (max 80 chars)",
+  "description": "Detailed description of what needs to be done",
+  "priority": "low" | "medium" | "high" (based on urgency mentioned),
+  "suggestedAssignee": "Name of person/team mentioned, or null if none",
+  "suggestedAssigneeType": "member" | "pod" | null,
+  "dueDate": "YYYY-MM-DD format if a date/deadline mentioned, or null",
+  "dueDateReason": "Why this date was suggested (e.g., 'mentioned Friday' or 'said by end of week')"
+}
+
+Guidelines:
+- Title should start with a verb (Create, Review, Update, Send, etc.)
+- If someone says "assign to [name]" or "this is for [name]", extract that as suggestedAssignee
+- If they mention a team like "creatives team" or "CRM team", use suggestedAssigneeType: "pod"
+- For dates: "tomorrow" = next business day, "Friday" = this week's Friday, "next week" = Monday, "ASAP" = today
+- Priority: "urgent", "ASAP", "critical" = high; "when you can", "low priority" = low; otherwise = medium`
+          }
+        ],
+        max_tokens: 1024,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!extractResponse.ok) {
+      // Fallback: return transcript only
+      return new Response(
+        JSON.stringify({ 
+          transcript,
+          extracted: null,
+          error: "Failed to extract details" 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const extractData = await extractResponse.json();
+    const extractContent = extractData.choices?.[0]?.message?.content || "";
+
+    let extracted = null;
+    try {
+      let jsonStr = extractContent;
+      const jsonMatch = extractContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[1];
+      }
+      extracted = JSON.parse(jsonStr.trim());
+    } catch (parseError) {
+      console.error("Error parsing extraction JSON:", parseError);
+    }
+
+    return new Response(
+      JSON.stringify({
+        transcript,
+        extracted,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (error) {
+    console.error("Extract task details error:", error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+}

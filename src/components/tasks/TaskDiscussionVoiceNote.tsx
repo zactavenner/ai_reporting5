@@ -3,22 +3,50 @@ import { Mic, Square, Loader2, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useAddVoiceComment } from '@/hooks/useTasks';
+ import { useAddVoiceComment, useCreateTask, useAgencyMembers } from '@/hooks/useTasks';
+ import { useAgencyPods } from '@/hooks/useAgencyPods';
+ import { useSetTaskAssignees } from '@/hooks/useTaskAssignees';
+ import { VoiceNoteTaskReview } from './VoiceNoteTaskReview';
+ import { format } from 'date-fns';
 
 interface TaskDiscussionVoiceNoteProps {
   taskId: string;
   authorName: string;
+   clientId?: string;
+   clientName?: string;
+   mode?: 'comment' | 'create_task';
+   onTaskCreated?: () => void;
 }
 
-export function TaskDiscussionVoiceNote({ taskId, authorName }: TaskDiscussionVoiceNoteProps) {
+export function TaskDiscussionVoiceNote({ 
+  taskId, 
+  authorName, 
+  clientId,
+  clientName,
+  mode = 'comment',
+  onTaskCreated,
+}: TaskDiscussionVoiceNoteProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+   const [showReview, setShowReview] = useState(false);
+   const [extractedData, setExtractedData] = useState<{
+     transcript: string;
+     extracted: any;
+     audioUrl: string;
+     duration: number;
+   } | null>(null);
+   const [isCreatingTask, setIsCreatingTask] = useState(false);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const addVoiceComment = useAddVoiceComment();
+   const createTask = useCreateTask();
+   const setTaskAssignees = useSetTaskAssignees();
+   const { data: agencyMembers = [] } = useAgencyMembers();
+   const { data: pods = [] } = useAgencyPods();
 
   const startRecording = async () => {
     try {
@@ -87,25 +115,64 @@ export function TaskDiscussionVoiceNote({ taskId, authorName }: TaskDiscussionVo
         .from('task-files')
         .getPublicUrl(fileName);
       
-      // Transcribe using AI
-      let transcript = '';
-      try {
-        const { data: transcriptData } = await supabase.functions.invoke('process-voice-note', {
-          body: { audioUrl: publicUrl, action: 'transcribe_only' },
+       if (mode === 'create_task') {
+         // Use enhanced extraction for task creation
+         toast.info('Analyzing voice note...');
+         
+         const { data: extractData, error: extractError } = await supabase.functions.invoke('process-voice-note', {
+           body: { 
+             action: 'extract_task_details',
+             audioUrl: publicUrl,
+             existingTaskContext: { clientId, clientName },
+             agencyMembers: agencyMembers.map(m => ({ id: m.id, name: m.name, pod_id: m.pod_id })),
+             agencyPods: pods.map(p => ({ id: p.id, name: p.name })),
+           },
         });
-        transcript = transcriptData?.transcript || '';
-      } catch (e) {
-        console.log('Transcription not available:', e);
+         
+         if (extractError) {
+           console.error('Extraction error:', extractError);
+           toast.error('Failed to analyze voice note');
+           setIsProcessing(false);
+           return;
+         }
+         
+         if (!extractData?.transcript) {
+           toast.error('No speech detected in recording');
+           setIsProcessing(false);
+           return;
+         }
+         
+         // Show review dialog with extracted data
+         setExtractedData({
+           transcript: extractData.transcript,
+           extracted: extractData.extracted,
+           audioUrl: publicUrl,
+           duration,
+         });
+         setShowReview(true);
+       } else {
+         // Original comment-only flow
+         let transcript = '';
+         try {
+           const { data: transcriptData } = await supabase.functions.invoke('process-voice-note', {
+             body: { audioUrl: publicUrl, action: 'transcribe_only' },
+           });
+           transcript = transcriptData?.transcript || '';
+         } catch (e) {
+           console.log('Transcription not available:', e);
+         }
+         
+         // Add voice comment
+         await addVoiceComment.mutateAsync({
+           taskId,
+           authorName,
+           audioUrl: publicUrl,
+           durationSeconds: duration,
+           transcript,
+         });
+         
+         toast.success('Voice note added');
       }
-      
-      // Add voice comment
-      await addVoiceComment.mutateAsync({
-        taskId,
-        authorName,
-        audioUrl: publicUrl,
-        durationSeconds: duration,
-        transcript,
-      });
       
       setRecordingTime(0);
     } catch (error) {
@@ -116,11 +183,101 @@ export function TaskDiscussionVoiceNote({ taskId, authorName }: TaskDiscussionVo
     }
   };
 
+   const handleConfirmTask = async (taskData: {
+     title: string;
+     description: string;
+     priority: string;
+     dueDate: Date | null;
+     assignedTo: string;
+     assignedPodId: string;
+   }) => {
+     if (!extractedData) return;
+     
+     setIsCreatingTask(true);
+     
+     try {
+       // Determine display name for assigned_to
+       let displayAssignedTo = taskData.assignedTo || null;
+       if (taskData.assignedPodId) {
+         const pod = pods.find(p => p.id === taskData.assignedPodId);
+         displayAssignedTo = pod ? `${pod.name} Team` : null;
+       }
+       
+       // Create the task
+       const newTask = await createTask.mutateAsync({
+         title: taskData.title,
+         description: taskData.description || null,
+         client_id: clientId || null,
+         priority: taskData.priority,
+         due_date: taskData.dueDate ? format(taskData.dueDate, 'yyyy-MM-dd') : null,
+         status: 'todo',
+         stage: 'todo',
+         assigned_to: displayAssignedTo,
+         created_by: authorName,
+       });
+       
+       // Assign pod members if a pod was selected
+       if (taskData.assignedPodId && newTask?.id) {
+         const podMembers = agencyMembers.filter(m => m.pod_id === taskData.assignedPodId);
+         const memberIds = podMembers.map(m => m.id);
+         
+         if (memberIds.length > 0) {
+           await setTaskAssignees.mutateAsync({
+             taskId: newTask.id,
+             memberIds,
+             podIds: [taskData.assignedPodId],
+           });
+         }
+       }
+       
+       // Add the voice note as the first comment on the task
+       if (newTask?.id) {
+         await addVoiceComment.mutateAsync({
+           taskId: newTask.id,
+           authorName,
+           audioUrl: extractedData.audioUrl,
+           durationSeconds: extractedData.duration,
+           transcript: extractedData.transcript,
+         });
+       }
+       
+       toast.success('Task created from voice note!');
+       setShowReview(false);
+       setExtractedData(null);
+       onTaskCreated?.();
+     } catch (error) {
+       console.error('Failed to create task:', error);
+       toast.error('Failed to create task');
+     } finally {
+       setIsCreatingTask(false);
+     }
+   };
+
+   const handleCancelReview = () => {
+     setShowReview(false);
+     setExtractedData(null);
+   };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+   // Show review dialog when we have extracted data
+   if (showReview && extractedData) {
+     return (
+       <VoiceNoteTaskReview
+         transcript={extractedData.transcript}
+         extracted={extractedData.extracted}
+         audioUrl={extractedData.audioUrl}
+         duration={extractedData.duration}
+         onConfirm={handleConfirmTask}
+         onCancel={handleCancelReview}
+         isSubmitting={isCreatingTask}
+       />
+     );
+   }
 
   return (
     <div className="flex items-center gap-2">
@@ -149,7 +306,7 @@ export function TaskDiscussionVoiceNote({ taskId, authorName }: TaskDiscussionVo
           variant="outline"
           onClick={startRecording}
           disabled={isProcessing}
-          title="Record voice note"
+           title={mode === 'create_task' ? 'Record voice to create task' : 'Record voice note'}
         >
           {isProcessing ? (
             <Loader2 className="h-4 w-4 animate-spin" />

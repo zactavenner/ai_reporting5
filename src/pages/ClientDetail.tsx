@@ -246,6 +246,8 @@ export default function ClientDetail() {
               meetings={meetings}
               creatives={creatives}
               isPublicView={false}
+               clientId={client.id}
+               clientName={client.name}
               onActivityClick={handleActivityClick}
             />
             <DropdownMenu>

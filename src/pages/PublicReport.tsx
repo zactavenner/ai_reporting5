@@ -210,6 +210,8 @@ function PublicReportContent() {
                 meetings={meetings}
                 creatives={creatives}
                 isPublicView={true}
+                 clientId={client.id}
+                 clientName={client.name}
                 onActivityClick={handleActivityClick}
               />
             </SectionErrorBoundary>

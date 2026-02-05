@@ -39,6 +39,7 @@ import {
   ListTodo,
   Check,
   X,
+   Plus,
 } from 'lucide-react';
 import { Task } from '@/hooks/useTasks';
 import { VoiceNote } from '@/hooks/useVoiceNotes';
@@ -47,6 +48,8 @@ import { Creative } from '@/hooks/useCreatives';
 import { cn } from '@/lib/utils';
 import { useApprovePendingTask, useRejectPendingTask, useCreatePendingTaskFromActionItem } from '@/hooks/useMeetings';
 import { toast } from 'sonner';
+ import { TaskDiscussionVoiceNote } from '@/components/tasks/TaskDiscussionVoiceNote';
+ import { useTeamMember } from '@/contexts/TeamMemberContext';
 
 interface ActivityPanelProps {
   tasks: Task[];
@@ -54,6 +57,8 @@ interface ActivityPanelProps {
   meetings?: Meeting[];
   creatives?: Creative[];
   isPublicView?: boolean;
+   clientId?: string;
+   clientName?: string;
   onDeleteActivity?: (activityId: string, type: string) => void;
   onActivityClick?: (activityId: string, type: ActivityType) => void;
 }
@@ -92,6 +97,8 @@ export function ActivityPanel({
   meetings = [],
   creatives = [],
   isPublicView = false,
+   clientId,
+   clientName,
   onDeleteActivity,
   onActivityClick,
 }: ActivityPanelProps) {
@@ -105,9 +112,11 @@ export function ActivityPanel({
     clientId: string | null;
     type: 'voice_note' | 'meeting';
   }>({ open: false, title: '', actionItems: [], sourceId: '', clientId: null, type: 'voice_note' });
+   const [showVoiceTaskRecorder, setShowVoiceTaskRecorder] = useState(false);
 
   const createPendingTask = useCreatePendingTaskFromActionItem();
   const approvePendingTask = useApprovePendingTask();
+   const { currentMember } = useTeamMember();
 
   // Build unified activity list
   const activities = useMemo(() => {
@@ -306,6 +315,35 @@ export function ActivityPanel({
           </SheetHeader>
 
           <div className="mt-6 space-y-4">
+             {/* Voice Task Recording Section */}
+             {!isPublicView && (
+               <div className="pb-4 border-b">
+                 {showVoiceTaskRecorder ? (
+                   <TaskDiscussionVoiceNote
+                     taskId="new"
+                     authorName={currentMember?.name || 'Agency'}
+                     clientId={clientId}
+                     clientName={clientName}
+                     mode="create_task"
+                     onTaskCreated={() => {
+                       setShowVoiceTaskRecorder(false);
+                       toast.success('Task created from voice recording!');
+                     }}
+                   />
+                 ) : (
+                   <Button 
+                     variant="outline" 
+                     size="sm" 
+                     className="w-full"
+                     onClick={() => setShowVoiceTaskRecorder(true)}
+                   >
+                     <Mic className="h-4 w-4 mr-2" />
+                     Record Voice Task
+                   </Button>
+                 )}
+               </div>
+             )}
+
             {/* Filter toolbar */}
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
