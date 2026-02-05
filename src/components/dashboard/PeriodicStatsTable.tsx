@@ -227,8 +227,9 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
     : periodicStats;
 
   // Get months without data for "Add" option
+  // For current year, only show up to current month; for past years, show all 12 months
   const emptyMonths = periodType === 'monthly'
-    ? periodicStats.filter(p => !p.hasData && p.month <= new Date().getMonth() + 1)
+    ? periodicStats.filter(p => !p.hasData && (selectedYear < CURRENT_YEAR || p.month <= new Date().getMonth() + 1))
     : [];
 
   // Calculate totals
