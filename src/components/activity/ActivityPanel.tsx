@@ -144,7 +144,7 @@ export function ActivityPanel({
         });
       }
 
-      if (task.stage === 'Review') {
+      if (task.stage === 'review') {
         items.push({
           id: `task-review-${task.id}`,
           sourceId: task.id,
