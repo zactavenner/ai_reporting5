@@ -2210,6 +2210,65 @@ export type Database = {
           },
         ]
       }
+      sync_outbound_events: {
+        Row: {
+          channel: string
+          client_id: string
+          contact_identifier: string
+          created_at: string
+          direction: string
+          event_at: string
+          external_id: string
+          ghl_contact_id: string | null
+          id: string
+          payload: Json
+          retry_count: number
+          sync_error: string | null
+          synced_at: string | null
+          synced_to_ghl: boolean
+        }
+        Insert: {
+          channel: string
+          client_id: string
+          contact_identifier: string
+          created_at?: string
+          direction: string
+          event_at?: string
+          external_id: string
+          ghl_contact_id?: string | null
+          id?: string
+          payload?: Json
+          retry_count?: number
+          sync_error?: string | null
+          synced_at?: string | null
+          synced_to_ghl?: boolean
+        }
+        Update: {
+          channel?: string
+          client_id?: string
+          contact_identifier?: string
+          created_at?: string
+          direction?: string
+          event_at?: string
+          external_id?: string
+          ghl_contact_id?: string | null
+          id?: string
+          payload?: Json
+          retry_count?: number
+          sync_error?: string | null
+          synced_at?: string | null
+          synced_to_ghl?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_outbound_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sync_queue: {
         Row: {
           batch_number: number | null
