@@ -15,6 +15,8 @@ interface KanbanColumnProps {
   onAddTask: () => void;
   onTaskClick: (task: Task) => void;
   isPublicView?: boolean;
+   selectedTaskIds?: Set<string>;
+   onTaskSelect?: (taskId: string, selected: boolean) => void;
 }
 
 export function KanbanColumn({ 
@@ -25,6 +27,8 @@ export function KanbanColumn({
   onAddTask, 
   onTaskClick,
   isPublicView = false,
+   selectedTaskIds,
+   onTaskSelect,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
@@ -70,6 +74,8 @@ export function KanbanColumn({
                   assignee={task.assigned_to ? memberMap[task.assigned_to] : undefined}
                   onClick={() => onTaskClick(task)}
                   isPublicView={isPublicView}
+                   isSelected={selectedTaskIds?.has(task.id) || false}
+                   onSelectChange={onTaskSelect ? (selected) => onTaskSelect(task.id, selected) : undefined}
                 />
               ))
             )}

@@ -454,3 +454,53 @@ export function useAddTaskHistory() {
     },
   });
 }
+ 
+ // Bulk update tasks mutation
+ export function useBulkUpdateTasks() {
+   const queryClient = useQueryClient();
+   
+   return useMutation({
+     mutationFn: async ({ ids, updates }: { ids: string[]; updates: Partial<Task> }) => {
+       const { data, error } = await supabase
+         .from('tasks')
+         .update(updates)
+         .in('id', ids)
+         .select();
+       
+       if (error) throw error;
+       return data;
+     },
+     onSuccess: () => {
+       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+       queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+       toast.success('Tasks updated successfully');
+     },
+     onError: (error: Error) => {
+       toast.error('Failed to update tasks: ' + error.message);
+     },
+   });
+ }
+ 
+ // Bulk delete tasks mutation
+ export function useBulkDeleteTasks() {
+   const queryClient = useQueryClient();
+   
+   return useMutation({
+     mutationFn: async (taskIds: string[]) => {
+       const { error } = await supabase
+         .from('tasks')
+         .delete()
+         .in('id', taskIds);
+       
+       if (error) throw error;
+     },
+     onSuccess: () => {
+       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+       queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+       toast.success('Tasks deleted successfully');
+     },
+     onError: (error: Error) => {
+       toast.error('Failed to delete tasks: ' + error.message);
+     },
+   });
+ }

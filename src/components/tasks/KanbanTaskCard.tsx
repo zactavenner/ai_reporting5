@@ -31,6 +31,8 @@ interface KanbanTaskCardProps {
   onClick?: () => void;
   isDragging?: boolean;
   isPublicView?: boolean;
+   isSelected?: boolean;
+   onSelectChange?: (selected: boolean) => void;
 }
 
 export function KanbanTaskCard({ 
@@ -40,6 +42,8 @@ export function KanbanTaskCard({
   onClick,
   isDragging,
   isPublicView = false,
+   isSelected = false,
+   onSelectChange,
 }: KanbanTaskCardProps) {
   const {
     attributes,
@@ -80,6 +84,12 @@ export function KanbanTaskCard({
     });
   };
 
+   const handleSelectionChange = (checked: boolean) => {
+     if (onSelectChange) {
+       onSelectChange(checked);
+     }
+   };
+ 
   return (
     <HoverCard openDelay={400} closeDelay={100}>
       <HoverCardTrigger asChild>
@@ -93,27 +103,29 @@ export function KanbanTaskCard({
             'hover:border-primary/50 hover:shadow-md hover:scale-[1.02]',
             (isDragging || isSortableDragging) && 'opacity-50 shadow-lg rotate-2',
             isOverdue && 'border-destructive/50 bg-destructive/5',
-            isCompleted && 'opacity-70 bg-muted/30'
+             isCompleted && 'opacity-70 bg-muted/30',
+             isSelected && 'ring-2 ring-primary border-primary'
           )}
         >
-          {/* Hover Checkbox - Enhanced styling */}
+           {/* Selection Checkbox */}
           <div 
             className={cn(
               'absolute -left-2 top-3 transition-all duration-200 z-10',
-              isCompleted ? 'opacity-100 scale-100' : 'opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100'
+               (isCompleted || isSelected || onSelectChange) ? 'opacity-100 scale-100' : 'opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100'
             )}
             onClick={(e) => e.stopPropagation()}
           >
             <div className={cn(
               'rounded-full p-0.5 shadow-sm transition-colors',
-              isCompleted ? 'bg-green-500' : 'bg-background border border-border'
+               isCompleted ? 'bg-green-500' : isSelected ? 'bg-primary' : 'bg-background border border-border'
             )}>
               <Checkbox 
-                checked={isCompleted}
-                onCheckedChange={handleCheckboxChange}
+                 checked={onSelectChange ? isSelected : isCompleted}
+                 onCheckedChange={onSelectChange ? handleSelectionChange : handleCheckboxChange}
                 className={cn(
                   'h-5 w-5 border-2 transition-colors',
-                  isCompleted && 'border-green-500 bg-green-500 text-white data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500'
+                   isCompleted && !onSelectChange && 'border-green-500 bg-green-500 text-white data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500',
+                   isSelected && onSelectChange && 'border-primary bg-primary text-primary-foreground data-[state=checked]:bg-primary data-[state=checked]:border-primary'
                 )}
               />
             </div>

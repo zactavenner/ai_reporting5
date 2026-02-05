@@ -46,15 +46,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Task, useUpdateTask, useAgencyMembers, AgencyMember, useAddTaskHistory } from '@/hooks/useTasks';
+ import { Task, useUpdateTask, useAgencyMembers, AgencyMember, useAddTaskHistory, useBulkUpdateTasks, useBulkDeleteTasks } from '@/hooks/useTasks';
 import { Client } from '@/hooks/useClients';
-import { TaskDetailModal } from './TaskDetailModal';
+ import { TaskDetailPanel } from './TaskDetailPanel';
 import { CreateTaskModal } from './CreateTaskModal';
 import { KanbanColumn } from './KanbanColumn';
 import { KanbanTaskCard } from './KanbanTaskCard';
+ import { BulkActionBar } from './BulkActionBar';
 import { format, isToday, isPast, isTomorrow, isThisWeek, addDays, startOfDay, endOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
+ import { useSearchParams } from 'react-router-dom';
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -85,11 +87,29 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
   const [filterAssigneeId, setFilterAssigneeId] = useState<string>('');
   const [showMyTasksOnly, setShowMyTasksOnly] = useState<boolean>(false);
   const [dueDateFilter, setDueDateFilter] = useState<string>('all');
+   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   
   const updateTask = useUpdateTask();
   const addHistory = useAddTaskHistory();
+   const bulkUpdateTasks = useBulkUpdateTasks();
+   const bulkDeleteTasks = useBulkDeleteTasks();
   const { data: agencyMembers = [] } = useAgencyMembers();
   const { currentMember } = useTeamMember();
+   const [searchParams, setSearchParams] = useSearchParams();
+   
+   // Handle deep link to specific task
+   useEffect(() => {
+     const taskId = searchParams.get('task');
+     if (taskId && tasks.length > 0) {
+       const task = tasks.find(t => t.id === taskId);
+       if (task) {
+         setSelectedTask(task);
+         // Clear the query param after opening
+         searchParams.delete('task');
+         setSearchParams(searchParams, { replace: true });
+       }
+     }
+   }, [searchParams, tasks, setSearchParams]);
   
   // Initialize "My Tasks" filter based on logged-in member
   useEffect(() => {
@@ -259,6 +279,48 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
     return map;
   }, [agencyMembers]);
 
+   const handleTaskSelect = (taskId: string, selected: boolean) => {
+     setSelectedTaskIds(prev => {
+       const next = new Set(prev);
+       if (selected) {
+         next.add(taskId);
+       } else {
+         next.delete(taskId);
+       }
+       return next;
+     });
+   };
+   
+   const handleClearSelection = () => {
+     setSelectedTaskIds(new Set());
+   };
+   
+   const handleBulkDueDateChange = async (date: Date) => {
+     const ids = Array.from(selectedTaskIds);
+     await bulkUpdateTasks.mutateAsync({
+       ids,
+       updates: { due_date: format(date, 'yyyy-MM-dd') },
+     });
+     setSelectedTaskIds(new Set());
+   };
+   
+   const handleBulkDelete = async () => {
+     const ids = Array.from(selectedTaskIds);
+     await bulkDeleteTasks.mutateAsync(ids);
+     setSelectedTaskIds(new Set());
+   };
+ 
+   // Clear selection on Escape key
+   useEffect(() => {
+     const handleKeyDown = (e: KeyboardEvent) => {
+       if (e.key === 'Escape') {
+         setSelectedTaskIds(new Set());
+       }
+     };
+     window.addEventListener('keydown', handleKeyDown);
+     return () => window.removeEventListener('keydown', handleKeyDown);
+   }, []);
+ 
   return (
     <>
       <div className="space-y-4">
@@ -384,6 +446,8 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
                 onAddTask={() => handleAddTask(stage.id)}
                 onTaskClick={setSelectedTask}
                 isPublicView={isPublicView}
+                 selectedTaskIds={selectedTaskIds}
+                 onTaskSelect={handleTaskSelect}
               />
             ))}
           </div>
@@ -402,7 +466,7 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
         </DndContext>
       </div>
 
-      <TaskDetailModal
+       <TaskDetailPanel
         task={selectedTask}
         open={!!selectedTask}
         onOpenChange={(open) => !open && setSelectedTask(null)}
@@ -418,6 +482,15 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
         defaultClientId={clientId}
         isPublicView={isPublicView}
       />
+ 
+       <BulkActionBar
+         selectedCount={selectedTaskIds.size}
+         onChangeDueDate={handleBulkDueDateChange}
+         onDelete={handleBulkDelete}
+         onClearSelection={handleClearSelection}
+         isUpdating={bulkUpdateTasks.isPending}
+         isDeleting={bulkDeleteTasks.isPending}
+       />
     </>
   );
 }

@@ -12,6 +12,8 @@ import DatabaseView from "./pages/DatabaseView";
 import PublicReport from "./pages/PublicReport";
 import SpamBlacklist from "./pages/SpamBlacklist";
 import NotFound from "./pages/NotFound";
+ import ClientCreatives from "./pages/ClientCreatives";
+ import PublicCreatives from "./pages/PublicCreatives";
 
 const queryClient = new QueryClient();
 
@@ -27,11 +29,13 @@ const App = () => (
             <Route path="/" element={<PasswordGate><Index /></PasswordGate>} />
             <Route path="/client/:clientId" element={<PasswordGate><ClientDetail /></PasswordGate>} />
             <Route path="/client/:clientId/records" element={<PasswordGate><ClientRecords /></PasswordGate>} />
+             <Route path="/client/:clientId/creatives" element={<PasswordGate><ClientCreatives /></PasswordGate>} />
             <Route path="/database" element={<PasswordGate><DatabaseView /></PasswordGate>} />
             <Route path="/spam-blacklist" element={<PasswordGate><SpamBlacklist /></PasswordGate>} />
             
             {/* Public routes - no password required */}
             <Route path="/public/:token" element={<PublicReport />} />
+             <Route path="/public/:token/creatives" element={<PublicCreatives />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
