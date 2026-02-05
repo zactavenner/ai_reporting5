@@ -7,11 +7,10 @@ const corsHeaders = {
 };
 
 // ============================================================
-// WEBHOOKS FROZEN - ALL PROCESSING DISABLED
+// WEBHOOKS FROZEN - EXCEPT AD SPEND
 // ============================================================
-// All webhook processing is currently frozen pending transition
-// to API-only sync architecture. Webhooks are logged but not
-// processed to prevent duplicate data and ensure data integrity.
+// Most webhook processing is frozen pending API-only sync.
+// Only ad_spend webhooks are processed for real-time spend tracking.
 // ============================================================
 
 serve(async (req) => {
@@ -61,16 +60,66 @@ serve(async (req) => {
       );
     }
 
-    // Log the webhook for monitoring (but don't process)
+    // ONLY process ad_spend webhooks - everything else is frozen
+    if (webhookType === 'ad_spend') {
+      console.log(`[ACTIVE] Ad spend webhook - Client: ${client.name} (${clientId})`);
+      
+      const records = Array.isArray(payload) ? payload : [payload];
+      let insertedCount = 0;
+      
+      for (const record of records) {
+        const reportedAt = record.reported_at || record.date || new Date().toISOString().split('T')[0];
+        
+        const adSpendRecord = {
+          client_id: clientId,
+          reported_at: reportedAt,
+          spend: parseFloat(record.spend) || 0,
+          impressions: parseInt(record.impressions) || null,
+          clicks: parseInt(record.clicks) || null,
+          platform: record.platform || 'facebook',
+          campaign_name: record.campaign_name || record.campaign || null,
+          ad_set_name: record.ad_set_name || record.adset || null,
+        };
+
+        const { error: insertError } = await supabase
+          .from('ad_spend_reports')
+          .upsert(adSpendRecord, { 
+            onConflict: 'client_id,reported_at,platform,campaign_name',
+            ignoreDuplicates: false 
+          });
+
+        if (insertError) {
+          console.error('Error inserting ad spend:', insertError);
+        } else {
+          insertedCount++;
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          status: 'processed',
+          message: `Processed ${insertedCount} ad spend records`,
+          webhook_type: webhookType,
+          client_id: clientId,
+          received_at: new Date().toISOString(),
+        }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // All other webhook types remain frozen
     console.log(`[FROZEN] Webhook received - Type: ${webhookType}, Client: ${client.name} (${clientId})`);
     console.log(`[FROZEN] Payload preview: ${JSON.stringify(payload).substring(0, 500)}`);
 
-    // Return frozen status - webhook acknowledged but not processed
     return new Response(
       JSON.stringify({
         success: true,
         status: 'frozen',
-        message: 'Webhook acknowledged but processing is currently frozen. Data sync is handled via hourly API sync.',
+        message: 'Webhook acknowledged but processing is frozen. Data sync is handled via hourly API sync.',
         webhook_type: webhookType,
         client_id: clientId,
         received_at: new Date().toISOString(),
