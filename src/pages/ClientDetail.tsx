@@ -418,7 +418,7 @@ export default function ClientDetail() {
               />
             </section>
 
-            <PeriodicStatsTable dailyMetrics={dailyMetrics} />
+            <PeriodicStatsTable clientId={clientId} />
 
             <MetricChartsGrid dailyMetrics={dailyMetrics} />
 
