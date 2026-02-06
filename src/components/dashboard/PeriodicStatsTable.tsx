@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { format, startOfWeek, startOfMonth, endOfWeek, endOfMonth, eachWeekOfInterval, eachMonthOfInterval, eachDayOfInterval, isWithinInterval, parseISO } from 'date-fns';
+import { format, startOfWeek, endOfWeek, endOfMonth, eachWeekOfInterval, eachDayOfInterval, isWithinInterval, parseISO } from 'date-fns';
 import { DailyMetric } from '@/hooks/useMetrics';
 import { useYearlyMetrics, useUpsertMonthlyMetric } from '@/hooks/useYearlyMetrics';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 
 interface PeriodicStatsTableProps {
   clientId?: string;
-  dailyMetrics?: DailyMetric[]; // Optional fallback for non-client views
+  dailyMetrics?: DailyMetric[];
 }
 
 type PeriodType = 'daily' | 'weekly' | 'monthly';
@@ -55,12 +55,43 @@ interface EditingState {
   value: string;
 }
 
+interface MetricRowConfig {
+  label: string;
+  key: keyof PeriodStats;
+  format: (value: number) => string;
+  editable: boolean;
+  dbField?: string;
+  highlight?: boolean;
+}
+
 const CURRENT_YEAR = new Date().getFullYear();
 const AVAILABLE_YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1];
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+// Metric row definitions for transposed table
+const METRIC_ROWS: MetricRowConfig[] = [
+  { label: 'Ad Spend', key: 'adSpend', format: (v) => `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, editable: true, dbField: 'ad_spend' },
+  { label: 'Leads', key: 'leads', format: (v) => v.toLocaleString(), editable: true, dbField: 'leads' },
+  { label: 'CPL', key: 'cpl', format: (v) => `$${v.toFixed(2)}`, editable: false },
+  { label: 'Calls', key: 'calls', format: (v) => v.toLocaleString(), editable: true, dbField: 'calls' },
+  { label: '$/Call', key: 'costPerCall', format: (v) => `$${v.toFixed(2)}`, editable: false },
+  { label: 'Showed', key: 'showedCalls', format: (v) => v.toLocaleString(), editable: true, dbField: 'showed_calls' },
+  { label: 'Show %', key: 'showRate', format: (v) => `${v.toFixed(1)}%`, editable: false },
+  { label: '$/Show', key: 'costPerShow', format: (v) => `$${v.toFixed(2)}`, editable: false },
+  { label: 'Reconnect', key: 'reconnectCalls', format: (v) => v.toLocaleString(), editable: true, dbField: 'reconnect_calls' },
+  { label: '$/Recon', key: 'costPerReconnect', format: (v) => `$${v.toFixed(2)}`, editable: false },
+  { label: 'Recon Showed', key: 'reconnectShowed', format: (v) => v.toLocaleString(), editable: true, dbField: 'reconnect_showed' },
+  { label: '$/R.Showed', key: 'costPerReconnectShowed', format: (v) => `$${v.toFixed(2)}`, editable: false },
+  { label: 'Commitments', key: 'commitments', format: (v) => v.toLocaleString(), editable: true, dbField: 'commitments' },
+  { label: 'Commit $', key: 'commitmentDollars', format: (v) => `$${v.toLocaleString()}`, editable: true, dbField: 'commitment_dollars' },
+  { label: 'Funded #', key: 'fundedInvestors', format: (v) => v.toLocaleString(), editable: true, dbField: 'funded_investors' },
+  { label: 'Funded $', key: 'fundedDollars', format: (v) => `$${v.toLocaleString()}`, editable: true, dbField: 'funded_dollars', highlight: true },
+  { label: 'CPA', key: 'costPerInvestor', format: (v) => `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, editable: false },
+  { label: 'CoC %', key: 'costOfCapital', format: (v) => `${v.toFixed(2)}%`, editable: false },
 ];
 
 export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: PeriodicStatsTableProps) {
@@ -70,15 +101,12 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
   const [addingMonth, setAddingMonth] = useState<number | null>(null);
   const [newMonthData, setNewMonthData] = useState<Record<string, string>>({});
 
-  // Fetch yearly metrics if clientId provided
   const { data: yearlyMetrics = [], isLoading } = useYearlyMetrics(clientId, selectedYear);
   const upsertMonthlyMetric = useUpsertMonthlyMetric();
 
-  // Use external metrics if no clientId, otherwise use yearly metrics
   const metricsToUse = clientId ? yearlyMetrics : (externalMetrics || []);
 
   const periodicStats = useMemo(() => {
-    // Generate all months for the year
     const allMonths: PeriodStats[] = [];
 
     if (periodType === 'monthly') {
@@ -86,7 +114,6 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
         const monthStart = new Date(selectedYear, month - 1, 1);
         const monthEnd = endOfMonth(monthStart);
 
-        // Filter metrics for this month
         const monthMetrics = metricsToUse.filter(m => {
           const date = parseISO(m.date);
           return isWithinInterval(date, { start: monthStart, end: monthEnd });
@@ -112,7 +139,7 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
 
         allMonths.push({
           period: format(monthStart, 'yyyy-MM-dd'),
-          periodLabel: format(monthStart, 'MMMM yyyy'),
+          periodLabel: format(monthStart, 'MMM yyyy'),
           year: selectedYear,
           month,
           hasData,
@@ -137,11 +164,9 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
         });
       }
 
-      // Return in reverse order (most recent first)
       return allMonths.reverse();
     }
 
-    // For weekly and daily, use existing logic
     if (metricsToUse.length === 0) return [];
 
     const metricsWithDates = metricsToUse.map(m => ({
@@ -159,7 +184,7 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
       periods = days.map(day => ({
         start: day,
         end: day,
-        label: format(day, 'MMM d, yyyy')
+        label: format(day, 'MMM d')
       }));
     } else if (periodType === 'weekly') {
       const weeks = eachWeekOfInterval({ start: yearStart, end: yearEnd }, { weekStartsOn: 1 });
@@ -221,13 +246,10 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
     return stats.sort((a, b) => b.period.localeCompare(a.period));
   }, [metricsToUse, periodType, selectedYear]);
 
-  // Filter to only show months with data (for monthly view)
   const displayStats = periodType === 'monthly'
     ? periodicStats.filter(p => p.hasData)
     : periodicStats;
 
-  // Get months without data for "Add" option
-  // For current year, only show up to current month; for past years, show all 12 months
   const emptyMonths = periodType === 'monthly'
     ? periodicStats.filter(p => !p.hasData && (selectedYear < CURRENT_YEAR || p.month <= new Date().getMonth() + 1))
     : [];
@@ -260,8 +282,13 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
       costPerReconnectShowed: t.reconnectShowed > 0 ? t.adSpend / t.reconnectShowed : 0,
       costPerInvestor: t.fundedInvestors > 0 ? t.adSpend / t.fundedInvestors : 0,
       costOfCapital: t.fundedDollars > 0 ? (t.adSpend / t.fundedDollars) * 100 : 0,
-    };
-  }, [displayStats]);
+      period: 'total',
+      periodLabel: 'TOTAL',
+      year: selectedYear,
+      month: 0,
+      hasData: true,
+    } as PeriodStats;
+  }, [displayStats, selectedYear]);
 
   const handleEditClick = (period: string, field: string, currentValue: number) => {
     setEditing({ period, field, value: currentValue.toString() });
@@ -329,12 +356,12 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
     }
   };
 
-  const renderEditableCell = (periodStats: PeriodStats, field: string, value: number, format: (v: number) => string) => {
-    const isEditing = editing?.period === periodStats.period && editing?.field === field;
+  const renderEditableCell = (periodStats: PeriodStats, metric: MetricRowConfig, value: number) => {
+    const isEditing = editing?.period === periodStats.period && editing?.field === metric.key;
 
     if (isEditing) {
       return (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center justify-end gap-1">
           <Input
             type="number"
             value={editing.value}
@@ -349,7 +376,7 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
             onClick={() => handleEditSave(periodStats)}
             disabled={upsertMonthlyMetric.isPending}
           >
-            {upsertMonthlyMetric.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-green-600" />}
+            {upsertMonthlyMetric.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-chart-2" />}
           </Button>
           <Button
             size="icon"
@@ -364,14 +391,14 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
     }
 
     return (
-      <div className="flex items-center gap-1 group">
-        <span>{format(value)}</span>
-        {clientId && (
+      <div className="flex items-center justify-end gap-1 group">
+        <span className={metric.highlight ? 'text-chart-2' : ''}>{metric.format(value)}</span>
+        {clientId && metric.editable && (
           <Button
             size="icon"
             variant="ghost"
             className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={() => handleEditClick(periodStats.period, field, value)}
+            onClick={() => handleEditClick(periodStats.period, metric.key, value)}
           >
             <Pencil className="h-3 w-3" />
           </Button>
@@ -424,21 +451,21 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
               size="sm"
               onClick={() => setPeriodType('monthly')}
             >
-              Monthly
+              M
             </Button>
             <Button
               variant={periodType === 'weekly' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setPeriodType('weekly')}
             >
-              Weekly
+              W
             </Button>
             <Button
               variant={periodType === 'daily' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setPeriodType('daily')}
             >
-              Daily
+              D
             </Button>
           </div>
         </div>
@@ -470,7 +497,7 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
         <>
           {/* Add month option */}
           {clientId && periodType === 'monthly' && emptyMonths.length > 0 && (
-            <div className="mb-4 flex items-center gap-2">
+            <div className="mb-4 flex items-center gap-2 flex-wrap">
               <span className="text-sm text-muted-foreground">Add missing month:</span>
               {emptyMonths.slice(0, 3).map(m => (
                 <Button
@@ -489,98 +516,43 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
             </div>
           )}
 
+          {/* Transposed Table: Metrics as rows, Periods as columns */}
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="border-b-2">
-                  <TableHead className="font-bold whitespace-nowrap">
-                    {periodType === 'daily' ? 'Day' : periodType === 'weekly' ? 'Week' : 'Month'}
+                  <TableHead className="font-bold whitespace-nowrap sticky left-0 bg-card z-10 min-w-[120px]">
+                    Metric
                   </TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">Ad Spend</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">Leads</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">CPL</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">Calls</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">$/Call</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">Showed</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">Show %</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">$/Show</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">Recon</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">$/Recon</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">Recon Shwd</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">$/R.Shwd</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">Commits</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">Commit $</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">Funded #</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">Funded $</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">CPA</TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap">CoC %</TableHead>
+                  <TableHead className="font-bold text-right whitespace-nowrap bg-muted/50 min-w-[100px]">
+                    TOTAL
+                  </TableHead>
+                  {displayStats.map(period => (
+                    <TableHead key={period.period} className="font-bold text-right whitespace-nowrap min-w-[100px]">
+                      {period.periodLabel}
+                    </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* Totals Row */}
-                <TableRow className="border-b-2 bg-muted/50 font-semibold">
-                  <TableCell className="font-bold">TOTAL</TableCell>
-                  <TableCell className="text-right font-mono">${totals.adSpend.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
-                  <TableCell className="text-right font-mono">{totals.leads.toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-mono">${totals.cpl.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-mono">{totals.calls.toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-mono">${totals.costPerCall.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-mono">{totals.showedCalls.toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-mono">{totals.showRate.toFixed(1)}%</TableCell>
-                  <TableCell className="text-right font-mono">${totals.costPerShow.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-mono">{totals.reconnectCalls.toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-mono">${totals.costPerReconnect.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-mono">{totals.reconnectShowed.toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-mono">${totals.costPerReconnectShowed.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-mono">{totals.commitments.toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-mono">${totals.commitmentDollars.toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-mono">{totals.fundedInvestors.toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-mono text-chart-2">${totals.fundedDollars.toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-mono">${totals.costPerInvestor.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
-                  <TableCell className="text-right font-mono">{totals.costOfCapital.toFixed(2)}%</TableCell>
-                </TableRow>
-
-                {displayStats.map((period) => (
-                  <TableRow key={period.period} className="border-b">
-                    <TableCell className="font-medium whitespace-nowrap">{period.periodLabel}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {renderEditableCell(period, 'adSpend', period.adSpend, (v) => `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`)}
+                {METRIC_ROWS.map((metric) => (
+                  <TableRow key={metric.key} className={`border-b ${metric.highlight ? 'bg-chart-2/5' : ''}`}>
+                    <TableCell className="font-medium whitespace-nowrap sticky left-0 bg-card z-10">
+                      {metric.label}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {renderEditableCell(period, 'leads', period.leads, (v) => v.toString())}
+                    <TableCell className="text-right font-mono bg-muted/50 font-semibold">
+                      <span className={metric.highlight ? 'text-chart-2' : ''}>
+                        {metric.format(totals[metric.key] as number)}
+                      </span>
                     </TableCell>
-                    <TableCell className="text-right font-mono">${period.cpl.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {renderEditableCell(period, 'calls', period.calls, (v) => v.toString())}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">${period.costPerCall.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {renderEditableCell(period, 'showedCalls', period.showedCalls, (v) => v.toString())}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">{period.showRate.toFixed(1)}%</TableCell>
-                    <TableCell className="text-right font-mono">${period.costPerShow.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {renderEditableCell(period, 'reconnectCalls', period.reconnectCalls, (v) => v.toString())}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">${period.costPerReconnect.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {renderEditableCell(period, 'reconnectShowed', period.reconnectShowed, (v) => v.toString())}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">${period.costPerReconnectShowed.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {renderEditableCell(period, 'commitments', period.commitments, (v) => v.toString())}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {renderEditableCell(period, 'commitmentDollars', period.commitmentDollars, (v) => `$${v.toLocaleString()}`)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {renderEditableCell(period, 'fundedInvestors', period.fundedInvestors, (v) => v.toString())}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-chart-2">
-                      {renderEditableCell(period, 'fundedDollars', period.fundedDollars, (v) => `$${v.toLocaleString()}`)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">${period.costPerInvestor.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
-                    <TableCell className="text-right font-mono">{period.costOfCapital.toFixed(2)}%</TableCell>
+                    {displayStats.map(period => (
+                      <TableCell key={period.period} className="text-right font-mono">
+                        {metric.editable 
+                          ? renderEditableCell(period, metric, period[metric.key] as number)
+                          : <span className={metric.highlight ? 'text-chart-2' : ''}>{metric.format(period[metric.key] as number)}</span>
+                        }
+                      </TableCell>
+                    ))}
                   </TableRow>
                 ))}
               </TableBody>
