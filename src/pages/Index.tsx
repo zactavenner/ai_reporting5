@@ -25,7 +25,7 @@ import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sliders, Video, CheckCircle, RefreshCw, Upload, LayoutDashboard, Smartphone, Bot, Wifi } from 'lucide-react';
+import { Sliders, Video, CheckCircle, RefreshCw, Upload, LayoutDashboard, Smartphone, Bot, Wifi, LayoutGrid } from 'lucide-react';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics, AggregatedMetrics } from '@/hooks/useMetrics';
 import { useAllClientSettings, useAllClientFullSettings } from '@/hooks/useAllClientSettings';
@@ -177,10 +177,14 @@ const Index = () => {
 
         {/* Main Tabs Navigation */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-5">
+          <TabsList className="grid w-full max-w-3xl grid-cols-6">
             <TabsTrigger value="dashboard" className="gap-2">
               <LayoutDashboard className="h-4 w-4" />
               Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="tasks" className="gap-2">
+              <LayoutGrid className="h-4 w-4" />
+              Tasks
             </TabsTrigger>
             <TabsTrigger value="ai" className="gap-2">
               <Bot className="h-4 w-4" />
@@ -287,10 +291,11 @@ const Index = () => {
               )}
             </section>
 
-            {/* Project Management */}
-            <section>
-              <TaskBoardView />
-            </section>
+          </TabsContent>
+
+          {/* Tasks Tab - Project Management */}
+          <TabsContent value="tasks" className="space-y-6">
+            <TaskBoardView />
           </TabsContent>
 
           {/* AI Hub Tab */}
