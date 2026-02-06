@@ -21,6 +21,7 @@ export interface ClientSyncStatus {
   lastSyncAt: string | null;
   syncError: string | null;
   hasCredentials: boolean;
+  source: 'ghl' | 'hubspot' | 'none';
 }
 
 export interface SyncHealthData {
@@ -42,58 +43,96 @@ function getSyncStatus(lastSynced: string | null): 'healthy' | 'stale' | 'critic
 }
 
 function getClientSyncStatus(
-  lastGhlSyncAt: string | null,
-  ghlSyncStatus: string | null,
-  ghlSyncError: string | null,
-  hasCredentials: boolean
+  ghlData: {
+    lastSyncAt: string | null;
+    syncStatus: string | null;
+    syncError: string | null;
+    hasCredentials: boolean;
+  },
+  hubspotData: {
+    lastSyncAt: string | null;
+    syncStatus: string | null;
+    syncError: string | null;
+    hasCredentials: boolean;
+  }
 ): ClientSyncStatus {
-  if (!hasCredentials) {
+  // Check HubSpot first (if configured)
+  if (hubspotData.hasCredentials) {
+    if (hubspotData.syncStatus) {
+      return {
+        status: hubspotData.syncStatus as 'healthy' | 'stale' | 'error' | 'not_configured',
+        lastSyncAt: hubspotData.lastSyncAt,
+        syncError: hubspotData.syncError,
+        hasCredentials: true,
+        source: 'hubspot',
+      };
+    }
+    
+    // Fall back to time-based calculation
+    if (!hubspotData.lastSyncAt) {
+      return {
+        status: 'not_configured',
+        lastSyncAt: null,
+        syncError: null,
+        hasCredentials: true,
+        source: 'hubspot',
+      };
+    }
+    
+    const hoursDiff = (new Date().getTime() - new Date(hubspotData.lastSyncAt).getTime()) / (1000 * 60 * 60);
+    let status: 'healthy' | 'stale' | 'error' = hoursDiff <= 2 ? 'healthy' : hoursDiff <= 24 ? 'stale' : 'error';
+    
     return {
-      status: 'not_configured',
-      lastSyncAt: null,
-      syncError: null,
-      hasCredentials: false,
-    };
-  }
-  
-  // Use explicit status if available
-  if (ghlSyncStatus) {
-    return {
-      status: ghlSyncStatus as 'healthy' | 'stale' | 'error' | 'not_configured',
-      lastSyncAt: lastGhlSyncAt,
-      syncError: ghlSyncError,
+      status,
+      lastSyncAt: hubspotData.lastSyncAt,
+      syncError: hubspotData.syncError,
       hasCredentials: true,
+      source: 'hubspot',
     };
   }
   
-  // Fall back to time-based calculation
-  if (!lastGhlSyncAt) {
+  // Check GHL
+  if (ghlData.hasCredentials) {
+    if (ghlData.syncStatus) {
+      return {
+        status: ghlData.syncStatus as 'healthy' | 'stale' | 'error' | 'not_configured',
+        lastSyncAt: ghlData.lastSyncAt,
+        syncError: ghlData.syncError,
+        hasCredentials: true,
+        source: 'ghl',
+      };
+    }
+    
+    // Fall back to time-based calculation
+    if (!ghlData.lastSyncAt) {
+      return {
+        status: 'not_configured',
+        lastSyncAt: null,
+        syncError: null,
+        hasCredentials: true,
+        source: 'ghl',
+      };
+    }
+    
+    const hoursDiff = (new Date().getTime() - new Date(ghlData.lastSyncAt).getTime()) / (1000 * 60 * 60);
+    let status: 'healthy' | 'stale' | 'error' = hoursDiff <= 2 ? 'healthy' : hoursDiff <= 24 ? 'stale' : 'error';
+    
     return {
-      status: 'not_configured',
-      lastSyncAt: null,
-      syncError: null,
+      status,
+      lastSyncAt: ghlData.lastSyncAt,
+      syncError: ghlData.syncError,
       hasCredentials: true,
+      source: 'ghl',
     };
   }
   
-  const now = new Date();
-  const syncedAt = new Date(lastGhlSyncAt);
-  const hoursDiff = (now.getTime() - syncedAt.getTime()) / (1000 * 60 * 60);
-  
-  let status: 'healthy' | 'stale' | 'error';
-  if (hoursDiff <= 2) {
-    status = 'healthy';
-  } else if (hoursDiff <= 24) {
-    status = 'stale';
-  } else {
-    status = 'error';
-  }
-  
+  // No CRM configured
   return {
-    status,
-    lastSyncAt: lastGhlSyncAt,
-    syncError: ghlSyncError,
-    hasCredentials: true,
+    status: 'not_configured',
+    lastSyncAt: null,
+    syncError: null,
+    hasCredentials: false,
+    source: 'none',
   };
 }
 
@@ -110,6 +149,7 @@ export function useSyncHealth(clientId: string | undefined) {
             lastSyncAt: null,
             syncError: null,
             hasCredentials: false,
+            source: 'none',
           }
         };
       }
@@ -123,10 +163,10 @@ export function useSyncHealth(clientId: string | undefined) {
         callsMissingLeadResult,
         fundedMissingLeadResult,
       ] = await Promise.all([
-        // Get client sync status
+        // Get client sync status (both GHL and HubSpot)
         supabase
           .from('clients')
-          .select('ghl_api_key, ghl_location_id, last_ghl_sync_at, ghl_sync_status, ghl_sync_error')
+          .select('ghl_api_key, ghl_location_id, last_ghl_sync_at, ghl_sync_status, ghl_sync_error, hubspot_portal_id, hubspot_access_token, last_hubspot_sync_at, hubspot_sync_status, hubspot_sync_error')
           .eq('id', clientId)
           .single(),
         
@@ -170,13 +210,22 @@ export function useSyncHealth(clientId: string | undefined) {
       ]);
 
       const clientData = clientResult.data;
-      const hasCredentials = !!(clientData?.ghl_api_key && clientData?.ghl_location_id);
+      const hasGhlCredentials = !!(clientData?.ghl_api_key && clientData?.ghl_location_id);
+      const hasHubspotCredentials = !!((clientData as any)?.hubspot_portal_id && (clientData as any)?.hubspot_access_token);
       
       const clientSync = getClientSyncStatus(
-        clientData?.last_ghl_sync_at,
-        clientData?.ghl_sync_status,
-        clientData?.ghl_sync_error,
-        hasCredentials
+        {
+          lastSyncAt: clientData?.last_ghl_sync_at || null,
+          syncStatus: clientData?.ghl_sync_status || null,
+          syncError: clientData?.ghl_sync_error || null,
+          hasCredentials: hasGhlCredentials,
+        },
+        {
+          lastSyncAt: (clientData as any)?.last_hubspot_sync_at || null,
+          syncStatus: (clientData as any)?.hubspot_sync_status || null,
+          syncError: (clientData as any)?.hubspot_sync_error || null,
+          hasCredentials: hasHubspotCredentials,
+        }
       );
 
       const leadsLastSync = leadsResult.data?.[0]?.ghl_synced_at || null;

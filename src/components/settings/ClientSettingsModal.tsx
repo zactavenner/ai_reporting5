@@ -833,14 +833,26 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
             </div>
 
             {/* Sync Health Indicator */}
-            <SyncHealthIndicator
-              status={getSyncStatus(
-                (client as any).last_ghl_sync_at,
-                !!(client?.ghl_api_key && client?.ghl_location_id)
-              )}
-              lastSyncAt={(client as any).last_ghl_sync_at}
-              syncError={(client as any).ghl_sync_error}
-            />
+            {(() => {
+              const hasHubspot = !!(client?.hubspot_portal_id && client?.hubspot_access_token);
+              const hasGhl = !!(client?.ghl_api_key && client?.ghl_location_id);
+              const source = hasHubspot ? 'hubspot' : hasGhl ? 'ghl' : 'none';
+              const lastSync = hasHubspot 
+                ? (client as any).last_hubspot_sync_at 
+                : (client as any).last_ghl_sync_at;
+              const syncError = hasHubspot 
+                ? (client as any).hubspot_sync_error 
+                : (client as any).ghl_sync_error;
+              
+              return (
+                <SyncHealthIndicator
+                  status={getSyncStatus(lastSync, hasHubspot || hasGhl)}
+                  lastSyncAt={lastSync}
+                  syncError={syncError}
+                  source={source as 'ghl' | 'hubspot' | 'none'}
+                />
+              );
+            })()}
 
             {/* Calendar Tracking Section */}
             <CalendarTrackingSection
