@@ -1,256 +1,214 @@
 
-# Platform Enhancement Plan: Creatives Tab, Task Panel & Multi-Select
+# HubSpot CRM Integration Plan
 
 ## Overview
 
-This plan addresses three main feature requests:
-1. **Dedicated Creatives route** (`/client/:clientId/creatives`) with its own shareable URL
-2. **Task side panel** - Tasks open in a slide-out panel (like records), with a copyable task URL
-3. **Multi-select tasks** - Bulk actions for changing due dates and deleting
+Add HubSpot as an alternative CRM integration alongside the existing GoHighLevel (GHL) integration. This will allow clients to sync contacts, deals, and call data from HubSpot using the same hourly sync architecture already established for GHL.
 
----
+## Architecture Approach
 
-## 1. Dedicated Creatives Route with Shareable URL
-
-### What You'll Get
-
-- A new route `/client/:clientId/creatives` that opens the Creatives section directly
-- Public equivalent: `/public/:token/creatives` for client access
-- The Creatives tab remains visible in the main navigation alongside other tabs
-- Direct links can be shared with clients to go straight to creative approval
-
-### Route Structure
+The integration will follow the same patterns already established in your system:
+- **Per-client API credentials** stored in the database
+- **Hourly Edge Function sync** via `pg_cron` (matching GHL pattern)
+- **Deal-to-Funded Investor mapping** using HubSpot deal stages (similar to GHL pipelines)
+- **Contact sync** with UTM/attribution extraction
 
 ```text
-Internal Routes:
-├── /client/:clientId            → Client Detail (current)
-├── /client/:clientId/creatives  → Creatives Tab (NEW)
-└── /client/:clientId/records    → Records (existing)
-
-Public Routes:
-├── /public/:token               → Public Report (current)
-└── /public/:token/creatives     → Creative Approval (NEW)
++-------------------+       +----------------------+       +------------------+
+|   Client Settings |------>|  sync-hubspot-       |------>|  leads, calls,   |
+|   (HubSpot creds) |       |  contacts (Edge Fn)  |       |  funded_investors|
++-------------------+       +----------------------+       +------------------+
+         ^                           |
+         |                           v
++-------------------+       +----------------------+
+| Settings Modal    |       | HubSpot CRM API v3   |
+| (new tab section) |       | (Private App Token)  |
++-------------------+       +----------------------+
 ```
 
-### Navigation Behavior
+## Implementation Steps
 
-| Location | Behavior |
-|----------|----------|
-| Client Detail page | Creatives tab navigates to `/client/:clientId/creatives` |
-| Creatives page header | "Back to Dashboard" returns to `/client/:clientId` |
-| Public Report | Creatives section navigates to `/public/:token/creatives` |
+### Phase 1: Database Schema Updates
 
-### Files to Create/Modify
+**Add HubSpot columns to `clients` table:**
+- `hubspot_portal_id` (text) - HubSpot account/portal ID
+- `hubspot_access_token` (text) - Private App access token
+- `hubspot_sync_status` (text) - healthy/syncing/error
+- `hubspot_sync_error` (text) - Last error message
+- `last_hubspot_sync_at` (timestamp) - Last successful sync
 
-| File | Changes |
-|------|---------|
-| `src/App.tsx` | Add new routes for `/client/:clientId/creatives` and `/public/:token/creatives` |
-| `src/pages/ClientCreatives.tsx` | **NEW** - Dedicated creatives page with full header |
-| `src/pages/PublicCreatives.tsx` | **NEW** - Public-facing creatives page |
-| `src/pages/ClientDetail.tsx` | Change Creatives button to use `navigate()` instead of local state |
-| `src/pages/PublicReport.tsx` | Change Creatives button to use `navigate()` |
+**Add HubSpot settings to `client_settings` table:**
+- `hubspot_sync_enabled` (boolean) - Toggle for HubSpot sync
+- `hubspot_funded_pipeline_id` (text) - Deal pipeline for funded investors
+- `hubspot_funded_stage_ids` (text[]) - Deal stages that indicate "funded"
+- `hubspot_committed_stage_ids` (text[]) - Deal stages for "committed"
+- `hubspot_booked_meeting_types` (text[]) - Meeting types to track as calls
+- `hubspot_reconnect_meeting_types` (text[]) - Meeting types for reconnect calls
+- `hubspot_last_contacts_sync` (timestamp)
+- `hubspot_last_deals_sync` (timestamp)
 
----
+### Phase 2: Edge Function - `sync-hubspot-contacts`
 
-## 2. Task Side Panel (Like Records)
+Create new Edge Function with these capabilities:
 
-### What You'll Get
+**Authentication:** HubSpot Private App Token (simpler than OAuth for server-to-server)
 
-Based on the reference image, tasks will open in a side panel (Sheet) similar to how records work, with:
-- Slide-out panel from the right side
-- Task details, status, assignees, files, and discussion
-- **Copy Task URL button** - Copies a shareable link like `/client/:clientId/tasks/:taskId`
+**Sync Operations:**
+1. **Contacts Sync** - Fetch contacts, map to `leads` table
+2. **Deals Sync** - Fetch deals, create `funded_investors` records based on stage mapping
+3. **Meetings Sync** - Fetch meeting engagements, create `calls` records
+4. **Activities Sync** - Pull call recordings and notes
 
-### Panel Layout
+**Field Mapping (HubSpot to Internal):**
+| HubSpot Field | Internal Field | Notes |
+|---------------|----------------|-------|
+| `vid` or `id` | `external_id` | Contact identifier |
+| `firstname + lastname` | `name` | |
+| `email` | `email` | |
+| `phone` | `phone` | |
+| `hs_analytics_source` | `utm_source` | Traffic source |
+| `hs_latest_source` | `source` | Normalized source |
+| `properties.utm_*` | `utm_*` columns | Campaign tracking |
+| `lifecyclestage` | `status` | Lead status mapping |
 
-```text
-┌─────────────────────────────────────┐
-│  Task Title                   [X]   │
-│  ─────────────────────────────────  │
-│  Client: Blue Capital               │
-│  Status: [To-Do ▼]                  │
-│  Priority: [High ▼]                 │
-│  Due: [Dec 15, 2024]                │
-│  Assigned: [Team Member ▼]          │
-│  ─────────────────────────────────  │
-│  [📋 Copy Task URL]                 │
-│  ─────────────────────────────────  │
-│  Description                        │
-│  Lorem ipsum...                     │
-│  ─────────────────────────────────  │
-│  📎 Attachments                     │
-│  [file1.png] [file2.pdf]            │
-│  ─────────────────────────────────  │
-│  💬 Discussion                      │
-│  ... comments timeline ...          │
-└─────────────────────────────────────┘
-```
+**Deal Stage Mapping:**
+- User configures which deal stages = "Funded" vs "Committed"
+- On sync, deals in those stages create/update `funded_investors` records
+- Monetary value maps to `funded_amount` or `commitment_amount`
 
-### Task URL Structure
+### Phase 3: UI - Settings Modal Updates
 
-```text
-Internal:  /client/:clientId/tasks/:taskId
-Public:    /public/:token/tasks/:taskId
-```
-
-When a user navigates to these URLs:
-1. The page loads the client/public report
-2. Auto-opens the task panel for the specified task
-3. Shows the full task details in the side panel
-
-### Copy URL Behavior
-
-- Click the copy icon → Copies the full task URL to clipboard
-- Toast notification: "Task link copied to clipboard!"
-- URL format: `https://funding-sonar.lovable.app/client/:clientId/tasks/:taskId`
-
-### Files to Create/Modify
-
-| File | Changes |
-|------|---------|
-| `src/components/tasks/TaskDetailPanel.tsx` | **NEW** - Sheet-based panel (converted from modal) |
-| `src/components/tasks/KanbanBoard.tsx` | Open TaskDetailPanel instead of TaskDetailModal |
-| `src/pages/ClientDetail.tsx` | Add route param handling for `?task=:taskId` |
-| `src/pages/PublicReport.tsx` | Add route param handling for `?task=:taskId` |
-| `src/App.tsx` | Add optional task routes |
-
----
-
-## 3. Multi-Select Tasks for Bulk Actions
-
-### What You'll Get
-
-Based on the reference image showing checkboxes on task cards:
-- Checkbox appears on hover (or always visible when in selection mode)
-- Select multiple tasks across columns
-- Floating action bar appears when tasks are selected
-- Bulk actions: **Change Due Date** and **Delete**
-
-### Selection Interface
+**Update Integrations Tab:**
+Add new section below GHL integration:
 
 ```text
 ┌────────────────────────────────────────────────────┐
-│  ☑ 3 tasks selected    [📅 Change Due Date] [🗑️ Delete]  │
+│ 🔌 CRM Integration Selection                       │
+│ ○ GoHighLevel  ● HubSpot  ○ None                  │
+└────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────┐
+│ HubSpot Integration                                │
+├────────────────────────────────────────────────────┤
+│ Portal ID: [_______________]                       │
+│ (Found in Settings → Account Defaults)             │
+│                                                    │
+│ Private App Token: [••••••••••••••••]              │
+│ (Generate in Settings → Integrations → Private    │
+│  Apps → Create Private App)                        │
+│                                                    │
+│ Status: ● Connected                                │
+│                                                    │
+│ [Test Connection]  [Sync Now]                      │
+└────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────┐
+│ Deal Stage Mapping                                 │
+├────────────────────────────────────────────────────┤
+│ Funded Pipeline: [Sales Pipeline     ▼]            │
+│                                                    │
+│ Funded Stages (select multiple):                   │
+│ ☑ Closed Won                                       │
+│ ☐ Contract Signed                                  │
+│                                                    │
+│ Committed Stages (select multiple):                │
+│ ☑ Decision Made                                    │
+│ ☐ Proposal Sent                                    │
+└────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────┐
+│ Meeting Tracking                                   │
+├────────────────────────────────────────────────────┤
+│ Booked Call Meeting Types:                         │
+│ ☑ Discovery Call                                   │
+│ ☑ Sales Call                                       │
+│                                                    │
+│ Reconnect Meeting Types:                           │
+│ ☑ Follow-up Meeting                                │
 └────────────────────────────────────────────────────┘
 ```
 
-### Selection Behavior
+### Phase 4: Hourly Sync Automation
 
-| Action | Behavior |
-|--------|----------|
-| Click checkbox | Toggle task selection |
-| Shift+Click | Select range (future enhancement) |
-| Click outside | Keep selection (selection is explicit) |
-| Escape key | Clear selection |
-| Navigate away | Clear selection |
+**Update `pg_cron` schedule** to trigger HubSpot sync alongside GHL:
 
-### Bulk Actions
-
-**Change Due Date:**
-1. Click "Change Due Date" button
-2. Calendar popover opens
-3. Select new date
-4. All selected tasks update
-5. Toast: "Updated due date for 3 tasks"
-
-**Delete:**
-1. Click "Delete" button
-2. Confirmation dialog: "Delete 3 tasks? This cannot be undone."
-3. Confirm → All selected tasks deleted
-4. Toast: "Deleted 3 tasks"
-
-### Files to Create/Modify
-
-| File | Changes |
-|------|---------|
-| `src/components/tasks/KanbanBoard.tsx` | Add selection state, floating action bar |
-| `src/components/tasks/KanbanTaskCard.tsx` | Add selection checkbox (persistent, not just hover) |
-| `src/components/tasks/BulkActionBar.tsx` | **NEW** - Floating bar with bulk actions |
-| `src/hooks/useTasks.ts` | Add `useBulkUpdateTasks` and `useBulkDeleteTasks` mutations |
-
----
-
-## Technical Implementation Details
-
-### New Components
-
-**TaskDetailPanel.tsx** - Converts the existing modal to a Sheet:
-```typescript
-// Key differences from TaskDetailModal:
-// - Uses Sheet instead of Dialog
-// - Adds Copy URL button in header
-// - Slides from right side
-// - Maintains all existing functionality
+```sql
+-- Add HubSpot sync to hourly schedule (offset by 30 minutes to avoid overlap)
+SELECT cron.schedule(
+  'hubspot-hourly-sync',
+  '30 * * * *',  -- Run at :30 of every hour
+  $$SELECT net.http_post(...)$$
+);
 ```
 
-**BulkActionBar.tsx** - Floating action bar:
-```typescript
-interface BulkActionBarProps {
-  selectedCount: number;
-  onChangeDueDate: (date: Date) => void;
-  onDelete: () => void;
-  onClearSelection: () => void;
-}
+### Phase 5: Hook Updates
+
+**Create `useHubSpotSync` hook:**
+- Test connection
+- Trigger manual sync
+- Fetch pipelines and meeting types for dropdown population
+
+**Update `useClientSettings` hook:**
+- Add HubSpot-specific fields to interface
+- Handle new settings in mutations
+
+## Required HubSpot API Scopes
+
+When creating the Private App in HubSpot, these scopes are needed:
+- `crm.objects.contacts.read` - Read contacts
+- `crm.objects.deals.read` - Read deals/opportunities
+- `crm.objects.companies.read` - Read company data
+- `sales-email-read` - Read email engagements
+- `crm.objects.owners.read` - Read owner assignments
+- `crm.schemas.deals.read` - Read deal pipelines
+
+## Technical Details
+
+### HubSpot API Endpoints Used
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /crm/v3/objects/contacts` | Fetch contacts with properties |
+| `GET /crm/v3/objects/deals` | Fetch deals with stage info |
+| `GET /crm/v3/pipelines/deals` | List deal pipelines and stages |
+| `GET /crm/v3/objects/meetings` | Fetch meeting engagements |
+| `GET /crm/v3/objects/calls` | Fetch call engagements |
+| `GET /crm/v4/associations` | Get contact-deal associations |
+
+### Rate Limiting Strategy
+
+HubSpot has stricter rate limits than GHL:
+- 10 requests/second for Private Apps
+- Implement 100ms delay between requests
+- Batch operations where possible (max 100 per batch)
+- Store `cursor` for pagination continuation on timeout
+
+### Contact Property Extraction
+
+Fetch these properties per contact:
+```javascript
+properties: [
+  'email', 'firstname', 'lastname', 'phone',
+  'lifecyclestage', 'hs_lead_status',
+  'hs_analytics_source', 'hs_analytics_source_data_1',
+  'utm_campaign', 'utm_source', 'utm_medium', 'utm_content'
+]
 ```
 
-### Database Considerations
+## Files to Create/Modify
 
-No schema changes required - all features use existing `tasks` table structure.
+**New Files:**
+- `supabase/functions/sync-hubspot-contacts/index.ts` - Main sync function
+- `src/components/settings/HubSpotIntegrationSection.tsx` - UI component
+- `src/components/settings/HubSpotPipelineMappingSection.tsx` - Deal stage mapping
+- `src/components/settings/HubSpotMeetingTrackingSection.tsx` - Meeting type config
+- `src/hooks/useHubSpotSync.ts` - Sync hook
 
-### Bulk Operations (New Hooks)
+**Modified Files:**
+- `src/components/settings/ClientSettingsModal.tsx` - Add HubSpot tab content
+- `src/hooks/useClientSettings.ts` - Add HubSpot settings fields
+- `supabase/config.toml` - Register new Edge Function
 
-```typescript
-// useBulkUpdateTasks - Updates multiple tasks at once
-await supabase
-  .from('tasks')
-  .update({ due_date: newDate })
-  .in('id', taskIds);
-
-// useBulkDeleteTasks - Deletes multiple tasks at once  
-await supabase
-  .from('tasks')
-  .delete()
-  .in('id', taskIds);
-```
-
-### URL Query Parameters
-
-For deep-linking to specific tasks:
-```text
-/client/:clientId?tab=tasks&task=:taskId
-/public/:token?section=tasks&task=:taskId
-```
-
----
-
-## Implementation Order
-
-1. **Phase 1: Task Side Panel**
-   - Create TaskDetailPanel (Sheet-based)
-   - Add Copy URL functionality
-   - Update KanbanBoard to use panel
-
-2. **Phase 2: Multi-Select**
-   - Add selection state to KanbanBoard
-   - Update KanbanTaskCard with selection checkbox
-   - Create BulkActionBar component
-   - Add bulk mutation hooks
-
-3. **Phase 3: Creatives Routes**
-   - Create ClientCreatives page
-   - Create PublicCreatives page
-   - Update App.tsx with new routes
-   - Update navigation in ClientDetail and PublicReport
-
----
-
-## Summary
-
-| Feature | Files Affected | Complexity |
-|---------|---------------|------------|
-| Creatives dedicated route | 5 files | Medium |
-| Task side panel with URL copy | 4 files | Medium |
-| Multi-select tasks | 4 files | Medium |
-| **Total** | ~10 files | ~2-3 hours |
-
-All features maintain existing design patterns, use existing UI components (Sheet, Checkbox, Badge), and follow the established code architecture.
+**Database Migration:**
+- Add HubSpot columns to `clients` table
+- Add HubSpot settings to `client_settings` table
