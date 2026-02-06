@@ -60,39 +60,62 @@ function getClientSyncStatus(client: Client): {
   status: 'healthy' | 'stale' | 'error' | 'not_configured';
   lastSyncAt: string | null;
   error: string | null;
+  source: 'ghl' | 'hubspot' | 'none';
 } {
-  const hasCredentials = !!(client.ghl_api_key && client.ghl_location_id);
+  const hasGhlCredentials = !!(client.ghl_api_key && client.ghl_location_id);
+  const hasHubspotCredentials = !!(client.hubspot_portal_id && client.hubspot_access_token);
   
-  // Use the new fields if available, otherwise fall back to checking credentials
-  const ghlSyncStatus = (client as any).ghl_sync_status;
-  const lastGhlSyncAt = (client as any).last_ghl_sync_at;
-  const ghlSyncError = (client as any).ghl_sync_error;
-  
-  if (ghlSyncStatus) {
-    return {
-      status: ghlSyncStatus as 'healthy' | 'stale' | 'error' | 'not_configured',
-      lastSyncAt: lastGhlSyncAt,
-      error: ghlSyncError,
-    };
+  // Check HubSpot first (if configured)
+  if (hasHubspotCredentials) {
+    const hubspotSyncStatus = client.hubspot_sync_status;
+    const lastHubspotSyncAt = client.last_hubspot_sync_at;
+    const hubspotSyncError = client.hubspot_sync_error;
+    
+    if (hubspotSyncStatus) {
+      return {
+        status: hubspotSyncStatus as 'healthy' | 'stale' | 'error' | 'not_configured',
+        lastSyncAt: lastHubspotSyncAt,
+        error: hubspotSyncError,
+        source: 'hubspot',
+      };
+    }
+    
+    // If credentials exist but no sync status, assume it needs to be synced
+    return { status: 'stale', lastSyncAt: null, error: null, source: 'hubspot' };
   }
   
-  // Fallback logic based on credentials presence
-  if (!hasCredentials) {
-    return { status: 'not_configured', lastSyncAt: null, error: null };
+  // Check GHL
+  if (hasGhlCredentials) {
+    const ghlSyncStatus = client.ghl_sync_status;
+    const lastGhlSyncAt = client.last_ghl_sync_at;
+    const ghlSyncError = client.ghl_sync_error;
+    
+    if (ghlSyncStatus) {
+      return {
+        status: ghlSyncStatus as 'healthy' | 'stale' | 'error' | 'not_configured',
+        lastSyncAt: lastGhlSyncAt,
+        error: ghlSyncError,
+        source: 'ghl',
+      };
+    }
+    
+    // If credentials exist but no sync status, assume it needs to be synced
+    return { status: 'stale', lastSyncAt: null, error: null, source: 'ghl' };
   }
   
-  // If credentials exist but no sync status, assume it needs to be synced
-  return { status: 'stale', lastSyncAt: null, error: null };
+  // No CRM configured
+  return { status: 'not_configured', lastSyncAt: null, error: null, source: 'none' };
 }
 
 // Get row border style based on sync status
 function getSyncBorderStyle(status: 'healthy' | 'stale' | 'error' | 'not_configured'): string {
   switch (status) {
     case 'error':
-    case 'not_configured':
       return 'border-l-4 border-l-destructive';
     case 'stale':
       return 'border-l-4 border-l-yellow-500';
+    case 'not_configured':
+      return ''; // No border for not configured - neutral state
     default:
       return '';
   }

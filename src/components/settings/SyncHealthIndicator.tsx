@@ -7,6 +7,7 @@ interface SyncHealthIndicatorProps {
   lastSyncAt: string | null;
   syncError: string | null;
   compact?: boolean;
+  source?: 'ghl' | 'hubspot' | 'none';
 }
 
 export function SyncHealthIndicator({
@@ -14,13 +15,16 @@ export function SyncHealthIndicator({
   lastSyncAt,
   syncError,
   compact = false,
+  source = 'ghl',
 }: SyncHealthIndicatorProps) {
   const getStatusConfig = () => {
+    const sourceLabel = source === 'hubspot' ? 'HubSpot' : source === 'ghl' ? 'GHL' : 'CRM';
+    
     switch (status) {
       case 'healthy':
         return {
           icon: CheckCircle,
-          label: 'Synced',
+          label: `${sourceLabel} Synced`,
           color: 'text-chart-2',
           bgColor: 'bg-chart-2/10',
           borderColor: 'border-chart-2/30',
@@ -28,7 +32,7 @@ export function SyncHealthIndicator({
       case 'stale':
         return {
           icon: Clock,
-          label: 'Stale',
+          label: `${sourceLabel} Stale`,
           color: 'text-yellow-600 dark:text-yellow-500',
           bgColor: 'bg-yellow-500/10',
           borderColor: 'border-yellow-500/30',
@@ -36,7 +40,7 @@ export function SyncHealthIndicator({
       case 'error':
         return {
           icon: XCircle,
-          label: 'Error',
+          label: `${sourceLabel} Error`,
           color: 'text-destructive',
           bgColor: 'bg-destructive/10',
           borderColor: 'border-destructive/30',
@@ -45,7 +49,7 @@ export function SyncHealthIndicator({
       default:
         return {
           icon: AlertCircle,
-          label: 'Not Configured',
+          label: 'CRM Not Configured',
           color: 'text-muted-foreground',
           bgColor: 'bg-muted/30',
           borderColor: 'border-border',
