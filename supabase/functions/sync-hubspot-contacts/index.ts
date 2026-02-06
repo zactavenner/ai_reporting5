@@ -196,6 +196,11 @@ async function handleFullSync(
       summary.meetings = await syncMeetings(supabase, client.id, accessToken, settings);
     }
 
+    // 4. Recalculate daily_metrics to ensure KPIs are accurate
+    console.log('[HubSpot Sync] Recalculating daily metrics...');
+    const metricsResult = await recalculateRecentMetrics(supabase, client.id, 7);
+    console.log(`[HubSpot Sync] Metrics updated: ${metricsResult.daysUpdated} days`);
+
     // Update sync status and timestamps
     await supabase
       .from('clients')
@@ -523,4 +528,160 @@ function normalizeSource(source: string | null): string {
     'OFFLINE': 'offline',
   };
   return sourceMap[source.toUpperCase()] || source.toLowerCase();
+}
+
+// =======================================
+// RECENT METRICS RECALCULATION
+// =======================================
+// Updates daily_metrics for the last N days to keep KPIs current
+// =======================================
+async function recalculateRecentMetrics(
+  supabase: any,
+  clientId: string,
+  daysBack: number = 7
+): Promise<{ daysUpdated: number; errors: string[] }> {
+  const result = { daysUpdated: 0, errors: [] as string[] };
+  
+  console.log(`[HubSpot] Starting recent metrics recalculation for client ${clientId}, last ${daysBack} days`);
+  
+  try {
+    const today = new Date();
+    const startDate = new Date(today);
+    startDate.setUTCDate(startDate.getUTCDate() - daysBack);
+    startDate.setUTCHours(0, 0, 0, 0);
+    
+    // Delete existing metrics for the date range
+    const startDateStr = startDate.toISOString().split('T')[0];
+    await supabase
+      .from('daily_metrics')
+      .delete()
+      .eq('client_id', clientId)
+      .gte('date', startDateStr);
+    
+    // Iterate through each day
+    const currentDate = new Date(startDate);
+    const metricsToInsert: any[] = [];
+    
+    while (currentDate <= today) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      const dayStart = `${dateStr}T00:00:00.000Z`;
+      const dayEnd = `${dateStr}T23:59:59.999Z`;
+      
+      try {
+        // Count leads
+        const { count: leadsCount } = await supabase
+          .from('leads')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .eq('is_spam', false)
+          .gte('created_at', dayStart)
+          .lte('created_at', dayEnd);
+        
+        const { count: nullSpamCount } = await supabase
+          .from('leads')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .is('is_spam', null)
+          .gte('created_at', dayStart)
+          .lte('created_at', dayEnd);
+        
+        const { count: spamCount } = await supabase
+          .from('leads')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .eq('is_spam', true)
+          .gte('created_at', dayStart)
+          .lte('created_at', dayEnd);
+        
+        const totalValidLeads = (leadsCount || 0) + (nullSpamCount || 0);
+        
+        // Count calls
+        const { count: callsCount } = await supabase
+          .from('calls')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .neq('is_reconnect', true)
+          .gte('booked_at', dayStart)
+          .lte('booked_at', dayEnd);
+        
+        const { count: showedCount } = await supabase
+          .from('calls')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .eq('showed', true)
+          .neq('is_reconnect', true)
+          .gte('booked_at', dayStart)
+          .lte('booked_at', dayEnd);
+        
+        const { count: reconnectCount } = await supabase
+          .from('calls')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .eq('is_reconnect', true)
+          .gte('booked_at', dayStart)
+          .lte('booked_at', dayEnd);
+        
+        const { count: reconnectShowedCount } = await supabase
+          .from('calls')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .eq('is_reconnect', true)
+          .eq('showed', true)
+          .gte('booked_at', dayStart)
+          .lte('booked_at', dayEnd);
+        
+        // Get funded investors
+        const { data: fundedData, count: fundedCount } = await supabase
+          .from('funded_investors')
+          .select('funded_amount, commitment_amount', { count: 'exact' })
+          .eq('client_id', clientId)
+          .gte('funded_at', dayStart)
+          .lte('funded_at', dayEnd);
+        
+        const fundedDollars = (fundedData || []).reduce((sum: number, f: any) => sum + (f.funded_amount || 0), 0);
+        const commitmentDollars = (fundedData || []).reduce((sum: number, f: any) => sum + (f.commitment_amount || 0), 0);
+        const commitmentCount = (fundedData || []).filter((f: any) => f.commitment_amount && f.commitment_amount > 0).length;
+        
+        if (totalValidLeads > 0 || (spamCount || 0) > 0 || (callsCount || 0) > 0 || (reconnectCount || 0) > 0 || (fundedCount || 0) > 0) {
+          metricsToInsert.push({
+            client_id: clientId,
+            date: dateStr,
+            leads: totalValidLeads,
+            spam_leads: spamCount || 0,
+            calls: callsCount || 0,
+            showed_calls: showedCount || 0,
+            reconnect_calls: reconnectCount || 0,
+            reconnect_showed: reconnectShowedCount || 0,
+            funded_investors: fundedCount || 0,
+            funded_dollars: fundedDollars,
+            commitments: commitmentCount,
+            commitment_dollars: commitmentDollars,
+            updated_at: new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        result.errors.push(`Date ${dateStr}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
+      
+      currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+    }
+    
+    if (metricsToInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from('daily_metrics')
+        .insert(metricsToInsert);
+      
+      if (insertError) {
+        result.errors.push(`Insert error: ${insertError.message}`);
+      } else {
+        result.daysUpdated = metricsToInsert.length;
+      }
+    }
+    
+    console.log(`[HubSpot] Recent metrics recalculation complete: ${result.daysUpdated} days updated`);
+  } catch (err) {
+    result.errors.push(`Metrics recalculation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+  }
+  
+  return result;
 }
