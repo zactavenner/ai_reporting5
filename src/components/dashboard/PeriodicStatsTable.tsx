@@ -166,7 +166,8 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
         });
       }
 
-      return allMonths.reverse();
+      // Return in chronological order (January first)
+      return allMonths;
     }
 
     if (metricsToUse.length === 0) return [];
