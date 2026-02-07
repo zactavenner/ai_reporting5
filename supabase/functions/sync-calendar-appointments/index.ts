@@ -188,6 +188,88 @@ async function syncAppointmentToCall(
   return { action: 'created' };
 }
 
+// Recalculate daily_metrics for a client based on actual calls data
+async function recalculateClientMetrics(supabase: any, clientId: string) {
+  // Get all calls for this client grouped by booked_at date
+  const { data: callStats } = await supabase
+    .from('calls')
+    .select('booked_at, showed, is_reconnect')
+    .eq('client_id', clientId)
+    .not('booked_at', 'is', null);
+
+  if (!callStats || callStats.length === 0) {
+    console.log('No calls to recalculate');
+    return;
+  }
+
+  // Aggregate by date
+  const metricsByDate = new Map<string, {
+    calls: number;
+    showed_calls: number;
+    reconnect_calls: number;
+    reconnect_showed: number;
+  }>();
+
+  for (const call of callStats) {
+    const date = call.booked_at.split('T')[0];
+    const existing = metricsByDate.get(date) || {
+      calls: 0,
+      showed_calls: 0,
+      reconnect_calls: 0,
+      reconnect_showed: 0,
+    };
+
+    if (call.is_reconnect) {
+      existing.reconnect_calls++;
+      if (call.showed) existing.reconnect_showed++;
+    } else {
+      existing.calls++;
+      if (call.showed) existing.showed_calls++;
+    }
+
+    metricsByDate.set(date, existing);
+  }
+
+  console.log(`Updating metrics for ${metricsByDate.size} dates`);
+
+  // Update daily_metrics for each date
+  for (const [date, metrics] of metricsByDate) {
+    // Check if record exists
+    const { data: existing } = await supabase
+      .from('daily_metrics')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('date', date)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase
+        .from('daily_metrics')
+        .update({
+          calls: metrics.calls,
+          showed_calls: metrics.showed_calls,
+          reconnect_calls: metrics.reconnect_calls,
+          reconnect_showed: metrics.reconnect_showed,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id);
+    } else {
+      await supabase
+        .from('daily_metrics')
+        .insert({
+          client_id: clientId,
+          date,
+          calls: metrics.calls,
+          showed_calls: metrics.showed_calls,
+          reconnect_calls: metrics.reconnect_calls,
+          reconnect_showed: metrics.reconnect_showed,
+        });
+    }
+  }
+
+  console.log('Metrics recalculation complete');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -349,6 +431,10 @@ serve(async (req) => {
       .eq('client_id', clientId);
 
     console.log(`Calendar sync complete for ${client.name}: created=${result.created}, updated=${result.updated}, skipped=${result.skipped}`);
+
+    // Recalculate daily_metrics for this client
+    console.log(`Recalculating daily_metrics for ${client.name}...`);
+    await recalculateClientMetrics(supabase, clientId);
 
     return new Response(
       JSON.stringify({
