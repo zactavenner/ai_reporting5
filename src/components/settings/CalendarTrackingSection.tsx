@@ -47,26 +47,23 @@ export function CalendarTrackingSection({
     setError(null);
 
     try {
-      // Use a direct API call to GHL calendars endpoint
-      const response = await fetch(
-        `https://services.leadconnectorhq.com/calendars/?locationId=${ghlLocationId}`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${ghlApiKey}`,
-            'Content-Type': 'application/json',
-            'Version': '2021-07-28',
-          },
-        }
-      );
+      // Use edge function to proxy GHL API request (avoids CORS issues)
+      const { data, error: fnError } = await supabase.functions.invoke('fetch-ghl-calendars', {
+        body: { ghlApiKey, ghlLocationId },
+      });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch calendars: ${response.status}`);
+      if (fnError) {
+        throw new Error(fnError.message || 'Failed to fetch calendars');
       }
 
-      const data = await response.json();
-      setCalendars(data.calendars || []);
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      setCalendars(data?.calendars || []);
+      if (data?.calendars?.length > 0) {
+        toast.success(`Loaded ${data.calendars.length} calendars from GHL`);
+      }
     } catch (err) {
       console.error('Error fetching GHL calendars:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch calendars');
