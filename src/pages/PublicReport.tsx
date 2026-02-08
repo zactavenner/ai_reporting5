@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useClientByToken } from '@/hooks/useClients';
 import { TeamMemberProvider } from '@/contexts/TeamMemberContext';
 import { DateFilterProvider, useDateFilter } from '@/contexts/DateFilterContext';
-import { useDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
+import { useDailyMetrics, useFundedInvestors } from '@/hooks/useMetrics';
+import { useSourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
 import { useLeads, useCalls } from '@/hooks/useLeadsAndCalls';
 import { useCustomTabs } from '@/hooks/useCustomTabs';
 import { useFunnelSteps } from '@/hooks/useFunnelSteps';
@@ -102,10 +103,8 @@ function PublicReportContent() {
     }
   };
 
-  const metrics = useMemo(() => {
-    console.log('[PublicReport] Computing metrics from', dailyMetrics.length, 'daily records');
-    return aggregateMetrics(dailyMetrics, fundedInvestors, leads);
-  }, [dailyMetrics, fundedInvestors, leads]);
+  // Calculate KPIs directly from source data (leads, calls, funded_investors)
+  const metrics = useSourceAggregatedMetrics(leads, calls, fundedInvestors, dailyMetrics);
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });

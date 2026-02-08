@@ -33,7 +33,8 @@ import { DataAuditSection } from '@/components/dashboard/DataAuditSection';
 import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
 import { PipelineTab } from '@/components/pipeline/PipelineTab';
 import { useClient } from '@/hooks/useClients';
-import { useDailyMetrics, useFundedInvestors, aggregateMetrics } from '@/hooks/useMetrics';
+import { useDailyMetrics, useFundedInvestors } from '@/hooks/useMetrics';
+import { useSourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
 import { usePriorPeriodMetrics } from '@/hooks/usePriorMetrics';
 import { useLeads, useCalls } from '@/hooks/useLeadsAndCalls';
 import { useClientSettings, getThresholdsFromSettings } from '@/hooks/useClientSettings';
@@ -123,11 +124,14 @@ export default function ClientDetail() {
     isFiltered: hasSourceFilter 
   } = useSourceFilteredMetrics(leads, calls, fundedInvestors, true);
 
-  const aggregatedMetrics = useMemo(() => {
-    // Use filtered data when source filter is active
-    const leadsToUse = hasSourceFilter ? filteredLeads : leads;
-    return aggregateMetrics(dailyMetrics, fundedInvestors, leadsToUse as { pipeline_value?: number }[]);
-  }, [dailyMetrics, fundedInvestors, leads, filteredLeads, hasSourceFilter]);
+  // Calculate KPIs directly from source data (leads, calls, funded_investors)
+  // dailyMetrics is only used for ad_spend, impressions, clicks, commitments
+  const aggregatedMetrics = useSourceAggregatedMetrics(
+    hasSourceFilter ? filteredLeads : leads,
+    hasSourceFilter ? filteredCalls : calls,
+    hasSourceFilter ? filteredFundedInvestors : fundedInvestors,
+    dailyMetrics
+  );
 
   const thresholds = useMemo(() => getThresholdsFromSettings(settings), [settings]);
 

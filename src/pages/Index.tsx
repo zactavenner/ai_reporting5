@@ -30,6 +30,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Sliders, Video, CheckCircle, RefreshCw, Upload, LayoutDashboard, Smartphone, Bot, Wifi, LayoutGrid } from 'lucide-react';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics, AggregatedMetrics } from '@/hooks/useMetrics';
+import { aggregateFromSourceData } from '@/hooks/useSourceMetrics';
 import { useAllClientSettings, useAllClientFullSettings } from '@/hooks/useAllClientSettings';
 import { useAllClientMRR } from '@/hooks/useClientMRR';
 import { useMeetings, usePendingMeetingTasks, useSyncMeetings } from '@/hooks/useMeetings';
@@ -38,7 +39,7 @@ import { useApiConnectionTest } from '@/hooks/useApiConnectionTest';
 import { useAllCreatives } from '@/hooks/useAllCreatives';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { useSourceFilteredMetrics } from '@/hooks/useSourceFilteredMetrics';
-import { useLeads } from '@/hooks/useLeadsAndCalls';
+import { useLeads, useCalls } from '@/hooks/useLeadsAndCalls';
 import { exportToCSV } from '@/lib/exportUtils';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUpdateClientOrder } from '@/hooks/useClientOrder';
@@ -66,8 +67,9 @@ const Index = () => {
   const { data: dailyMetrics = [], isLoading: metricsLoading } = useAllDailyMetrics(startDate, endDate);
   const { data: fundedInvestors = [] } = useFundedInvestors(undefined, startDate, endDate);
   
-  // Fetch all leads across clients for source filtering
+  // Fetch all leads and calls across clients for source filtering and accurate KPI calculation
   const { data: allLeads = [] } = useLeads(undefined, startDate, endDate);
+  const { data: allCalls = [] } = useCalls(undefined, false, startDate, endDate);
   
   const clientIds = useMemo(() => clients.map(c => c.id), [clients]);
   const { data: clientThresholds = {} } = useAllClientSettings(clientIds);
@@ -89,29 +91,32 @@ const Index = () => {
   
 
   // Apply source filter to leads for metric calculations - updateGlobalSources=true on agency view
-  const { filteredLeads, isFiltered: hasSourceFilter } = useSourceFilteredMetrics(allLeads, [], fundedInvestors, true);
+  const { filteredLeads, filteredCalls, filteredFundedInvestors, isFiltered: hasSourceFilter } = useSourceFilteredMetrics(allLeads, allCalls, fundedInvestors, true);
 
+  // Calculate KPIs directly from source data (leads, calls, funded_investors)
   const aggregatedMetrics = useMemo(() => {
-    return aggregateMetrics(dailyMetrics, fundedInvestors);
-  }, [dailyMetrics, fundedInvestors]);
+    const leadsToUse = hasSourceFilter ? filteredLeads : allLeads;
+    const callsToUse = hasSourceFilter ? filteredCalls : allCalls;
+    const fundedToUse = hasSourceFilter ? filteredFundedInvestors : fundedInvestors;
+    return aggregateFromSourceData(leadsToUse, callsToUse, fundedToUse, dailyMetrics);
+  }, [allLeads, allCalls, fundedInvestors, dailyMetrics, filteredLeads, filteredCalls, filteredFundedInvestors, hasSourceFilter]);
 
-  // Group metrics by client for the table
+  // Group source data by client for the table
   const clientMetrics = useMemo(() => {
-    const grouped: Record<string, typeof dailyMetrics> = {};
-    for (const metric of dailyMetrics) {
-      if (!grouped[metric.client_id]) {
-        grouped[metric.client_id] = [];
-      }
-      grouped[metric.client_id].push(metric);
+    // Group leads, calls, and funded investors by client
+    const result: Record<string, ReturnType<typeof aggregateFromSourceData>> = {};
+    
+    for (const client of clients) {
+      const clientLeads = allLeads.filter(l => l.client_id === client.id);
+      const clientCalls = allCalls.filter(c => c.client_id === client.id);
+      const clientFunded = fundedInvestors.filter(f => f.client_id === client.id);
+      const clientDailyMetrics = dailyMetrics.filter(m => m.client_id === client.id);
+      
+      result[client.id] = aggregateFromSourceData(clientLeads, clientCalls, clientFunded, clientDailyMetrics);
     }
     
-    const result: Record<string, ReturnType<typeof aggregateMetrics>> = {};
-    for (const [clientId, metrics] of Object.entries(grouped)) {
-      const clientFunded = fundedInvestors.filter(f => f.client_id === clientId);
-      result[clientId] = aggregateMetrics(metrics, clientFunded);
-    }
     return result;
-  }, [dailyMetrics, fundedInvestors]);
+  }, [clients, allLeads, allCalls, fundedInvestors, dailyMetrics]);
 
   // Extract ad spends for MRR calculation
   const clientAdSpends = useMemo(() => {
