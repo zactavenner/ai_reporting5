@@ -47,6 +47,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
  import { Task, useUpdateTask, useAgencyMembers, AgencyMember, useAddTaskHistory, useBulkUpdateTasks, useBulkDeleteTasks } from '@/hooks/useTasks';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Client } from '@/hooks/useClients';
  import { TaskDetailPanel } from './TaskDetailPanel';
 import { CreateTaskModal } from './CreateTaskModal';
@@ -284,6 +286,40 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
     return map;
   }, [agencyMembers]);
 
+  // Bulk fetch all task assignees for the current task set
+  const taskIds = useMemo(() => tasks.map(t => t.id), [tasks]);
+  const { data: allTaskAssignees = [] } = useQuery({
+    queryKey: ['all-task-assignees', taskIds],
+    queryFn: async () => {
+      if (taskIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('task_assignees')
+        .select('task_id, member_id, pod_id, member:agency_members(id, name, pod_id, pod:agency_pods(id, name, color)), pod:agency_pods(id, name, color)')
+        .in('task_id', taskIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: taskIds.length > 0,
+  });
+
+  // Build a map: taskId → { assignee: AgencyMember | null, podName: string | null }
+  const taskAssigneeMap = useMemo(() => {
+    const map: Record<string, { members: AgencyMember[]; podName: string | null; podColor: string | null }> = {};
+    allTaskAssignees.forEach((ta: any) => {
+      if (!map[ta.task_id]) {
+        map[ta.task_id] = { members: [], podName: null, podColor: null };
+      }
+      if (ta.member) {
+        map[ta.task_id].members.push(ta.member as AgencyMember);
+      }
+      if (ta.pod) {
+        map[ta.task_id].podName = ta.pod.name;
+        map[ta.task_id].podColor = ta.pod.color;
+      }
+    });
+    return map;
+  }, [allTaskAssignees]);
+
    const handleTaskSelect = (taskId: string, selected: boolean) => {
      setSelectedTaskIds(prev => {
        const next = new Set(prev);
@@ -462,6 +498,7 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
                 tasks={tasksByStage[stage.id]}
                 clientMap={clientMap}
                 memberMap={memberMap}
+                taskAssigneeMap={taskAssigneeMap}
                 onAddTask={() => handleAddTask(stage.id)}
                 onTaskClick={setSelectedTask}
                 isPublicView={isPublicView}
@@ -477,6 +514,7 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
                 task={activeTask}
                 clientName={activeTask.client_id ? clientMap[activeTask.client_id] : undefined}
                 assignee={activeTask.assigned_to ? memberMap[activeTask.assigned_to] : undefined}
+                taskAssignees={taskAssigneeMap[activeTask.id]}
                 isDragging
                 isPublicView={isPublicView}
               />

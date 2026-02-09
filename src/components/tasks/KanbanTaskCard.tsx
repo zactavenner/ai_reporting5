@@ -23,6 +23,7 @@ interface KanbanTaskCardProps {
   task: Task;
   clientName?: string;
   assignee?: AgencyMember;
+  taskAssignees?: { members: AgencyMember[]; podName: string | null; podColor: string | null };
   onClick?: () => void;
   isDragging?: boolean;
   isPublicView?: boolean;
@@ -34,6 +35,7 @@ export function KanbanTaskCard({
   task, 
   clientName, 
   assignee,
+  taskAssignees,
   onClick,
   isDragging,
   isPublicView = false,
@@ -233,53 +235,119 @@ export function KanbanTaskCard({
           
           <div className="flex-1" />
           
-          {/* Assignee */}
+          {/* Assignee(s) */}
           <div className="flex items-center gap-1 flex-shrink-0">
-            {assignee ? (
-              isPublicView ? (
-                <Badge 
-                  variant="outline" 
-                  className="text-[10px] font-normal border-border/60 px-1.5 py-0"
-                  style={assignee.pod?.color ? { 
-                    backgroundColor: `${assignee.pod.color}15`,
-                    borderColor: `${assignee.pod.color}40`,
-                    color: assignee.pod.color
-                  } : undefined}
-                >
-                  {assignee.pod?.name ? `${assignee.pod.name}` : 'Team'}
-                </Badge>
-              ) : (
+            {(() => {
+              // Resolve assignees: prefer taskAssignees from junction table, fallback to assigned_to
+              const hasJunctionAssignees = taskAssignees && (taskAssignees.members.length > 0 || taskAssignees.podName);
+              
+              if (isPublicView) {
+                // Public view: show pod/group name only
+                const podName = taskAssignees?.podName || assignee?.pod?.name;
+                const podColor = taskAssignees?.podColor || assignee?.pod?.color;
+                if (podName) {
+                  return (
+                    <Badge 
+                      variant="outline" 
+                      className="text-[10px] font-normal border-border/60 px-1.5 py-0"
+                      style={podColor ? { 
+                        backgroundColor: `${podColor}15`,
+                        borderColor: `${podColor}40`,
+                        color: podColor
+                      } : undefined}
+                    >
+                      {podName}
+                    </Badge>
+                  );
+                }
+                return null;
+              }
+              
+              // Agency view: show avatars
+              if (hasJunctionAssignees) {
+                const members = taskAssignees!.members.slice(0, 3);
+                const extraCount = taskAssignees!.members.length - 3;
+                return (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex -space-x-1.5">
+                          {taskAssignees!.podName && members.length === 0 ? (
+                            <Badge 
+                              variant="outline" 
+                              className="text-[10px] font-normal px-1.5 py-0"
+                              style={taskAssignees!.podColor ? { 
+                                backgroundColor: `${taskAssignees!.podColor}15`,
+                                borderColor: `${taskAssignees!.podColor}40`,
+                                color: taskAssignees!.podColor
+                              } : undefined}
+                            >
+                              {taskAssignees!.podName}
+                            </Badge>
+                          ) : (
+                            <>
+                              {members.map((m) => (
+                                <Avatar key={m.id} className="h-5 w-5 border border-background">
+                                  <AvatarFallback className="text-[9px] font-medium bg-muted/80 text-muted-foreground">
+                                    {(m.name || '').slice(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                              ))}
+                              {extraCount > 0 && (
+                                <Avatar className="h-5 w-5 border border-background">
+                                  <AvatarFallback className="text-[8px] font-medium bg-muted text-muted-foreground">
+                                    +{extraCount}
+                                  </AvatarFallback>
+                                </Avatar>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <p>{taskAssignees!.members.map(m => m.name).join(', ')}{taskAssignees!.podName ? ` (${taskAssignees!.podName})` : ''}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              }
+
+              if (assignee) {
+                return (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Avatar className="h-5 w-5 border border-border/50">
+                          <AvatarFallback className="text-[9px] font-medium bg-muted/80 text-muted-foreground">
+                            {(assignee.name || 'N/A').slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <p>{assignee.name}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              }
+
+              return (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Avatar className="h-5 w-5 border border-border/50">
-                        <AvatarFallback className="text-[9px] font-medium bg-muted/80 text-muted-foreground">
-                          {(assignee.name || 'N/A').slice(0, 2).toUpperCase()}
+                      <Avatar className="h-5 w-5 border-2 border-dashed border-muted-foreground/30">
+                        <AvatarFallback className="text-[9px] font-medium bg-transparent text-muted-foreground/40">
+                          ?
                         </AvatarFallback>
                       </Avatar>
                     </TooltipTrigger>
                     <TooltipContent side="bottom">
-                      <p>{assignee.name}</p>
+                      <p>Unassigned</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-              )
-            ) : (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Avatar className="h-5 w-5 border-2 border-dashed border-muted-foreground/30">
-                      <AvatarFallback className="text-[9px] font-medium bg-transparent text-muted-foreground/40">
-                        ?
-                      </AvatarFallback>
-                    </Avatar>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p>Unassigned</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
+              );
+            })()}
           </div>
         </div>
       </div>
