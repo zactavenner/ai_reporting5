@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   LayoutGrid, 
   List, 
@@ -10,11 +10,14 @@ import {
   Clock,
   Trophy,
   PenLine,
-  History,
+  Activity,
 } from 'lucide-react';
 import { useAllTasks, Task } from '@/hooks/useTasks';
 import { useClients, Client } from '@/hooks/useClients';
 import { useTaskMetrics } from '@/hooks/useTaskMetrics';
+import { useVoiceNotes } from '@/hooks/useVoiceNotes';
+import { useMeetings } from '@/hooks/useMeetings';
+import { useCreatives } from '@/hooks/useCreatives';
 import { KanbanBoard } from './KanbanBoard';
 import { AgencyTaskSummary } from './AgencyTaskSummary';
 import { CreateTaskModal } from './CreateTaskModal';
@@ -29,7 +32,7 @@ interface TaskBoardViewProps {
 export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskBoardViewProps) {
   const { data: allTasks = [] } = useAllTasks();
   const { data: clients = [] } = useClients();
-  const [view, setView] = useState<'kanban' | 'summary' | 'history'>('kanban');
+  const [view, setView] = useState<'kanban' | 'summary' | 'activity'>('kanban');
   const [showCreateTask, setShowCreateTask] = useState(false);
 
   // In public view, only show tasks for the specific client
@@ -39,6 +42,11 @@ export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskB
   const filteredClients = isPublicView && clientId 
     ? clients.filter(c => c.id === clientId) 
     : clients;
+
+  // Fetch activity data
+  const { data: voiceNotes = [] } = useVoiceNotes(clientId);
+  const { data: meetings = [] } = useMeetings(clientId);
+  const { data: creatives = [] } = useCreatives(clientId);
 
   // Task metrics
   const metrics = useTaskMetrics(tasks);
@@ -85,24 +93,24 @@ export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskB
           </div>
           
           <div className="flex items-center gap-2">
-            {!isPublicView && (
-              <Tabs value={view} onValueChange={(v) => setView(v as any)}>
-                <TabsList className="h-8">
+            <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+              <TabsList className="h-8">
+                {!isPublicView && (
                   <TabsTrigger value="summary" className="text-xs px-3 h-7">
                     <List className="h-3 w-3 mr-1" />
                     Summary
                   </TabsTrigger>
-                  <TabsTrigger value="kanban" className="text-xs px-3 h-7">
-                    <LayoutGrid className="h-3 w-3 mr-1" />
-                    Kanban
-                  </TabsTrigger>
-                  <TabsTrigger value="history" className="text-xs px-3 h-7">
-                    <History className="h-3 w-3 mr-1" />
-                    History
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            )}
+                )}
+                <TabsTrigger value="kanban" className="text-xs px-3 h-7">
+                  <LayoutGrid className="h-3 w-3 mr-1" />
+                  Kanban
+                </TabsTrigger>
+                <TabsTrigger value="activity" className="text-xs px-3 h-7">
+                  <Activity className="h-3 w-3 mr-1" />
+                  Activity
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
             <Button size="sm" onClick={() => setShowCreateTask(true)}>
               <Plus className="h-4 w-4 mr-1" />
               Add Task
@@ -116,7 +124,14 @@ export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskB
         ) : view === 'summary' ? (
           <AgencyTaskSummary />
         ) : (
-          <TaskHistoryTab tasks={tasks} clientId={clientId} />
+          <TaskHistoryTab 
+            tasks={tasks} 
+            clientId={clientId}
+            voiceNotes={voiceNotes}
+            meetings={meetings}
+            creatives={creatives}
+            isPublicView={isPublicView}
+          />
         )}
       </CardContent>
 
