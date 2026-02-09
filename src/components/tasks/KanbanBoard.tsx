@@ -162,7 +162,11 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
     
     // Filter by assignee
     if (filterAssigneeId && filterAssigneeId !== 'all') {
-      filtered = filtered.filter(t => t.assigned_to === filterAssigneeId);
+      if (filterAssigneeId === 'unassigned') {
+        filtered = filtered.filter(t => !t.assigned_to);
+      } else {
+        filtered = filtered.filter(t => t.assigned_to === filterAssigneeId);
+      }
     }
     
     // Filter by search
@@ -376,13 +380,14 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
                   <SelectValue placeholder="All Assignees" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Assignees</SelectItem>
-                  {agencyMembers.map(member => (
-                    <SelectItem key={member.id} value={member.id}>
-                      {member.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
+                   <SelectItem value="all">All Assignees</SelectItem>
+                   <SelectItem value="unassigned">Unassigned</SelectItem>
+                   {agencyMembers.map(member => (
+                     <SelectItem key={member.id} value={member.id}>
+                       {member.name}
+                     </SelectItem>
+                   ))}
+               </SelectContent>
             </Select>
             )}
             

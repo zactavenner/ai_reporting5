@@ -234,9 +234,9 @@ export function KanbanTaskCard({
           <div className="flex-1" />
           
           {/* Assignee */}
-          {assignee && (
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {isPublicView ? (
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {assignee ? (
+              isPublicView ? (
                 <Badge 
                   variant="outline" 
                   className="text-[10px] font-normal border-border/60 px-1.5 py-0"
@@ -259,13 +259,28 @@ export function KanbanTaskCard({
                       </Avatar>
                     </TooltipTrigger>
                     <TooltipContent side="bottom">
-                      <p>{assignee.name || 'Unassigned'}</p>
+                      <p>{assignee.name}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-              )}
-            </div>
-          )}
+              )
+            ) : (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Avatar className="h-5 w-5 border-2 border-dashed border-muted-foreground/30">
+                      <AvatarFallback className="text-[9px] font-medium bg-transparent text-muted-foreground/40">
+                        ?
+                      </AvatarFallback>
+                    </Avatar>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>Unassigned</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
         </div>
       </div>
     </div>
