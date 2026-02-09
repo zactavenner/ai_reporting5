@@ -2548,7 +2548,9 @@ export type Database = {
           due_date: string | null
           id: string
           meeting_id: string | null
+          parent_task_id: string | null
           priority: string
+          show_subtasks_to_client: boolean | null
           stage: string
           status: string
           title: string
@@ -2565,7 +2567,9 @@ export type Database = {
           due_date?: string | null
           id?: string
           meeting_id?: string | null
+          parent_task_id?: string | null
           priority?: string
+          show_subtasks_to_client?: boolean | null
           stage?: string
           status?: string
           title: string
@@ -2582,7 +2586,9 @@ export type Database = {
           due_date?: string | null
           id?: string
           meeting_id?: string | null
+          parent_task_id?: string | null
           priority?: string
+          show_subtasks_to_client?: boolean | null
           stage?: string
           status?: string
           title?: string
@@ -2608,6 +2614,13 @@ export type Database = {
             columns: ["meeting_id"]
             isOneToOne: false
             referencedRelation: "agency_meetings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]

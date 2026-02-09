@@ -42,6 +42,12 @@ import {
   Copy,
   Upload,
   FileAudio,
+  ListChecks,
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  Circle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn, addBusinessDays } from '@/lib/utils';
@@ -52,6 +58,7 @@ import {
   TaskFile,
   useUpdateTask,
   useDeleteTask,
+  useCreateTask,
   useTaskComments,
   useTaskFiles,
   useTaskHistory,
@@ -59,6 +66,7 @@ import {
   useUploadTaskFile,
   useAddTaskHistory,
   useAgencyMembers,
+  useSubtasks,
 } from '@/hooks/useTasks';
 import { useMeetings } from '@/hooks/useMeetings';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
@@ -96,12 +104,14 @@ import { toast } from 'sonner';
  export function TaskDetailPanel({ task, open, onOpenChange, clientName, clientId, isPublicView = false }: TaskDetailPanelProps) {
    const updateTask = useUpdateTask();
    const deleteTask = useDeleteTask();
+   const createTask = useCreateTask();
    const addHistory = useAddTaskHistory();
    const { data: comments = [] } = useTaskComments(task?.id);
    const { data: files = [] } = useTaskFiles(task?.id);
    const { data: history = [] } = useTaskHistory(task?.id);
    const { data: meetings = [] } = useMeetings();
    const { data: agencyMembers = [] } = useAgencyMembers();
+   const { data: subtasks = [] } = useSubtasks(task?.id);
    const addComment = useAddTaskComment();
    const uploadFile = useUploadTaskFile();
    const { currentMember } = useTeamMember();
@@ -118,6 +128,9 @@ import { toast } from 'sonner';
   const [isDragOver, setIsDragOver] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcribingFileId, setTranscribingFileId] = useState<string | null>(null);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [showSubtaskForm, setShowSubtaskForm] = useState(false);
+  const [showSubtasks, setShowSubtasks] = useState(true);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const discussionFileInputRef = useRef<HTMLInputElement>(null);
@@ -210,6 +223,43 @@ import { toast } from 'sonner';
     }
   }, [files.length, inlineFileIndex]);
     
+  const handleCreateSubtask = async () => {
+    if (!task || !newSubtaskTitle.trim()) return;
+    try {
+      await createTask.mutateAsync({
+        title: newSubtaskTitle.trim(),
+        client_id: task.client_id,
+        parent_task_id: task.id,
+        priority: task.priority,
+        stage: 'todo',
+        status: 'todo',
+        created_by: currentMember?.name || (isPublicView ? 'Client' : null),
+      });
+      setNewSubtaskTitle('');
+      setShowSubtaskForm(false);
+      toast.success('Subtask created');
+    } catch (err) {
+      toast.error('Failed to create subtask');
+    }
+  };
+
+  const handleToggleSubtaskComplete = async (subtask: Task) => {
+    const newStage = subtask.stage === 'done' ? 'todo' : 'done';
+    await updateTask.mutateAsync({
+      id: subtask.id,
+      stage: newStage,
+      completed_at: newStage === 'done' ? new Date().toISOString() : null,
+    });
+  };
+
+  const handleToggleShowSubtasksToClient = async () => {
+    if (!task) return;
+    await updateTask.mutateAsync({
+      id: task.id,
+      show_subtasks_to_client: !task.show_subtasks_to_client,
+    });
+  };
+
   if (!task) return null;
    
    const resolvedClientId = clientId || task.client_id;
@@ -595,6 +645,116 @@ import { toast } from 'sonner';
                   </div>
                 )}
                 
+                {/* Subtasks Section */}
+                {(!isPublicView || task.show_subtasks_to_client) && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <button 
+                        className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors"
+                        onClick={() => setShowSubtasks(!showSubtasks)}
+                      >
+                        {showSubtasks ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        <ListChecks className="h-4 w-4 text-muted-foreground" />
+                        <span>Subtasks ({subtasks.length})</span>
+                        {subtasks.length > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            {subtasks.filter(s => s.stage === 'done').length}/{subtasks.length} done
+                          </span>
+                        )}
+                      </button>
+                      <div className="flex items-center gap-2">
+                        {!isPublicView && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs gap-1"
+                            onClick={handleToggleShowSubtasksToClient}
+                          >
+                            {task.show_subtasks_to_client ? (
+                              <><Eye className="h-3 w-3" /> Visible to client</>
+                            ) : (
+                              <><EyeOff className="h-3 w-3" /> Hidden from client</>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {showSubtasks && (
+                      <div className="space-y-1.5">
+                        {subtasks.map((subtask) => (
+                          <div
+                            key={subtask.id}
+                            className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 group transition-colors"
+                          >
+                            <button
+                              onClick={() => handleToggleSubtaskComplete(subtask)}
+                              className="flex-shrink-0"
+                            >
+                              {subtask.stage === 'done' ? (
+                                <CheckCircle2 className="h-4 w-4 text-success" />
+                              ) : (
+                                <Circle className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
+                              )}
+                            </button>
+                            <span className={cn(
+                              "text-sm flex-1",
+                              subtask.stage === 'done' && "line-through text-muted-foreground"
+                            )}>
+                              {subtask.title}
+                            </span>
+                            {subtask.assigned_to && (
+                              <span className="text-xs text-muted-foreground">
+                                {agencyMembers.find(m => m.id === subtask.assigned_to)?.name?.split(' ')[0] || ''}
+                              </span>
+                            )}
+                            {!isPublicView && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => updateTask.mutateAsync({ id: subtask.id }).catch(() => {})}
+                              >
+                                <Trash2 className="h-3 w-3 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Add subtask form */}
+                        {showSubtaskForm ? (
+                          <div className="flex items-center gap-2 mt-2">
+                            <Input
+                              placeholder="Subtask title..."
+                              value={newSubtaskTitle}
+                              onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                              className="h-8 text-sm"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleCreateSubtask();
+                                if (e.key === 'Escape') { setShowSubtaskForm(false); setNewSubtaskTitle(''); }
+                              }}
+                            />
+                            <Button size="sm" className="h-8" onClick={handleCreateSubtask} disabled={!newSubtaskTitle.trim() || createTask.isPending}>
+                              {createTask.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-muted-foreground mt-1"
+                            onClick={() => setShowSubtaskForm(true)}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add subtask
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {files.length > 0 && (
                   <div>
                     <div className="flex items-center gap-2 mb-3">

@@ -16,6 +16,8 @@ export interface Task {
   created_by: string | null;
   completed_at: string | null;
   meeting_id: string | null;
+  parent_task_id: string | null;
+  show_subtasks_to_client: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -158,6 +160,24 @@ export function useTaskHistory(taskId?: string) {
   });
 }
 
+// Fetch subtasks for a parent task
+export function useSubtasks(parentTaskId?: string) {
+  return useQuery({
+    queryKey: ['subtasks', parentTaskId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('parent_task_id', parentTaskId!)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data as Task[];
+    },
+    enabled: !!parentTaskId,
+  });
+}
+
+
 // Fetch agency members with pod info
 export function useAgencyMembers() {
   return useQuery({
@@ -210,6 +230,7 @@ export function useCreateTask() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['subtasks'] });
       toast.success('Task created successfully');
       
       // Send notification if task is assigned
@@ -242,6 +263,7 @@ export function useUpdateTask() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['subtasks'] });
       
       // Send notification for completion
       if (data.status === 'completed') {

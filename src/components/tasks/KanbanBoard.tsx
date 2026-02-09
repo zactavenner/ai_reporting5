@@ -152,7 +152,8 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
 
   // Filter tasks
   const filteredTasks = useMemo(() => {
-    let filtered = tasks;
+    // Filter out subtasks from top-level board view
+    let filtered = tasks.filter(t => !t.parent_task_id);
     
     // Filter by client - use prop clientId if provided, otherwise use filter dropdown
     const effectiveClientId = clientId || (filterClientId && filterClientId !== 'all' ? filterClientId : '');
