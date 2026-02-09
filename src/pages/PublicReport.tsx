@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useClientByToken } from '@/hooks/useClients';
 import { TeamMemberProvider } from '@/contexts/TeamMemberContext';
 import { DateFilterProvider, useDateFilter } from '@/contexts/DateFilterContext';
@@ -90,7 +90,10 @@ function PublicReportContent() {
     }
   }, [dataErrors.length]);
   
-  const [activeSection, setActiveSection] = useState<string>('overview');
+  const [searchParams] = useSearchParams();
+  const [activeSection, setActiveSection] = useState<string>(() => {
+    return searchParams.get('section') || 'overview';
+  });
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [selectedType, setSelectedType] = useState<string>('');
   const [drillDownModal, setDrillDownModal] = useState<string | null>(null);
