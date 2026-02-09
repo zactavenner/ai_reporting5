@@ -87,12 +87,15 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
   const handleCreate = async () => {
     if (!title.trim()) return;
     
-    // Determine the display name for assigned_to field
-    let displayAssignedTo = assignedTo || null;
-    if (selectedPodId) {
-      // When a pod is selected, show the team name
-      const pod = pods.find(p => p.id === selectedPodId);
-      displayAssignedTo = pod ? `${pod.name} Team` : null;
+    // Determine assigned_to: must be a valid member UUID or null
+    // When a pod is selected, we use the first pod member's ID for the assigned_to column
+    // and the task_assignees table handles the full team assignment
+    let resolvedAssignedTo: string | null = null;
+    if (selectedMemberId) {
+      resolvedAssignedTo = selectedMemberId;
+    } else if (selectedPodId) {
+      const podMembers = getMembersForPod(selectedPodId);
+      resolvedAssignedTo = podMembers.length > 0 ? podMembers[0].id : null;
     }
     
     const taskData = await createTask.mutateAsync({
@@ -103,7 +106,7 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
       due_date: dueDate ? format(dueDate, 'yyyy-MM-dd') : null,
       status: 'todo',
       stage,
-      assigned_to: displayAssignedTo,
+      assigned_to: resolvedAssignedTo,
       assigned_client_name: assignedClientName || null,
       created_by: currentMember?.name || (isPublicView ? 'Client' : null),
     });
