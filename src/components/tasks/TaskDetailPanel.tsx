@@ -216,9 +216,9 @@ import { toast } from 'sonner';
    
    const handleCopyTaskUrl = () => {
      const baseUrl = window.location.origin;
-     const taskUrl = isPublicView
-       ? `${baseUrl}/public/${window.location.pathname.split('/')[2]}?task=${task.id}`
-       : `${baseUrl}/client/${task.client_id}?task=${task.id}`;
+      const taskUrl = isPublicView
+        ? `${baseUrl}/public/${window.location.pathname.split('/')[2]}?section=tasks&task=${task.id}`
+        : `${baseUrl}/client/${task.client_id}?task=${task.id}`;
      navigator.clipboard.writeText(taskUrl);
      toast.success('Task link copied to clipboard!');
    };
