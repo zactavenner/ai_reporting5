@@ -4,17 +4,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Download, Play, FileText } from 'lucide-react';
+import { Download, Play, FileText, RefreshCw, Loader2 } from 'lucide-react';
 import { useCallRecordings, CallRecording } from '@/hooks/useCallRecordings';
 import { exportToCSV } from '@/lib/exportUtils';
 import {
@@ -24,6 +16,9 @@ import {
 } from '@/components/ui/collapsible';
 import { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface CallRecordingsModalProps {
   clientId?: string;
@@ -34,6 +29,29 @@ interface CallRecordingsModalProps {
 export function CallRecordingsModal({ clientId, open, onOpenChange }: CallRecordingsModalProps) {
   const { data: calls = [], isLoading } = useCallRecordings(clientId);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const handleSyncTranscript = async (callId: string) => {
+    setSyncingId(callId);
+    try {
+      const { data, error } = await supabase.functions.invoke('meetgeek-webhook', {
+        body: { action: 'sync_call_transcript', call_id: callId },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(data.hasTranscript ? 'Transcript synced!' : 'No matching meeting found');
+        queryClient.invalidateQueries({ queryKey: ['call-recordings'] });
+      } else {
+        toast.error(data?.error || 'No matching meeting found');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to sync transcript');
+    } finally {
+      setSyncingId(null);
+    }
+  };
 
   const handleExport = () => {
     const exportData = calls.map(call => ({
@@ -132,6 +150,27 @@ export function CallRecordingsModal({ clientId, open, onOpenChange }: CallRecord
                             >
                               <Play className="h-4 w-4 mr-1" />
                               Play
+                            </Button>
+                          )}
+                          
+                          {!call.transcript && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSyncTranscript(call.id);
+                              }}
+                              disabled={syncingId === call.id}
+                            >
+                              {syncingId === call.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <RefreshCw className="h-4 w-4 mr-1" />
+                                  Sync
+                                </>
+                              )}
                             </Button>
                           )}
                           

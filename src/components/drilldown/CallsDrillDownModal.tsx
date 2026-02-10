@@ -16,7 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Download, Trash2, Plus, ChevronLeft, ChevronRight, Eye, Filter } from 'lucide-react';
+import { Download, Trash2, Plus, ChevronLeft, ChevronRight, Eye, Filter, FileText } from 'lucide-react';
 import { useCalls, Call, useLeads } from '@/hooks/useLeadsAndCalls';
 import { useClient } from '@/hooks/useClients';
 import { useDateFilter } from '@/contexts/DateFilterContext';
@@ -270,8 +270,9 @@ export function CallsDrillDownModal({ clientId, showedOnly, open, onOpenChange }
                     <TableHead className="font-bold">Type</TableHead>
                     <TableHead className="font-bold">Status</TableHead>
                     <TableHead className="font-bold">Outcome</TableHead>
-                    <TableHead className="font-bold">Created</TableHead>
-                    <TableHead className="font-bold">Actions</TableHead>
+                     <TableHead className="font-bold">Transcript</TableHead>
+                     <TableHead className="font-bold">Created</TableHead>
+                     <TableHead className="font-bold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -302,8 +303,18 @@ export function CallsDrillDownModal({ clientId, showedOnly, open, onOpenChange }
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{call.outcome || '-'}</TableCell>
-                      <TableCell className="font-mono text-sm">
+                       <TableCell>{call.outcome || '-'}</TableCell>
+                       <TableCell>
+                         {(call as any).transcript ? (
+                           <Badge variant="outline" className="text-xs gap-1">
+                             <FileText className="h-3 w-3" />
+                             Available
+                           </Badge>
+                         ) : (
+                           <span className="text-xs text-muted-foreground">—</span>
+                         )}
+                       </TableCell>
+                       <TableCell className="font-mono text-sm">
                         {new Date(call.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell>

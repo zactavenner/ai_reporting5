@@ -22,6 +22,7 @@ import { PodAssignmentSection } from './PodAssignmentSection';
 import { CalendarTrackingSection } from './CalendarTrackingSection';
 import { PipelineMappingSection } from './PipelineMappingSection';
 import { HubSpotIntegrationSection } from './HubSpotIntegrationSection';
+import { MeetGeekIntegrationSection } from './MeetGeekIntegrationSection';
 import { SyncHealthIndicator, getSyncStatus } from './SyncHealthIndicator';
 import { useSyncQueue } from '@/hooks/useSyncQueue';
 import { DollarSign, Target, Plug, Loader2, RefreshCw, CheckCircle, XCircle, Users, Lock, Eye, EyeOff, AlertTriangle, ListOrdered } from 'lucide-react';
@@ -905,6 +906,11 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
             {/* HubSpot Integration Section */}
             <div className="border-t-2 border-border pt-6 mt-6">
               <HubSpotIntegrationSection client={client} settings={settings} />
+            </div>
+
+            {/* MeetGeek Integration Section */}
+            <div className="border-t-2 border-border pt-6 mt-6">
+              <MeetGeekIntegrationSection clientId={client.id} settings={settings} />
             </div>
           </TabsContent>
           
