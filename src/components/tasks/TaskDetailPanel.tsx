@@ -76,6 +76,7 @@ import { FilePreviewLightbox, MiniThumbnail } from './FilePreviewLightbox';
 import { InlineFilePreview } from './InlineFilePreview';
 import { SendToCreativeModal } from './SendToCreativeModal';
 import { MultiAssigneeSelector } from './MultiAssigneeSelector';
+import { SubtaskRow } from './SubtaskRow';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
  
@@ -129,6 +130,8 @@ import { toast } from 'sonner';
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcribingFileId, setTranscribingFileId] = useState<string | null>(null);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [newSubtaskPriority, setNewSubtaskPriority] = useState<string>('');
+  const [newSubtaskDueDate, setNewSubtaskDueDate] = useState<Date | undefined>();
   const [showSubtaskForm, setShowSubtaskForm] = useState(false);
   const [showSubtasks, setShowSubtasks] = useState(true);
   const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
@@ -232,12 +235,15 @@ import { toast } from 'sonner';
         title: newSubtaskTitle.trim(),
         client_id: task.client_id,
         parent_task_id: task.id,
-        priority: task.priority,
+        priority: newSubtaskPriority || task.priority,
+        due_date: newSubtaskDueDate ? format(newSubtaskDueDate, 'yyyy-MM-dd') : null,
         stage: 'todo',
         status: 'todo',
         created_by: currentMember?.name || (isPublicView ? 'Client' : null),
       });
       setNewSubtaskTitle('');
+      setNewSubtaskPriority('');
+      setNewSubtaskDueDate(undefined);
       setShowSubtaskForm(false);
       toast.success('Subtask created');
     } catch (err) {
@@ -683,78 +689,30 @@ import { toast } from 'sonner';
                     </div>
 
                     {showSubtasks && (
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         {subtasks.map((subtask) => (
-                          <div
+                          <SubtaskRow
                             key={subtask.id}
-                            className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 group transition-colors"
-                          >
-                            <button
-                              onClick={() => handleToggleSubtaskComplete(subtask)}
-                              className="flex-shrink-0"
-                            >
-                              {subtask.stage === 'done' ? (
-                                <CheckCircle2 className="h-4 w-4 text-success" />
-                              ) : (
-                                <Circle className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
-                              )}
-                            </button>
-                            {editingSubtaskId === subtask.id ? (
-                              <Input
-                                value={editingSubtaskTitle}
-                                onChange={(e) => setEditingSubtaskTitle(e.target.value)}
-                                className="h-7 text-sm flex-1"
-                                autoFocus
-                                onKeyDown={async (e) => {
-                                  if (e.key === 'Enter' && editingSubtaskTitle.trim()) {
-                                    await updateTask.mutateAsync({ id: subtask.id, title: editingSubtaskTitle.trim() });
-                                    setEditingSubtaskId(null);
-                                  }
-                                  if (e.key === 'Escape') setEditingSubtaskId(null);
-                                }}
-                                onBlur={async () => {
-                                  if (editingSubtaskTitle.trim() && editingSubtaskTitle.trim() !== subtask.title) {
-                                    await updateTask.mutateAsync({ id: subtask.id, title: editingSubtaskTitle.trim() });
-                                  }
-                                  setEditingSubtaskId(null);
-                                }}
-                              />
-                            ) : (
-                              <span
-                                className={cn(
-                                  "text-sm flex-1 cursor-pointer hover:text-primary transition-colors",
-                                  subtask.stage === 'done' && "line-through text-muted-foreground"
-                                )}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingSubtaskId(subtask.id);
-                                  setEditingSubtaskTitle(subtask.title);
-                                }}
-                              >
-                                {subtask.title}
-                              </span>
-                            )}
-                            {subtask.assigned_to && (
-                              <span className="text-xs text-muted-foreground">
-                                {agencyMembers.find(m => m.id === subtask.assigned_to)?.name?.split(' ')[0] || ''}
-                              </span>
-                            )}
-                            {!isPublicView && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => updateTask.mutateAsync({ id: subtask.id }).catch(() => {})}
-                              >
-                                <Trash2 className="h-3 w-3 text-destructive" />
-                              </Button>
-                            )}
-                          </div>
+                            subtask={subtask}
+                            isPublicView={isPublicView}
+                            editingSubtaskId={editingSubtaskId}
+                            editingSubtaskTitle={editingSubtaskTitle}
+                            onStartEdit={(s) => {
+                              setEditingSubtaskId(s.id);
+                              setEditingSubtaskTitle(s.title);
+                            }}
+                            onCancelEdit={() => setEditingSubtaskId(null)}
+                            onSaveEdit={async (id, title) => {
+                              await updateTask.mutateAsync({ id, title });
+                              setEditingSubtaskId(null);
+                            }}
+                            onToggleComplete={handleToggleSubtaskComplete}
+                          />
                         ))}
 
                         {/* Add subtask form */}
                         {showSubtaskForm ? (
-                          <div className="flex items-center gap-2 mt-2">
+                          <div className="space-y-2 mt-2 p-2 rounded-md border border-border/50">
                             <Input
                               placeholder="Subtask title..."
                               value={newSubtaskTitle}
@@ -763,12 +721,43 @@ import { toast } from 'sonner';
                               autoFocus
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') handleCreateSubtask();
-                                if (e.key === 'Escape') { setShowSubtaskForm(false); setNewSubtaskTitle(''); }
+                                if (e.key === 'Escape') { setShowSubtaskForm(false); setNewSubtaskTitle(''); setNewSubtaskPriority(''); setNewSubtaskDueDate(undefined); }
                               }}
                             />
-                            <Button size="sm" className="h-8" onClick={handleCreateSubtask} disabled={!newSubtaskTitle.trim() || createTask.isPending}>
-                              {createTask.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}
-                            </Button>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Select value={newSubtaskPriority || task.priority} onValueChange={setNewSubtaskPriority}>
+                                <SelectTrigger className="h-7 w-24 text-xs">
+                                  <SelectValue placeholder="Priority" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="low">Low</SelectItem>
+                                  <SelectItem value="medium">Medium</SelectItem>
+                                  <SelectItem value="high">High</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button variant="outline" size="sm" className={cn("h-7 text-xs gap-1", !newSubtaskDueDate && "text-muted-foreground")}>
+                                    <CalendarIcon className="h-3 w-3" />
+                                    {newSubtaskDueDate ? format(newSubtaskDueDate, 'MMM d') : 'Due date'}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={newSubtaskDueDate}
+                                    onSelect={setNewSubtaskDueDate}
+                                    initialFocus
+                                    className="pointer-events-auto"
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                              <div className="ml-auto">
+                                <Button size="sm" className="h-7 text-xs" onClick={handleCreateSubtask} disabled={!newSubtaskTitle.trim() || createTask.isPending}>
+                                  {createTask.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}
+                                </Button>
+                              </div>
+                            </div>
                           </div>
                         ) : (
                           <Button
