@@ -42,7 +42,7 @@ interface Message {
   content: string;
 }
 
-type AIModel = 'gemini-2.5-pro' | 'gemini-3-flash' | 'gemini-3-pro' | 'gpt-5';
+type AIModel = 'gemini-2.5-pro' | 'gemini-3-flash' | 'gemini-3-pro' | 'gpt-5' | 'grok';
 
 const QUICK_ACTIONS = [
   { label: 'Compare all clients', prompt: 'Compare the performance of all active clients and identify the top performer.' },

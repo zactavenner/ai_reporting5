@@ -12,6 +12,7 @@ const MODEL_MAP: Record<string, string> = {
   "gemini-3-pro": "google/gemini-3-pro-preview",
   "gemini-3-flash": "google/gemini-3-flash-preview",
   "gpt-5": "openai/gpt-5",
+  "grok": "xai-grok",  // handled separately
 };
 
 serve(async (req) => {
@@ -183,10 +184,35 @@ Provide specific, data-driven insights. Reference exact numbers. Compare clients
     const totalTokens = systemTokens + conversationTokens;
 
     const resolvedModel = MODEL_MAP[model] || "google/gemini-2.5-pro";
+    const isGrok = model === "grok";
 
-    const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
+    let response: Response;
+
+    if (isGrok) {
+      const XAI_API_KEY = Deno.env.get("XAI_API_KEY");
+      if (!XAI_API_KEY) {
+        return new Response(
+          JSON.stringify({ error: "XAI_API_KEY is not configured. Please add it in settings." }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      response = await fetch("https://api.x.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${XAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "grok-3",
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...(messages || []),
+          ],
+          stream: true,
+        }),
+      });
+    } else {
+      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -200,8 +226,8 @@ Provide specific, data-driven insights. Reference exact numbers. Compare clients
           ],
           stream: true,
         }),
-      }
-    );
+      });
+    }
 
     if (!response.ok) {
       if (response.status === 429) {
