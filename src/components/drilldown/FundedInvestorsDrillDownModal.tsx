@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { Download, Trash2, Plus, ChevronLeft, ChevronRight, Eye, Filter } from 'lucide-react';
 import { useFundedInvestors, FundedInvestor } from '@/hooks/useMetrics';
 import { useLeads } from '@/hooks/useLeadsAndCalls';
@@ -41,6 +42,18 @@ interface FundedInvestorsDrillDownModalProps {
 }
 
 const PAGE_SIZE = 150;
+
+function getInvestorStatus(investor: FundedInvestor): 'funded' | 'committed' | 'pending' {
+  if (Number(investor.funded_amount) > 0) return 'funded';
+  if (Number(investor.commitment_amount || 0) > 0) return 'committed';
+  return 'pending';
+}
+
+function StatusBadge({ status }: { status: 'funded' | 'committed' | 'pending' }) {
+  if (status === 'funded') return <Badge className="bg-chart-2/20 text-chart-2 border-chart-2/30 text-xs">Funded</Badge>;
+  if (status === 'committed') return <Badge className="bg-primary/20 text-primary border-primary/30 text-xs">Committed</Badge>;
+  return <Badge variant="outline" className="text-xs">Pending</Badge>;
+}
 
 export function FundedInvestorsDrillDownModal({ clientId, open, onOpenChange }: FundedInvestorsDrillDownModalProps) {
   const { startDate, endDate } = useDateFilter();
@@ -107,7 +120,6 @@ export function FundedInvestorsDrillDownModal({ clientId, open, onOpenChange }: 
   const addInvestor = async () => {
     if (!clientId) return;
     
-    // Calculate time to fund if both dates provided
     let timeToFund: number | null = null;
     if (newInvestor.first_contact_at && newInvestor.funded_at) {
       const firstContact = new Date(newInvestor.first_contact_at);
@@ -268,55 +280,68 @@ export function FundedInvestorsDrillDownModal({ clientId, open, onOpenChange }: 
                 <TableHeader>
                   <TableRow className="border-b-2">
                     <TableHead className="font-bold">Name</TableHead>
-                    <TableHead className="font-bold text-right">Amount</TableHead>
+                    <TableHead className="font-bold">Status</TableHead>
+                    <TableHead className="font-bold text-right">Commitment $</TableHead>
+                    <TableHead className="font-bold text-right">Funded $</TableHead>
                     <TableHead className="font-bold">First Contact</TableHead>
                     <TableHead className="font-bold">Funded Date</TableHead>
                     <TableHead className="font-bold text-right">Time to Fund</TableHead>
-                    <TableHead className="font-bold text-right">Calls to Fund</TableHead>
+                    <TableHead className="font-bold text-right">Calls</TableHead>
                     <TableHead className="font-bold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedInvestors.map((investor: FundedInvestor) => (
-                    <TableRow key={investor.id} className="border-b hover:bg-muted/50 cursor-pointer" onClick={() => viewInvestorActivity(investor)}>
-                      <TableCell className="font-medium">{investor.name || 'Unknown'}</TableCell>
-                      <TableCell className="text-right font-mono text-chart-2">
-                        ${Number(investor.funded_amount).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {investor.first_contact_at 
-                          ? new Date(investor.first_contact_at).toLocaleDateString() 
-                          : '-'}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {new Date(investor.funded_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {investor.time_to_fund_days !== null ? `${investor.time_to_fund_days} days` : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">{investor.calls_to_fund || 0}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8" 
-                            onClick={() => viewInvestorActivity(investor)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8" 
-                            onClick={() => deleteInvestor(investor.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {paginatedInvestors.map((investor: FundedInvestor) => {
+                    const status = getInvestorStatus(investor);
+                    return (
+                      <TableRow key={investor.id} className="border-b hover:bg-muted/50 cursor-pointer" onClick={() => viewInvestorActivity(investor)}>
+                        <TableCell className="font-medium">{investor.name || 'Unknown'}</TableCell>
+                        <TableCell><StatusBadge status={status} /></TableCell>
+                        <TableCell className="text-right font-mono text-primary">
+                          {Number(investor.commitment_amount || 0) > 0
+                            ? `$${Number(investor.commitment_amount).toLocaleString()}`
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-chart-2">
+                          {Number(investor.funded_amount) > 0
+                            ? `$${Number(investor.funded_amount).toLocaleString()}`
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {investor.first_contact_at 
+                            ? new Date(investor.first_contact_at).toLocaleDateString() 
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {new Date(investor.funded_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {investor.time_to_fund_days !== null ? `${investor.time_to_fund_days} days` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">{investor.calls_to_fund || 0}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8" 
+                              onClick={(e) => { e.stopPropagation(); viewInvestorActivity(investor); }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8" 
+                              onClick={(e) => { e.stopPropagation(); deleteInvestor(investor.id); }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}

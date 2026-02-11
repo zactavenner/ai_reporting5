@@ -32,6 +32,8 @@ export interface FundedInvestor {
   first_contact_at: string | null;
   time_to_fund_days: number | null;
   calls_to_fund: number;
+  commitment_amount: number | null;
+  source: string | null;
 }
 
 export interface AggregatedMetrics {
