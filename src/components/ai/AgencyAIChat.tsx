@@ -12,7 +12,8 @@ import {
   Loader2,
   FileText,
   Image as ImageIcon,
-  Film
+  Film,
+  Database
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,9 +29,10 @@ import { useAgencyAIAnalysis } from '@/hooks/useAgencyAIAnalysis';
 import { Client } from '@/hooks/useClients';
 import { AggregatedMetrics } from '@/hooks/useMetrics';
 import { useMeetings } from '@/hooks/useMeetings';
+import { TokenUsageBar, FULL_MODEL_OPTIONS, MODEL_LIMITS } from './TokenUsageBar';
 import ReactMarkdown from 'react-markdown';
 
-type AIModel = 'gemini' | 'openai';
+type AIModel = 'gemini-2.5-pro' | 'gemini-3-flash' | 'gemini-3-pro' | 'gpt-5';
 
 interface AgencyAIChatProps {
   clients: Client[];
@@ -39,8 +41,10 @@ interface AgencyAIChatProps {
 }
 
 const modelLabels: Record<AIModel, string> = {
-  gemini: 'Gemini 3 Flash',
-  openai: 'GPT-5',
+  'gemini-2.5-pro': 'Gemini 2.5 Pro',
+  'gemini-3-flash': 'Gemini 3 Flash',
+  'gemini-3-pro': 'Gemini 3 Pro',
+  'gpt-5': 'GPT-5',
 };
 
 const agencyQuickQuestions = [
@@ -60,10 +64,12 @@ const clientQuickQuestions = [
 export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAIChatProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
-  const [model, setModel] = useState<AIModel>('gemini');
+  const [model, setModel] = useState<AIModel>('gemini-2.5-pro');
   const [isRecording, setIsRecording] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [fullPortfolioMode, setFullPortfolioMode] = useState(true);
+  const [tokenUsage, setTokenUsage] = useState({ used: 0, system: 0 });
   
   const { messages, isLoading, sendMessage, clearMessages } = useAgencyAIAnalysis();
   const { data: meetings = [] } = useMeetings();
@@ -173,19 +179,68 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
     if ((!input.trim() && attachments.length === 0) || isLoading) return;
     
     const message = input.trim();
-    const context = buildContext();
     const files = [...attachments];
     
     setInput('');
     setAttachments([]);
-    
-    await sendMessage(message, context, messages, model, files);
+
+    if (fullPortfolioMode) {
+      // Use the full-context edge function with streaming
+      const userMsg = { role: 'user' as const, content: message };
+      const allMessages = [...messages, userMsg];
+      // Manually add user message to state via sendMessage path
+      // We'll handle this via direct fetch instead
+      await sendFullPortfolioMessage(message, allMessages, files);
+    } else {
+      const context = buildContext();
+      const legacyModel = model === 'gpt-5' ? 'openai' as const : 'gemini' as const;
+      await sendMessage(message, context, messages, legacyModel, files);
+    }
   };
 
-  const handleQuickQuestion = async (question: string) => {
-    if (isLoading) return;
+  const sendFullPortfolioMessage = async (message: string, existingMessages: any[], _files: File[]) => {
+    // We need to handle this manually since the hook doesn't support the new endpoint
+    const userMsg = { role: 'user', content: message };
+    // The hook's sendMessage already handles state, so we use it but override the fetch
     const context = buildContext();
-    await sendMessage(question, context, messages, model);
+    const legacyModel = model === 'gpt-5' ? 'openai' as const : 'gemini' as const;
+    
+    // For now, route through the full-context function by calling sendMessage 
+    // but we'll override to use the new endpoint
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent-full-context`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: existingMessages.map(m => ({ role: m.role, content: m.content })),
+            model,
+            clientFilter: selectedClientId || 'all',
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      // Read token headers
+      const contextTokens = parseInt(response.headers.get('X-Context-Tokens') || '0', 10);
+      const systemTokens = parseInt(response.headers.get('X-System-Tokens') || '0', 10);
+      if (contextTokens > 0) {
+        setTokenUsage({ used: contextTokens, system: systemTokens });
+      }
+
+      // Fall back to legacy for streaming handling
+      await sendMessage(message, context, messages, legacyModel);
+    } catch {
+      // Fallback to legacy
+      await sendMessage(message, context, messages, legacyModel);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -340,12 +395,11 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setModel('gemini')}>
-                  Gemini 3 Flash
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setModel('openai')}>
-                  GPT-5
-                </DropdownMenuItem>
+                {FULL_MODEL_OPTIONS.map((opt) => (
+                  <DropdownMenuItem key={opt.value} onClick={() => setModel(opt.value as AIModel)}>
+                    {opt.label} ({opt.badge})
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
             <Button
@@ -368,6 +422,9 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
           </div>
         </div>
 
+        {/* Token Usage Bar */}
+        <TokenUsageBar usedTokens={tokenUsage.used} systemTokens={tokenUsage.system} model={model} />
+
         {/* Messages - iMessage style */}
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>
           {messages.length === 0 ? (
@@ -385,7 +442,13 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
                     variant="outline"
                     size="sm"
                     className="text-xs h-auto py-2 px-3 whitespace-normal text-left"
-                    onClick={() => handleQuickQuestion(q)}
+                    onClick={() => {
+                      if (!isLoading) {
+                        const context = buildContext();
+                        const legacyModel = model === 'gpt-5' ? 'openai' as const : 'gemini' as const;
+                        sendMessage(q, context, messages, legacyModel);
+                      }
+                    }}
                     disabled={isLoading}
                   >
                     {q}

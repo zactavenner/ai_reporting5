@@ -4,9 +4,11 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { 
   Send, Loader2, Plus, Trash2, Bot, X, 
-  Paperclip, ChevronLeft, ChevronRight, Sparkles, Zap
+  Paperclip, ChevronLeft, ChevronRight, Sparkles, Zap, Database
 } from 'lucide-react';
 import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
@@ -24,6 +26,7 @@ import { CustomGPT } from '@/hooks/useCustomGPTs';
 import { Client } from '@/hooks/useClients';
 import { AggregatedMetrics } from '@/hooks/useMetrics';
 import { AIToolsMenu, TOOL_MODES, ToolMode } from './AIToolsMenu';
+import { TokenUsageBar, FULL_MODEL_OPTIONS, MODEL_LIMITS } from './TokenUsageBar';
 import { cn } from '@/lib/utils';
 
 interface AIHubChatProps {
@@ -39,13 +42,7 @@ interface Message {
   content: string;
 }
 
-type AIModel = 'gemini-flash' | 'gemini-pro' | 'openai';
-
-const MODEL_OPTIONS = [
-  { value: 'gemini-flash', label: 'Gemini 3 Flash', badge: 'Fast', icon: <Zap className="h-3 w-3" /> },
-  { value: 'gemini-pro', label: 'Gemini 3 Pro', badge: 'Pro', icon: <Sparkles className="h-3 w-3" /> },
-  { value: 'openai', label: 'GPT-5', badge: 'Powerful', icon: <Bot className="h-3 w-3" /> },
-];
+type AIModel = 'gemini-2.5-pro' | 'gemini-3-flash' | 'gemini-3-pro' | 'gpt-5';
 
 const QUICK_ACTIONS = [
   { label: 'Compare all clients', prompt: 'Compare the performance of all active clients and identify the top performer.' },
@@ -58,11 +55,13 @@ export function AIHubChat({ selectedGPT, onClearGPT, clients, clientMetrics, age
   const [input, setInput] = useState('');
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [model, setModel] = useState<AIModel>('gemini-flash');
+  const [model, setModel] = useState<AIModel>('gemini-2.5-pro');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [activeTool, setActiveTool] = useState<ToolMode | null>(null);
   const [selectedClientFilter, setSelectedClientFilter] = useState<string>('all');
+  const [fullPortfolioMode, setFullPortfolioMode] = useState(true);
+  const [tokenUsage, setTokenUsage] = useState({ used: 0, system: 0 });
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -78,12 +77,10 @@ export function AIHubChat({ selectedGPT, onClearGPT, clients, clientMetrics, age
   const { data: documents = [] } = useKnowledgeDocuments();
   const { data: gptFiles = [] } = useGPTFiles(selectedGPT?.id);
 
-  // Get linked documents for context
   const linkedDocs = selectedGPT 
     ? documents.filter(d => gptLinks.some(l => l.document_id === d.id))
-    : documents; // Use all docs for agency AI
+    : documents;
 
-  // Sync local messages with DB messages
   useEffect(() => {
     if (dbMessages.length > 0) {
       setLocalMessages(dbMessages.map(m => ({ 
@@ -101,6 +98,12 @@ export function AIHubChat({ selectedGPT, onClearGPT, clients, clientMetrics, age
     }
   }, [localMessages]);
 
+  // Estimate local token usage for conversation messages
+  useEffect(() => {
+    const convTokens = localMessages.reduce((sum, m) => sum + Math.ceil(m.content.length / 4), 0);
+    setTokenUsage(prev => ({ ...prev, used: prev.system + convTokens }));
+  }, [localMessages]);
+
   const handleNewConversation = async () => {
     const conv = await createConversation.mutateAsync({
       gptId: selectedGPT?.id,
@@ -108,6 +111,7 @@ export function AIHubChat({ selectedGPT, onClearGPT, clients, clientMetrics, age
     });
     setSelectedConversationId(conv.id);
     setLocalMessages([]);
+    setTokenUsage({ used: 0, system: 0 });
   };
 
   const handleSelectTool = (tool: ToolMode) => {
@@ -118,12 +122,10 @@ export function AIHubChat({ selectedGPT, onClearGPT, clients, clientMetrics, age
     let prompt = selectedGPT?.system_prompt || 
       'You are an expert advertising agency AI assistant. Help analyze performance data, provide insights, and assist with strategy.';
 
-    // Add tool mode context
     if (activeTool) {
       prompt += `\n\n[TOOL MODE: ${activeTool.name}]\n${activeTool.prompt}`;
     }
 
-    // Add GPT-specific files
     if (selectedGPT && gptFiles.length > 0) {
       prompt += '\n\nYou have access to these GPT-specific data sources:\n';
       gptFiles.forEach(file => {
@@ -137,7 +139,6 @@ export function AIHubChat({ selectedGPT, onClearGPT, clients, clientMetrics, age
       });
     }
 
-    // Add knowledge base context
     if (linkedDocs.length > 0) {
       prompt += '\n\nYou have access to the following knowledge base documents:\n';
       linkedDocs.forEach(doc => {
@@ -149,7 +150,6 @@ export function AIHubChat({ selectedGPT, onClearGPT, clients, clientMetrics, age
       });
     }
 
-    // Filter metrics by selected client
     if (selectedClientFilter !== 'all') {
       const client = clients.find(c => c.id === selectedClientFilter);
       const metrics = clientMetrics[selectedClientFilter];
@@ -165,7 +165,6 @@ Client Metrics:
 - Funded Dollars: $${metrics.fundedDollars?.toLocaleString() || 0}`;
       }
     } else {
-      // Add agency metrics context
       prompt += `\n\nCurrent Agency Metrics:
 - Total Ad Spend: $${agencyMetrics.totalAdSpend?.toLocaleString() || 0}
 - Total Leads: ${agencyMetrics.totalLeads || 0}
@@ -186,7 +185,6 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
     if (!messageText && attachments.length === 0) return;
     if (isLoading) return;
 
-    // Create conversation if needed
     let conversationId = selectedConversationId;
     if (!conversationId) {
       const conv = await createConversation.mutateAsync({
@@ -203,7 +201,6 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
     setInput('');
     setIsLoading(true);
 
-    // Save user message to DB
     await addMessage.mutateAsync({
       conversationId,
       role: 'user',
@@ -213,7 +210,6 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
     let assistantContent = '';
 
     try {
-      // Convert files to base64
       const fileContents: { name: string; type: string; content: string }[] = [];
       for (const file of attachments) {
         const content = await fileToBase64(file);
@@ -221,39 +217,69 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
       }
       setAttachments([]);
 
-      // Map model to API format
-      const modelMap: Record<AIModel, string> = {
-        'gemini-flash': 'gemini',
-        'gemini-pro': 'gemini-pro',
-        'openai': 'openai',
-      };
+      let response: Response;
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analysis`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            messages: [
-              { role: 'system', content: buildSystemPrompt() },
-              ...newMessages,
-            ],
-            context: { 
-              isAgencyLevel: true,
-              clientFilter: selectedClientFilter !== 'all' ? selectedClientFilter : undefined,
-              toolMode: activeTool?.id,
+      if (fullPortfolioMode && !selectedGPT) {
+        // Use the full-context edge function
+        response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent-full-context`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
             },
-            model: modelMap[model],
-            files: fileContents,
-          }),
-        }
-      );
+            body: JSON.stringify({
+              messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+              model,
+              clientFilter: selectedClientFilter,
+            }),
+          }
+        );
+      } else {
+        // Legacy: use ai-analysis
+        const modelMap: Record<string, string> = {
+          'gemini-2.5-pro': 'gemini',
+          'gemini-3-flash': 'gemini',
+          'gemini-3-pro': 'gemini-pro',
+          'gpt-5': 'openai',
+        };
+        response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analysis`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            },
+            body: JSON.stringify({
+              messages: [
+                { role: 'system', content: buildSystemPrompt() },
+                ...newMessages,
+              ],
+              context: { 
+                isAgencyLevel: true,
+                clientFilter: selectedClientFilter !== 'all' ? selectedClientFilter : undefined,
+                toolMode: activeTool?.id,
+              },
+              model: modelMap[model] || 'gemini',
+              files: fileContents,
+            }),
+          }
+        );
+      }
 
       if (!response.ok) {
+        if (response.status === 429) throw new Error('Rate limit exceeded. Please try again later.');
+        if (response.status === 402) throw new Error('AI credits exhausted. Please add more credits.');
         throw new Error('Failed to get AI response');
+      }
+
+      // Read token headers
+      const contextTokens = parseInt(response.headers.get('X-Context-Tokens') || '0', 10);
+      const systemTokens = parseInt(response.headers.get('X-System-Tokens') || '0', 10);
+      if (contextTokens > 0) {
+        setTokenUsage({ used: contextTokens, system: systemTokens });
       }
 
       if (!response.body) throw new Error('No response body');
@@ -299,8 +325,11 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
         }
       }
 
-      // Save assistant message to DB
+      // Update token usage with assistant response
       if (assistantContent) {
+        const assistantTokens = Math.ceil(assistantContent.length / 4);
+        setTokenUsage(prev => ({ ...prev, used: prev.used + assistantTokens }));
+
         await addMessage.mutateAsync({
           conversationId,
           role: 'assistant',
@@ -308,7 +337,6 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
         });
       }
 
-      // Clear tool after use
       setActiveTool(null);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred';
@@ -423,10 +451,31 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
                   <Bot className="h-4 w-4 text-primary" />
                 </div>
                 <span className="font-semibold text-sm">Agency AI</span>
+                {fullPortfolioMode && (
+                  <Badge variant="secondary" className="text-[10px] gap-1">
+                    <Database className="h-3 w-3" />
+                    Full Portfolio
+                  </Badge>
+                )}
               </div>
             )}
           </div>
           <div className="flex items-center gap-2">
+            {/* Full Portfolio Toggle */}
+            {!selectedGPT && (
+              <div className="flex items-center gap-1.5">
+                <Switch
+                  id="full-portfolio"
+                  checked={fullPortfolioMode}
+                  onCheckedChange={setFullPortfolioMode}
+                  className="scale-75"
+                />
+                <Label htmlFor="full-portfolio" className="text-[10px] text-muted-foreground cursor-pointer">
+                  Full Data
+                </Label>
+              </div>
+            )}
+            
             {/* Client Filter */}
             <Select value={selectedClientFilter} onValueChange={setSelectedClientFilter}>
               <SelectTrigger className="w-[140px] h-8 text-xs">
@@ -444,15 +493,15 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
             
             {/* Model Selection */}
             <Select value={model} onValueChange={(v) => setModel(v as AIModel)}>
-              <SelectTrigger className="w-[140px] h-8 text-xs">
+              <SelectTrigger className="w-[160px] h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {MODEL_OPTIONS.map((opt) => (
+                {FULL_MODEL_OPTIONS.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>
                     <div className="flex items-center gap-2">
-                      {opt.icon}
                       <span>{opt.label}</span>
+                      <Badge variant="outline" className="text-[9px] px-1 py-0">{opt.badge}</Badge>
                     </div>
                   </SelectItem>
                 ))}
@@ -460,6 +509,9 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
             </Select>
           </div>
         </div>
+
+        {/* Token Usage Bar */}
+        <TokenUsageBar usedTokens={tokenUsage.used} systemTokens={tokenUsage.system} model={model} />
 
         {/* Messages */}
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>
@@ -474,10 +526,12 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
                 </h3>
                 <p className="text-muted-foreground text-sm max-w-md mx-auto mb-6">
                   {selectedGPT?.description || 
-                    'Ask about clients, campaigns, or performance metrics. I have access to your agency data.'}
+                    (fullPortfolioMode 
+                      ? 'Full Portfolio Mode: I have complete access to all client data including metrics, leads, calls, tasks, meetings, and pipeline data.'
+                      : 'Ask about clients, campaigns, or performance metrics. I have access to your agency data.'
+                    )}
                 </p>
                 
-                {/* Quick Actions */}
                 <div className="flex flex-wrap justify-center gap-2">
                   {QUICK_ACTIONS.map((action, i) => (
                     <Button 
@@ -539,7 +593,6 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
 
         {/* Input Area */}
         <div className="p-4 border-t bg-background/80 backdrop-blur-sm">
-          {/* Active Tool Badge */}
           {activeTool && (
             <div className="flex items-center gap-2 mb-2 max-w-3xl mx-auto">
               <Badge variant="secondary" className="gap-1">
@@ -553,7 +606,6 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
             </div>
           )}
           
-          {/* Attachments */}
           {attachments.length > 0 && (
             <div className="flex gap-2 mb-2 flex-wrap max-w-3xl mx-auto">
               {attachments.map((file, i) => (
@@ -568,7 +620,6 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
             </div>
           )}
           
-          {/* Input Row */}
           <div className="flex gap-2 max-w-3xl mx-auto items-center">
             <input
               type="file"
@@ -601,7 +652,7 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
               />
               <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                  {MODEL_OPTIONS.find(m => m.value === model)?.badge}
+                  {FULL_MODEL_OPTIONS.find(m => m.value === model)?.badge}
                 </Badge>
               </div>
             </div>

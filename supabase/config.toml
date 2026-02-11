@@ -71,3 +71,6 @@ verify_jwt = false
 
 [functions.external-data-api]
 verify_jwt = false
+
+[functions.ai-agent-full-context]
+verify_jwt = false
