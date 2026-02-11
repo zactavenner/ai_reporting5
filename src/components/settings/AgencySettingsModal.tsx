@@ -35,6 +35,7 @@ const GEMINI_MODELS = [
 ];
 
 const GROK_MODELS = [
+  { value: 'grok-4-fast-reasoning', label: 'Grok 4 Fast Reasoning' },
   { value: 'grok-3', label: 'Grok 3' },
   { value: 'grok-3-mini', label: 'Grok 3 Mini' },
   { value: 'grok-2', label: 'Grok 2' },
