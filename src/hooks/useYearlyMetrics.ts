@@ -113,20 +113,30 @@ export function useUpsertMonthlyMetric() {
       const startOfMonth = `${year}-${String(month).padStart(2, '0')}-01`;
       const endOfMonth = `${year}-${String(month).padStart(2, '0')}-31`;
 
-      const { data: existing } = await supabase
+      const { data: allMonthRecords } = await supabase
         .from('daily_metrics')
-        .select('id, date')
+        .select('*')
         .eq('client_id', clientId)
         .gte('date', startOfMonth)
         .lte('date', endOfMonth)
-        .limit(1)
-        .maybeSingle();
+        .order('date', { ascending: true });
+
+      const existing = allMonthRecords && allMonthRecords.length > 0 ? allMonthRecords[0] : null;
 
       if (existing) {
-        // Update the first record of the month
+        // Calculate adjusted updates: desired total minus sum of OTHER records
+        const adjustedUpdates = { ...updates };
+        const otherRecords = allMonthRecords!.filter(r => r.id !== existing.id);
+        
+        for (const [field, desiredValue] of Object.entries(updates)) {
+          if (desiredValue === undefined || desiredValue === null) continue;
+          const otherSum = otherRecords.reduce((sum, r) => sum + Number((r as any)[field] || 0), 0);
+          (adjustedUpdates as any)[field] = Number(desiredValue) - otherSum;
+        }
+
         const { data, error } = await supabase
           .from('daily_metrics')
-          .update(updates)
+          .update(adjustedUpdates)
           .eq('id', existing.id)
           .select()
           .single();
