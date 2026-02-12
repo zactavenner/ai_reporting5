@@ -71,7 +71,7 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
   const [fullPortfolioMode, setFullPortfolioMode] = useState(true);
   const [tokenUsage, setTokenUsage] = useState({ used: 0, system: 0 });
   
-  const { messages, isLoading, sendMessage, clearMessages } = useAgencyAIAnalysis();
+  const { messages, isLoading, sendMessage, sendFullContextMessage, clearMessages } = useAgencyAIAnalysis();
   const { data: meetings = [] } = useMeetings();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -185,61 +185,17 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
     setAttachments([]);
 
     if (fullPortfolioMode) {
-      // Use the full-context edge function with streaming
-      const userMsg = { role: 'user' as const, content: message };
-      const allMessages = [...messages, userMsg];
-      // Manually add user message to state via sendMessage path
-      // We'll handle this via direct fetch instead
-      await sendFullPortfolioMessage(message, allMessages, files);
+      await sendFullContextMessage(
+        message,
+        messages,
+        model,
+        selectedClientId || 'all',
+        (used, system) => setTokenUsage({ used, system }),
+      );
     } else {
       const context = buildContext();
       const legacyModel = model === 'gpt-5' ? 'openai' as const : 'gemini' as const;
       await sendMessage(message, context, messages, legacyModel, files);
-    }
-  };
-
-  const sendFullPortfolioMessage = async (message: string, existingMessages: any[], _files: File[]) => {
-    // We need to handle this manually since the hook doesn't support the new endpoint
-    const userMsg = { role: 'user', content: message };
-    // The hook's sendMessage already handles state, so we use it but override the fetch
-    const context = buildContext();
-    const legacyModel = model === 'gpt-5' ? 'openai' as const : 'gemini' as const;
-    
-    // For now, route through the full-context function by calling sendMessage 
-    // but we'll override to use the new endpoint
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent-full-context`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            messages: existingMessages.map(m => ({ role: m.role, content: m.content })),
-            model,
-            clientFilter: selectedClientId || 'all',
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to get AI response');
-      }
-
-      // Read token headers
-      const contextTokens = parseInt(response.headers.get('X-Context-Tokens') || '0', 10);
-      const systemTokens = parseInt(response.headers.get('X-System-Tokens') || '0', 10);
-      if (contextTokens > 0) {
-        setTokenUsage({ used: contextTokens, system: systemTokens });
-      }
-
-      // Fall back to legacy for streaming handling
-      await sendMessage(message, context, messages, legacyModel);
-    } catch {
-      // Fallback to legacy
-      await sendMessage(message, context, messages, legacyModel);
     }
   };
 
