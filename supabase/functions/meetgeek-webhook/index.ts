@@ -394,15 +394,18 @@ async function processMeeting(supabase: any, apiKey: string, baseUrl: string, me
     } catch {}
 
     // Fetch highlights
+    let meetingHighlights: any[] = [];
     try {
       const hlResponse = await fetch(`${baseUrl}/v1/meetings/${meetingId}/highlights`, {
         headers: { 'Authorization': `Bearer ${apiKey}` },
       });
       if (hlResponse.ok) {
         const data = await hlResponse.json();
-        const tasks = (data.highlights || [])
+        meetingHighlights = (data.highlights || data || []);
+        // Also extract action items from highlights
+        const tasks = meetingHighlights
           .filter((h: any) => h.label === 'Task' || h.label === 'Action Item')
-          .map((h: any) => ({ text: h.highlightText, source: 'highlights', speaker: h.speaker }));
+          .map((h: any) => ({ text: h.highlightText || h.text, source: 'highlights', speaker: h.speaker }));
         allActionItems.push(...tasks);
       }
     } catch {}
@@ -434,7 +437,7 @@ async function processMeeting(supabase: any, apiKey: string, baseUrl: string, me
         recording_url: meeting.recording_url,
         meetgeek_url: meeting.meetgeek_url || `https://app.meetgeek.ai/meetings/${meetingId}`,
         client_id: matchedClientId,
-        highlights: (meeting.highlights || []),
+        highlights: meetingHighlights.length > 0 ? meetingHighlights : (meeting.highlights || []),
       }, { onConflict: 'meeting_id' })
       .select()
       .single();
