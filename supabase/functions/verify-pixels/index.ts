@@ -153,53 +153,57 @@ const EVENT_PATTERNS = {
 };
 
 async function fetchPageContent(url: string): Promise<string> {
-  // Try multiple user agents in case one is blocked
-  const userAgents = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-  ];
-  
-  let lastError: Error | null = null;
-  
-  for (const userAgent of userAgents) {
-    try {
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': userAgent,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'none',
-          'Sec-Fetch-User': '?1',
-          'Upgrade-Insecure-Requests': '1',
-        },
-        redirect: 'follow',
-      });
-      
-      if (response.ok) {
-        return await response.text();
-      }
-      
-      // If 403, try next user agent
-      if (response.status === 403) {
-        lastError = new Error(`HTTP 403: Forbidden (tried ${userAgent.substring(0, 30)}...)`);
-        console.log(`403 with user agent, trying next...`);
-        continue;
-      }
-      
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    } catch (error) {
-      lastError = error as Error;
-      console.error('Fetch attempt failed:', error);
+  // First try direct fetch with a realistic browser user agent
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      redirect: 'follow',
+    });
+    
+    if (response.ok) {
+      return await response.text();
     }
+    
+    console.log(`Direct fetch returned ${response.status}, falling back to Firecrawl`);
+  } catch (error) {
+    console.log('Direct fetch failed, falling back to Firecrawl:', error);
   }
-  
-  throw lastError || new Error('Failed to fetch page after all attempts');
+
+  // Fallback: use Firecrawl to scrape the page (handles bot protection)
+  const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
+  if (!firecrawlKey) {
+    throw new Error('Page blocked direct access and FIRECRAWL_API_KEY is not configured');
+  }
+
+  const fcResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${firecrawlKey}`,
+    },
+    body: JSON.stringify({
+      url,
+      formats: ['rawHtml'],
+      waitFor: 3000,
+    }),
+  });
+
+  if (!fcResponse.ok) {
+    const errText = await fcResponse.text();
+    throw new Error(`Firecrawl scrape failed (${fcResponse.status}): ${errText}`);
+  }
+
+  const fcData = await fcResponse.json();
+  const html = fcData?.data?.rawHtml;
+  if (!html) {
+    throw new Error('Firecrawl returned no HTML content');
+  }
+
+  return html;
 }
 
 function detectAllEvents(html: string): DetectedEvent[] {
