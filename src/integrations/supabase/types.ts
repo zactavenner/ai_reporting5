@@ -824,6 +824,8 @@ export type Database = {
           meetgeek_last_sync: string | null
           meetgeek_region: string | null
           meetgeek_webhook_secret: string | null
+          meta_ads_last_sync: string | null
+          meta_ads_sync_enabled: boolean | null
           monthly_ad_spend_target: number | null
           mrr: number | null
           pixel_notification_email: string | null
@@ -881,6 +883,8 @@ export type Database = {
           meetgeek_last_sync?: string | null
           meetgeek_region?: string | null
           meetgeek_webhook_secret?: string | null
+          meta_ads_last_sync?: string | null
+          meta_ads_sync_enabled?: boolean | null
           monthly_ad_spend_target?: number | null
           mrr?: number | null
           pixel_notification_email?: string | null
@@ -938,6 +942,8 @@ export type Database = {
           meetgeek_last_sync?: string | null
           meetgeek_region?: string | null
           meetgeek_webhook_secret?: string | null
+          meta_ads_last_sync?: string | null
+          meta_ads_sync_enabled?: boolean | null
           monthly_ad_spend_target?: number | null
           mrr?: number | null
           pixel_notification_email?: string | null
@@ -1949,6 +1955,308 @@ export type Database = {
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "agency_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meta_ad_sets: {
+        Row: {
+          bid_strategy: string | null
+          billing_event: string | null
+          budget_remaining: number | null
+          campaign_id: string | null
+          clicks: number | null
+          client_id: string
+          cpc: number | null
+          cpm: number | null
+          created_at: string | null
+          ctr: number | null
+          daily_budget: number | null
+          effective_status: string | null
+          end_time: string | null
+          frequency: number | null
+          id: string
+          impressions: number | null
+          lifetime_budget: number | null
+          meta_adset_id: string
+          meta_campaign_id: string | null
+          name: string
+          optimization_goal: string | null
+          reach: number | null
+          spend: number | null
+          start_time: string | null
+          status: string | null
+          synced_at: string | null
+          targeting: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          bid_strategy?: string | null
+          billing_event?: string | null
+          budget_remaining?: number | null
+          campaign_id?: string | null
+          clicks?: number | null
+          client_id: string
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          daily_budget?: number | null
+          effective_status?: string | null
+          end_time?: string | null
+          frequency?: number | null
+          id?: string
+          impressions?: number | null
+          lifetime_budget?: number | null
+          meta_adset_id: string
+          meta_campaign_id?: string | null
+          name: string
+          optimization_goal?: string | null
+          reach?: number | null
+          spend?: number | null
+          start_time?: string | null
+          status?: string | null
+          synced_at?: string | null
+          targeting?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          bid_strategy?: string | null
+          billing_event?: string | null
+          budget_remaining?: number | null
+          campaign_id?: string | null
+          clicks?: number | null
+          client_id?: string
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          daily_budget?: number | null
+          effective_status?: string | null
+          end_time?: string | null
+          frequency?: number | null
+          id?: string
+          impressions?: number | null
+          lifetime_budget?: number | null
+          meta_adset_id?: string
+          meta_campaign_id?: string | null
+          name?: string
+          optimization_goal?: string | null
+          reach?: number | null
+          spend?: number | null
+          start_time?: string | null
+          status?: string | null
+          synced_at?: string | null
+          targeting?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_ad_sets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_ad_sets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meta_ads: {
+        Row: {
+          ad_set_id: string | null
+          body: string | null
+          call_to_action_type: string | null
+          clicks: number | null
+          client_id: string
+          conversions: number | null
+          cost_per_conversion: number | null
+          cpc: number | null
+          cpm: number | null
+          created_at: string | null
+          creative_id: string | null
+          ctr: number | null
+          effective_status: string | null
+          headline: string | null
+          id: string
+          impressions: number | null
+          link_url: string | null
+          meta_ad_id: string
+          meta_adset_id: string | null
+          meta_campaign_id: string | null
+          name: string
+          preview_url: string | null
+          reach: number | null
+          spend: number | null
+          status: string | null
+          synced_at: string | null
+          thumbnail_url: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ad_set_id?: string | null
+          body?: string | null
+          call_to_action_type?: string | null
+          clicks?: number | null
+          client_id: string
+          conversions?: number | null
+          cost_per_conversion?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          creative_id?: string | null
+          ctr?: number | null
+          effective_status?: string | null
+          headline?: string | null
+          id?: string
+          impressions?: number | null
+          link_url?: string | null
+          meta_ad_id: string
+          meta_adset_id?: string | null
+          meta_campaign_id?: string | null
+          name: string
+          preview_url?: string | null
+          reach?: number | null
+          spend?: number | null
+          status?: string | null
+          synced_at?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ad_set_id?: string | null
+          body?: string | null
+          call_to_action_type?: string | null
+          clicks?: number | null
+          client_id?: string
+          conversions?: number | null
+          cost_per_conversion?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          creative_id?: string | null
+          ctr?: number | null
+          effective_status?: string | null
+          headline?: string | null
+          id?: string
+          impressions?: number | null
+          link_url?: string | null
+          meta_ad_id?: string
+          meta_adset_id?: string | null
+          meta_campaign_id?: string | null
+          name?: string
+          preview_url?: string | null
+          reach?: number | null
+          spend?: number | null
+          status?: string | null
+          synced_at?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_ads_ad_set_id_fkey"
+            columns: ["ad_set_id"]
+            isOneToOne: false
+            referencedRelation: "meta_ad_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meta_campaigns: {
+        Row: {
+          budget_remaining: number | null
+          buying_type: string | null
+          clicks: number | null
+          client_id: string
+          cpc: number | null
+          cpm: number | null
+          created_at: string | null
+          created_time: string | null
+          ctr: number | null
+          daily_budget: number | null
+          id: string
+          impressions: number | null
+          lifetime_budget: number | null
+          meta_campaign_id: string
+          name: string
+          objective: string | null
+          spend: number | null
+          start_time: string | null
+          status: string | null
+          stop_time: string | null
+          synced_at: string | null
+          updated_at: string | null
+          updated_time: string | null
+        }
+        Insert: {
+          budget_remaining?: number | null
+          buying_type?: string | null
+          clicks?: number | null
+          client_id: string
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          created_time?: string | null
+          ctr?: number | null
+          daily_budget?: number | null
+          id?: string
+          impressions?: number | null
+          lifetime_budget?: number | null
+          meta_campaign_id: string
+          name: string
+          objective?: string | null
+          spend?: number | null
+          start_time?: string | null
+          status?: string | null
+          stop_time?: string | null
+          synced_at?: string | null
+          updated_at?: string | null
+          updated_time?: string | null
+        }
+        Update: {
+          budget_remaining?: number | null
+          buying_type?: string | null
+          clicks?: number | null
+          client_id?: string
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          created_time?: string | null
+          ctr?: number | null
+          daily_budget?: number | null
+          id?: string
+          impressions?: number | null
+          lifetime_budget?: number | null
+          meta_campaign_id?: string
+          name?: string
+          objective?: string | null
+          spend?: number | null
+          start_time?: string | null
+          status?: string | null
+          stop_time?: string | null
+          synced_at?: string | null
+          updated_at?: string | null
+          updated_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]

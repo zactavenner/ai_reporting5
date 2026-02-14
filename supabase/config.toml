@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.ai-agent-full-context]
 verify_jwt = false
+
+[functions.sync-meta-ads]
+verify_jwt = false

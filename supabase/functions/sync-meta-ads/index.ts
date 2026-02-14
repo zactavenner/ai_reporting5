@@ -1,0 +1,266 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+const META_GRAPH_API_VERSION = "v21.0";
+const META_GRAPH_API_URL = `https://graph.facebook.com/${META_GRAPH_API_VERSION}`;
+
+interface MetaApiResponse {
+  data?: any[];
+  paging?: { next?: string };
+  error?: { message: string; type: string; code: number };
+}
+
+async function fetchMeta(url: string, accessToken: string): Promise<MetaApiResponse> {
+  const separator = url.includes("?") ? "&" : "?";
+  const res = await fetch(`${url}${separator}access_token=${accessToken}`);
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Meta API ${res.status}: ${errBody.substring(0, 500)}`);
+  }
+  return res.json();
+}
+
+async function fetchAllPages(url: string, accessToken: string, limit = 200): Promise<any[]> {
+  const all: any[] = [];
+  let nextUrl: string | undefined = `${url}&limit=${limit}`;
+  while (nextUrl) {
+    const res = await fetchMeta(nextUrl, accessToken);
+    if (res.error) throw new Error(res.error.message);
+    if (res.data) all.push(...res.data);
+    nextUrl = res.paging?.next;
+    if (all.length > 500) break; // safety cap
+  }
+  return all;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { clientId } = await req.json();
+    if (!clientId) {
+      return new Response(JSON.stringify({ success: false, error: "clientId is required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get client's Meta credentials
+    const { data: client, error: clientErr } = await supabase
+      .from("clients")
+      .select("meta_access_token, meta_ad_account_id, name")
+      .eq("id", clientId)
+      .single();
+
+    if (clientErr || !client) {
+      return new Response(JSON.stringify({ success: false, error: "Client not found" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!client.meta_access_token || !client.meta_ad_account_id) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Meta Access Token and Ad Account ID must be configured in client settings.",
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const accessToken = client.meta_access_token;
+    const adAccountId = client.meta_ad_account_id.startsWith("act_")
+      ? client.meta_ad_account_id
+      : `act_${client.meta_ad_account_id}`;
+
+    console.log(`Syncing Meta Ads for ${client.name} (${adAccountId})`);
+
+    // ── 1. Fetch Campaigns ──
+    const campaignFields = "id,name,status,objective,buying_type,daily_budget,lifetime_budget,budget_remaining,start_time,stop_time,created_time,updated_time";
+    const campaigns = await fetchAllPages(
+      `${META_GRAPH_API_URL}/${adAccountId}/campaigns?fields=${campaignFields}`,
+      accessToken
+    );
+    console.log(`Fetched ${campaigns.length} campaigns`);
+
+    // Upsert campaigns
+    const campaignRecords = campaigns.map((c: any) => ({
+      client_id: clientId,
+      meta_campaign_id: c.id,
+      name: c.name,
+      status: c.status,
+      objective: c.objective || null,
+      buying_type: c.buying_type || null,
+      daily_budget: c.daily_budget ? Number(c.daily_budget) / 100 : null,
+      lifetime_budget: c.lifetime_budget ? Number(c.lifetime_budget) / 100 : null,
+      budget_remaining: c.budget_remaining ? Number(c.budget_remaining) / 100 : null,
+      start_time: c.start_time || null,
+      stop_time: c.stop_time || null,
+      created_time: c.created_time || null,
+      updated_time: c.updated_time || null,
+      synced_at: new Date().toISOString(),
+    }));
+
+    for (const rec of campaignRecords) {
+      await supabase.from("meta_campaigns").upsert(rec, { onConflict: "client_id,meta_campaign_id" });
+    }
+
+    // Build campaign ID map for linking ad sets
+    const { data: dbCampaigns } = await supabase
+      .from("meta_campaigns")
+      .select("id, meta_campaign_id")
+      .eq("client_id", clientId);
+    const campaignIdMap = new Map((dbCampaigns || []).map((c: any) => [c.meta_campaign_id, c.id]));
+
+    // ── 2. Fetch Ad Sets ──
+    const adSetFields = "id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,budget_remaining,bid_strategy,optimization_goal,billing_event,targeting,start_time,end_time";
+    const adSets = await fetchAllPages(
+      `${META_GRAPH_API_URL}/${adAccountId}/adsets?fields=${adSetFields}`,
+      accessToken
+    );
+    console.log(`Fetched ${adSets.length} ad sets`);
+
+    const adSetRecords = adSets.map((a: any) => ({
+      client_id: clientId,
+      campaign_id: campaignIdMap.get(a.campaign_id) || null,
+      meta_adset_id: a.id,
+      meta_campaign_id: a.campaign_id || null,
+      name: a.name,
+      status: a.status,
+      effective_status: a.effective_status || null,
+      daily_budget: a.daily_budget ? Number(a.daily_budget) / 100 : null,
+      lifetime_budget: a.lifetime_budget ? Number(a.lifetime_budget) / 100 : null,
+      budget_remaining: a.budget_remaining ? Number(a.budget_remaining) / 100 : null,
+      bid_strategy: a.bid_strategy || null,
+      optimization_goal: a.optimization_goal || null,
+      billing_event: a.billing_event || null,
+      targeting: a.targeting || {},
+      start_time: a.start_time || null,
+      end_time: a.end_time || null,
+      synced_at: new Date().toISOString(),
+    }));
+
+    for (const rec of adSetRecords) {
+      await supabase.from("meta_ad_sets").upsert(rec, { onConflict: "client_id,meta_adset_id" });
+    }
+
+    // Build ad set ID map
+    const { data: dbAdSets } = await supabase
+      .from("meta_ad_sets")
+      .select("id, meta_adset_id")
+      .eq("client_id", clientId);
+    const adSetIdMap = new Map((dbAdSets || []).map((a: any) => [a.meta_adset_id, a.id]));
+
+    // ── 3. Fetch Ads ──
+    const adFields = "id,name,status,effective_status,adset_id,campaign_id,creative{id,thumbnail_url,effective_object_story_id}";
+    const ads = await fetchAllPages(
+      `${META_GRAPH_API_URL}/${adAccountId}/ads?fields=${adFields}`,
+      accessToken
+    );
+    console.log(`Fetched ${ads.length} ads`);
+
+    const adRecords = ads.map((a: any) => ({
+      client_id: clientId,
+      ad_set_id: adSetIdMap.get(a.adset_id) || null,
+      meta_ad_id: a.id,
+      meta_adset_id: a.adset_id || null,
+      meta_campaign_id: a.campaign_id || null,
+      name: a.name,
+      status: a.status,
+      effective_status: a.effective_status || null,
+      creative_id: a.creative?.id || null,
+      thumbnail_url: a.creative?.thumbnail_url || null,
+      synced_at: new Date().toISOString(),
+    }));
+
+    for (const rec of adRecords) {
+      await supabase.from("meta_ads").upsert(rec, { onConflict: "client_id,meta_ad_id" });
+    }
+
+    // ── 4. Fetch Insights (spend/impressions/clicks) per campaign ──
+    try {
+      const insightsFields = "campaign_id,impressions,clicks,spend,ctr,cpc,cpm";
+      const insights = await fetchAllPages(
+        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=${insightsFields}&level=campaign&date_preset=last_30d&time_increment=all_days`,
+        accessToken
+      );
+      for (const ins of insights) {
+        await supabase.from("meta_campaigns").update({
+          spend: Number(ins.spend) || 0,
+          impressions: Number(ins.impressions) || 0,
+          clicks: Number(ins.clicks) || 0,
+          ctr: Number(ins.ctr) || 0,
+          cpc: Number(ins.cpc) || 0,
+          cpm: Number(ins.cpm) || 0,
+        }).eq("client_id", clientId).eq("meta_campaign_id", ins.campaign_id);
+      }
+
+      // Ad set level insights
+      const adSetInsights = await fetchAllPages(
+        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=adset_id,impressions,clicks,spend,ctr,cpc,cpm,reach,frequency&level=adset&date_preset=last_30d&time_increment=all_days`,
+        accessToken
+      );
+      for (const ins of adSetInsights) {
+        await supabase.from("meta_ad_sets").update({
+          spend: Number(ins.spend) || 0,
+          impressions: Number(ins.impressions) || 0,
+          clicks: Number(ins.clicks) || 0,
+          ctr: Number(ins.ctr) || 0,
+          cpc: Number(ins.cpc) || 0,
+          cpm: Number(ins.cpm) || 0,
+          reach: Number(ins.reach) || 0,
+          frequency: Number(ins.frequency) || 0,
+        }).eq("client_id", clientId).eq("meta_adset_id", ins.adset_id);
+      }
+
+      // Ad level insights
+      const adInsights = await fetchAllPages(
+        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,ctr,cpc,cpm,reach,conversions,cost_per_action_type&level=ad&date_preset=last_30d&time_increment=all_days`,
+        accessToken
+      );
+      for (const ins of adInsights) {
+        const conversions = ins.conversions ? ins.conversions.reduce((sum: number, c: any) => sum + Number(c.value || 0), 0) : 0;
+        const costPerConversion = ins.cost_per_action_type?.[0]?.value ? Number(ins.cost_per_action_type[0].value) : 0;
+        await supabase.from("meta_ads").update({
+          spend: Number(ins.spend) || 0,
+          impressions: Number(ins.impressions) || 0,
+          clicks: Number(ins.clicks) || 0,
+          ctr: Number(ins.ctr) || 0,
+          cpc: Number(ins.cpc) || 0,
+          cpm: Number(ins.cpm) || 0,
+          reach: Number(ins.reach) || 0,
+          conversions,
+          cost_per_conversion: costPerConversion,
+        }).eq("client_id", clientId).eq("meta_ad_id", ins.ad_id);
+      }
+    } catch (insightErr) {
+      console.error("Insights fetch error (non-fatal):", insightErr);
+    }
+
+    // Update sync timestamp
+    await supabase.from("client_settings").upsert({
+      client_id: clientId,
+      meta_ads_sync_enabled: true,
+      meta_ads_last_sync: new Date().toISOString(),
+    }, { onConflict: "client_id" });
+
+    return new Response(JSON.stringify({
+      success: true,
+      campaigns: campaigns.length,
+      adSets: adSets.length,
+      ads: ads.length,
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  } catch (error) {
+    console.error("sync-meta-ads error:", error);
+    return new Response(JSON.stringify({
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+});

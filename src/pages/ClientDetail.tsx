@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Settings, DollarSign, Upload, History, Plus, ExternalLink, X, ClipboardList, Phone, Users, BarChart3, Video, Smartphone, Layers } from 'lucide-react';
+import { ArrowLeft, Settings, DollarSign, Upload, History, Plus, ExternalLink, X, ClipboardList, Phone, Users, BarChart3, Video, Smartphone, Layers, Megaphone } from 'lucide-react';
 import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal';
 import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
 import { AdSpendDrillDownModal } from '@/components/drilldown/AdSpendDrillDownModal';
@@ -32,6 +32,7 @@ import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import { DataAuditSection } from '@/components/dashboard/DataAuditSection';
 import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
 import { PipelineTab } from '@/components/pipeline/PipelineTab';
+import { AdsManagerTab } from '@/components/ads-manager/AdsManagerTab';
 import { useClient } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors } from '@/hooks/useMetrics';
 import { useSourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
@@ -355,6 +356,14 @@ export default function ClientDetail() {
             <Layers className="h-4 w-4 mr-1" />
             Pipeline
           </Button>
+          <Button 
+            variant={activeTab === 'ads-manager' ? 'default' : 'outline'} 
+            size="sm"
+            onClick={() => setActiveTab('ads-manager')}
+          >
+            <Megaphone className="h-4 w-4 mr-1" />
+            Ads Manager
+          </Button>
           {customTabs.map((tab) => (
             <div key={tab.id} className="relative group">
               <Button 
@@ -508,6 +517,13 @@ export default function ClientDetail() {
         {activeTab === 'funnel' && (
           <SectionErrorBoundary sectionName="Funnel Preview">
             <FunnelPreviewTab clientId={client.id} isPublicView={false} />
+          </SectionErrorBoundary>
+        )}
+
+        {/* Ads Manager Tab */}
+        {activeTab === 'ads-manager' && (
+          <SectionErrorBoundary sectionName="Ads Manager">
+            <AdsManagerTab clientId={client.id} />
           </SectionErrorBoundary>
         )}
         {customTabs.map((tab) => (
