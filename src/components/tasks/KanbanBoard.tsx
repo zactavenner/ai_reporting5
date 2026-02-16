@@ -152,6 +152,40 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
     })
   );
 
+  // Bulk fetch all task assignees for the current task set
+  const taskIds = useMemo(() => tasks.map(t => t.id), [tasks]);
+  const { data: allTaskAssignees = [] } = useQuery({
+    queryKey: ['all-task-assignees', taskIds],
+    queryFn: async () => {
+      if (taskIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('task_assignees')
+        .select('task_id, member_id, pod_id, member:agency_members(id, name, pod_id, pod:agency_pods(id, name, color)), pod:agency_pods(id, name, color)')
+        .in('task_id', taskIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: taskIds.length > 0,
+  });
+
+  // Build a set of task IDs assigned to the current member (via individual or pod assignment)
+  const myTaskIds = useMemo(() => {
+    if (!currentMember) return new Set<string>();
+    const ids = new Set<string>();
+    const myMember = agencyMembers.find(m => m.id === currentMember.id);
+    const myPodId = myMember?.pod_id;
+    allTaskAssignees.forEach((ta: any) => {
+      if (ta.member_id === currentMember.id) {
+        ids.add(ta.task_id);
+      }
+      if (ta.pod_id && myPodId && ta.pod_id === myPodId) {
+        ids.add(ta.task_id);
+      }
+    });
+    return ids;
+  }, [currentMember, allTaskAssignees, agencyMembers]);
+
+
   // Filter tasks
   const filteredTasks = useMemo(() => {
     // Filter out subtasks from top-level board view
@@ -163,12 +197,27 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
       filtered = filtered.filter(t => t.client_id === effectiveClientId);
     }
     
-    // Filter by assignee
+    // Filter by assignee - check both legacy assigned_to AND task_assignees junction table
     if (filterAssigneeId && filterAssigneeId !== 'all') {
       if (filterAssigneeId === 'unassigned') {
-        filtered = filtered.filter(t => !t.assigned_to);
+        filtered = filtered.filter(t => {
+          const hasLegacyAssignee = !!t.assigned_to;
+          const hasJunctionAssignee = allTaskAssignees.some((ta: any) => ta.task_id === t.id);
+          return !hasLegacyAssignee && !hasJunctionAssignee;
+        });
+      } else if (showMyTasksOnly && currentMember) {
+        // "My Tasks" mode: show tasks assigned to me directly, via pod, or via legacy field
+        filtered = filtered.filter(t => 
+          t.assigned_to === currentMember.id || myTaskIds.has(t.id)
+        );
       } else {
-        filtered = filtered.filter(t => t.assigned_to === filterAssigneeId);
+        // Specific assignee filter: check legacy field AND junction table
+        filtered = filtered.filter(t => {
+          if (t.assigned_to === filterAssigneeId) return true;
+          return allTaskAssignees.some((ta: any) => 
+            ta.task_id === t.id && ta.member_id === filterAssigneeId
+          );
+        });
       }
     }
     
@@ -216,7 +265,7 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
     }
     
     return filtered;
-  }, [tasks, clientId, filterClientId, filterAssigneeId, searchQuery, showCompleted, dueDateFilter]);
+  }, [tasks, clientId, filterClientId, filterAssigneeId, searchQuery, showCompleted, dueDateFilter, allTaskAssignees, myTaskIds, showMyTasksOnly, currentMember]);
 
   // Group by stage
   const tasksByStage = useMemo(() => {
@@ -286,21 +335,7 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
     return map;
   }, [agencyMembers]);
 
-  // Bulk fetch all task assignees for the current task set
-  const taskIds = useMemo(() => tasks.map(t => t.id), [tasks]);
-  const { data: allTaskAssignees = [] } = useQuery({
-    queryKey: ['all-task-assignees', taskIds],
-    queryFn: async () => {
-      if (taskIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from('task_assignees')
-        .select('task_id, member_id, pod_id, member:agency_members(id, name, pod_id, pod:agency_pods(id, name, color)), pod:agency_pods(id, name, color)')
-        .in('task_id', taskIds);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: taskIds.length > 0,
-  });
+
 
   // Build a map: taskId → { assignee: AgencyMember | null, podName: string | null }
   const taskAssigneeMap = useMemo(() => {
