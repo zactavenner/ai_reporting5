@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { format, startOfWeek, endOfWeek, endOfMonth, eachWeekOfInterval, eachDayOfInterval, isWithinInterval, parseISO } from 'date-fns';
 import { DailyMetric } from '@/hooks/useMetrics';
-import { useYearlyMetrics, useUpsertMonthlyMetric } from '@/hooks/useYearlyMetrics';
+import { useYearlyMetrics, useUpsertMonthlyMetric, useUpdateDailyMetric } from '@/hooks/useYearlyMetrics';
 import { useClientSettings, getThresholdsFromSettings, KPIThresholds } from '@/hooks/useClientSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -109,6 +109,7 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
   const { data: yearlyMetrics = [], isLoading } = useYearlyMetrics(clientId, selectedYear);
   const { data: clientSettings } = useClientSettings(clientId);
   const upsertMonthlyMetric = useUpsertMonthlyMetric();
+  const updateDailyMetric = useUpdateDailyMetric();
   
   const thresholds = useMemo(() => getThresholdsFromSettings(clientSettings), [clientSettings]);
 
@@ -323,12 +324,29 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
     if (!dbField) return;
 
     try {
-      await upsertMonthlyMetric.mutateAsync({
-        clientId,
-        year: periodStats.year,
-        month: periodStats.month,
-        updates: { [dbField]: parseFloat(editing.value) || 0 },
-      });
+      if (periodType === 'daily') {
+        // Daily mode: update the specific day's record directly
+        await updateDailyMetric.mutateAsync({
+          clientId,
+          date: periodStats.period,
+          updates: { [dbField]: parseFloat(editing.value) || 0 },
+        });
+      } else if (periodType === 'weekly') {
+        // Weekly mode: update the first day of the week's record
+        await updateDailyMetric.mutateAsync({
+          clientId,
+          date: periodStats.period,
+          updates: { [dbField]: parseFloat(editing.value) || 0 },
+        });
+      } else {
+        // Monthly mode: use the monthly upsert with delta logic
+        await upsertMonthlyMetric.mutateAsync({
+          clientId,
+          year: periodStats.year,
+          month: periodStats.month,
+          updates: { [dbField]: parseFloat(editing.value) || 0 },
+        });
+      }
       toast.success('Metric updated successfully');
       setEditing(null);
     } catch (error) {
@@ -412,9 +430,9 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
             variant="ghost"
             className="h-5 w-5"
             onClick={() => handleEditSave(periodStats)}
-            disabled={upsertMonthlyMetric.isPending}
+            disabled={upsertMonthlyMetric.isPending || updateDailyMetric.isPending}
           >
-            {upsertMonthlyMetric.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-success" />}
+            {(upsertMonthlyMetric.isPending || updateDailyMetric.isPending) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-success" />}
           </Button>
           <Button
             size="icon"

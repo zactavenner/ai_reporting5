@@ -122,6 +122,7 @@ export function AdSpendDrillDownModal({ clientId, open, onOpenChange }: AdSpendD
       setEditingId(null);
       setEditValues({});
       queryClient.invalidateQueries({ queryKey: ['daily-metrics', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['yearly-metrics'] });
     } catch (error: any) {
       toast.error('Failed to update record: ' + error.message);
     }
@@ -140,6 +141,7 @@ export function AdSpendDrillDownModal({ clientId, open, onOpenChange }: AdSpendD
 
       toast.success('Record deleted successfully');
       queryClient.invalidateQueries({ queryKey: ['daily-metrics', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['yearly-metrics'] });
     } catch (error: any) {
       toast.error('Failed to delete record: ' + error.message);
     }
@@ -170,6 +172,7 @@ export function AdSpendDrillDownModal({ clientId, open, onOpenChange }: AdSpendD
         clicks: 0,
       });
       queryClient.invalidateQueries({ queryKey: ['daily-metrics', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['yearly-metrics'] });
     } catch (error: any) {
       toast.error('Failed to add record: ' + error.message);
     }
