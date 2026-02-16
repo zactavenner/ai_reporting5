@@ -7,10 +7,11 @@ const corsHeaders = {
 };
 
 // ============================================================
-// WEBHOOKS FROZEN - EXCEPT AD SPEND
+// WEBHOOK PROCESSING
 // ============================================================
-// Most webhook processing is frozen pending API-only sync.
-// Only ad_spend webhooks are processed for real-time spend tracking.
+// - ad_spend: processed inline for real-time spend tracking
+// - contact/opportunity webhooks: trigger automatic full sync
+//   for end-to-end attribution tracking
 // ============================================================
 
 serve(async (req) => {
@@ -48,7 +49,7 @@ serve(async (req) => {
     // Verify client exists
     const { data: client, error: clientError } = await supabase
       .from('clients')
-      .select('id, name')
+      .select('id, name, ghl_api_key, ghl_location_id')
       .eq('id', clientId)
       .single();
 
@@ -60,7 +61,9 @@ serve(async (req) => {
       );
     }
 
-    // ONLY process ad_spend webhooks - everything else is frozen
+    // ============================================================
+    // AD SPEND WEBHOOKS - Process inline
+    // ============================================================
     if (webhookType === 'ad_spend') {
       console.log(`[ACTIVE] Ad spend webhook - Client: ${client.name} (${clientId})`);
       
@@ -111,15 +114,123 @@ serve(async (req) => {
       );
     }
 
-    // All other webhook types remain frozen
-    console.log(`[FROZEN] Webhook received - Type: ${webhookType}, Client: ${client.name} (${clientId})`);
-    console.log(`[FROZEN] Payload preview: ${JSON.stringify(payload).substring(0, 500)}`);
+    // ============================================================
+    // CONTACT & OPPORTUNITY WEBHOOKS - Auto-sync everything
+    // ============================================================
+    const contactWebhookTypes = [
+      'contact', 'contacts', 'contact_created', 'contact_updated',
+      'ContactCreate', 'ContactUpdate', 'ContactDndUpdate',
+      'ContactTagUpdate', 'ContactDelete',
+      'opportunity', 'opportunities', 'opportunity_created', 'opportunity_updated',
+      'OpportunityCreate', 'OpportunityUpdate', 'OpportunityStageUpdate',
+      'OpportunityStatusUpdate', 'OpportunityMonetaryValueUpdate',
+      'appointment', 'appointments', 'AppointmentCreate', 'AppointmentUpdate',
+      'TaskCreate', 'TaskUpdate', 'NoteCreate', 'NoteUpdate',
+    ];
+
+    // Extract the GHL contact ID from various webhook payload formats
+    const extractContactId = (payload: any): string | null => {
+      // Direct contactId field
+      if (payload.contactId) return payload.contactId;
+      if (payload.contact_id) return payload.contact_id;
+      // Contact object with id
+      if (payload.contact?.id) return payload.contact.id;
+      // For opportunity webhooks
+      if (payload.opportunity?.contactId) return payload.opportunity.contactId;
+      if (payload.opportunity?.contact_id) return payload.opportunity.contact_id;
+      // For appointment webhooks
+      if (payload.appointment?.contactId) return payload.appointment.contactId;
+      // The payload itself might be the contact
+      if (payload.id && (payload.firstName || payload.lastName || payload.email || payload.phone)) {
+        return payload.id;
+      }
+      return null;
+    };
+
+    if (contactWebhookTypes.some(t => webhookType.toLowerCase().includes(t.toLowerCase()) || webhookType === t)) {
+      const contactId = extractContactId(payload);
+      
+      console.log(`[AUTO-SYNC] ${webhookType} webhook - Client: ${client.name}, ContactId: ${contactId || 'unknown'}`);
+      
+      if (contactId && client.ghl_api_key && client.ghl_location_id) {
+        // Fire-and-forget: call sync-ghl-contacts with single_contact mode
+        // This runs the comprehensive sync (contact info, fields, pipelines, value, timelines)
+        const syncUrl = `${supabaseUrl}/functions/v1/sync-ghl-contacts`;
+        
+        const syncPayload = {
+          mode: 'single_contact',
+          client_id: clientId,
+          contact_id: contactId,
+        };
+        
+        // Use EdgeRuntime.waitUntil for background execution so we respond immediately
+        const syncPromise = fetch(syncUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify(syncPayload),
+        }).then(async (res) => {
+          const result = await res.text();
+          console.log(`[AUTO-SYNC] Single contact sync completed for ${contactId}: ${res.status} - ${result.substring(0, 200)}`);
+        }).catch((err) => {
+          console.error(`[AUTO-SYNC] Single contact sync failed for ${contactId}:`, err);
+        });
+
+        // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
+        if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+          // @ts-ignore
+          EdgeRuntime.waitUntil(syncPromise);
+        }
+        // If EdgeRuntime not available, the fetch is already fire-and-forget
+        
+        return new Response(
+          JSON.stringify({
+            success: true,
+            status: 'auto_sync_triggered',
+            message: `Webhook received. Full contact sync triggered for ${contactId} (contact info, fields, pipelines, value, timelines).`,
+            webhook_type: webhookType,
+            client_id: clientId,
+            contact_id: contactId,
+            received_at: new Date().toISOString(),
+          }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      } else {
+        // No contact ID or no GHL credentials - acknowledge but can't sync
+        console.log(`[AUTO-SYNC] Cannot sync - contactId: ${contactId}, hasApiKey: ${!!client.ghl_api_key}, hasLocationId: ${!!client.ghl_location_id}`);
+        
+        return new Response(
+          JSON.stringify({
+            success: true,
+            status: 'acknowledged',
+            message: contactId 
+              ? 'Webhook received but client has no GHL credentials configured for auto-sync.'
+              : 'Webhook received but no contact ID could be extracted from payload.',
+            webhook_type: webhookType,
+            client_id: clientId,
+            received_at: new Date().toISOString(),
+          }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+    }
+
+    // All other webhook types - acknowledge without processing
+    console.log(`[ACK] Webhook received - Type: ${webhookType}, Client: ${client.name} (${clientId})`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        status: 'frozen',
-        message: 'Webhook acknowledged but processing is frozen. Data sync is handled via hourly API sync.',
+        status: 'acknowledged',
+        message: 'Webhook acknowledged.',
         webhook_type: webhookType,
         client_id: clientId,
         received_at: new Date().toISOString(),
