@@ -1648,29 +1648,139 @@ async function syncAppointmentsAsCalls(
   return result;
 }
 
-// Handle single contact sync mode
+// Handle single contact sync mode - comprehensive: contact info, fields, pipelines, value, timelines
 async function syncSingleContact(
   supabase: any,
   clientId: string,
   contactId: string,
   apiKey: string
-): Promise<{ success: boolean; contact?: any; notes?: GHLNote[]; error?: string }> {
-  console.log(`Single contact sync: fetching contact ${contactId} for client ${clientId}`);
+): Promise<{ success: boolean; contact?: any; notes?: GHLNote[]; timeline_events?: number; calls_synced?: number; opportunity_synced?: boolean; error?: string }> {
+  console.log(`Single contact sync (comprehensive): fetching contact ${contactId} for client ${clientId}`);
   
-  const contact = await fetchSingleGHLContact(apiKey, contactId);
+  // Fetch client settings for pipeline config
+  const { data: clientRow } = await supabase
+    .from('clients')
+    .select('ghl_location_id')
+    .eq('id', clientId)
+    .maybeSingle();
+  
+  const locationId = clientRow?.ghl_location_id || '';
+  
+  const { data: settings } = await supabase
+    .from('client_settings')
+    .select('funded_pipeline_id, funded_stage_ids, committed_stage_ids')
+    .eq('client_id', clientId)
+    .maybeSingle();
+  
+  const fundedPipelineId = settings?.funded_pipeline_id || null;
+  const fundedStageIds: string[] = settings?.funded_stage_ids || [];
+  const committedStageIds: string[] = settings?.committed_stage_ids || [];
+  
+  // Fetch contact + notes + appointments + timeline data in parallel
+  const [contact, notes, appointments] = await Promise.all([
+    fetchSingleGHLContact(apiKey, contactId),
+    fetchGHLNotes(apiKey, contactId),
+    fetchGHLAppointments(apiKey, contactId),
+  ]);
   
   if (!contact) {
     return { success: false, error: 'Contact not found in GHL' };
   }
   
-  console.log(`Found GHL contact: ${contact.name || contact.firstName || 'Unknown'}`);
+  console.log(`Found GHL contact: ${contact.name || contact.firstName || 'Unknown'}, notes: ${notes.length}, appointments: ${appointments.length}`);
   
-  // Fetch notes for this contact
-  const notes = await fetchGHLNotes(apiKey, contactId);
-  console.log(`Fetched ${notes.length} notes for contact ${contactId}`);
+  // --- 1. Fetch opportunity data for this contact ---
+  let contactOpportunity: GHLOpportunity | undefined;
+  let opportunitySynced = false;
   
-  // Sync the contact to database
-  const syncResult = await syncContactToDatabase(supabase, clientId, contact);
+  try {
+    const headers = {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'Version': '2021-07-28',
+    };
+    
+    // Search opportunities by contact ID
+    const oppResponse = await fetch(
+      `${GHL_BASE_URL}/opportunities/search?location_id=${locationId}&contact_id=${contactId}&limit=100`,
+      { method: 'GET', headers }
+    );
+    
+    if (oppResponse.ok) {
+      const oppData = await oppResponse.json();
+      const opportunities = oppData.opportunities || [];
+      
+      if (opportunities.length > 0) {
+        // Use the most recent opportunity
+        contactOpportunity = opportunities[0];
+        opportunitySynced = true;
+        console.log(`Found ${opportunities.length} opportunities for contact ${contactId}`);
+        
+        // Process each opportunity for funded/committed investor creation
+        for (const opp of opportunities) {
+          const stageId = opp.pipelineStageId;
+          const monetaryValue = opp.monetaryValue || opp.monetary_value || 0;
+          const externalId = contactId;
+          
+          // Check funded stages
+          if (stageId && fundedStageIds.includes(stageId)) {
+            const { data: existing } = await supabase
+              .from('funded_investors')
+              .select('id')
+              .eq('client_id', clientId)
+              .eq('external_id', externalId)
+              .maybeSingle();
+            
+            if (!existing) {
+              const fundedAt = opp.lastStageChangeAt || opp.dateUpdated || opp.dateAdded || new Date().toISOString();
+              const name = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown';
+              
+              await supabase.from('funded_investors').insert({
+                client_id: clientId,
+                external_id: externalId,
+                name,
+                funded_amount: monetaryValue,
+                funded_at: fundedAt,
+                source: 'pipeline_stage',
+              });
+              console.log(`Created funded investor from single sync: ${name} ($${monetaryValue})`);
+            }
+          }
+          
+          // Check committed stages
+          if (stageId && committedStageIds.includes(stageId)) {
+            const { data: existing } = await supabase
+              .from('funded_investors')
+              .select('id')
+              .eq('client_id', clientId)
+              .eq('external_id', externalId)
+              .maybeSingle();
+            
+            if (!existing) {
+              const commitAt = opp.lastStageChangeAt || opp.dateUpdated || opp.dateAdded || new Date().toISOString();
+              const name = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown';
+              
+              await supabase.from('funded_investors').insert({
+                client_id: clientId,
+                external_id: externalId,
+                name,
+                commitment_amount: monetaryValue,
+                funded_amount: 0,
+                funded_at: commitAt,
+                source: 'commitment_stage',
+              });
+              console.log(`Created committed investor from single sync: ${name} ($${monetaryValue})`);
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching opportunities for single contact:', err);
+  }
+  
+  // --- 2. Sync contact to database (with opportunity data) ---
+  const syncResult = await syncContactToDatabase(supabase, clientId, contact, contactOpportunity);
   
   // Update ghl_synced_at timestamp and ghl_notes for lead
   const { data: updatedLead, error: updateError } = await supabase
@@ -1688,24 +1798,57 @@ async function syncSingleContact(
     console.error('Error updating lead with sync data:', updateError);
   }
   
-  // Also update any calls associated with this contact
+  const leadId = updatedLead?.id || syncResult.leadId || null;
+  
+  // --- 3. Sync appointments as call records ---
+  let callsSynced = 0;
+  try {
+    const callResult = await syncAppointmentsAsCalls(supabase, clientId, contactId, leadId, apiKey);
+    callsSynced = callResult.created + callResult.updated;
+    console.log(`Synced ${callsSynced} appointments as calls for contact ${contactId}`);
+  } catch (err) {
+    console.error('Error syncing appointments for single contact:', err);
+  }
+  
+  // Also update any existing calls associated with this contact with contact details
+  const contactName = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
   await supabase
     .from('calls')
-    .update({ ghl_synced_at: new Date().toISOString() })
+    .update({ 
+      ghl_synced_at: new Date().toISOString(),
+      contact_name: contactName || undefined,
+      contact_email: contact.email || undefined,
+      contact_phone: contact.phone || undefined,
+    })
     .eq('client_id', clientId)
-    .or(`external_id.eq.${contactId},lead_id.eq.${updatedLead?.id || ''}`);
+    .or(`external_id.eq.${contactId}${leadId ? `,lead_id.eq.${leadId}` : ''}`);
   
-  console.log(`Single contact sync complete: ${syncResult.action}, notes: ${notes.length}`);
+  // --- 4. Sync full timeline (notes, tasks, appointments, messages) ---
+  let timelineEvents = 0;
+  try {
+    if (locationId) {
+      const timelineResult = await syncContactDeepTimeline(supabase, clientId, contactId, apiKey, locationId);
+      timelineEvents = timelineResult.events_count;
+      console.log(`Synced ${timelineEvents} timeline events for contact ${contactId}`);
+    }
+  } catch (err) {
+    console.error('Error syncing timeline for single contact:', err);
+  }
+  
+  console.log(`Comprehensive single contact sync complete: ${syncResult.action}, notes: ${notes.length}, calls: ${callsSynced}, timeline: ${timelineEvents}, opportunity: ${opportunitySynced}`);
   
   return { 
     success: true, 
     contact: updatedLead || { 
       id: syncResult.leadId, 
-      name: contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
+      name: contactName,
       ghl_synced_at: new Date().toISOString(),
       ghl_notes: notes
     },
-    notes
+    notes,
+    timeline_events: timelineEvents,
+    calls_synced: callsSynced,
+    opportunity_synced: opportunitySynced,
   };
 }
 
