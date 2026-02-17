@@ -464,6 +464,63 @@ serve(async (req) => {
 
     console.log(`Calendar sync complete for ${client.name}: created=${result.created}, updated=${result.updated}, skipped=${result.skipped}`);
 
+    // ============================================================
+    // DEEP CONTACT SYNC: Trigger full contact + timeline sync
+    // for all unique contacts from booked/showed appointments
+    // ============================================================
+    const uniqueContactIds = new Set<string>();
+    for (const appt of result.appointments) {
+      if (appt.contactId) {
+        const status = (appt.status || '').toLowerCase();
+        // Sync all contacts that have booked or showed appointments
+        if (status === 'booked' || status === 'confirmed' || status === 'showed' || status === 'completed' || appt.action === 'created') {
+          uniqueContactIds.add(appt.contactId);
+        }
+      }
+    }
+
+    if (uniqueContactIds.size > 0) {
+      console.log(`Triggering deep sync for ${uniqueContactIds.size} unique contacts...`);
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      
+      // Fire off deep syncs in parallel batches (max 5 concurrent)
+      const contactIds = Array.from(uniqueContactIds);
+      const batchSize = 5;
+      let syncedContacts = 0;
+      
+      for (let i = 0; i < contactIds.length; i += batchSize) {
+        const batch = contactIds.slice(i, i + batchSize);
+        const promises = batch.map(contactId => 
+          fetch(`${supabaseUrl}/functions/v1/sync-ghl-contacts`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${serviceRoleKey}`,
+            },
+            body: JSON.stringify({
+              mode: 'single',
+              client_id: clientId,
+              contactId: contactId,
+            }),
+          }).then(async (res) => {
+            if (res.ok) {
+              syncedContacts++;
+              console.log(`Deep sync completed for contact ${contactId}`);
+            } else {
+              const text = await res.text();
+              console.error(`Deep sync failed for contact ${contactId}: ${res.status} - ${text.substring(0, 100)}`);
+            }
+          }).catch(err => {
+            console.error(`Deep sync error for contact ${contactId}:`, err);
+          })
+        );
+        await Promise.all(promises);
+      }
+      
+      console.log(`Deep contact sync complete: ${syncedContacts}/${uniqueContactIds.size} contacts synced`);
+    }
+
     // Recalculate daily_metrics for this client
     console.log(`Recalculating daily_metrics for ${client.name}...`);
     await recalculateClientMetrics(supabase, clientId);
