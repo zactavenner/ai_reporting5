@@ -67,14 +67,7 @@ function getTimeRange(startDate?: string, endDate?: string): string {
 async function attributeCRMData(supabase: any, clientId: string) {
   console.log("Starting CRM attribution...");
 
-  // Also backfill campaign_name / ad_set_name from custom fields on every sync
-  await supabase.rpc("", {}).catch(() => {});
-  // Direct updates for backfill
-  const { error: bf1 } = await supabase
-    .from("leads")
-    .update({ campaign_name: undefined }) // placeholder - we do raw below
-  // Instead, use individual queries to do the backfill
-  // We'll query leads missing campaign_name but having custom_fields
+  // Backfill campaign_name / ad_set_name from custom fields handled below
 
   // 1. Get all meta campaigns for this client
   const { data: metaCampaigns } = await supabase
