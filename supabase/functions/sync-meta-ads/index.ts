@@ -14,7 +14,20 @@ interface MetaApiResponse {
   error?: { message: string; type: string; code: number };
 }
 
-async function fetchMeta(url: string, accessToken: string): Promise<MetaApiResponse> {
+// ── Strict Meta API call budget ──
+const META_API_CALL_LIMIT = 190;
+let metaApiCallCount = 0;
+
+function checkCallBudget(label: string) {
+  if (metaApiCallCount >= META_API_CALL_LIMIT) {
+    throw new Error(`Meta API call budget exhausted (${META_API_CALL_LIMIT} calls). Stopped before: ${label}`);
+  }
+}
+
+async function fetchMeta(url: string, accessToken: string, label = "unknown"): Promise<MetaApiResponse> {
+  checkCallBudget(label);
+  metaApiCallCount++;
+  console.log(`Meta API call #${metaApiCallCount}/${META_API_CALL_LIMIT}: ${label}`);
   const separator = url.includes("?") ? "&" : "?";
   const res = await fetch(`${url}${separator}access_token=${accessToken}`);
   if (!res.ok) {
@@ -24,15 +37,22 @@ async function fetchMeta(url: string, accessToken: string): Promise<MetaApiRespo
   return res.json();
 }
 
-async function fetchAllPages(url: string, accessToken: string, limit = 100): Promise<any[]> {
+async function fetchAllPages(url: string, accessToken: string, limit = 100, label = "unknown"): Promise<any[]> {
   const all: any[] = [];
   let nextUrl: string | undefined = `${url}&limit=${limit}`;
+  let page = 0;
   while (nextUrl) {
-    const res = await fetchMeta(nextUrl, accessToken);
+    page++;
+    const res = await fetchMeta(nextUrl, accessToken, `${label} page ${page}`);
     if (res.error) throw new Error(res.error.message);
     if (res.data) all.push(...res.data);
     nextUrl = res.paging?.next;
     if (all.length > 1000) break;
+    // Stop paginating if we're running low on budget
+    if (metaApiCallCount >= META_API_CALL_LIMIT - 5) {
+      console.warn(`Stopping pagination for ${label} - nearing API budget`);
+      break;
+    }
   }
   return all;
 }
@@ -236,7 +256,7 @@ Deno.serve(async (req) => {
     const campaignFields = "id,name,status,objective,buying_type,daily_budget,lifetime_budget,budget_remaining,start_time,stop_time,created_time,updated_time";
     const campaigns = await fetchAllPages(
       `${META_GRAPH_API_URL}/${adAccountId}/campaigns?fields=${campaignFields}`,
-      accessToken
+      accessToken, 100, "campaigns"
     );
     console.log(`Fetched ${campaigns.length} campaigns`);
 
@@ -271,7 +291,7 @@ Deno.serve(async (req) => {
     const adSetFields = "id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,budget_remaining,bid_strategy,optimization_goal,billing_event,targeting,start_time,end_time";
     const adSets = await fetchAllPages(
       `${META_GRAPH_API_URL}/${adAccountId}/adsets?fields=${adSetFields}`,
-      accessToken
+      accessToken, 100, "adsets"
     );
     console.log(`Fetched ${adSets.length} ad sets`);
 
@@ -309,8 +329,7 @@ Deno.serve(async (req) => {
     const adFields = "id,name,status,effective_status,adset_id,campaign_id,creative{id,thumbnail_url,image_url,object_story_spec}";
     const ads = await fetchAllPages(
       `${META_GRAPH_API_URL}/${adAccountId}/ads?fields=${adFields}`,
-      accessToken,
-      50
+      accessToken, 50, "ads"
     );
     console.log(`Fetched ${ads.length} ads`);
 
@@ -358,10 +377,10 @@ Deno.serve(async (req) => {
     // ── 4. Fetch Insights ──
     try {
       const insightsFields = "campaign_id,impressions,clicks,spend,ctr,cpc,cpm";
+      checkCallBudget("campaign-insights");
       const insights = await fetchAllPages(
         `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=${insightsFields}&level=campaign&${getTimeRange()}&time_increment=all_days`,
-        accessToken,
-        50
+        accessToken, 50, "campaign-insights"
       );
       for (const ins of insights) {
         await supabase.from("meta_campaigns").update({
@@ -374,10 +393,10 @@ Deno.serve(async (req) => {
         }).eq("client_id", clientId).eq("meta_campaign_id", ins.campaign_id);
       }
 
+      checkCallBudget("adset-insights");
       const adSetInsights = await fetchAllPages(
         `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=adset_id,impressions,clicks,spend,ctr,cpc,cpm,reach,frequency&level=adset&${getTimeRange()}&time_increment=all_days`,
-        accessToken,
-        50
+        accessToken, 50, "adset-insights"
       );
       for (const ins of adSetInsights) {
         await supabase.from("meta_ad_sets").update({
@@ -392,10 +411,10 @@ Deno.serve(async (req) => {
         }).eq("client_id", clientId).eq("meta_adset_id", ins.adset_id);
       }
 
+      checkCallBudget("ad-insights");
       const adInsights = await fetchAllPages(
         `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,ctr,cpc,cpm,reach,conversions,cost_per_action_type&level=ad&${getTimeRange()}&time_increment=all_days`,
-        accessToken,
-        50
+        accessToken, 50, "ad-insights"
       );
       for (const ins of adInsights) {
         const conversions = ins.conversions ? ins.conversions.reduce((sum: number, c: any) => sum + Number(c.value || 0), 0) : 0;
@@ -420,9 +439,10 @@ Deno.serve(async (req) => {
     let dailyRows = 0;
     try {
       const dailyFields = "spend,impressions,clicks,inline_link_click_ctr";
+      checkCallBudget("daily-insights");
       const dailyInsights = await fetchAllPages(
         `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=${dailyFields}&${getTimeRange()}&time_increment=1&level=account`,
-        accessToken
+        accessToken, 100, "daily-insights"
       );
       console.log(`Fetched ${dailyInsights.length} daily insight rows`);
 
@@ -464,12 +484,14 @@ Deno.serve(async (req) => {
       meta_ads_last_sync: new Date().toISOString(),
     }, { onConflict: "client_id" });
 
+    console.log(`Sync complete. Total Meta API calls: ${metaApiCallCount}/${META_API_CALL_LIMIT}`);
     return new Response(JSON.stringify({
       success: true,
       campaigns: campaigns.length,
       adSets: adSets.length,
       ads: ads.length,
       dailyMetrics: dailyRows,
+      metaApiCalls: metaApiCallCount,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
     console.error("sync-meta-ads error:", error);
