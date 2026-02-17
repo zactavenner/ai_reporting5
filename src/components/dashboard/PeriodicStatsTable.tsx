@@ -63,10 +63,6 @@ interface MetricRowConfig {
   editable: boolean;
   dbField?: string;
   highlight?: boolean;
-  // KPI type for coloring: 'cost' = lower is better (green), 'volume' = higher is better (green), 'rate' = higher is better
-  kpiType?: 'cost' | 'volume' | 'rate';
-  // Threshold key to lookup in client settings
-  thresholdKey?: keyof KPIThresholds;
 }
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -80,19 +76,19 @@ const MONTH_NAMES = [
 // Metric row definitions for transposed table
 const METRIC_ROWS: MetricRowConfig[] = [
   { label: 'Ad Spend', key: 'adSpend', format: (v) => `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, editable: true, dbField: 'ad_spend' },
-  { label: 'Leads', key: 'leads', format: (v) => v.toLocaleString(), editable: true, dbField: 'leads', kpiType: 'volume' },
-  { label: 'CPL', key: 'cpl', format: (v) => `$${v.toFixed(2)}`, editable: false, kpiType: 'cost', thresholdKey: 'costPerLead' },
-  { label: 'Calls', key: 'calls', format: (v) => v.toLocaleString(), editable: true, dbField: 'calls', kpiType: 'volume' },
-  { label: '$/Call', key: 'costPerCall', format: (v) => `$${v.toFixed(2)}`, editable: false, kpiType: 'cost', thresholdKey: 'costPerCall' },
-  { label: 'Showed', key: 'showedCalls', format: (v) => v.toLocaleString(), editable: true, dbField: 'showed_calls', kpiType: 'volume' },
-  { label: 'Show %', key: 'showRate', format: (v) => `${v.toFixed(1)}%`, editable: false, kpiType: 'rate' },
-  { label: '$/Show', key: 'costPerShow', format: (v) => `$${v.toFixed(2)}`, editable: false, kpiType: 'cost', thresholdKey: 'costPerShow' },
-  { label: 'Commitments', key: 'commitments', format: (v) => v.toLocaleString(), editable: true, dbField: 'commitments', kpiType: 'volume' },
-  { label: 'Commit $', key: 'commitmentDollars', format: (v) => `$${v.toLocaleString()}`, editable: true, dbField: 'commitment_dollars', kpiType: 'volume' },
-  { label: 'Funded #', key: 'fundedInvestors', format: (v) => v.toLocaleString(), editable: true, dbField: 'funded_investors', kpiType: 'volume' },
-  { label: 'Funded $', key: 'fundedDollars', format: (v) => `$${v.toLocaleString()}`, editable: true, dbField: 'funded_dollars', highlight: true, kpiType: 'volume' },
-  { label: 'CPA', key: 'costPerInvestor', format: (v) => `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, editable: false, kpiType: 'cost', thresholdKey: 'costPerInvestor' },
-  { label: 'CoC %', key: 'costOfCapital', format: (v) => `${v.toFixed(2)}%`, editable: false, kpiType: 'cost', thresholdKey: 'costOfCapital' },
+  { label: 'Leads', key: 'leads', format: (v) => v.toLocaleString(), editable: true, dbField: 'leads' },
+  { label: 'CPL', key: 'cpl', format: (v) => `$${v.toFixed(2)}`, editable: false },
+  { label: 'Calls', key: 'calls', format: (v) => v.toLocaleString(), editable: true, dbField: 'calls' },
+  { label: '$/Call', key: 'costPerCall', format: (v) => `$${v.toFixed(2)}`, editable: false },
+  { label: 'Showed', key: 'showedCalls', format: (v) => v.toLocaleString(), editable: true, dbField: 'showed_calls' },
+  { label: 'Show %', key: 'showRate', format: (v) => `${v.toFixed(1)}%`, editable: false },
+  { label: '$/Show', key: 'costPerShow', format: (v) => `$${v.toFixed(2)}`, editable: false },
+  { label: 'Commitments', key: 'commitments', format: (v) => v.toLocaleString(), editable: true, dbField: 'commitments' },
+  { label: 'Commit $', key: 'commitmentDollars', format: (v) => `$${v.toLocaleString()}`, editable: true, dbField: 'commitment_dollars' },
+  { label: 'Funded #', key: 'fundedInvestors', format: (v) => v.toLocaleString(), editable: true, dbField: 'funded_investors' },
+  { label: 'Funded $', key: 'fundedDollars', format: (v) => `$${v.toLocaleString()}`, editable: true, dbField: 'funded_dollars', highlight: true },
+  { label: 'CPA', key: 'costPerInvestor', format: (v) => `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, editable: false },
+  { label: 'Cost of Capital %', key: 'costOfCapital', format: (v) => `${v.toFixed(2)}%`, editable: false, highlight: true },
 ];
 
 export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: PeriodicStatsTableProps) {
@@ -379,32 +375,8 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
     }
   };
 
-  // Get KPI color class based on metric type, value, and thresholds
-  const getKpiColorClass = (metric: MetricRowConfig, value: number): string => {
-    if (value === 0) return '';
-    
-    // Cost metrics: use threshold-based coloring (lower is better)
-    if (metric.kpiType === 'cost' && metric.thresholdKey) {
-      const threshold = thresholds[metric.thresholdKey];
-      if (threshold) {
-        if (value >= threshold.red) return 'text-destructive';
-        if (value >= threshold.yellow) return 'text-warning';
-        return 'text-success'; // Under yellow = good
-      }
-    }
-    
-    // Volume metrics: higher is better = green
-    if (metric.kpiType === 'volume' && value > 0) {
-      return 'text-success';
-    }
-    
-    // Rate metrics: higher is better = green  
-    if (metric.kpiType === 'rate') {
-      if (value >= 50) return 'text-success';
-      if (value < 30) return 'text-destructive';
-      return 'text-warning';
-    }
-    
+  // Color coding removed — all values render plain
+  const getKpiColorClass = (_metric: MetricRowConfig, _value: number): string => {
     return '';
   };
 
@@ -442,7 +414,7 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
       );
     }
 
-    const colorClass = metric.highlight ? 'text-success font-semibold' : getKpiColorClass(metric, value);
+    const colorClass = metric.highlight ? 'text-chart-2 font-semibold' : getKpiColorClass(metric, value);
 
     return (
       <div className="flex items-center justify-end gap-1 group">
