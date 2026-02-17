@@ -21,6 +21,7 @@ interface CallLike {
 interface FundedInvestorLike {
   id: string;
   funded_amount: number;
+  commitment_amount?: number | null;
   time_to_fund_days?: number | null;
   calls_to_fund?: number | null;
   [key: string]: any;
@@ -94,8 +95,12 @@ export function aggregateFromSourceData(
   const reconnectShowed = reconnectCalls.filter(c => c.showed);
 
   // Calculate funded from source
+  // Use commitment_amount as fallback when funded_amount is 0
   const fundedCount = fundedInvestors.length;
-  const fundedDollars = fundedInvestors.reduce((sum, f) => sum + (f.funded_amount || 0), 0);
+  const fundedDollars = fundedInvestors.reduce((sum, f) => {
+    const amount = (f.funded_amount && f.funded_amount > 0) ? f.funded_amount : (f.commitment_amount || 0);
+    return sum + amount;
+  }, 0);
 
   // Calculate funded investor averages from source
   const fundedWithTimeData = fundedInvestors.filter(f => f.time_to_fund_days !== null);

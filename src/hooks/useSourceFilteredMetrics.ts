@@ -141,7 +141,10 @@ export function useSourceFilteredAggregatedMetrics(
     const reconnectShowed = reconnectCalls.filter(c => c.showed);
     
     const fundedCount = filteredFundedInvestors.length;
-    const fundedDollars = filteredFundedInvestors.reduce((sum, f) => sum + (f.funded_amount || 0), 0);
+    const fundedDollars = filteredFundedInvestors.reduce((sum, f) => {
+      const amount = (f.funded_amount && f.funded_amount > 0) ? f.funded_amount : (f.commitment_amount || 0);
+      return sum + amount;
+    }, 0);
 
     // Calculate cost metrics using full ad spend but filtered lead counts
     // This gives "true CPL" for the selected source

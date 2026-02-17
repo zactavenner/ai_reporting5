@@ -594,7 +594,10 @@ async function updateDailyMetricsFromGHL(supabase: any, clientId: string): Promi
     .lte('funded_at', todayEnd);
 
   const fundedCount = fundedData?.length || 0;
-  const fundedDollars = fundedData?.reduce((sum: number, f: any) => sum + (f.funded_amount || 0), 0) || 0;
+  const fundedDollars = fundedData?.reduce((sum: number, f: any) => {
+    const amount = (f.funded_amount && f.funded_amount > 0) ? f.funded_amount : (f.commitment_amount || 0);
+    return sum + amount;
+  }, 0) || 0;
   const commitmentDollars = fundedData?.reduce((sum: number, f: any) => sum + (f.commitment_amount || 0), 0) || 0;
   const commitmentCount = fundedData?.filter((f: any) => f.commitment_amount && f.commitment_amount > 0).length || 0;
 
