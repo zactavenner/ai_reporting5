@@ -287,7 +287,53 @@ Deno.serve(async (req) => {
       .eq("client_id", clientId);
     const campaignIdMap = new Map((dbCampaigns || []).map((c: any) => [c.meta_campaign_id, c.id]));
 
-    // ── 2. Fetch Ad Sets ──
+    // ── 2. Fetch Daily Breakdown (highest priority for dashboard) ──
+    let dailyRows = 0;
+    try {
+      const dailyFields = "spend,impressions,clicks,inline_link_click_ctr";
+      checkCallBudget("daily-insights");
+      const dailyInsights = await fetchAllPages(
+        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=${dailyFields}&${getTimeRange(startDate, endDate)}&time_increment=1&level=account`,
+        accessToken, 100, "daily-insights"
+      );
+      console.log(`Fetched ${dailyInsights.length} daily insight rows`);
+
+      for (const day of dailyInsights) {
+        const dateStr = day.date_start;
+        if (!dateStr) continue;
+
+        const { data: existing } = await supabase
+          .from("daily_metrics")
+          .select("id")
+          .eq("client_id", clientId)
+          .eq("date", dateStr)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase.from("daily_metrics").update({
+            ad_spend: Number(day.spend) || 0,
+            impressions: Number(day.impressions) || 0,
+            clicks: Number(day.clicks) || 0,
+            ctr: Number(day.inline_link_click_ctr) || 0,
+          }).eq("id", existing.id);
+        } else {
+          await supabase.from("daily_metrics").insert({
+            client_id: clientId,
+            date: dateStr,
+            ad_spend: Number(day.spend) || 0,
+            impressions: Number(day.impressions) || 0,
+            clicks: Number(day.clicks) || 0,
+            ctr: Number(day.inline_link_click_ctr) || 0,
+          });
+        }
+        dailyRows++;
+      }
+      console.log(`Upserted ${dailyRows} daily metric rows`);
+    } catch (dailyErr) {
+      console.error("Daily insights fetch error (non-fatal):", dailyErr);
+    }
+
+    // ── 3. Fetch Ad Sets ──
     const adSetFields = "id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,budget_remaining,bid_strategy,optimization_goal,billing_event,targeting,start_time,end_time";
     const adSets = await fetchAllPages(
       `${META_GRAPH_API_URL}/${adAccountId}/adsets?fields=${adSetFields}`,
@@ -374,7 +420,7 @@ Deno.serve(async (req) => {
       await supabase.from("meta_ads").upsert(rec, { onConflict: "client_id,meta_ad_id" });
     }
 
-    // ── 4. Fetch Insights ──
+    // ── 5. Fetch Per-Entity Insights ──
     try {
       const insightsFields = "campaign_id,impressions,clicks,spend,ctr,cpc,cpm";
       checkCallBudget("campaign-insights");
@@ -432,42 +478,7 @@ Deno.serve(async (req) => {
         }).eq("client_id", clientId).eq("meta_ad_id", ins.ad_id);
       }
     } catch (insightErr) {
-      console.error("Insights fetch error (non-fatal):", insightErr);
-    }
-
-    // ── 5. Fetch Daily Breakdown ──
-    let dailyRows = 0;
-    try {
-      const dailyFields = "spend,impressions,clicks,inline_link_click_ctr";
-      checkCallBudget("daily-insights");
-      const dailyInsights = await fetchAllPages(
-        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=${dailyFields}&${getTimeRange(startDate, endDate)}&time_increment=1&level=account`,
-        accessToken, 100, "daily-insights"
-      );
-      console.log(`Fetched ${dailyInsights.length} daily insight rows`);
-
-      for (const day of dailyInsights) {
-        const dateStr = day.date_start;
-        if (!dateStr) continue;
-
-        const { error: upsertErr } = await supabase.from("daily_metrics").upsert({
-          client_id: clientId,
-          date: dateStr,
-          ad_spend: Number(day.spend) || 0,
-          impressions: Number(day.impressions) || 0,
-          clicks: Number(day.clicks) || 0,
-          ctr: Number(day.inline_link_click_ctr) || 0,
-        }, { onConflict: "client_id,date", ignoreDuplicates: false });
-
-        if (upsertErr) {
-          console.error(`Daily metrics upsert error for ${dateStr}:`, upsertErr.message);
-        } else {
-          dailyRows++;
-        }
-      }
-      console.log(`Upserted ${dailyRows} daily metric rows`);
-    } catch (dailyErr) {
-      console.error("Daily insights fetch error (non-fatal):", dailyErr);
+      console.error("Per-entity insights fetch error (non-fatal):", insightErr);
     }
 
     // ── 6. CRM Attribution ──
