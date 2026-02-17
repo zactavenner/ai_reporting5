@@ -1964,12 +1964,20 @@ export type Database = {
       }
       meta_ad_sets: {
         Row: {
+          attributed_calls: number | null
+          attributed_funded: number | null
+          attributed_funded_dollars: number | null
+          attributed_leads: number | null
+          attributed_showed: number | null
           bid_strategy: string | null
           billing_event: string | null
           budget_remaining: number | null
           campaign_id: string | null
           clicks: number | null
           client_id: string
+          cost_per_call: number | null
+          cost_per_funded: number | null
+          cost_per_lead: number | null
           cpc: number | null
           cpm: number | null
           created_at: string | null
@@ -1994,12 +2002,20 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          attributed_calls?: number | null
+          attributed_funded?: number | null
+          attributed_funded_dollars?: number | null
+          attributed_leads?: number | null
+          attributed_showed?: number | null
           bid_strategy?: string | null
           billing_event?: string | null
           budget_remaining?: number | null
           campaign_id?: string | null
           clicks?: number | null
           client_id: string
+          cost_per_call?: number | null
+          cost_per_funded?: number | null
+          cost_per_lead?: number | null
           cpc?: number | null
           cpm?: number | null
           created_at?: string | null
@@ -2024,12 +2040,20 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          attributed_calls?: number | null
+          attributed_funded?: number | null
+          attributed_funded_dollars?: number | null
+          attributed_leads?: number | null
+          attributed_showed?: number | null
           bid_strategy?: string | null
           billing_event?: string | null
           budget_remaining?: number | null
           campaign_id?: string | null
           clicks?: number | null
           client_id?: string
+          cost_per_call?: number | null
+          cost_per_funded?: number | null
+          cost_per_lead?: number | null
           cpc?: number | null
           cpm?: number | null
           created_at?: string | null
@@ -2073,12 +2097,20 @@ export type Database = {
       meta_ads: {
         Row: {
           ad_set_id: string | null
+          attributed_calls: number | null
+          attributed_funded: number | null
+          attributed_funded_dollars: number | null
+          attributed_leads: number | null
+          attributed_showed: number | null
           body: string | null
           call_to_action_type: string | null
           clicks: number | null
           client_id: string
           conversions: number | null
+          cost_per_call: number | null
           cost_per_conversion: number | null
+          cost_per_funded: number | null
+          cost_per_lead: number | null
           cpc: number | null
           cpm: number | null
           created_at: string | null
@@ -2103,12 +2135,20 @@ export type Database = {
         }
         Insert: {
           ad_set_id?: string | null
+          attributed_calls?: number | null
+          attributed_funded?: number | null
+          attributed_funded_dollars?: number | null
+          attributed_leads?: number | null
+          attributed_showed?: number | null
           body?: string | null
           call_to_action_type?: string | null
           clicks?: number | null
           client_id: string
           conversions?: number | null
+          cost_per_call?: number | null
           cost_per_conversion?: number | null
+          cost_per_funded?: number | null
+          cost_per_lead?: number | null
           cpc?: number | null
           cpm?: number | null
           created_at?: string | null
@@ -2133,12 +2173,20 @@ export type Database = {
         }
         Update: {
           ad_set_id?: string | null
+          attributed_calls?: number | null
+          attributed_funded?: number | null
+          attributed_funded_dollars?: number | null
+          attributed_leads?: number | null
+          attributed_showed?: number | null
           body?: string | null
           call_to_action_type?: string | null
           clicks?: number | null
           client_id?: string
           conversions?: number | null
+          cost_per_call?: number | null
           cost_per_conversion?: number | null
+          cost_per_funded?: number | null
+          cost_per_lead?: number | null
           cpc?: number | null
           cpm?: number | null
           created_at?: string | null
@@ -2180,10 +2228,18 @@ export type Database = {
       }
       meta_campaigns: {
         Row: {
+          attributed_calls: number | null
+          attributed_funded: number | null
+          attributed_funded_dollars: number | null
+          attributed_leads: number | null
+          attributed_showed: number | null
           budget_remaining: number | null
           buying_type: string | null
           clicks: number | null
           client_id: string
+          cost_per_call: number | null
+          cost_per_funded: number | null
+          cost_per_lead: number | null
           cpc: number | null
           cpm: number | null
           created_at: string | null
@@ -2205,10 +2261,18 @@ export type Database = {
           updated_time: string | null
         }
         Insert: {
+          attributed_calls?: number | null
+          attributed_funded?: number | null
+          attributed_funded_dollars?: number | null
+          attributed_leads?: number | null
+          attributed_showed?: number | null
           budget_remaining?: number | null
           buying_type?: string | null
           clicks?: number | null
           client_id: string
+          cost_per_call?: number | null
+          cost_per_funded?: number | null
+          cost_per_lead?: number | null
           cpc?: number | null
           cpm?: number | null
           created_at?: string | null
@@ -2230,10 +2294,18 @@ export type Database = {
           updated_time?: string | null
         }
         Update: {
+          attributed_calls?: number | null
+          attributed_funded?: number | null
+          attributed_funded_dollars?: number | null
+          attributed_leads?: number | null
+          attributed_showed?: number | null
           budget_remaining?: number | null
           buying_type?: string | null
           clicks?: number | null
           client_id?: string
+          cost_per_call?: number | null
+          cost_per_funded?: number | null
+          cost_per_lead?: number | null
           cpc?: number | null
           cpm?: number | null
           created_at?: string | null

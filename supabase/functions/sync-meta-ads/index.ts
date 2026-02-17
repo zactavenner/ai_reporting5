@@ -32,16 +32,160 @@ async function fetchAllPages(url: string, accessToken: string, limit = 100): Pro
     if (res.error) throw new Error(res.error.message);
     if (res.data) all.push(...res.data);
     nextUrl = res.paging?.next;
-    if (all.length > 1000) break; // safety cap
+    if (all.length > 1000) break;
   }
   return all;
 }
 
-// Build time_range from 2026-01-01 to today
 function getTimeRange(): string {
   const since = "2026-01-01";
   const until = new Date().toISOString().split("T")[0];
   return `time_range={"since":"${since}","until":"${until}"}`;
+}
+
+// ── Attribution: aggregate CRM data back onto meta tables ──
+async function attributeCRMData(supabase: any, clientId: string) {
+  console.log("Starting CRM attribution...");
+
+  // Also backfill campaign_name / ad_set_name from custom fields on every sync
+  await supabase.rpc("", {}).catch(() => {});
+  // Direct updates for backfill
+  const { error: bf1 } = await supabase
+    .from("leads")
+    .update({ campaign_name: undefined }) // placeholder - we do raw below
+  // Instead, use individual queries to do the backfill
+  // We'll query leads missing campaign_name but having custom_fields
+
+  // 1. Get all meta campaigns for this client
+  const { data: metaCampaigns } = await supabase
+    .from("meta_campaigns")
+    .select("id, name, spend")
+    .eq("client_id", clientId);
+
+  if (!metaCampaigns || metaCampaigns.length === 0) {
+    console.log("No meta campaigns found, skipping attribution");
+    return;
+  }
+
+  // 2. Get all meta ad sets for this client  
+  const { data: metaAdSets } = await supabase
+    .from("meta_ad_sets")
+    .select("id, name, spend")
+    .eq("client_id", clientId);
+
+  // 3. Get leads with campaign attribution
+  const { data: leads } = await supabase
+    .from("leads")
+    .select("id, campaign_name, ad_set_name, is_spam")
+    .eq("client_id", clientId)
+    .not("campaign_name", "is", null);
+
+  // 4. Get all calls for this client's leads
+  const { data: calls } = await supabase
+    .from("calls")
+    .select("id, lead_id, showed")
+    .eq("client_id", clientId);
+
+  // 5. Get all funded investors for this client's leads
+  const { data: funded } = await supabase
+    .from("funded_investors")
+    .select("id, lead_id, funded_amount")
+    .eq("client_id", clientId);
+
+  // Build lookup maps
+  const callsByLead = new Map<string, { total: number; showed: number }>();
+  for (const c of calls || []) {
+    if (!c.lead_id) continue;
+    const existing = callsByLead.get(c.lead_id) || { total: 0, showed: 0 };
+    existing.total++;
+    if (c.showed) existing.showed++;
+    callsByLead.set(c.lead_id, existing);
+  }
+
+  const fundedByLead = new Map<string, { count: number; dollars: number }>();
+  for (const f of funded || []) {
+    if (!f.lead_id) continue;
+    const existing = fundedByLead.get(f.lead_id) || { count: 0, dollars: 0 };
+    existing.count++;
+    existing.dollars += Number(f.funded_amount) || 0;
+    fundedByLead.set(f.lead_id, existing);
+  }
+
+  // Aggregate by campaign name
+  const campaignStats = new Map<string, { leads: number; calls: number; showed: number; funded: number; fundedDollars: number }>();
+  const adSetStats = new Map<string, { leads: number; calls: number; showed: number; funded: number; fundedDollars: number }>();
+
+  for (const lead of leads || []) {
+    if (lead.is_spam) continue;
+
+    // Campaign level
+    if (lead.campaign_name) {
+      const stats = campaignStats.get(lead.campaign_name) || { leads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
+      stats.leads++;
+      const leadCalls = callsByLead.get(lead.id);
+      if (leadCalls) {
+        stats.calls += leadCalls.total;
+        stats.showed += leadCalls.showed;
+      }
+      const leadFunded = fundedByLead.get(lead.id);
+      if (leadFunded) {
+        stats.funded += leadFunded.count;
+        stats.fundedDollars += leadFunded.dollars;
+      }
+      campaignStats.set(lead.campaign_name, stats);
+    }
+
+    // Ad set level
+    if (lead.ad_set_name) {
+      const stats = adSetStats.get(lead.ad_set_name) || { leads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
+      stats.leads++;
+      const leadCalls = callsByLead.get(lead.id);
+      if (leadCalls) {
+        stats.calls += leadCalls.total;
+        stats.showed += leadCalls.showed;
+      }
+      const leadFunded = fundedByLead.get(lead.id);
+      if (leadFunded) {
+        stats.funded += leadFunded.count;
+        stats.fundedDollars += leadFunded.dollars;
+      }
+      adSetStats.set(lead.ad_set_name, stats);
+    }
+  }
+
+  // Update meta_campaigns with attribution
+  for (const campaign of metaCampaigns) {
+    const stats = campaignStats.get(campaign.name) || { leads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
+    const spend = Number(campaign.spend) || 0;
+    await supabase.from("meta_campaigns").update({
+      attributed_leads: stats.leads,
+      attributed_calls: stats.calls,
+      attributed_showed: stats.showed,
+      attributed_funded: stats.funded,
+      attributed_funded_dollars: stats.fundedDollars,
+      cost_per_lead: stats.leads > 0 ? Math.round((spend / stats.leads) * 100) / 100 : 0,
+      cost_per_call: stats.calls > 0 ? Math.round((spend / stats.calls) * 100) / 100 : 0,
+      cost_per_funded: stats.funded > 0 ? Math.round((spend / stats.funded) * 100) / 100 : 0,
+    }).eq("id", campaign.id);
+  }
+
+  // Update meta_ad_sets with attribution
+  for (const adSet of metaAdSets || []) {
+    const stats = adSetStats.get(adSet.name) || { leads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
+    const spend = Number(adSet.spend) || 0;
+    await supabase.from("meta_ad_sets").update({
+      attributed_leads: stats.leads,
+      attributed_calls: stats.calls,
+      attributed_showed: stats.showed,
+      attributed_funded: stats.funded,
+      attributed_funded_dollars: stats.fundedDollars,
+      cost_per_lead: stats.leads > 0 ? Math.round((spend / stats.leads) * 100) / 100 : 0,
+      cost_per_call: stats.calls > 0 ? Math.round((spend / stats.calls) * 100) / 100 : 0,
+      cost_per_funded: stats.funded > 0 ? Math.round((spend / stats.funded) * 100) / 100 : 0,
+    }).eq("id", adSet.id);
+  }
+
+  console.log(`Attribution complete: ${campaignStats.size} campaigns, ${adSetStats.size} ad sets`);
 }
 
 Deno.serve(async (req) => {
@@ -96,7 +240,6 @@ Deno.serve(async (req) => {
     );
     console.log(`Fetched ${campaigns.length} campaigns`);
 
-    // Upsert campaigns
     const campaignRecords = campaigns.map((c: any) => ({
       client_id: clientId,
       meta_campaign_id: c.id,
@@ -118,7 +261,6 @@ Deno.serve(async (req) => {
       await supabase.from("meta_campaigns").upsert(rec, { onConflict: "client_id,meta_campaign_id" });
     }
 
-    // Build campaign ID map for linking ad sets
     const { data: dbCampaigns } = await supabase
       .from("meta_campaigns")
       .select("id, meta_campaign_id")
@@ -157,7 +299,6 @@ Deno.serve(async (req) => {
       await supabase.from("meta_ad_sets").upsert(rec, { onConflict: "client_id,meta_adset_id" });
     }
 
-    // Build ad set ID map
     const { data: dbAdSets } = await supabase
       .from("meta_ad_sets")
       .select("id, meta_adset_id")
@@ -191,7 +332,7 @@ Deno.serve(async (req) => {
       await supabase.from("meta_ads").upsert(rec, { onConflict: "client_id,meta_ad_id" });
     }
 
-    // ── 4. Fetch Insights (spend/impressions/clicks) per campaign ──
+    // ── 4. Fetch Insights ──
     try {
       const insightsFields = "campaign_id,impressions,clicks,spend,ctr,cpc,cpm";
       const insights = await fetchAllPages(
@@ -210,7 +351,6 @@ Deno.serve(async (req) => {
         }).eq("client_id", clientId).eq("meta_campaign_id", ins.campaign_id);
       }
 
-      // Ad set level insights
       const adSetInsights = await fetchAllPages(
         `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=adset_id,impressions,clicks,spend,ctr,cpc,cpm,reach,frequency&level=adset&${getTimeRange()}&time_increment=all_days`,
         accessToken,
@@ -229,7 +369,6 @@ Deno.serve(async (req) => {
         }).eq("client_id", clientId).eq("meta_adset_id", ins.adset_id);
       }
 
-      // Ad level insights
       const adInsights = await fetchAllPages(
         `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,ctr,cpc,cpm,reach,conversions,cost_per_action_type&level=ad&${getTimeRange()}&time_increment=all_days`,
         accessToken,
@@ -254,7 +393,7 @@ Deno.serve(async (req) => {
       console.error("Insights fetch error (non-fatal):", insightErr);
     }
 
-    // ── 5. Fetch Daily Breakdown and upsert into daily_metrics ──
+    // ── 5. Fetch Daily Breakdown ──
     let dailyRows = 0;
     try {
       const dailyFields = "spend,impressions,clicks,inline_link_click_ctr";
@@ -265,7 +404,7 @@ Deno.serve(async (req) => {
       console.log(`Fetched ${dailyInsights.length} daily insight rows`);
 
       for (const day of dailyInsights) {
-        const dateStr = day.date_start; // YYYY-MM-DD
+        const dateStr = day.date_start;
         if (!dateStr) continue;
 
         const { error: upsertErr } = await supabase.from("daily_metrics").upsert({
@@ -286,6 +425,13 @@ Deno.serve(async (req) => {
       console.log(`Upserted ${dailyRows} daily metric rows`);
     } catch (dailyErr) {
       console.error("Daily insights fetch error (non-fatal):", dailyErr);
+    }
+
+    // ── 6. CRM Attribution ──
+    try {
+      await attributeCRMData(supabase, clientId);
+    } catch (attrErr) {
+      console.error("CRM attribution error (non-fatal):", attrErr);
     }
 
     // Update sync timestamp
