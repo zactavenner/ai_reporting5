@@ -131,7 +131,7 @@ async function syncAppointmentToCall(
   const lead = contactId ? leadsByContactId.get(contactId) : null;
   const leadId = lead?.id || null;
   
-  // Get contact details - priority: lead data > appointment contact object > GHL API fetch
+  // Get contact details from lead data or appointment data (NO extra API call)
   let contactName = lead?.name || null;
   let contactEmail = lead?.email || null;
   let contactPhone = lead?.phone || null;
@@ -143,14 +143,10 @@ async function syncAppointmentToCall(
     contactPhone = contactPhone || appt.contact.phone || null;
   }
   
-  // If still missing contact details and we have a contactId, fetch from GHL API
-  if (contactId && (!contactName || contactName === '')) {
-    const ghlContact = await fetchGHLContact(apiKey, contactId);
-    if (ghlContact) {
-      contactName = contactName || ghlContact.name;
-      contactEmail = contactEmail || ghlContact.email;
-      contactPhone = contactPhone || ghlContact.phone;
-    }
+  // Use title to extract name if still missing
+  if (!contactName && appt.title) {
+    const titleMatch = appt.title.match(/with\s+(.+?)\s+x\s+/i);
+    if (titleMatch) contactName = titleMatch[1].trim();
   }
   
   // Use GHL dateAdded as the original creation date
@@ -159,7 +155,7 @@ async function syncAppointmentToCall(
   const callData = {
     client_id: clientId,
     lead_id: leadId,
-    external_id: contactId || appointmentId,
+    external_id: appointmentId,
     ghl_appointment_id: appointmentId,
     ghl_calendar_id: calendarId,
     scheduled_at: appt.startTime || appt.dateAdded,
@@ -183,7 +179,7 @@ async function syncAppointmentToCall(
     .maybeSingle();
   
   if (existingCall) {
-    // Update existing call (don't change created_at)
+    // Update existing call
     const { error: updateError } = await supabase
       .from('calls')
       .update({
@@ -195,9 +191,9 @@ async function syncAppointmentToCall(
         is_reconnect: callData.is_reconnect,
         booked_at: callData.booked_at,
         ghl_synced_at: callData.ghl_synced_at,
-        contact_name: callData.contact_name,
-        contact_email: callData.contact_email,
-        contact_phone: callData.contact_phone,
+        contact_name: callData.contact_name || undefined,
+        contact_email: callData.contact_email || undefined,
+        contact_phone: callData.contact_phone || undefined,
       })
       .eq('id', existingCall.id);
     
@@ -208,12 +204,12 @@ async function syncAppointmentToCall(
     return { action: 'updated' };
   }
   
-  // Create new call with GHL creation date
+  // Create new call
   const { error: insertError } = await supabase
     .from('calls')
     .insert({
       ...callData,
-      created_at: ghlCreatedAt, // Use GHL creation date
+      created_at: ghlCreatedAt,
     });
   
   if (insertError) {
@@ -221,7 +217,6 @@ async function syncAppointmentToCall(
     return { action: 'skipped' };
   }
   
-  console.log(`Created call: ${contactName || contactId} - ${outcome} - ${appt.startTime}`);
   return { action: 'created' };
 }
 
