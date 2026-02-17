@@ -44,11 +44,11 @@ export function KPICard({
     if (typeof val === 'string') return val;
     switch (format) {
       case 'currency':
-        return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        return `$${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
       case 'percent':
-        return `${val.toFixed(2)}%`;
+        return `${val.toFixed(0)}%`;
       case 'days':
-        return `${val.toFixed(1)} days`;
+        return `${val.toFixed(0)} days`;
       default:
         return val.toLocaleString();
     }
@@ -116,7 +116,7 @@ export function KPICard({
       <p className="text-3xl font-semibold mt-2 tracking-tight tabular-nums">{formatValue(value)}</p>
       <div className={cn('flex items-center gap-1 mt-2 text-sm', getTrendColor())}>
         {getTrendIcon()}
-        <span className="tabular-nums">{change > 0 ? '+' : ''}{change.toFixed(1)}%</span>
+        <span className="tabular-nums">{change > 0 ? '+' : ''}{change.toFixed(0)}%</span>
         <span className="text-muted-foreground">{changeLabel}</span>
       </div>
     </div>
