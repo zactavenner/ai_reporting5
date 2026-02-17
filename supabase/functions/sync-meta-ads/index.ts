@@ -37,6 +37,13 @@ async function fetchAllPages(url: string, accessToken: string, limit = 100): Pro
   return all;
 }
 
+// Build time_range from 2026-01-01 to today
+function getTimeRange(): string {
+  const since = "2026-01-01";
+  const until = new Date().toISOString().split("T")[0];
+  return `time_range={"since":"${since}","until":"${until}"}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -188,8 +195,9 @@ Deno.serve(async (req) => {
     try {
       const insightsFields = "campaign_id,impressions,clicks,spend,ctr,cpc,cpm";
       const insights = await fetchAllPages(
-        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=${insightsFields}&level=campaign&date_preset=last_30d&time_increment=all_days`,
-        accessToken
+        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=${insightsFields}&level=campaign&${getTimeRange()}&time_increment=all_days`,
+        accessToken,
+        50
       );
       for (const ins of insights) {
         await supabase.from("meta_campaigns").update({
@@ -204,8 +212,9 @@ Deno.serve(async (req) => {
 
       // Ad set level insights
       const adSetInsights = await fetchAllPages(
-        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=adset_id,impressions,clicks,spend,ctr,cpc,cpm,reach,frequency&level=adset&date_preset=last_30d&time_increment=all_days`,
-        accessToken
+        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=adset_id,impressions,clicks,spend,ctr,cpc,cpm,reach,frequency&level=adset&${getTimeRange()}&time_increment=all_days`,
+        accessToken,
+        50
       );
       for (const ins of adSetInsights) {
         await supabase.from("meta_ad_sets").update({
@@ -222,8 +231,9 @@ Deno.serve(async (req) => {
 
       // Ad level insights
       const adInsights = await fetchAllPages(
-        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,ctr,cpc,cpm,reach,conversions,cost_per_action_type&level=ad&date_preset=last_30d&time_increment=all_days`,
-        accessToken
+        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,ctr,cpc,cpm,reach,conversions,cost_per_action_type&level=ad&${getTimeRange()}&time_increment=all_days`,
+        accessToken,
+        50
       );
       for (const ins of adInsights) {
         const conversions = ins.conversions ? ins.conversions.reduce((sum: number, c: any) => sum + Number(c.value || 0), 0) : 0;
@@ -249,7 +259,7 @@ Deno.serve(async (req) => {
     try {
       const dailyFields = "spend,impressions,clicks,inline_link_click_ctr";
       const dailyInsights = await fetchAllPages(
-        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=${dailyFields}&date_preset=last_30d&time_increment=1&level=account`,
+        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=${dailyFields}&${getTimeRange()}&time_increment=1&level=account`,
         accessToken
       );
       console.log(`Fetched ${dailyInsights.length} daily insight rows`);

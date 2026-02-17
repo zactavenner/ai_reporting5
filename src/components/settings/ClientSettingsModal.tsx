@@ -76,6 +76,8 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
   const [testingConnection, setTestingConnection] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [fullSyncing, setFullSyncing] = useState(false);
+  const [metaAdAccountId, setMetaAdAccountId] = useState('');
+  const [syncingMeta, setSyncingMeta] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
   const [historicalSyncRange, setHistoricalSyncRange] = useState<'7' | '30' | '90' | '365'>('7');
 
@@ -142,7 +144,7 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
     }
   }, [settings]);
 
-  // Load client business manager URL and GHL credentials
+  // Load client business manager URL, GHL credentials, and Meta Ad Account
   useEffect(() => {
     if (client?.business_manager_url) {
       setBusinessManagerUrl(client.business_manager_url);
@@ -153,6 +155,8 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
     if (client?.ghl_api_key) {
       setGhlApiKey(client.ghl_api_key);
     }
+    // Load Meta Ad Account ID
+    setMetaAdAccountId((client as any)?.meta_ad_account_id || '');
     // Determine connection status based on saved credentials
     if (client?.ghl_location_id && client?.ghl_api_key) {
       setConnectionStatus('connected');
@@ -250,7 +254,7 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
         }
       }
 
-      // Save business manager URL and GHL credentials to client
+      // Save business manager URL, GHL credentials, and Meta Ad Account to client
       const clientUpdates: Record<string, string | null> = {};
       
       if (businessManagerUrl !== (client.business_manager_url || '')) {
@@ -261,6 +265,9 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
       }
       if (ghlApiKey !== (client.ghl_api_key || '')) {
         clientUpdates.ghl_api_key = ghlApiKey || null;
+      }
+      if (metaAdAccountId !== ((client as any).meta_ad_account_id || '')) {
+        clientUpdates.meta_ad_account_id = metaAdAccountId || null;
       }
 
       if (Object.keys(clientUpdates).length > 0) {
@@ -901,6 +908,98 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
                 <li>Opportunities (read) - For pipeline tracking</li>
                 <li>Conversations (read) - For call validation</li>
               </ul>
+            </div>
+
+            {/* Meta Ads Integration Section */}
+            <div className="border-t-2 border-border pt-6 mt-6">
+              <div className="border-2 border-border p-4 space-y-4">
+                <div>
+                  <h4 className="font-medium mb-1 flex items-center gap-2">
+                    <Plug className="h-4 w-4" />
+                    Meta Ads Integration
+                  </h4>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Connect your Meta Ad Account to sync campaigns, ad sets, ads, and daily performance metrics
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="metaAdAccountId">Ad Account ID</Label>
+                  <Input
+                    id="metaAdAccountId"
+                    value={metaAdAccountId}
+                    onChange={(e) => setMetaAdAccountId(e.target.value)}
+                    placeholder="478773718246380"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Found in Meta Business Manager → Ad Accounts (numeric ID, without "act_" prefix)
+                  </p>
+                </div>
+
+                {/* Meta Ads Last Sync */}
+                {(settings as any)?.meta_ads_last_sync && (
+                  <div className="p-3 border-2 border-border bg-muted/30 space-y-1">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">Last Meta Ads Sync:</span>
+                      <span className="font-medium">
+                        {new Date((settings as any).meta_ads_last_sync).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {metaAdAccountId && (
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={async () => {
+                        if (!metaAdAccountId) {
+                          toast.error('Please enter an Ad Account ID first');
+                          return;
+                        }
+                        // Save the ad account ID first
+                        await supabase.from('clients').update({ meta_ad_account_id: metaAdAccountId }).eq('id', client.id);
+                        setSyncingMeta(true);
+                        try {
+                          const { data, error } = await supabase.functions.invoke('sync-meta-ads', {
+                            body: { clientId: client.id },
+                          });
+                          if (error) throw error;
+                          if (!data?.success) throw new Error(data?.error || 'Sync failed');
+                          toast.success(`Synced ${data.campaigns} campaigns, ${data.adSets} ad sets, ${data.ads} ads, ${data.dailyMetrics || 0} daily metrics`);
+                          queryClient.invalidateQueries({ queryKey: ['meta-campaigns', client.id] });
+                          queryClient.invalidateQueries({ queryKey: ['meta-ad-sets', client.id] });
+                          queryClient.invalidateQueries({ queryKey: ['meta-ads', client.id] });
+                          queryClient.invalidateQueries({ queryKey: ['metrics', client.id] });
+                        } catch (error) {
+                          console.error('Meta Ads sync failed:', error);
+                          toast.error(error instanceof Error ? error.message : 'Failed to sync Meta Ads');
+                        } finally {
+                          setSyncingMeta(false);
+                        }
+                      }}
+                      disabled={syncingMeta}
+                    >
+                      {syncingMeta ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Syncing Meta Ads...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Sync Meta Ads Now
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  Auto-syncs every 2 hours. Pulls all data from Jan 1, 2026 to today.
+                </p>
+              </div>
             </div>
 
             {/* HubSpot Integration Section */}
