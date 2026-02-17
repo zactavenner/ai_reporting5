@@ -1,46 +1,49 @@
 
-# Connect Meta Ads Token and Enable Daily Stats Sync
+
+# Add Default Pipeline Value Per Lead Setting
 
 ## Overview
-Store the new long-lived Meta access token on all relevant clients, set their shared ad account ID, enhance the sync function to log daily ad stats, and schedule automatic daily syncing.
+Add a per-client setting that assigns a fixed dollar value to every lead for pipeline value calculations. For example, Blue Capital can set each lead to $100k, so pipeline value = lead count x $100k.
 
-## What Will Happen
+## What Changes
 
-### 1. Connect the Token to All Clients
-Store the new Meta access token and ad account ID (`478773718246380`) on the clients that share this ad account:
-- Blue Capital
-- LSCRE
-- Jay More - Human Factors International
+### 1. Database -- New Column on client_settings
+Add `default_lead_pipeline_value` (numeric, default 0) to the `client_settings` table. When set to a value greater than 0, the system uses this as the per-lead value instead of relying on individual lead survey responses.
 
-(Land Value Alpha was not found as an active client -- if it needs to be added, let me know.)
+### 2. Settings UI -- New Field in KPI Section
+Add a "Default Pipeline Value Per Lead" input field in the Settings > KPI Thresholds tab, below the existing "Total Raise Amount" field. Includes a helper label explaining that when set, every lead will be valued at this amount for pipeline calculations.
 
-### 2. Enhance the Sync Function for Daily Stats
-The current `sync-meta-ads` function fetches campaigns, ad sets, and ads with 30-day aggregated insights. It will be upgraded to **also fetch day-by-day breakdowns** and write them into the `daily_metrics` table (ad_spend, impressions, clicks, ctr per client per day).
+### 3. Pipeline Value Calculation Update
+Update the aggregation logic in `useMetrics.ts` and `useSourceMetrics.ts`:
+- If the client has a `default_lead_pipeline_value > 0`, pipeline value = total non-spam leads x that value
+- Otherwise, fall back to the current behavior (sum/min from individual lead `pipeline_value` fields)
 
-This ensures the dashboard's daily performance table reflects accurate Meta ad spend data alongside CRM metrics.
-
-### 3. Schedule Automatic Daily Sync
-Set up a cron job to automatically trigger the sync for each Meta-connected client. This will run every 15 minutes (matching the existing sync cadence from the architecture) to keep the Ads Manager and daily stats current.
+The `useClientSettings` hook already provides settings alongside metrics, so the calculation can reference it without additional queries.
 
 ---
 
 ## Technical Details
 
-### Step 1 -- Database Updates
-Run SQL to set `meta_access_token` and `meta_ad_account_id` on the 3 client records:
-- Token: the provided long-lived token (expires April 17, 2026)
-- Ad Account: `478773718246380`
-
-### Step 2 -- Update `sync-meta-ads` Edge Function
-Add a new section after the existing insights fetch that:
-- Calls Meta Insights API with `time_increment=1` and `date_preset=last_30d` at the account level
-- Upserts each day's `spend`, `impressions`, `clicks`, `ctr` into the `daily_metrics` table using `(client_id, date)` as the conflict key
-- Only updates ad-spend columns (preserves lead/call/funded data already in the row)
-
-### Step 3 -- Create Cron Job
-Schedule a `pg_cron` + `pg_net` job that calls `sync-meta-ads` for each Meta-enabled client every 15 minutes. The job will query for all clients with a non-null `meta_access_token` and fire the edge function for each.
+### Database Migration
+```sql
+ALTER TABLE client_settings 
+ADD COLUMN IF NOT EXISTS default_lead_pipeline_value numeric DEFAULT 0;
+```
 
 ### Files Changed
-- `supabase/functions/sync-meta-ads/index.ts` -- add daily metrics upsert logic
-- Database: UPDATE clients table with token + ad account ID
-- Database: INSERT cron job for automated sync
+- `src/components/settings/ClientSettingsModal.tsx` -- add input field + state + save logic in KPI tab
+- `src/hooks/useClientSettings.ts` -- add `default_lead_pipeline_value` to the `ClientSettings` interface and defaults
+- `src/hooks/useAllClientSettings.ts` -- add to defaults
+- `src/hooks/useMetrics.ts` -- update `aggregateMetrics()` to accept optional default value and use it when > 0
+- `src/hooks/useSourceMetrics.ts` -- same calculation update
+- `src/components/dashboard/KPIGrid.tsx` -- pass the setting through (no visual change needed, just data flow)
+
+### Calculation Logic
+```typescript
+// In aggregateMetrics:
+const pipelineValue = defaultLeadPipelineValue > 0
+  ? (totals.totalLeads - totals.spamLeads) * defaultLeadPipelineValue
+  : leadsWithPipeline.length > 0
+    ? leadsWithPipeline.reduce((sum, l) => sum + (l.pipeline_value || 0), 0)
+    : 0;
+```
