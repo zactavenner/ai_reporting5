@@ -64,8 +64,12 @@ function getTimeRange(startDate?: string, endDate?: string): string {
 }
 
 // ── Attribution: aggregate CRM data back onto meta tables ──
-async function attributeCRMData(supabase: any, clientId: string) {
-  console.log("Starting CRM attribution...");
+async function attributeCRMData(supabase: any, clientId: string, startDate?: string, endDate?: string) {
+  console.log(`Starting CRM attribution (date range: ${startDate || 'all'} to ${endDate || 'all'})...`);
+
+  // Build date filters for CRM queries
+  const dateStart = startDate ? `${startDate}T00:00:00.000Z` : null;
+  const dateEnd = endDate ? `${endDate}T23:59:59.999Z` : null;
 
   // 1. Get all meta campaigns for this client
   const { data: metaCampaigns } = await supabase
@@ -90,24 +94,33 @@ async function attributeCRMData(supabase: any, clientId: string) {
     .select("id, name, spend, ad_set_id, meta_ad_id, meta_adset_id")
     .eq("client_id", clientId);
 
-  // 4. Get leads with campaign attribution
-  const { data: leads } = await supabase
+  // 4. Get leads with campaign attribution — filtered by date range
+  let leadsQuery = supabase
     .from("leads")
     .select("id, campaign_name, ad_set_name, ad_id, is_spam")
     .eq("client_id", clientId)
     .not("campaign_name", "is", null);
+  if (dateStart) leadsQuery = leadsQuery.gte("created_at", dateStart);
+  if (dateEnd) leadsQuery = leadsQuery.lte("created_at", dateEnd);
+  const { data: leads } = await leadsQuery;
 
-  // 5. Get all calls for this client's leads
-  const { data: calls } = await supabase
+  // 5. Get all calls for this client's leads — filtered by date range
+  let callsQuery = supabase
     .from("calls")
     .select("id, lead_id, showed")
     .eq("client_id", clientId);
+  if (dateStart) callsQuery = callsQuery.gte("booked_at", dateStart);
+  if (dateEnd) callsQuery = callsQuery.lte("booked_at", dateEnd);
+  const { data: calls } = await callsQuery;
 
-  // 6. Get all funded investors for this client's leads
-  const { data: funded } = await supabase
+  // 6. Get all funded investors for this client's leads — filtered by date range
+  let fundedQuery = supabase
     .from("funded_investors")
-    .select("id, lead_id, funded_amount")
+    .select("id, lead_id, funded_amount, commitment_amount")
     .eq("client_id", clientId);
+  if (dateStart) fundedQuery = fundedQuery.gte("funded_at", dateStart);
+  if (dateEnd) fundedQuery = fundedQuery.lte("funded_at", dateEnd);
+  const { data: funded } = await fundedQuery;
 
   // Build lookup maps
   const callsByLead = new Map<string, { total: number; showed: number }>();
@@ -124,7 +137,8 @@ async function attributeCRMData(supabase: any, clientId: string) {
     if (!f.lead_id) continue;
     const existing = fundedByLead.get(f.lead_id) || { count: 0, dollars: 0 };
     existing.count++;
-    existing.dollars += Number(f.funded_amount) || 0;
+    const amount = (Number(f.funded_amount) > 0) ? Number(f.funded_amount) : (Number(f.commitment_amount) || 0);
+    existing.dollars += amount;
     fundedByLead.set(f.lead_id, existing);
   }
 
@@ -538,7 +552,7 @@ Deno.serve(async (req) => {
 
     // ── 6. CRM Attribution ──
     try {
-      await attributeCRMData(supabase, clientId);
+      await attributeCRMData(supabase, clientId, startDate, endDate);
     } catch (attrErr) {
       console.error("CRM attribution error (non-fatal):", attrErr);
     }
