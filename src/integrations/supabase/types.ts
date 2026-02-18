@@ -3091,6 +3091,23 @@ export type Database = {
     }
     Functions: {
       generate_client_slug: { Args: { client_name: string }; Returns: string }
+      get_client_source_metrics: {
+        Args: { p_end_date?: string; p_start_date?: string }
+        Returns: {
+          avg_calls_to_fund: number
+          avg_time_to_fund: number
+          client_id: string
+          commitment_dollars: number
+          funded_count: number
+          funded_dollars: number
+          reconnect_calls: number
+          reconnect_showed: number
+          showed_calls: number
+          spam_leads: number
+          total_calls: number
+          total_leads: number
+        }[]
+      }
       get_sync_queue_stats: {
         Args: never
         Returns: {

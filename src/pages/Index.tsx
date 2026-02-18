@@ -31,7 +31,8 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Sliders, Video, CheckCircle, RefreshCw, Upload, LayoutDashboard, Smartphone, Bot, Wifi, LayoutGrid } from 'lucide-react';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics, AggregatedMetrics } from '@/hooks/useMetrics';
-import { aggregateFromSourceData } from '@/hooks/useSourceMetrics';
+import { aggregateFromSourceData, SourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
+import { useClientSourceMetrics, buildClientMetricsFromRPC } from '@/hooks/useClientSourceMetrics';
 import { useAllClientSettings, useAllClientFullSettings } from '@/hooks/useAllClientSettings';
 import { useAllClientMRR } from '@/hooks/useClientMRR';
 import { useMeetings, usePendingMeetingTasks, useSyncMeetings } from '@/hooks/useMeetings';
@@ -68,9 +69,12 @@ const Index = () => {
   const { data: dailyMetrics = [], isLoading: metricsLoading } = useAllDailyMetrics(startDate, endDate);
   const { data: fundedInvestors = [] } = useFundedInvestors(undefined, startDate, endDate);
   
-  // Fetch all leads and calls across clients for source filtering and accurate KPI calculation
+  // Fetch leads and calls for source filtering (these are still limited to 1000 rows for source filter dropdown)
   const { data: allLeads = [] } = useLeads(undefined, startDate, endDate);
   const { data: allCalls = [] } = useCalls(undefined, false, startDate, endDate);
+  
+  // Fetch accurate per-client metrics via database RPC (bypasses 1000-row limit)
+  const { data: rpcMetrics = [] } = useClientSourceMetrics(startDate, endDate);
   
   const clientIds = useMemo(() => clients.map(c => c.id), [clients]);
   const { data: clientThresholds = {} } = useAllClientSettings(clientIds);
@@ -94,31 +98,68 @@ const Index = () => {
   // Apply source filter to leads for metric calculations - updateGlobalSources=true on agency view
   const { filteredLeads, filteredCalls, filteredFundedInvestors, isFiltered: hasSourceFilter } = useSourceFilteredMetrics(allLeads, allCalls, fundedInvestors, true);
 
-  // Calculate KPIs directly from source data (leads, calls, funded_investors)
-  const aggregatedMetrics = useMemo(() => {
-    const leadsToUse = hasSourceFilter ? filteredLeads : allLeads;
-    const callsToUse = hasSourceFilter ? filteredCalls : allCalls;
-    const fundedToUse = hasSourceFilter ? filteredFundedInvestors : fundedInvestors;
-    return aggregateFromSourceData(leadsToUse, callsToUse, fundedToUse, dailyMetrics);
-  }, [allLeads, allCalls, fundedInvestors, dailyMetrics, filteredLeads, filteredCalls, filteredFundedInvestors, hasSourceFilter]);
-
-  // Group source data by client for the table
+  // Build per-client metrics from RPC data (accurate, no row limit)
   const clientMetrics = useMemo(() => {
-    // Group leads, calls, and funded investors by client
-    const result: Record<string, ReturnType<typeof aggregateFromSourceData>> = {};
-    
-    for (const client of clients) {
-      const clientLeads = allLeads.filter(l => l.client_id === client.id);
-      const clientCalls = allCalls.filter(c => c.client_id === client.id);
-      const clientFunded = fundedInvestors.filter(f => f.client_id === client.id);
-      const clientDailyMetrics = dailyMetrics.filter(m => m.client_id === client.id);
-      
-      const clientDefaultPipelineValue = (clientFullSettings[client.id] as any)?.default_lead_pipeline_value || 0;
-      result[client.id] = aggregateFromSourceData(clientLeads, clientCalls, clientFunded, clientDailyMetrics, clientDefaultPipelineValue);
+    return buildClientMetricsFromRPC(rpcMetrics, dailyMetrics, clientFullSettings);
+  }, [rpcMetrics, dailyMetrics, clientFullSettings]);
+
+  // Calculate agency-level aggregated metrics by summing RPC per-client metrics
+  const aggregatedMetrics = useMemo(() => {
+    const allClientMetrics = Object.values(clientMetrics);
+    if (allClientMetrics.length === 0) {
+      // Fallback to source data if RPC hasn't loaded yet
+      return aggregateFromSourceData(allLeads, allCalls, fundedInvestors, dailyMetrics);
     }
     
-    return result;
-  }, [clients, allLeads, allCalls, fundedInvestors, dailyMetrics, clientFullSettings]);
+    const totals = allClientMetrics.reduce(
+      (acc, m) => ({
+        totalAdSpend: acc.totalAdSpend + m.totalAdSpend,
+        totalLeads: acc.totalLeads + m.totalLeads,
+        spamLeads: acc.spamLeads + m.spamLeads,
+        totalCalls: acc.totalCalls + m.totalCalls,
+        showedCalls: acc.showedCalls + m.showedCalls,
+        reconnectCalls: acc.reconnectCalls + m.reconnectCalls,
+        reconnectShowed: acc.reconnectShowed + m.reconnectShowed,
+        fundedInvestors: acc.fundedInvestors + m.fundedInvestors,
+        fundedDollars: acc.fundedDollars + m.fundedDollars,
+        totalCommitments: acc.totalCommitments + m.totalCommitments,
+        commitmentDollars: acc.commitmentDollars + m.commitmentDollars,
+        pipelineValue: acc.pipelineValue + m.pipelineValue,
+      }),
+      {
+        totalAdSpend: 0, totalLeads: 0, spamLeads: 0, totalCalls: 0,
+        showedCalls: 0, reconnectCalls: 0, reconnectShowed: 0,
+        fundedInvestors: 0, fundedDollars: 0, totalCommitments: 0,
+        commitmentDollars: 0, pipelineValue: 0,
+      }
+    );
+
+    // Derive daily totals for CTR
+    const dailyTotals = dailyMetrics.reduce(
+      (acc, day) => ({
+        totalClicks: acc.totalClicks + (day.clicks || 0),
+        totalImpressions: acc.totalImpressions + (day.impressions || 0),
+      }),
+      { totalClicks: 0, totalImpressions: 0 }
+    );
+
+    return {
+      ...totals,
+      ctr: dailyTotals.totalImpressions > 0 ? (dailyTotals.totalClicks / dailyTotals.totalImpressions) * 100 : 0,
+      costPerLead: totals.totalLeads > 0 ? totals.totalAdSpend / totals.totalLeads : 0,
+      costPerCall: totals.totalCalls > 0 ? totals.totalAdSpend / totals.totalCalls : 0,
+      showedPercent: totals.totalCalls > 0 ? (totals.showedCalls / totals.totalCalls) * 100 : 0,
+      costPerShow: totals.showedCalls > 0 ? totals.totalAdSpend / totals.showedCalls : 0,
+      costPerInvestor: totals.fundedInvestors > 0 ? totals.totalAdSpend / totals.fundedInvestors : 0,
+      costOfCapital: totals.fundedDollars > 0 ? (totals.totalAdSpend / totals.fundedDollars) * 100 : 0,
+      avgTimeToFund: 0,
+      avgCallsToFund: 0,
+      leadToBookedPercent: totals.totalLeads > 0 ? (totals.totalCalls / totals.totalLeads) * 100 : 0,
+      closeRate: totals.showedCalls > 0 ? (totals.fundedInvestors / totals.showedCalls) * 100 : 0,
+      costPerReconnectCall: totals.reconnectCalls > 0 ? totals.totalAdSpend / totals.reconnectCalls : 0,
+      costPerReconnectShowed: totals.reconnectShowed > 0 ? totals.totalAdSpend / totals.reconnectShowed : 0,
+    } as SourceAggregatedMetrics;
+  }, [clientMetrics, dailyMetrics, allLeads, allCalls, fundedInvestors]);
 
   // Extract ad spends for MRR calculation
   const clientAdSpends = useMemo(() => {
