@@ -558,16 +558,17 @@ async function updateDailyMetricsFromGHL(supabase: any, clientId: string): Promi
     .gte('booked_at', todayStart)
     .lte('booked_at', todayEnd);
 
+  // Use scheduled_at for showed calls (the actual appointment date when they showed up)
   const { count: showedCount } = await supabase
     .from('calls')
     .select('*', { count: 'exact', head: true })
     .eq('client_id', clientId)
     .eq('showed', true)
     .neq('is_reconnect', true)
-    .gte('booked_at', todayStart)
-    .lte('booked_at', todayEnd);
+    .gte('scheduled_at', todayStart)
+    .lte('scheduled_at', todayEnd);
   
-  // Count reconnect calls
+  // Count reconnect calls by booked_at
   const { count: reconnectCount } = await supabase
     .from('calls')
     .select('*', { count: 'exact', head: true })
@@ -576,14 +577,15 @@ async function updateDailyMetricsFromGHL(supabase: any, clientId: string): Promi
     .gte('booked_at', todayStart)
     .lte('booked_at', todayEnd);
   
+  // Count reconnect showed by scheduled_at (actual appointment date)
   const { count: reconnectShowedCount } = await supabase
     .from('calls')
     .select('*', { count: 'exact', head: true })
     .eq('client_id', clientId)
     .eq('is_reconnect', true)
     .eq('showed', true)
-    .gte('booked_at', todayStart)
-    .lte('booked_at', todayEnd);
+    .gte('scheduled_at', todayStart)
+    .lte('scheduled_at', todayEnd);
 
   // Use funded_at for funded investors (when they reached funded stage)
   const { data: fundedData } = await supabase

@@ -164,6 +164,7 @@ async function syncAppointmentToCall(
     outcome,
     is_reconnect: isReconnect,
     booked_at: ghlCreatedAt,
+    showed_at: showed ? (appt.startTime || new Date().toISOString()) : null,
     ghl_synced_at: new Date().toISOString(),
     contact_name: contactName,
     contact_email: contactEmail,
@@ -187,6 +188,7 @@ async function syncAppointmentToCall(
         scheduled_at: callData.scheduled_at,
         appointment_status: callData.appointment_status,
         showed: callData.showed,
+        showed_at: callData.showed_at,
         outcome: callData.outcome,
         is_reconnect: callData.is_reconnect,
         booked_at: callData.booked_at,
@@ -222,19 +224,18 @@ async function syncAppointmentToCall(
 
 // Recalculate daily_metrics for a client based on actual calls data
 async function recalculateClientMetrics(supabase: any, clientId: string) {
-  // Get all calls for this client grouped by booked_at date
+  // Get all calls for this client - need both booked_at and scheduled_at
   const { data: callStats } = await supabase
     .from('calls')
-    .select('booked_at, showed, is_reconnect')
-    .eq('client_id', clientId)
-    .not('booked_at', 'is', null);
+    .select('booked_at, scheduled_at, showed, is_reconnect')
+    .eq('client_id', clientId);
 
   if (!callStats || callStats.length === 0) {
     console.log('No calls to recalculate');
     return;
   }
 
-  // Aggregate by date
+  // Aggregate booked calls by booked_at date, showed calls by scheduled_at date
   const metricsByDate = new Map<string, {
     calls: number;
     showed_calls: number;
@@ -242,31 +243,40 @@ async function recalculateClientMetrics(supabase: any, clientId: string) {
     reconnect_showed: number;
   }>();
 
-  for (const call of callStats) {
-    const date = call.booked_at.split('T')[0];
-    const existing = metricsByDate.get(date) || {
-      calls: 0,
-      showed_calls: 0,
-      reconnect_calls: 0,
-      reconnect_showed: 0,
-    };
+  const ensureDate = (dateStr: string) => {
+    const date = dateStr.split('T')[0];
+    if (!metricsByDate.has(date)) {
+      metricsByDate.set(date, { calls: 0, showed_calls: 0, reconnect_calls: 0, reconnect_showed: 0 });
+    }
+    return metricsByDate.get(date)!;
+  };
 
-    if (call.is_reconnect) {
-      existing.reconnect_calls++;
-      if (call.showed) existing.reconnect_showed++;
-    } else {
-      existing.calls++;
-      if (call.showed) existing.showed_calls++;
+  for (const call of callStats) {
+    // Count booked calls by booked_at date
+    if (call.booked_at) {
+      const metrics = ensureDate(call.booked_at);
+      if (call.is_reconnect) {
+        metrics.reconnect_calls++;
+      } else {
+        metrics.calls++;
+      }
     }
 
-    metricsByDate.set(date, existing);
+    // Count showed/no-show by scheduled_at date (the actual appointment date)
+    if (call.showed && call.scheduled_at) {
+      const metrics = ensureDate(call.scheduled_at);
+      if (call.is_reconnect) {
+        metrics.reconnect_showed++;
+      } else {
+        metrics.showed_calls++;
+      }
+    }
   }
 
   console.log(`Updating metrics for ${metricsByDate.size} dates`);
 
   // Update daily_metrics for each date
   for (const [date, metrics] of metricsByDate) {
-    // Check if record exists
     const { data: existing } = await supabase
       .from('daily_metrics')
       .select('id')
