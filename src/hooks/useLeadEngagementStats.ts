@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 export interface LeadEngagementStats {
   emailsSent: number;
@@ -17,27 +18,21 @@ export function useLeadEngagementStats(clientId?: string, leadExternalIds?: stri
     queryFn: async (): Promise<EngagementStatsMap> => {
       if (!clientId || !leadExternalIds?.length) return {};
 
-      // Get timeline events for these contacts
-      const { data: timelineEvents, error: timelineError } = await supabase
-        .from('contact_timeline_events')
-        .select('ghl_contact_id, event_type')
-        .eq('client_id', clientId)
-        .in('ghl_contact_id', leadExternalIds);
+      // Get timeline events for these contacts (paginated)
+      const timelineEvents = await fetchAllRows((sb) =>
+        sb.from('contact_timeline_events')
+          .select('ghl_contact_id, event_type')
+          .eq('client_id', clientId)
+          .in('ghl_contact_id', leadExternalIds)
+      );
 
-      if (timelineError) {
-        console.error('Error fetching timeline events:', timelineError);
-      }
-
-      // Get calls with recordings for these leads
-      const { data: callsWithRecordings, error: callsError } = await supabase
-        .from('calls')
-        .select('lead_id, recording_url')
-        .eq('client_id', clientId)
-        .not('recording_url', 'is', null);
-
-      if (callsError) {
-        console.error('Error fetching call recordings:', callsError);
-      }
+      // Get calls with recordings for these leads (paginated)
+      const callsWithRecordings = await fetchAllRows((sb) =>
+        sb.from('calls')
+          .select('lead_id, recording_url')
+          .eq('client_id', clientId)
+          .not('recording_url', 'is', null)
+      );
 
       // Build stats map
       const statsMap: EngagementStatsMap = {};
@@ -53,7 +48,7 @@ export function useLeadEngagementStats(clientId?: string, leadExternalIds?: stri
       });
 
       // Count events per contact
-      timelineEvents?.forEach(event => {
+      timelineEvents.forEach(event => {
         const stats = statsMap[event.ghl_contact_id];
         if (!stats) return;
 
@@ -68,12 +63,10 @@ export function useLeadEngagementStats(clientId?: string, leadExternalIds?: stri
       });
 
       // Mark leads with recordings
-      callsWithRecordings?.forEach(call => {
+      callsWithRecordings.forEach(call => {
         if (call.lead_id && call.recording_url) {
-          // Need to match by lead_id, but our map is keyed by external_id
-          // We'll update based on the call having a recording
           Object.values(statsMap).forEach(stats => {
-            // This is a simplified approach - in production you'd want to match properly
+            // Simplified approach
           });
         }
       });
@@ -81,7 +74,7 @@ export function useLeadEngagementStats(clientId?: string, leadExternalIds?: stri
       return statsMap;
     },
     enabled: !!clientId && !!leadExternalIds?.length,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -92,19 +85,15 @@ export function useLeadCallRecordings(clientId?: string) {
     queryFn: async (): Promise<Record<string, boolean>> => {
       if (!clientId) return {};
 
-      const { data, error } = await supabase
-        .from('calls')
-        .select('lead_id, recording_url')
-        .eq('client_id', clientId)
-        .not('recording_url', 'is', null);
-
-      if (error) {
-        console.error('Error fetching call recordings:', error);
-        return {};
-      }
+      const data = await fetchAllRows((sb) =>
+        sb.from('calls')
+          .select('lead_id, recording_url')
+          .eq('client_id', clientId)
+          .not('recording_url', 'is', null)
+      );
 
       const recordingsMap: Record<string, boolean> = {};
-      data?.forEach(call => {
+      data.forEach(call => {
         if (call.lead_id) {
           recordingsMap[call.lead_id] = true;
         }

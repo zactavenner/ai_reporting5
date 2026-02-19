@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 export interface Pipeline {
   id: string;
@@ -95,14 +96,12 @@ export function usePipelineOpportunities(pipelineId: string | undefined) {
     queryFn: async () => {
       if (!pipelineId) return [];
       
-      const { data, error } = await supabase
-        .from('pipeline_opportunities')
-        .select('*')
-        .eq('pipeline_id', pipelineId)
-        .order('monetary_value', { ascending: false });
-
-      if (error) throw error;
-      return data as PipelineOpportunity[];
+      return await fetchAllRows<PipelineOpportunity>((sb) =>
+        sb.from('pipeline_opportunities')
+          .select('*')
+          .eq('pipeline_id', pipelineId)
+          .order('monetary_value', { ascending: false })
+      );
     },
     enabled: !!pipelineId,
   });
@@ -139,14 +138,13 @@ export function useClientOpportunities(clientId: string | undefined) {
       const stageNameMap: Record<string, string> = {};
       stages?.forEach(s => { stageNameMap[s.id] = s.name; });
       
-      // Get all opportunities
-      const { data: opportunities, error: oppError } = await supabase
-        .from('pipeline_opportunities')
-        .select('*')
-        .in('pipeline_id', pipelineIds)
-        .order('updated_at', { ascending: false });
-      
-      if (oppError) throw oppError;
+      // Get all opportunities (paginated)
+      const opportunities = await fetchAllRows((sb) =>
+        sb.from('pipeline_opportunities')
+          .select('*')
+          .in('pipeline_id', pipelineIds)
+          .order('updated_at', { ascending: false })
+      );
       
       // Enrich with stage and pipeline names
       return (opportunities || []).map(opp => ({

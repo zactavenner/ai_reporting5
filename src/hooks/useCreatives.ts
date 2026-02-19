@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Json } from '@/integrations/supabase/types';
 import { detectAspectRatio } from '@/lib/aspectRatioUtils';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 export interface CreativeComment {
   id: string;
@@ -34,16 +35,14 @@ export function useCreatives(clientId?: string) {
     queryFn: async () => {
       if (!clientId) return [];
       
-      const { data, error } = await supabase
-        .from('creatives')
-        .select('*')
-        .eq('client_id', clientId)
-        .order('created_at', { ascending: false });
+      const data = await fetchAllRows((sb) =>
+        sb.from('creatives')
+          .select('*')
+          .eq('client_id', clientId)
+          .order('created_at', { ascending: false })
+      );
       
-      if (error) throw error;
-      
-      // Transform the data to match our Creative type
-      return (data || []).map((item) => ({
+      return data.map((item) => ({
         ...item,
         type: item.type as 'image' | 'video' | 'copy',
         platform: (item.platform as 'meta' | 'tiktok' | 'youtube' | 'google') || 'meta',

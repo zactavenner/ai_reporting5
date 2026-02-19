@@ -1,17 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Creative, CreativeComment } from './useCreatives';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 export function useAllCreatives() {
   return useQuery({
     queryKey: ['all-creatives'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('creatives')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
+      const data = await fetchAllRows((sb) =>
+        sb.from('creatives')
+          .select('*')
+          .order('created_at', { ascending: false })
+      );
       
       return (data || []).map((item) => ({
         ...item,

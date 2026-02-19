@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 export interface DailyMetric {
   id: string;
@@ -55,13 +56,11 @@ export interface AggregatedMetrics {
   costOfCapital: number;
   avgTimeToFund: number;
   avgCallsToFund: number;
-  // New KPIs
   leadToBookedPercent: number;
   reconnectCalls: number;
   reconnectShowed: number;
   closeRate: number;
   pipelineValue: number;
-  // Additional cost metrics
   costPerReconnectCall: number;
   costPerReconnectShowed: number;
 }
@@ -72,22 +71,22 @@ export function useDailyMetrics(clientId: string | undefined, startDate?: string
     queryFn: async () => {
       if (!clientId) return [];
       
-      let query = supabase
-        .from('daily_metrics')
-        .select('*')
-        .eq('client_id', clientId)
-        .order('date', { ascending: false });
-      
-      if (startDate) {
-        query = query.gte('date', startDate);
-      }
-      if (endDate) {
-        query = query.lte('date', endDate);
-      }
-      
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as DailyMetric[];
+      return await fetchAllRows<DailyMetric>((sb) => {
+        let query = sb
+          .from('daily_metrics')
+          .select('*')
+          .eq('client_id', clientId)
+          .order('date', { ascending: false });
+        
+        if (startDate) {
+          query = query.gte('date', startDate);
+        }
+        if (endDate) {
+          query = query.lte('date', endDate);
+        }
+        
+        return query;
+      });
     },
     enabled: !!clientId,
   });
@@ -97,21 +96,21 @@ export function useAllDailyMetrics(startDate?: string, endDate?: string) {
   return useQuery({
     queryKey: ['all-daily-metrics', startDate, endDate],
     queryFn: async () => {
-      let query = supabase
-        .from('daily_metrics')
-        .select('*')
-        .order('date', { ascending: false });
-      
-      if (startDate) {
-        query = query.gte('date', startDate);
-      }
-      if (endDate) {
-        query = query.lte('date', endDate);
-      }
-      
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as DailyMetric[];
+      return await fetchAllRows<DailyMetric>((sb) => {
+        let query = sb
+          .from('daily_metrics')
+          .select('*')
+          .order('date', { ascending: false });
+        
+        if (startDate) {
+          query = query.gte('date', startDate);
+        }
+        if (endDate) {
+          query = query.lte('date', endDate);
+        }
+        
+        return query;
+      });
     },
   });
 }
@@ -120,28 +119,27 @@ export function useFundedInvestors(clientId?: string, startDate?: string, endDat
   return useQuery({
     queryKey: ['funded-investors', clientId, startDate, endDate],
     queryFn: async () => {
-      let query = supabase
-        .from('funded_investors')
-        .select('*')
-        .order('funded_at', { ascending: false });
-      
-      if (clientId) {
-        query = query.eq('client_id', clientId);
-      }
+      return await fetchAllRows<FundedInvestor>((sb) => {
+        let query = sb
+          .from('funded_investors')
+          .select('*')
+          .order('funded_at', { ascending: false });
+        
+        if (clientId) {
+          query = query.eq('client_id', clientId);
+        }
 
-      // Use full timestamp with timezone to ensure proper filtering
-      if (startDate) {
-        const startLocal = new Date(startDate + 'T00:00:00');
-        query = query.gte('funded_at', startLocal.toISOString());
-      }
-      if (endDate) {
-        const endLocal = new Date(endDate + 'T23:59:59.999');
-        query = query.lte('funded_at', endLocal.toISOString());
-      }
-      
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as FundedInvestor[];
+        if (startDate) {
+          const startLocal = new Date(startDate + 'T00:00:00');
+          query = query.gte('funded_at', startLocal.toISOString());
+        }
+        if (endDate) {
+          const endLocal = new Date(endDate + 'T23:59:59.999');
+          query = query.lte('funded_at', endLocal.toISOString());
+        }
+        
+        return query;
+      });
     },
   });
 }
@@ -180,7 +178,6 @@ export function aggregateMetrics(dailyMetrics: DailyMetric[], fundedInvestors: F
     }
   );
 
-  // Calculate funded investor averages
   const fundedWithTimeData = fundedInvestors.filter(f => f.time_to_fund_days !== null);
   const avgTimeToFund = fundedWithTimeData.length > 0
     ? fundedWithTimeData.reduce((sum, f) => sum + (f.time_to_fund_days || 0), 0) / fundedWithTimeData.length
@@ -190,11 +187,9 @@ export function aggregateMetrics(dailyMetrics: DailyMetric[], fundedInvestors: F
     ? fundedInvestors.reduce((sum, f) => sum + (f.calls_to_fund || 0), 0) / fundedInvestors.length
     : 0;
 
-  // Calculate new KPIs
   const leadToBookedPercent = totals.totalLeads > 0 ? (totals.totalCalls / totals.totalLeads) * 100 : 0;
   const closeRate = totals.showedCalls > 0 ? (totals.fundedInvestors / totals.showedCalls) * 100 : 0;
 
-  // Calculate pipeline value
   const pipelineValue = (defaultLeadPipelineValue && defaultLeadPipelineValue > 0)
     ? (totals.totalLeads - totals.spamLeads) * defaultLeadPipelineValue
     : (() => {
@@ -223,13 +218,11 @@ export function aggregateMetrics(dailyMetrics: DailyMetric[], fundedInvestors: F
     costOfCapital: totals.fundedDollars > 0 ? (totals.totalAdSpend / totals.fundedDollars) * 100 : 0,
     avgTimeToFund,
     avgCallsToFund,
-    // New KPIs
     leadToBookedPercent,
     reconnectCalls: totals.reconnectCalls,
     reconnectShowed: totals.reconnectShowed,
     closeRate,
     pipelineValue,
-    // Additional cost metrics
     costPerReconnectCall: totals.reconnectCalls > 0 ? totals.totalAdSpend / totals.reconnectCalls : 0,
     costPerReconnectShowed: totals.reconnectShowed > 0 ? totals.totalAdSpend / totals.reconnectShowed : 0,
   };

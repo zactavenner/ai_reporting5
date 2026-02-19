@@ -1,19 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 export function useMetaCampaigns(clientId: string | undefined) {
   return useQuery({
     queryKey: ['meta-campaigns', clientId],
     queryFn: async () => {
       if (!clientId) return [];
-      const { data, error } = await supabase
-        .from('meta_campaigns')
-        .select('*')
-        .eq('client_id', clientId)
-        .order('spend', { ascending: false });
-      if (error) throw error;
-      return data || [];
+      return await fetchAllRows((sb) =>
+        sb.from('meta_campaigns')
+          .select('*')
+          .eq('client_id', clientId)
+          .order('spend', { ascending: false })
+      );
     },
     enabled: !!clientId,
   });
@@ -24,17 +24,17 @@ export function useMetaAdSets(clientId: string | undefined, campaignId?: string)
     queryKey: ['meta-ad-sets', clientId, campaignId],
     queryFn: async () => {
       if (!clientId) return [];
-      let query = supabase
-        .from('meta_ad_sets')
-        .select('*')
-        .eq('client_id', clientId)
-        .order('spend', { ascending: false });
-      if (campaignId) {
-        query = query.eq('campaign_id', campaignId);
-      }
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
+      return await fetchAllRows((sb) => {
+        let query = sb
+          .from('meta_ad_sets')
+          .select('*')
+          .eq('client_id', clientId)
+          .order('spend', { ascending: false });
+        if (campaignId) {
+          query = query.eq('campaign_id', campaignId);
+        }
+        return query;
+      });
     },
     enabled: !!clientId,
   });
@@ -45,17 +45,17 @@ export function useMetaAds(clientId: string | undefined, adSetId?: string) {
     queryKey: ['meta-ads', clientId, adSetId],
     queryFn: async () => {
       if (!clientId) return [];
-      let query = supabase
-        .from('meta_ads')
-        .select('*')
-        .eq('client_id', clientId)
-        .order('spend', { ascending: false });
-      if (adSetId) {
-        query = query.eq('ad_set_id', adSetId);
-      }
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
+      return await fetchAllRows((sb) => {
+        let query = sb
+          .from('meta_ads')
+          .select('*')
+          .eq('client_id', clientId)
+          .order('spend', { ascending: false });
+        if (adSetId) {
+          query = query.eq('ad_set_id', adSetId);
+        }
+        return query;
+      });
     },
     enabled: !!clientId,
   });

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 export interface CallRecording {
   id: string;
@@ -20,18 +21,18 @@ export function useCallRecordings(clientId?: string) {
   return useQuery({
     queryKey: ['call-recordings', clientId],
     queryFn: async () => {
-      let query = supabase
-        .from('calls')
-        .select('*')
-        .order('scheduled_at', { ascending: false });
-      
-      if (clientId) {
-        query = query.eq('client_id', clientId);
-      }
-      
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as CallRecording[];
+      return await fetchAllRows<CallRecording>((sb) => {
+        let query = sb
+          .from('calls')
+          .select('*')
+          .order('scheduled_at', { ascending: false });
+        
+        if (clientId) {
+          query = query.eq('client_id', clientId);
+        }
+        
+        return query;
+      });
     },
     enabled: !!clientId,
   });

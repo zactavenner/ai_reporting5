@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 export interface Task {
   id: string;
@@ -75,13 +76,11 @@ export function useAllTasks() {
   return useQuery({
     queryKey: ['all-tasks'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data as Task[];
+      return await fetchAllRows<Task>((sb) =>
+        sb.from('tasks')
+          .select('*')
+          .order('created_at', { ascending: false })
+      );
     },
   });
 }
@@ -91,16 +90,15 @@ export function useTasks(clientId?: string) {
   return useQuery({
     queryKey: ['tasks', clientId],
     queryFn: async () => {
-      let query = supabase.from('tasks').select('*');
-      
-      if (clientId) {
-        query = query.eq('client_id', clientId);
-      }
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data as Task[];
+      return await fetchAllRows<Task>((sb) => {
+        let query = sb.from('tasks').select('*');
+        
+        if (clientId) {
+          query = query.eq('client_id', clientId);
+        }
+        
+        return query.order('created_at', { ascending: false });
+      });
     },
     enabled: true,
   });

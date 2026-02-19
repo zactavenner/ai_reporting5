@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { addBusinessDays } from '@/lib/utils';
 import { format } from 'date-fns';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 export interface MeetingHighlight {
   highlightText: string;
@@ -47,20 +48,20 @@ export function useMeetings(clientId?: string) {
   return useQuery({
     queryKey: ['meetings', clientId],
     queryFn: async () => {
-      let query = supabase
-        .from('agency_meetings')
-        .select('*')
-        .order('meeting_date', { ascending: false });
+      const data = await fetchAllRows((sb) => {
+        let query = sb
+          .from('agency_meetings')
+          .select('*')
+          .order('meeting_date', { ascending: false });
 
-      if (clientId) {
-        query = query.eq('client_id', clientId);
-      }
+        if (clientId) {
+          query = query.eq('client_id', clientId);
+        }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      
-      // Map database JSON fields to typed arrays
-      return (data || []).map(meeting => ({
+        return query;
+      });
+
+      return data.map(meeting => ({
         ...meeting,
         highlights: (meeting.highlights as unknown as MeetingHighlight[]) || [],
         action_items: (meeting.action_items as unknown as any[]) || [],

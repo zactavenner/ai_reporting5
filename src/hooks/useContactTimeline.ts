@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 export interface TimelineEvent {
   id: string;
@@ -22,15 +23,13 @@ export function useContactTimeline(clientId: string | undefined, ghlContactId: s
     queryFn: async () => {
       if (!clientId || !ghlContactId) return [];
       
-      const { data, error } = await supabase
-        .from('contact_timeline_events')
-        .select('*')
-        .eq('client_id', clientId)
-        .eq('ghl_contact_id', ghlContactId)
-        .order('event_at', { ascending: false });
-
-      if (error) throw error;
-      return data as TimelineEvent[];
+      return await fetchAllRows<TimelineEvent>((sb) =>
+        sb.from('contact_timeline_events')
+          .select('*')
+          .eq('client_id', clientId)
+          .eq('ghl_contact_id', ghlContactId)
+          .order('event_at', { ascending: false })
+      );
     },
     enabled: !!clientId && !!ghlContactId,
   });
