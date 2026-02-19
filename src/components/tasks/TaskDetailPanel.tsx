@@ -48,6 +48,7 @@ import {
   Eye,
   EyeOff,
   Circle,
+  Repeat,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn, addBusinessDays } from '@/lib/utils';
@@ -67,6 +68,7 @@ import {
   useAddTaskHistory,
   useAgencyMembers,
   useSubtasks,
+  useCompleteRecurringTask,
 } from '@/hooks/useTasks';
 import { useMeetings } from '@/hooks/useMeetings';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
@@ -283,6 +285,8 @@ import { toast } from 'sonner';
      toast.success('Task link copied to clipboard!');
    };
    
+   const completeRecurring = useCompleteRecurringTask();
+   
    const handleStatusChange = async (newStatus: string) => {
      const oldStage = task.stage;
      const isCompleting = newStatus === 'done';
@@ -295,12 +299,17 @@ import { toast } from 'sonner';
        changedBy: getAuthorName(),
      });
      
-     await updateTask.mutateAsync({
-       id: task.id,
-       stage: newStatus,
-       status: newStatus === 'done' ? 'completed' : newStatus === 'todo' ? 'todo' : 'in_progress',
-       completed_at: isCompleting ? new Date().toISOString() : null,
-     });
+     if (isCompleting && task.recurrence_type) {
+       // Recurring task: complete and spawn next occurrence
+       await completeRecurring.mutateAsync(task);
+     } else {
+       await updateTask.mutateAsync({
+         id: task.id,
+         stage: newStatus,
+         status: newStatus === 'done' ? 'completed' : newStatus === 'todo' ? 'todo' : 'in_progress',
+         completed_at: isCompleting ? new Date().toISOString() : null,
+       });
+     }
    };
    
    const handlePriorityChange = async (newPriority: string) => {
@@ -697,8 +706,22 @@ const getHistoryIcon = (action: string) => {
                      </PopoverContent>
                    </Popover>
                  </div>
-               </div>
-             </div>
+                 {/* Recurrence Info */}
+                 {task.recurrence_type && (
+                   <div className="col-span-2">
+                     <Label className="text-xs text-muted-foreground">Recurring</Label>
+                     <div className="flex items-center gap-2 mt-1 text-sm text-primary">
+                       <Repeat className="h-4 w-4" />
+                       <span className="capitalize">
+                         Every {(task.recurrence_interval || 1) > 1 ? `${task.recurrence_interval} ` : ''}
+                         {task.recurrence_type === 'daily' ? 'day' : task.recurrence_type === 'weekly' ? 'week' : 'month'}
+                         {(task.recurrence_interval || 1) > 1 ? 's' : ''}
+                       </span>
+                     </div>
+                   </div>
+                 )}
+                </div>
+              </div>
            </SheetHeader>
            
             <ScrollArea className="flex-1 overflow-y-auto">

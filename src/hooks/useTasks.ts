@@ -19,6 +19,10 @@ export interface Task {
   meeting_id: string | null;
   parent_task_id: string | null;
   show_subtasks_to_client: boolean;
+  recurrence_type: string | null;
+  recurrence_interval: number | null;
+  recurrence_next_at: string | null;
+  recurrence_parent_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -270,6 +274,78 @@ export function useUpdateTask() {
     },
     onError: (error: Error) => {
       toast.error('Failed to update task: ' + error.message);
+    },
+  });
+}
+
+// Complete a recurring task: mark done, then create the next occurrence
+export function useCompleteRecurringTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (task: Task) => {
+      // 1. Mark the current task as completed
+      const now = new Date().toISOString();
+      const { error: updateErr } = await supabase
+        .from('tasks')
+        .update({ status: 'completed', stage: 'done', completed_at: now })
+        .eq('id', task.id);
+      if (updateErr) throw updateErr;
+
+      // 2. Calculate the next due date
+      if (!task.recurrence_type || !task.due_date) return null;
+
+      const interval = task.recurrence_interval || 1;
+      const nextDue = new Date(task.due_date);
+
+      switch (task.recurrence_type) {
+        case 'daily':
+          nextDue.setDate(nextDue.getDate() + interval);
+          break;
+        case 'weekly':
+          nextDue.setDate(nextDue.getDate() + 7 * interval);
+          break;
+        case 'monthly':
+          nextDue.setMonth(nextDue.getMonth() + interval);
+          break;
+      }
+
+      const nextDueStr = nextDue.toISOString().slice(0, 10);
+
+      // 3. Create the next occurrence
+      const { data: newTask, error: insertErr } = await supabase
+        .from('tasks')
+        .insert({
+          title: task.title,
+          description: task.description,
+          client_id: task.client_id,
+          priority: task.priority,
+          stage: task.stage === 'done' ? 'todo' : task.stage,
+          status: 'todo',
+          assigned_to: task.assigned_to,
+          assigned_client_name: task.assigned_client_name,
+          due_date: nextDueStr,
+          created_by: task.created_by,
+          parent_task_id: task.parent_task_id,
+          show_subtasks_to_client: task.show_subtasks_to_client,
+          recurrence_type: task.recurrence_type,
+          recurrence_interval: task.recurrence_interval,
+          recurrence_next_at: nextDue.toISOString(),
+          recurrence_parent_id: task.recurrence_parent_id || task.id,
+        })
+        .select()
+        .single();
+
+      if (insertErr) throw insertErr;
+      return newTask;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      toast.success('Task completed — next occurrence created');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to complete recurring task: ' + error.message);
     },
   });
 }
