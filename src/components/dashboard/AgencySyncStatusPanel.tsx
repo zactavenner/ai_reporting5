@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Activity, Settings2, Calendar, Users, TrendingUp, Save } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Activity, Settings2, Calendar, Users, TrendingUp, Save, ArrowUpDown } from 'lucide-react';
 import { formatDistanceToNow, differenceInDays, parseISO, format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -47,6 +47,7 @@ interface ClientSyncInfo {
 interface AgencySyncStatusPanelProps {
   clients: Client[];
   clientFullSettings: Record<string, any>;
+  clientMetrics?: Record<string, any>;
 }
 
 type SyncStatus = 'healthy' | 'stale' | 'error' | 'not_configured';
@@ -90,7 +91,7 @@ function getMissedDays(lastSync: string | null, dayLookback: number): number {
   return Math.max(0, daysSince - 1); // -1 because sync day itself counts
 }
 
-export function AgencySyncStatusPanel({ clients, clientFullSettings }: AgencySyncStatusPanelProps) {
+export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetrics = {} }: AgencySyncStatusPanelProps) {
   const [syncingMeta, setSyncingMeta] = useState<Set<string>>(new Set());
   const [syncingLeads, setSyncingLeads] = useState<Set<string>>(new Set());
   const [syncingCalendar, setSyncingCalendar] = useState<Set<string>>(new Set());
@@ -106,6 +107,18 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings }: AgencySyn
   const [saving, setSaving] = useState(false);
   
   const queryClient = useQueryClient();
+  const [scaleSortDir, setScaleSortDir] = useState<'asc' | 'desc' | null>(null);
+
+  function formatCount(n: number): string {
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+    return String(n);
+  }
+
+  function getScaleStatus(count: number): { icon: string; color: string; tooltip: string } {
+    if (count > 9000) return { icon: '🔥', color: 'text-orange-500', tooltip: `${count.toLocaleString()} rows — approaching query limits, pagination active` };
+    if (count > 500 && count % 500 === 0) return { icon: '⚠️', color: 'text-yellow-500', tooltip: `${count.toLocaleString()} rows — suspiciously round number, may indicate a truncated query` };
+    return { icon: '✓', color: 'text-chart-2', tooltip: `${count.toLocaleString()} rows — count looks normal` };
+  }
 
   const clientSyncData: ClientSyncInfo[] = clients
     .filter(c => c.status === 'active' || c.status === 'onboarding')
@@ -327,11 +340,29 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings }: AgencySyn
                     <TableHead className="text-center">Calendar</TableHead>
                     <TableHead className="text-center">Pipeline</TableHead>
                     <TableHead className="text-center">Streak</TableHead>
+                    <TableHead className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-0 font-medium text-xs hover:bg-transparent"
+                        onClick={() => setScaleSortDir(prev => prev === 'desc' ? 'asc' : 'desc')}
+                      >
+                        Scale
+                        <ArrowUpDown className="h-3 w-3 ml-1" />
+                      </Button>
+                    </TableHead>
                     <TableHead className="text-center w-[80px]">Settings</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {clientSyncData.map((c) => {
+                  {[...clientSyncData]
+                    .sort((a, b) => {
+                      if (!scaleSortDir) return 0;
+                      const aLeads = clientMetrics[a.id]?.totalLeads ?? 0;
+                      const bLeads = clientMetrics[b.id]?.totalLeads ?? 0;
+                      return scaleSortDir === 'desc' ? bLeads - aLeads : aLeads - bLeads;
+                    })
+                    .map((c) => {
                     const metaStatus = getMetaStatus(c);
                     const crmSource = c.hubspotPortalId ? 'hubspot' : 'ghl';
                     const crmStatus = getGhlStatus(c);
@@ -508,6 +539,45 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings }: AgencySyn
                               {maxGap > 0 ? ` · Largest gap: ${maxGap}d` : ''}
                             </TooltipContent>
                           </Tooltip>
+                        </TableCell>
+
+                        {/* Scale - Data Counts */}
+                        <TableCell className="text-center py-2">
+                          {(() => {
+                            const m = clientMetrics[c.id];
+                            const leads = m?.totalLeads ?? 0;
+                            const calls = m?.totalCalls ?? 0;
+                            const funded = m?.fundedInvestors ?? 0;
+                            const maxCount = Math.max(leads, calls);
+                            const status = getScaleStatus(maxCount);
+                            const leadsStatus = getScaleStatus(leads);
+                            const callsStatus = getScaleStatus(calls);
+                            return (
+                              <div className="flex items-center justify-center gap-1 text-xs tabular-nums">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className={leadsStatus.icon !== '✓' ? 'cursor-help' : ''}>
+                                      {formatCount(leads)}
+                                      {leadsStatus.icon !== '✓' && <span className="ml-0.5">{leadsStatus.icon}</span>}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{leadsStatus.tooltip} (leads)</TooltipContent>
+                                </Tooltip>
+                                <span className="text-muted-foreground">|</span>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className={callsStatus.icon !== '✓' ? 'cursor-help' : ''}>
+                                      {formatCount(calls)}
+                                      {callsStatus.icon !== '✓' && <span className="ml-0.5">{callsStatus.icon}</span>}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{callsStatus.tooltip} (calls)</TooltipContent>
+                                </Tooltip>
+                                <span className="text-muted-foreground">|</span>
+                                <span>{formatCount(funded)}</span>
+                              </div>
+                            );
+                          })()}
                         </TableCell>
 
                         {/* Settings */}

@@ -353,6 +353,7 @@ const Index = () => {
               <AgencySyncStatusPanel
                 clients={clients}
                 clientFullSettings={clientFullSettings}
+                clientMetrics={clientMetrics}
               />
             </SectionErrorBoundary>
 
