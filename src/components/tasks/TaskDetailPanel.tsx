@@ -1050,24 +1050,37 @@ const getHistoryIcon = (action: string) => {
                  ))}
                </div>
              )}
-             <div className="flex gap-2">
-               <Input 
-                 value={newComment} 
-                 onChange={(e) => setNewComment(e.target.value)} 
-                 placeholder="Post a comment... (paste images here)" 
-                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleAddComment()} 
-                 onPaste={handleCommentPaste}
-                 className="flex-1" 
-               />
-               <Button variant="outline" size="icon" onClick={() => discussionFileInputRef.current?.click()} disabled={uploadFile.isPending}>
-                 {uploadFile.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-               </Button>
-               <input type="file" ref={discussionFileInputRef} className="hidden" onChange={handleFileUpload} />
-               <TaskDiscussionVoiceNote taskId={task.id} authorName={getAuthorName()} />
-               <Button onClick={handleAddComment} disabled={(!newComment.trim() && pastedFiles.length === 0) || addComment.isPending}>
-                 {addComment.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-               </Button>
-             </div>
+              <div className="flex gap-2 items-end">
+                <Textarea 
+                  value={newComment} 
+                  onChange={(e) => setNewComment(e.target.value)} 
+                  placeholder="Post a comment... (Ctrl+Enter to send, paste images)" 
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      handleAddComment();
+                    }
+                  }} 
+                  onPaste={handleCommentPaste}
+                  className="flex-1 min-h-[40px] max-h-[160px] resize-none"
+                  rows={1}
+                  onInput={(e) => {
+                    const target = e.target as HTMLTextAreaElement;
+                    target.style.height = 'auto';
+                    target.style.height = Math.min(target.scrollHeight, 160) + 'px';
+                  }}
+                />
+                <div className="flex gap-1 flex-shrink-0 pb-0.5">
+                  <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => discussionFileInputRef.current?.click()} disabled={uploadFile.isPending}>
+                    {uploadFile.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+                  </Button>
+                  <input type="file" ref={discussionFileInputRef} className="hidden" onChange={handleFileUpload} />
+                  <TaskDiscussionVoiceNote taskId={task.id} authorName={getAuthorName()} />
+                  <Button className="h-9 w-9" size="icon" onClick={handleAddComment} disabled={(!newComment.trim() && pastedFiles.length === 0) || addComment.isPending}>
+                    {addComment.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
            </div>
          </SheetContent>
        </Sheet>
