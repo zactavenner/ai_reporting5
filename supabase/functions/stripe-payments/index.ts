@@ -225,6 +225,68 @@ serve(async (req) => {
       );
     }
 
+    // ── list-payment-methods ──
+    if (action === "list-payment-methods") {
+      if (!customerId) {
+        return new Response(
+          JSON.stringify({ payment_methods: [] }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      }
+      const methods = await stripe.paymentMethods.list({ customer: customerId, type: 'card', limit: 10 });
+      const formatted = methods.data.map((pm: any) => ({
+        id: pm.id,
+        brand: pm.card?.brand,
+        last4: pm.card?.last4,
+        exp_month: pm.card?.exp_month,
+        exp_year: pm.card?.exp_year,
+      }));
+      return new Response(
+        JSON.stringify({ payment_methods: formatted }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
+    // ── create-charge ──
+    if (action === "create-charge") {
+      if (!customerId || !amount) {
+        return new Response(
+          JSON.stringify({ error: "customerId and amount are required" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+      const paymentMethodId = (await req.clone().json()).paymentMethodId;
+      const amountCents = Math.round(amount * 100);
+
+      const piData: any = {
+        amount: amountCents,
+        currency: currency || 'usd',
+        customer: customerId,
+        description: description || 'Agency charge',
+        confirm: true,
+        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+      };
+      if (paymentMethodId) {
+        piData.payment_method = paymentMethodId;
+        delete piData.automatic_payment_methods;
+      }
+
+      const paymentIntent = await stripe.paymentIntents.create(piData);
+      console.log(`PaymentIntent ${paymentIntent.id} created for customer ${customerId}`);
+
+      return new Response(
+        JSON.stringify({
+          payment: {
+            id: paymentIntent.id,
+            amount: (paymentIntent.amount || 0) / 100,
+            status: paymentIntent.status,
+            currency: paymentIntent.currency,
+          },
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: "Invalid action" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }

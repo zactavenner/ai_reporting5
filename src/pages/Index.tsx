@@ -24,11 +24,12 @@ import { PendingTasksReview } from '@/components/meetings/PendingTasksReview';
 import { SectionErrorBoundary } from '@/components/ui/SectionErrorBoundary';
 
 import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
+import { AgencyBillingTab } from '@/components/billing/AgencyBillingTab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { Sliders, Video, CheckCircle, RefreshCw, Upload, LayoutDashboard, Smartphone, Bot, Wifi, LayoutGrid } from 'lucide-react';
+import { Sliders, Video, CheckCircle, RefreshCw, Upload, LayoutDashboard, Smartphone, Bot, Wifi, LayoutGrid, Receipt } from 'lucide-react';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics, AggregatedMetrics } from '@/hooks/useMetrics';
 import { aggregateFromSourceData, SourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
@@ -263,6 +264,12 @@ const Index = () => {
                 <Smartphone className="h-4 w-4" />
                 <span className="hidden sm:inline">Funnel</span>
               </TabsTrigger>
+              {currentMember?.role === 'admin' && (
+                <TabsTrigger value="billing" className="gap-2">
+                  <Receipt className="h-4 w-4" />
+                  <span className="hidden sm:inline">Billing</span>
+                </TabsTrigger>
+              )}
             </TabsList>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
@@ -458,6 +465,15 @@ const Index = () => {
               )}
             </SectionErrorBoundary>
           </TabsContent>
+
+          {/* Billing Tab - Admin Only */}
+          {currentMember?.role === 'admin' && (
+            <TabsContent value="billing" className="space-y-6">
+              <SectionErrorBoundary sectionName="Billing">
+                <AgencyBillingTab clients={clients} />
+              </SectionErrorBoundary>
+            </TabsContent>
+          )}
         </Tabs>
       </main>
 
