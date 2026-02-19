@@ -1025,8 +1025,11 @@ export type Database = {
       }
       clients: {
         Row: {
+          brand_colors: Json | null
+          brand_fonts: Json | null
           business_manager_url: string | null
           created_at: string
+          description: string | null
           ghl_api_key: string | null
           ghl_location_id: string | null
           ghl_sync_error: string | null
@@ -1040,6 +1043,7 @@ export type Database = {
           last_ghl_sync_at: string | null
           last_hubspot_sync_at: string | null
           last_timeline_sync_at: string | null
+          logo_url: string | null
           meta_access_token: string | null
           meta_ad_account_id: string | null
           name: string
@@ -1049,10 +1053,14 @@ export type Database = {
           status: string
           updated_at: string
           webhook_secret: string | null
+          website_url: string | null
         }
         Insert: {
+          brand_colors?: Json | null
+          brand_fonts?: Json | null
           business_manager_url?: string | null
           created_at?: string
+          description?: string | null
           ghl_api_key?: string | null
           ghl_location_id?: string | null
           ghl_sync_error?: string | null
@@ -1066,6 +1074,7 @@ export type Database = {
           last_ghl_sync_at?: string | null
           last_hubspot_sync_at?: string | null
           last_timeline_sync_at?: string | null
+          logo_url?: string | null
           meta_access_token?: string | null
           meta_ad_account_id?: string | null
           name: string
@@ -1075,10 +1084,14 @@ export type Database = {
           status?: string
           updated_at?: string
           webhook_secret?: string | null
+          website_url?: string | null
         }
         Update: {
+          brand_colors?: Json | null
+          brand_fonts?: Json | null
           business_manager_url?: string | null
           created_at?: string
+          description?: string | null
           ghl_api_key?: string | null
           ghl_location_id?: string | null
           ghl_sync_error?: string | null
@@ -1092,6 +1105,7 @@ export type Database = {
           last_ghl_sync_at?: string | null
           last_hubspot_sync_at?: string | null
           last_timeline_sync_at?: string | null
+          logo_url?: string | null
           meta_access_token?: string | null
           meta_ad_account_id?: string | null
           name?: string
@@ -1101,6 +1115,7 @@ export type Database = {
           status?: string
           updated_at?: string
           webhook_secret?: string | null
+          website_url?: string | null
         }
         Relationships: []
       }
