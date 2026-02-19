@@ -315,20 +315,44 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
     const dbField = fieldMap[editing.field];
     if (!dbField) return;
 
+    const desiredValue = parseFloat(editing.value) || 0;
+
     try {
       if (periodType === 'daily') {
-        // Daily mode: update the specific day's record directly
+        // Daily mode: override the exact value for this day
         await updateDailyMetric.mutateAsync({
           clientId,
           date: periodStats.period,
-          updates: { [dbField]: parseFloat(editing.value) || 0 },
+          updates: { [dbField]: desiredValue },
         });
       } else if (periodType === 'weekly') {
-        // Weekly mode: update the first day of the week's record
+        // Weekly mode: calculate delta so weekly total matches the desired value
+        const weekStart = parseISO(periodStats.period);
+        const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+
+        const weekMetrics = metricsToUse.filter(m => {
+          const d = parseISO(m.date);
+          return isWithinInterval(d, { start: weekStart, end: weekEnd });
+        });
+
+        // Find the first record (anchor) or use week start date
+        const anchor = weekMetrics.length > 0
+          ? weekMetrics.sort((a, b) => a.date.localeCompare(b.date))[0]
+          : null;
+        const anchorDate = anchor ? anchor.date : periodStats.period;
+
+        // Sum of all OTHER records in the week (excluding anchor)
+        const otherSum = weekMetrics
+          .filter(m => m.date !== anchorDate)
+          .reduce((sum, m) => sum + Number((m as any)[dbField] || 0), 0);
+
+        // Set anchor so that anchor + otherSum = desiredValue
+        const anchorValue = desiredValue - otherSum;
+
         await updateDailyMetric.mutateAsync({
           clientId,
-          date: periodStats.period,
-          updates: { [dbField]: parseFloat(editing.value) || 0 },
+          date: anchorDate,
+          updates: { [dbField]: anchorValue },
         });
       } else {
         // Monthly mode: use the monthly upsert with delta logic
@@ -336,7 +360,7 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
           clientId,
           year: periodStats.year,
           month: periodStats.month,
-          updates: { [dbField]: parseFloat(editing.value) || 0 },
+          updates: { [dbField]: desiredValue },
         });
       }
       toast.success('Metric updated successfully');
