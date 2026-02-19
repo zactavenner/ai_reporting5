@@ -8,8 +8,9 @@ import {
   AlertTriangle,
   Check,
   CheckCircle2,
+  Repeat,
 } from 'lucide-react';
-import { Task, AgencyMember, useUpdateTask, useTaskFiles } from '@/hooks/useTasks';
+import { Task, AgencyMember, useUpdateTask, useTaskFiles, useCompleteRecurringTask } from '@/hooks/useTasks';
 import { format, isToday, isPast, parseISO, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
@@ -52,6 +53,7 @@ export function KanbanTaskCard({
   } = useSortable({ id: task.id });
 
   const updateTask = useUpdateTask();
+  const completeRecurring = useCompleteRecurringTask();
   const { data: files = [] } = useTaskFiles(task.id);
 
   const style = {
@@ -87,12 +89,17 @@ export function KanbanTaskCard({
 
   const handleCompleteTask = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    await updateTask.mutateAsync({
-      id: task.id,
-      stage: isCompleted ? 'todo' : 'done',
-      status: isCompleted ? 'todo' : 'completed',
-      completed_at: isCompleted ? null : new Date().toISOString(),
-    });
+    if (task.recurrence_type && !isCompleted) {
+      // Recurring task: complete and spawn next occurrence
+      await completeRecurring.mutateAsync(task);
+    } else {
+      await updateTask.mutateAsync({
+        id: task.id,
+        stage: isCompleted ? 'todo' : 'done',
+        status: isCompleted ? 'todo' : 'completed',
+        completed_at: isCompleted ? null : new Date().toISOString(),
+      });
+    }
   };
 
   const handleSelectionChange = (e: React.MouseEvent) => {
@@ -230,6 +237,15 @@ export function KanbanTaskCard({
                 const [year, month, day] = task.due_date.split('-').map(Number);
                 return format(new Date(year, month - 1, day), 'MMM d');
               })()}</span>
+              {task.recurrence_type && (
+                <Repeat className="h-3 w-3 text-primary/70 flex-shrink-0" />
+              )}
+            </div>
+          )}
+          {!task.due_date && task.recurrence_type && (
+            <div className="flex items-center gap-1 text-[11px] font-medium text-primary/70">
+              <Repeat className="h-3 w-3 flex-shrink-0" />
+              <span className="capitalize">{task.recurrence_type}</span>
             </div>
           )}
           

@@ -24,7 +24,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { CalendarIcon, Loader2, User, Building2 } from 'lucide-react';
+import { CalendarIcon, Loader2, User, Building2, Repeat } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn, addBusinessDays } from '@/lib/utils';
 import { useCreateTask, useAgencyMembers, AgencyMember } from '@/hooks/useTasks';
@@ -63,6 +63,8 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
   const [selectedPodId, setSelectedPodId] = useState<string>('');
   const [assignedClientName, setAssignedClientName] = useState('');
   const [stage, setStage] = useState('todo');
+  const [recurrenceType, setRecurrenceType] = useState<string>('none');
+  const [recurrenceInterval, setRecurrenceInterval] = useState<number>(1);
   
   useEffect(() => {
     if (defaultClientId) {
@@ -98,6 +100,19 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
       resolvedAssignedTo = podMembers.length > 0 ? podMembers[0].id : null;
     }
     
+    const hasRecurrence = recurrenceType !== 'none';
+    const recurrenceNextAt = hasRecurrence && dueDate
+      ? (() => {
+          const next = new Date(dueDate);
+          switch (recurrenceType) {
+            case 'daily': next.setDate(next.getDate() + recurrenceInterval); break;
+            case 'weekly': next.setDate(next.getDate() + 7 * recurrenceInterval); break;
+            case 'monthly': next.setMonth(next.getMonth() + recurrenceInterval); break;
+          }
+          return next.toISOString();
+        })()
+      : null;
+
     const taskData = await createTask.mutateAsync({
       title: title.trim(),
       description: description.trim() || null,
@@ -109,7 +124,10 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
       assigned_to: resolvedAssignedTo,
       assigned_client_name: assignedClientName || null,
       created_by: currentMember?.name || (isPublicView ? 'Client' : null),
-    });
+      recurrence_type: hasRecurrence ? recurrenceType : null,
+      recurrence_interval: hasRecurrence ? recurrenceInterval : null,
+      recurrence_next_at: recurrenceNextAt,
+    } as any);
     
     // Handle task_assignees table entries
     if (taskData?.id) {
@@ -147,6 +165,8 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
     setSelectedPodId('');
     setAssignedClientName('');
     setStage('todo');
+    setRecurrenceType('none');
+    setRecurrenceInterval(1);
     onOpenChange(false);
   };
 
@@ -291,6 +311,45 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
                 </PopoverContent>
               </Popover>
             </div>
+          </div>
+
+          {/* Recurrence Section */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="flex items-center gap-1.5">
+                <Repeat className="h-3.5 w-3.5" />
+                Recurring
+              </Label>
+              <Select value={recurrenceType} onValueChange={setRecurrenceType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No repeat</SelectItem>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {recurrenceType !== 'none' && (
+              <div>
+                <Label>Every</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={recurrenceInterval}
+                    onChange={(e) => setRecurrenceInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-20"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {recurrenceType === 'daily' ? 'day(s)' : recurrenceType === 'weekly' ? 'week(s)' : 'month(s)'}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Assignment Section */}

@@ -3044,6 +3044,10 @@ export type Database = {
           meeting_id: string | null
           parent_task_id: string | null
           priority: string
+          recurrence_interval: number | null
+          recurrence_next_at: string | null
+          recurrence_parent_id: string | null
+          recurrence_type: string | null
           show_subtasks_to_client: boolean | null
           stage: string
           status: string
@@ -3063,6 +3067,10 @@ export type Database = {
           meeting_id?: string | null
           parent_task_id?: string | null
           priority?: string
+          recurrence_interval?: number | null
+          recurrence_next_at?: string | null
+          recurrence_parent_id?: string | null
+          recurrence_type?: string | null
           show_subtasks_to_client?: boolean | null
           stage?: string
           status?: string
@@ -3082,6 +3090,10 @@ export type Database = {
           meeting_id?: string | null
           parent_task_id?: string | null
           priority?: string
+          recurrence_interval?: number | null
+          recurrence_next_at?: string | null
+          recurrence_parent_id?: string | null
+          recurrence_type?: string | null
           show_subtasks_to_client?: boolean | null
           stage?: string
           status?: string
@@ -3113,6 +3125,13 @@ export type Database = {
           {
             foreignKeyName: "tasks_parent_task_id_fkey"
             columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_recurrence_parent_id_fkey"
+            columns: ["recurrence_parent_id"]
             isOneToOne: false
             referencedRelation: "tasks"
             referencedColumns: ["id"]
