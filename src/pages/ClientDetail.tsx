@@ -47,6 +47,7 @@ import { useMeetings } from '@/hooks/useMeetings';
 import { useCreatives } from '@/hooks/useCreatives';
 
 import { useDateFilter } from '@/contexts/DateFilterContext';
+import { useTeamMember } from '@/contexts/TeamMemberContext';
 import { useSourceFilteredMetrics } from '@/hooks/useSourceFilteredMetrics';
 import { exportToCSV } from '@/lib/exportUtils';
 import { useQueryClient } from '@tanstack/react-query';
@@ -81,6 +82,8 @@ export default function ClientDetail() {
   const [selectedType, setSelectedType] = useState<string>('');
   const [drillDownModal, setDrillDownModal] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const { currentMember } = useTeamMember();
+  const isAdmin = currentMember?.role === 'admin';
 
   const { startDate, endDate, sourceFilter } = useDateFilter();
   const { data: client, isLoading: clientLoading } = useClient(clientId);
@@ -366,14 +369,16 @@ export default function ClientDetail() {
             <Megaphone className="h-4 w-4 mr-1" />
             Ads Manager
           </Button>
-          <Button 
-            variant={activeTab === 'billing' ? 'default' : 'outline'} 
-            size="sm"
-            onClick={() => setActiveTab('billing')}
-          >
-            <CreditCard className="h-4 w-4 mr-1" />
-            Billing
-          </Button>
+          {isAdmin && (
+            <Button 
+              variant={activeTab === 'billing' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => setActiveTab('billing')}
+            >
+              <CreditCard className="h-4 w-4 mr-1" />
+              Billing
+            </Button>
+          )}
           {customTabs.map((tab) => (
             <div key={tab.id} className="relative group">
               <Button 
@@ -536,8 +541,8 @@ export default function ClientDetail() {
             <AdsManagerTab clientId={client.id} />
           </SectionErrorBoundary>
         )}
-        {/* Billing Tab */}
-        {activeTab === 'billing' && (
+        {/* Billing Tab - Admin only */}
+        {activeTab === 'billing' && isAdmin && (
           <SectionErrorBoundary sectionName="Billing">
             <ClientBillingTab clientId={client.id} clientName={client.name} />
           </SectionErrorBoundary>
