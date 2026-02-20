@@ -11,6 +11,7 @@ const ALLOWED_TABLES = [
   "clients", "leads", "calls", "funded_investors", "daily_metrics",
   "agency_members", "agency_pods", "agency_settings", "agency_meetings",
   "tasks", "task_comments", "task_files", "task_history", "task_assignees",
+  "task_notifications",
   "creatives", "client_settings", "client_pipelines", "client_custom_tabs",
   "client_funnel_steps", "client_live_ads", "client_pod_assignments",
   "client_voice_notes", "pipeline_stages", "pipeline_opportunities",
@@ -22,6 +23,7 @@ const ALLOWED_TABLES = [
   "sync_outbound_events", "pixel_verifications", "pixel_expected_events",
   "email_parsed_investors", "pending_meeting_tasks", "member_activity_log",
   "dashboard_preferences", "spam_blacklist", "webhook_logs",
+  "meta_campaigns", "meta_ad_sets", "meta_ads",
 ];
 
 const ALLOWED_BUCKETS = ["creatives", "task-files", "gpt-files", "live-ads"];
@@ -29,11 +31,12 @@ const ALLOWED_BUCKETS = ["creatives", "task-files", "gpt-files", "live-ads"];
 // Predefined safe relation patterns for select_related
 const RELATION_MAP: Record<string, Record<string, string>> = {
   tasks: {
-    subtasks: "subtasks:tasks!parent_task_id(id,title,status,priority,due_date,stage,parent_task_id,created_at,updated_at,completed_at,assigned_to,assigned_client_name)",
+    subtasks: "subtasks:tasks!parent_task_id(id,title,status,priority,due_date,stage,parent_task_id,created_at,updated_at,completed_at,assigned_to,assigned_client_name,recurrence_type,recurrence_interval,recurrence_next_at)",
     assignees: "assignees:task_assignees(id,member_id,pod_id,member:agency_members(id,name,email,role),pod:agency_pods(id,name,color))",
     comments: "comments:task_comments(id,author_name,content,comment_type,audio_url,duration_seconds,transcript,created_at)",
     files: "files:task_files(id,file_name,file_url,file_type,uploaded_by,created_at)",
     history: "history:task_history(id,action,old_value,new_value,changed_by,created_at)",
+    notifications: "notifications:task_notifications(id,member_id,message,is_read,triggered_by,created_at)",
   },
   creatives: {
     client: "client:clients(id,name,slug)",
@@ -50,6 +53,19 @@ const RELATION_MAP: Record<string, Record<string, string>> = {
   task_assignees: {
     member: "member:agency_members(id,name,email,role,pod:agency_pods(id,name,color))",
     pod: "pod:agency_pods(id,name,color)",
+  },
+  meta_campaigns: {
+    ad_sets: "ad_sets:meta_ad_sets(id,meta_ad_set_id,name,status,spend,impressions,clicks,ctr,cpc,cpm,attributed_leads,attributed_calls,attributed_showed,attributed_funded,attributed_funded_dollars,cost_per_lead,cost_per_call,cost_per_funded)",
+    client: "client:clients(id,name,slug)",
+  },
+  meta_ad_sets: {
+    ads: "ads:meta_ads(id,meta_ad_id,name,status,spend,impressions,clicks,ctr,cpc,cpm,attributed_leads,attributed_calls,attributed_showed,attributed_funded,attributed_funded_dollars,cost_per_lead,cost_per_call,cost_per_funded,preview_url,thumbnail_url)",
+    campaign: "campaign:meta_campaigns(id,meta_campaign_id,name,status,objective)",
+    client: "client:clients(id,name,slug)",
+  },
+  meta_ads: {
+    ad_set: "ad_set:meta_ad_sets(id,meta_ad_set_id,name,status)",
+    client: "client:clients(id,name,slug)",
   },
 };
 
@@ -82,8 +98,205 @@ Deno.serve(async (req) => {
 
     // list_tables
     if (action === "list_tables") {
-      return jsonResp({ tables: ALLOWED_TABLES, buckets: ALLOWED_BUCKETS, relations: RELATION_MAP });
+      return jsonResp({ 
+        tables: ALLOWED_TABLES, 
+        buckets: ALLOWED_BUCKETS, 
+        relations: RELATION_MAP,
+        composite_actions: {
+          create_task: {
+            description: "Create a task with optional assignees, subtasks, and comments in one call",
+            fields: {
+              task: "Required. Task object: {title, description?, client_id?, priority?, stage?, due_date?, status?, recurrence_type?, recurrence_interval?, created_by?}",
+              assignees: "Optional. Array of {member_id?, pod_id?} - at least one of member_id or pod_id required per entry",
+              subtasks: "Optional. Array of {title, description?, priority?, due_date?, status?, stage?, assigned_client_name?}",
+              comments: "Optional. Array of {author_name, content, comment_type?}",
+            },
+          },
+          get_ads_overview: {
+            description: "Get full Meta ads hierarchy (campaigns → ad sets → ads) for a client with spend & attribution metrics",
+            fields: {
+              client_id: "Required. The client UUID",
+              status: "Optional. Filter by status (e.g. 'ACTIVE')",
+              date_start: "Optional. Filter synced_at >= date",
+              date_end: "Optional. Filter synced_at <= date",
+            },
+          },
+        },
+      });
     }
+
+    // ========================
+    // COMPOSITE: create_task
+    // ========================
+    if (action === "create_task") {
+      const { task, assignees, subtasks, comments } = body;
+      if (!task || !task.title) {
+        return jsonResp({ error: "Missing 'task' object with at least 'title'" }, 400);
+      }
+
+      // 1. Create the parent task
+      const { data: createdTask, error: taskError } = await supabase
+        .from("tasks")
+        .insert({
+          title: task.title,
+          description: task.description || null,
+          client_id: task.client_id || null,
+          priority: task.priority || "medium",
+          stage: task.stage || "backlog",
+          status: task.status || "todo",
+          due_date: task.due_date || null,
+          recurrence_type: task.recurrence_type || null,
+          recurrence_interval: task.recurrence_interval || 1,
+          recurrence_next_at: task.recurrence_next_at || null,
+          created_by: task.created_by || "api",
+          assigned_client_name: task.assigned_client_name || null,
+        })
+        .select()
+        .single();
+
+      if (taskError) return jsonResp({ error: `Task creation failed: ${taskError.message}` }, 400);
+
+      const taskId = createdTask.id;
+      const results: Record<string, unknown> = { task: createdTask };
+
+      // 2. Add assignees
+      if (assignees && Array.isArray(assignees) && assignees.length > 0) {
+        const assigneeRows = assignees.map((a: { member_id?: string; pod_id?: string }) => ({
+          task_id: taskId,
+          member_id: a.member_id || null,
+          pod_id: a.pod_id || null,
+        }));
+        const { data: createdAssignees, error: assErr } = await supabase
+          .from("task_assignees")
+          .insert(assigneeRows)
+          .select("id,member_id,pod_id,member:agency_members(id,name,email,role),pod:agency_pods(id,name,color)");
+        if (assErr) {
+          results.assignees_error = assErr.message;
+        } else {
+          results.assignees = createdAssignees;
+        }
+      }
+
+      // 3. Add subtasks
+      if (subtasks && Array.isArray(subtasks) && subtasks.length > 0) {
+        const subtaskRows = subtasks.map((s: Record<string, unknown>) => ({
+          parent_task_id: taskId,
+          client_id: task.client_id || null,
+          title: s.title,
+          description: s.description || null,
+          priority: s.priority || "medium",
+          stage: s.stage || "backlog",
+          status: s.status || "todo",
+          due_date: s.due_date || null,
+          assigned_client_name: s.assigned_client_name || null,
+          created_by: task.created_by || "api",
+        }));
+        const { data: createdSubtasks, error: subErr } = await supabase
+          .from("tasks")
+          .insert(subtaskRows)
+          .select();
+        if (subErr) {
+          results.subtasks_error = subErr.message;
+        } else {
+          results.subtasks = createdSubtasks;
+        }
+      }
+
+      // 4. Add comments
+      if (comments && Array.isArray(comments) && comments.length > 0) {
+        const commentRows = comments.map((c: Record<string, unknown>) => ({
+          task_id: taskId,
+          author_name: c.author_name || "API",
+          content: c.content,
+          comment_type: c.comment_type || "text",
+        }));
+        const { data: createdComments, error: comErr } = await supabase
+          .from("task_comments")
+          .insert(commentRows)
+          .select();
+        if (comErr) {
+          results.comments_error = comErr.message;
+        } else {
+          results.comments = createdComments;
+        }
+      }
+
+      // 5. Log history
+      await supabase.from("task_history").insert({
+        task_id: taskId,
+        action: "created",
+        new_value: task.title,
+        changed_by: task.created_by || "api",
+      });
+
+      return jsonResp(results);
+    }
+
+    // ========================
+    // COMPOSITE: get_ads_overview
+    // ========================
+    if (action === "get_ads_overview") {
+      const { client_id, status, date_start, date_end } = body;
+      if (!client_id) {
+        return jsonResp({ error: "Missing 'client_id'" }, 400);
+      }
+
+      // Fetch campaigns with nested ad sets and ads
+      let campaignQuery = supabase
+        .from("meta_campaigns")
+        .select(`
+          *,
+          ad_sets:meta_ad_sets(
+            *,
+            ads:meta_ads(*)
+          )
+        `)
+        .eq("client_id", client_id)
+        .order("spend", { ascending: false });
+
+      if (status) campaignQuery = campaignQuery.eq("status", status);
+      if (date_start) campaignQuery = campaignQuery.gte("synced_at", date_start);
+      if (date_end) campaignQuery = campaignQuery.lte("synced_at", date_end);
+
+      const { data: campaigns, error } = await campaignQuery;
+      if (error) return jsonResp({ error: error.message }, 400);
+
+      // Calculate totals
+      let totalSpend = 0, totalImpressions = 0, totalClicks = 0;
+      let totalLeads = 0, totalCalls = 0, totalFunded = 0, totalFundedDollars = 0;
+      for (const c of (campaigns || [])) {
+        totalSpend += Number(c.spend) || 0;
+        totalImpressions += Number(c.impressions) || 0;
+        totalClicks += Number(c.clicks) || 0;
+        totalLeads += Number(c.attributed_leads) || 0;
+        totalCalls += Number(c.attributed_calls) || 0;
+        totalFunded += Number(c.attributed_funded) || 0;
+        totalFundedDollars += Number(c.attributed_funded_dollars) || 0;
+      }
+
+      return jsonResp({
+        client_id,
+        totals: {
+          campaigns: (campaigns || []).length,
+          spend: totalSpend,
+          impressions: totalImpressions,
+          clicks: totalClicks,
+          ctr: totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : "0.00",
+          attributed_leads: totalLeads,
+          attributed_calls: totalCalls,
+          attributed_funded: totalFunded,
+          attributed_funded_dollars: totalFundedDollars,
+          cost_per_lead: totalLeads > 0 ? (totalSpend / totalLeads).toFixed(2) : null,
+          cost_per_call: totalCalls > 0 ? (totalSpend / totalCalls).toFixed(2) : null,
+          cost_per_funded: totalFunded > 0 ? (totalSpend / totalFunded).toFixed(2) : null,
+        },
+        campaigns,
+      });
+    }
+
+    // ========================
+    // Storage actions
+    // ========================
 
     // list_storage - list files in a bucket
     if (action === "list_storage") {
@@ -146,6 +359,10 @@ Deno.serve(async (req) => {
       return jsonResp({ success: true, url: urlData.publicUrl, bucket, file_path });
     }
 
+    // ========================
+    // Generic CRUD actions
+    // ========================
+
     if (!table || !ALLOWED_TABLES.includes(table)) {
       return jsonResp({ error: `Invalid table. Allowed: ${ALLOWED_TABLES.join(", ")}` }, 400);
     }
@@ -172,7 +389,6 @@ Deno.serve(async (req) => {
           if (v === null) {
             query = query.is(k, null);
           } else if (typeof v === "object" && v !== null && !Array.isArray(v)) {
-            // Support operators: {column: {op: "gte", value: 5}}
             const filterObj = v as { op: string; value: unknown };
             if (filterObj.op && filterObj.value !== undefined) {
               switch (filterObj.op) {
@@ -245,7 +461,7 @@ Deno.serve(async (req) => {
       return jsonResp({ data: rows, table });
     }
 
-    return jsonResp({ error: "Invalid action. Use: list_tables, select, count, insert, upsert, update, delete, list_storage, get_file_url, delete_file, upload_file_base64" }, 400);
+    return jsonResp({ error: "Invalid action. Use: list_tables, select, count, insert, upsert, update, delete, create_task, get_ads_overview, list_storage, get_file_url, delete_file, upload_file_base64" }, 400);
 
   } catch (err) {
     return jsonResp({ error: err.message }, 500);
