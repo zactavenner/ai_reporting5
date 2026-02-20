@@ -33,12 +33,12 @@ interface TaskBoardViewProps {
 }
 
 export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskBoardViewProps) {
-  const { data: allTasks = [] } = useAllTasks();
+  const { data: allTasks = [], isLoading: tasksLoading } = useAllTasks();
   const { data: clients = [] } = useClients();
   const [view, setView] = useState<'kanban' | 'summary' | 'activity' | 'notifications'>('kanban');
   const { currentMember } = useTeamMember();
   const { data: notifications = [] } = useNotifications(currentMember?.id);
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadCount = Array.isArray(notifications) ? notifications.filter(n => !n.is_read).length : 0;
   const [showCreateTask, setShowCreateTask] = useState(false);
 
   // In public view, only show tasks for the specific client
@@ -55,7 +55,7 @@ export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskB
   const { data: creatives = [] } = useCreatives(clientId);
 
   // Task metrics
-  const metrics = useTaskMetrics(tasks);
+  const metrics = useTaskMetrics(tasks || []);
 
   return (
     <Card className="border-2 border-border">
@@ -70,26 +70,26 @@ export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskB
             {/* Task Metrics - Inline with title */}
             {!isPublicView && (
               <div className="flex items-center gap-4 text-sm">
-                {metrics.avgCompletionDays !== null && (
+                {metrics?.avgCompletionDays !== null && metrics?.avgCompletionDays !== undefined && (
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Clock className="h-4 w-4" />
                     <span>Avg: <span className="font-medium text-foreground">{metrics.avgCompletionDays}d</span></span>
                   </div>
                 )}
-                {metrics.topCompleter && (
+                {metrics?.topCompleter && (
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Trophy className="h-4 w-4 text-amber-500" />
                     <span>
-                      <span className="font-medium text-foreground">{metrics.topCompleter.name.split(' ')[0]}</span>
+                      <span className="font-medium text-foreground">{String(metrics.topCompleter.name || '').split(' ')[0]}</span>
                       <Badge variant="secondary" className="ml-1 text-xs">{metrics.topCompleter.count}</Badge>
                     </span>
                   </div>
                 )}
-                {metrics.topCreator && (
+                {metrics?.topCreator && (
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <PenLine className="h-4 w-4 text-blue-500" />
                     <span>
-                      <span className="font-medium text-foreground">{metrics.topCreator.name.split(' ')[0]}</span>
+                      <span className="font-medium text-foreground">{String(metrics.topCreator.name || '').split(' ')[0]}</span>
                       <Badge variant="outline" className="ml-1 text-xs">{metrics.topCreator.count}</Badge>
                     </span>
                   </div>

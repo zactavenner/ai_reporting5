@@ -54,7 +54,7 @@ export function KanbanTaskCard({
 
   const updateTask = useUpdateTask();
   const completeRecurring = useCompleteRecurringTask();
-  const { data: files = [] } = useTaskFiles(task.id);
+  const { data: files = [] } = useTaskFiles(task?.id);
 
   const style = {
     transform: CSS.Transform.toString(transform),

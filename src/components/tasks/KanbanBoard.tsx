@@ -545,14 +545,19 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
 
           <DragOverlay>
             {activeTask && (
-              <KanbanTaskCard
-                task={activeTask}
-                clientName={activeTask.client_id ? clientMap[activeTask.client_id] : undefined}
-                assignee={activeTask.assigned_to ? memberMap[activeTask.assigned_to] : undefined}
-                taskAssignees={taskAssigneeMap[activeTask.id]}
-                isDragging
-                isPublicView={isPublicView}
-              />
+              <div className="p-3 rounded-lg bg-card border shadow-xl rotate-1 scale-105 w-80 opacity-90">
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge variant={activeTask.priority === 'high' ? 'destructive' : 'secondary'} className="text-[10px] uppercase font-semibold px-1.5 py-0">
+                    {activeTask.priority}
+                  </Badge>
+                  {activeTask.client_id && clientMap[activeTask.client_id] && (
+                    <span className="text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+                      {clientMap[activeTask.client_id]}
+                    </span>
+                  )}
+                </div>
+                <h4 className="font-medium text-sm leading-tight">{activeTask.title}</h4>
+              </div>
             )}
           </DragOverlay>
         </DndContext>
