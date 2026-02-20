@@ -272,6 +272,8 @@ import { toast } from 'sonner';
     });
   };
 
+  const completeRecurring = useCompleteRecurringTask();
+
   if (!task) return null;
    
    const resolvedClientId = clientId || task.client_id;
@@ -284,8 +286,6 @@ import { toast } from 'sonner';
      navigator.clipboard.writeText(taskUrl);
      toast.success('Task link copied to clipboard!');
    };
-   
-   const completeRecurring = useCompleteRecurringTask();
    
    const handleStatusChange = async (newStatus: string) => {
      const oldStage = task.stage;
