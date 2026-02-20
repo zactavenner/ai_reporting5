@@ -51,8 +51,12 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
   const { data: pods = [] } = useAgencyPods();
   const { currentMember } = useTeamMember();
   
-  // Calculate default due date (2 business days from today)
-  const defaultDueDate = useMemo(() => addBusinessDays(new Date(), 2), []);
+  // Default due date: yesterday
+  const defaultDueDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d;
+  }, []);
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -77,8 +81,9 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
   // Reset due date when modal opens
   useEffect(() => {
     if (open) {
-      const newDefaultDate = addBusinessDays(new Date(), 2);
-      setDueDate(newDefaultDate);
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      setDueDate(yesterday);
       setDueDateManuallySet(false);
     }
   }, [open]);
@@ -182,7 +187,8 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
     setDescription('');
     setClientId(defaultClientId || '');
     setPriority('medium');
-    setDueDate(addBusinessDays(new Date(), 2));
+    const resetYesterday = new Date(); resetYesterday.setDate(resetYesterday.getDate() - 1);
+    setDueDate(resetYesterday);
     setDueDateManuallySet(false);
     setAssignedTo('');
     setSelectedMemberId('');
@@ -306,7 +312,7 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
               <Label>
                 Due Date
                 {!dueDateManuallySet && dueDate && (
-                  <span className="text-xs text-muted-foreground ml-2">(auto: 2 business days)</span>
+                  <span className="text-xs text-muted-foreground ml-2">(auto: yesterday)</span>
                 )}
               </Label>
               <Popover>
