@@ -1,99 +1,110 @@
 
 
-# Ad-Level Attribution + Hyros-Style Meta Ads Overlay
+# Comprehensive Sync Overhaul: Meta Ads Daily + GHL/HubSpot Every 6 Hours + Sync Panel Upgrade
 
-## Overview
+## Current State
 
-This plan adds **ad-level CRM attribution** to the Ads Manager so every individual ad shows Leads, Calls, Showed, Funded, and CPA -- completing the full-funnel Hyros alternative at all three levels (Campaign > Ad Set > Ad).
-
-Regarding the **Chrome Extension**: Lovable builds web applications, not browser extensions. However, I can build an equivalent **embeddable overlay page** that you can open side-by-side with Meta Ads Manager, or even bookmark as a quick-access panel. It will show real-time CRM attribution (calls, funded investors) mapped to your Meta ad account structure.
+- **16 active/onboarding clients**, all have GHL API keys
+- **Only 3 clients** (Blue Capital, HRT, LSCRE) have their own Meta access token; the rest need the shared token
+- **1 client** (Paradyme) uses HubSpot instead of GHL
+- **8 clients** have Meta ad account IDs configured but no token -- they are currently skipped
+- The `metaApiCallCount` variable is module-level and never resets between warm invocations (bug)
+- No `META_SHARED_ACCESS_TOKEN` secret exists yet
 
 ---
 
-## Part 1: Ad-Level Attribution in Sync Function
+## Part 1: Meta Ads -- Shared Token + Daily 4 AM PST Sync
 
-**Problem**: The `attributeCRMData` function currently only attributes leads/calls/funded at the campaign and ad set level. The `meta_ads` table already has attribution columns but they're never populated.
+### 1a. Add `META_SHARED_ACCESS_TOKEN` Secret
+- Prompt you to securely store the shared Graph API token as a backend secret
 
-**Solution**: Extend the attribution logic to match leads to specific ads using a two-pass approach:
+### 1b. Fix `sync-meta-ads` Edge Function
+- Reset `metaApiCallCount = 0` at the top of every request (fixes warm isolate bug)
+- Add fallback logic: if a client has no `meta_access_token`, use the `META_SHARED_ACCESS_TOKEN` secret
+- Only error if BOTH are missing
 
-1. **Direct match**: If leads have an `ad_id` field populated (from UTM parameters or GHL custom fields), match directly to `meta_ads.meta_ad_id`
-2. **Name-based match**: Since ad set names in GHL often embed the ad creative name (e.g., ad set "Static-Ad-6 | Broad | iOS Users" contains ad name "Static-Ad-6"), use fuzzy/substring matching to attribute leads to the most likely ad within that ad set
+### 1c. New `sync-meta-ads-daily` Orchestrator Edge Function
+- Queries all active clients with a `meta_ad_account_id`
+- Loops through them sequentially with a 30-second delay between each client
+- Calls `sync-meta-ads` for each with yesterday's date as start and end
+- Returns a summary of successes/failures
+- Estimated runtime: ~8 minutes for 10 clients (well within Edge Function limits using `waitUntil`)
 
-**File**: `supabase/functions/sync-meta-ads/index.ts`
-- Add ad-level stats aggregation map (similar to existing campaign/adSet maps)
-- For each lead, attempt to match to a specific ad by:
-  - Checking if `ad_set_name` contains any ad name from that ad set
-  - Using the ad with the best substring match
-- Update `meta_ads` rows with attribution counts and cost metrics
+### 1d. Cron Job: Daily at 4 AM PST (12:00 UTC)
+- Schedule `sync-meta-ads-daily` via `pg_cron` + `pg_net`
+- Replaces the current staggered 4-hour Meta sync approach
 
-## Part 2: Full Attribution Columns in Ads Table UI
+### 1e. Enable Sync for All Clients with Ad Accounts
+- Set `meta_ads_sync_enabled = true` for all clients that have a `meta_ad_account_id`
 
-**Problem**: The Ads tab currently only shows Spend, Impressions, CPM, Clicks, CTR, CPC -- missing all CRM attribution columns.
+---
 
-**Solution**: Add the full METRIC_HEADERS (Leads, CPL, Calls, Showed, Funded, Funded $, CPA) to the Ads table, matching the Campaign and Ad Set tables.
+## Part 2: GHL Sync Every 6 Hours (Leads, Calls, Pipelines)
 
-**File**: `src/components/ads-manager/AdsManagerTab.tsx`
-- Replace the hardcoded 7 metric columns in AdsTable with the shared `METRIC_HEADERS` and `MetricCells` component (already used by campaigns/ad sets)
-- Keep the creative thumbnail preview in the first column
+### 2a. New `sync-ghl-all-clients` Orchestrator Edge Function
+- Queries all active clients with `ghl_api_key` and `ghl_location_id`
+- Skips HubSpot clients (those with `hubspot_portal_id`)
+- For each GHL client (sequentially, 15-second delay):
+  - Invokes `sync-ghl-contacts` for leads (recent contacts)
+  - Invokes `sync-calendar-appointments` for calls/calendar
+  - Invokes `sync-ghl-pipelines` for pipeline opportunities
+- Logs results per client
 
-## Part 3: Meta Ads Overlay Page (Chrome Extension Alternative)
+### 2b. New `sync-hubspot-all-clients` Orchestrator Edge Function
+- Same pattern but for HubSpot clients (currently just Paradyme)
+- Invokes `sync-hubspot-contacts` for each
 
-Build a standalone route `/meta-overlay` that provides a compact, always-on-top-style view of CRM attribution data organized by Meta ad structure. This can be opened in a separate browser window alongside the actual Meta Ads Manager.
+### 2c. Cron Jobs: Every 6 Hours
+- GHL orchestrator: `0 0,6,12,18 * * *` (midnight, 6am, noon, 6pm UTC)
+- HubSpot orchestrator: `30 0,6,12,18 * * *` (offset by 30 min to avoid overlap)
 
-**New file**: `src/pages/MetaAdsOverlay.tsx`
-- Compact, dark-themed panel designed to sit beside Meta Ads Manager
-- Client selector dropdown at top
-- Shows campaigns with expandable ad sets and ads
-- Each row shows: Leads, Calls, Showed, Funded, Funded $, CPA
-- Auto-refreshes every 60 seconds
-- Color-coded performance indicators (green/yellow/red based on CPA thresholds)
-- Copy-to-clipboard for any metric value
-- Searchable by campaign/ad set/ad name so you can quickly find the row matching what you're looking at in Meta
+---
 
-**Route**: Add `/meta-overlay` to `App.tsx` (public, no password gate)
+## Part 3: Agency Sync Status Panel Overhaul
+
+### 3a. Add CRM Type Column
+- Show "GHL" or "HubSpot" badge per client so it's immediately clear which system is in use
+- For HubSpot clients, Calendar and Pipeline columns should reflect HubSpot sync dates (not GHL)
+
+### 3b. Add Missing Integration Columns
+- **CRM Contacts**: Already exists (Leads column) -- ensure it shows the correct source
+- **Calls/Calendar**: Already exists -- ensure HubSpot clients show their meeting sync status
+- **Pipeline**: Already exists -- ensure HubSpot clients show deal sync status
+- **Meta Ads**: Already exists
+- Add a **"Last Full Sync"** timestamp showing the most recent orchestrator run
+
+### 3c. Health Thresholds Update
+- Meta Ads: Healthy if synced within 26 hours (daily sync + buffer), Stale if within 48h, Error if older
+- GHL/HubSpot: Keep current thresholds (Healthy <=6h, Stale <=24h, Error >24h)
+
+### 3d. CRM Source Badge
+- Each client row shows a small colored badge: "GHL" (blue) or "HS" (purple) next to the client name
+- If both are configured, show both
 
 ---
 
 ## Technical Details
 
-### Sync Function Changes (`sync-meta-ads/index.ts`)
+### Files to Create
+1. `supabase/functions/sync-meta-ads-daily/index.ts` -- Meta orchestrator
+2. `supabase/functions/sync-ghl-all-clients/index.ts` -- GHL orchestrator
+3. `supabase/functions/sync-hubspot-all-clients/index.ts` -- HubSpot orchestrator
 
-```text
-attributeCRMData() additions:
-  1. Fetch all meta_ads for client (id, name, ad_set_id, spend)
-  2. Build ad-name-to-ad-set mapping
-  3. For each lead with ad_set_name:
-     - Find matching meta_ad_set by name
-     - Find best-matching meta_ad within that set (substring match on ad name)
-     - Aggregate stats into adStats map
-  4. Update meta_ads rows with attribution data
-```
+### Files to Edit
+1. `supabase/functions/sync-meta-ads/index.ts` -- Reset counter + shared token fallback
+2. `supabase/config.toml` -- Register new functions with `verify_jwt = false`
+3. `src/components/dashboard/AgencySyncStatusPanel.tsx` -- Add CRM type badge, update health thresholds for Meta (26h), ensure HubSpot clients show correct sync dates for Calendar/Pipeline columns
 
-### UI Changes (`AdsManagerTab.tsx`)
+### Database Operations (via insert tool, not migrations)
+1. Add `META_SHARED_ACCESS_TOKEN` secret
+2. Create 3 cron jobs:
+   - `daily-meta-ads-sync`: `0 12 * * *` (4 AM PST) calling `sync-meta-ads-daily`
+   - `six-hour-ghl-sync`: `0 0,6,12,18 * * *` calling `sync-ghl-all-clients`
+   - `six-hour-hubspot-sync`: `30 0,6,12,18 * * *` calling `sync-hubspot-all-clients`
+3. Enable `meta_ads_sync_enabled` for all clients with ad account IDs
 
-- AdsTable: Replace individual SortableTableHeader columns with `METRIC_HEADERS.map(...)` loop
-- AdsTable: Replace individual TableCells with `<MetricCells row={a} />`
-- Keeps creative thumbnail + preview modal intact
-
-### Overlay Page (`MetaAdsOverlay.tsx`)
-
-- Uses existing hooks: `useClients`, `useMetaCampaigns`, `useMetaAdSets`, `useMetaAds`
-- Minimal UI with `refetchInterval: 60000` for auto-refresh
-- Expandable tree: Campaign > Ad Set > Ad with attribution metrics inline
-- No sidebar/header chrome -- just the data panel
-
-### Route Registration (`App.tsx`)
-
-- Add `/meta-overlay` as a public route (no PasswordGate)
-
----
-
-## Files to Create/Edit
-
-| File | Action |
-|------|--------|
-| `supabase/functions/sync-meta-ads/index.ts` | Edit -- add ad-level attribution |
-| `src/components/ads-manager/AdsManagerTab.tsx` | Edit -- full metrics in Ads tab |
-| `src/pages/MetaAdsOverlay.tsx` | Create -- compact overlay page |
-| `src/App.tsx` | Edit -- add overlay route |
+### Rate Limit Safety
+- Meta: 30s delay between clients, yesterday-only = ~15-20 API calls per client, well within 200/hour/token
+- GHL: 15s delay between clients, incremental sync only (recent data), respects existing pagination limits
+- HubSpot: 100ms request delay already built into existing function
 
