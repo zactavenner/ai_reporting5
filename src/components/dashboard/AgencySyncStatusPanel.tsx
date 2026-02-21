@@ -52,12 +52,12 @@ interface AgencySyncStatusPanelProps {
 
 type SyncStatus = 'healthy' | 'stale' | 'error' | 'not_configured';
 
-function getSyncStatusFromDate(lastSync: string | null, hasCredentials: boolean): SyncStatus {
+function getSyncStatusFromDate(lastSync: string | null, hasCredentials: boolean, thresholdHours: { healthy: number; stale: number } = { healthy: 6, stale: 24 }): SyncStatus {
   if (!hasCredentials) return 'not_configured';
   if (!lastSync) return 'not_configured';
   const hours = (Date.now() - new Date(lastSync).getTime()) / (1000 * 60 * 60);
-  if (hours <= 6) return 'healthy';
-  if (hours <= 24) return 'stale';
+  if (hours <= thresholdHours.healthy) return 'healthy';
+  if (hours <= thresholdHours.stale) return 'stale';
   return 'error';
 }
 
@@ -173,10 +173,6 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
         }
       }
       
-      if (!clientInfo?.metaAccessToken) {
-        toast.error('Meta Access Token is not configured for this client.');
-        return;
-      }
       if (!clientInfo?.metaAdAccountId) {
         toast.error('Meta Ad Account ID is not configured for this client.');
         return;
@@ -300,14 +296,15 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
     }
   };
 
-  const getGhlStatus = (c: ClientSyncInfo): SyncStatus => {
+    const getGhlStatus = (c: ClientSyncInfo): SyncStatus => {
     if (c.hubspotPortalId) return getSyncStatusFromDate(c.lastHubspotSyncAt, !!c.hubspotPortalId);
     if (c.ghlSyncStatus === 'error') return 'error';
     return getSyncStatusFromDate(c.lastGhlSyncAt, !!(c.ghlLocationId && c.ghlApiKey));
   };
 
   const getMetaStatus = (c: ClientSyncInfo): SyncStatus => {
-    return getSyncStatusFromDate(c.metaLastSync, !!(c.metaAdAccountId || c.metaAccessToken));
+    // Meta syncs daily — healthy within 26h, stale within 48h
+    return getSyncStatusFromDate(c.metaLastSync, !!(c.metaAdAccountId), { healthy: 26, stale: 48 });
   };
 
   if (clientSyncData.length === 0) return null;
@@ -390,6 +387,11 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
                               {c.status}
                             </Badge>
                             <span className="truncate max-w-[100px]">{c.name}</span>
+                            {c.hubspotPortalId ? (
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 border-purple-400 text-purple-600 dark:text-purple-400">HS</Badge>
+                            ) : (c.ghlLocationId && c.ghlApiKey) ? (
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 border-blue-400 text-blue-600 dark:text-blue-400">GHL</Badge>
+                            ) : null}
                           </div>
                         </TableCell>
 

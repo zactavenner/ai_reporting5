@@ -282,6 +282,9 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Reset API call counter for each request (fixes warm isolate bug)
+  metaApiCallCount = 0;
+
   try {
     const { clientId, startDate, endDate } = await req.json();
     if (!clientId) {
@@ -307,14 +310,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!client.meta_access_token || !client.meta_ad_account_id) {
+    if (!client.meta_ad_account_id) {
       return new Response(JSON.stringify({
         success: false,
-        error: "Meta Access Token and Ad Account ID must be configured in client settings.",
+        error: "Meta Ad Account ID must be configured in client settings.",
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const accessToken = client.meta_access_token;
+    // Use client-specific token, fall back to shared token
+    const accessToken = client.meta_access_token || Deno.env.get("META_SHARED_ACCESS_TOKEN");
+    if (!accessToken) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "No Meta access token available (client token and shared token both missing).",
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const adAccountId = client.meta_ad_account_id.startsWith("act_")
       ? client.meta_ad_account_id
       : `act_${client.meta_ad_account_id}`;

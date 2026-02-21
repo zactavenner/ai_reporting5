@@ -77,3 +77,12 @@ verify_jwt = false
 
 [functions.sync-meta-ads]
 verify_jwt = false
+
+[functions.sync-meta-ads-daily]
+verify_jwt = false
+
+[functions.sync-ghl-all-clients]
+verify_jwt = false
+
+[functions.sync-hubspot-all-clients]
+verify_jwt = false
