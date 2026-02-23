@@ -1102,14 +1102,20 @@ async function syncClientContacts(
   const reconnectCalendarIds: string[] = settings?.reconnect_calendar_ids || [];
   
   // Fetch opportunities to match with contacts for funded investor creation
-  const opportunities = await fetchGHLOpportunities(client.ghl_api_key, client.ghl_location_id);
+  // Wrapped in try-catch so pipeline failures don't block contact/calendar sync
   const opportunityByContactId = new Map<string, GHLOpportunity>();
-  for (const opp of opportunities) {
-    if (opp.contactId) {
-      opportunityByContactId.set(opp.contactId, opp);
+  try {
+    const opportunities = await fetchGHLOpportunities(client.ghl_api_key, client.ghl_location_id);
+    for (const opp of opportunities) {
+      if (opp.contactId) {
+        opportunityByContactId.set(opp.contactId, opp);
+      }
     }
+    console.log(`Fetched ${opportunities.length} opportunities for ${client.name}`);
+  } catch (err) {
+    console.error(`Failed to fetch opportunities for ${client.name}, continuing without pipeline data:`, err);
+    result.errors.push(`Pipeline fetch failed (non-blocking): ${err instanceof Error ? err.message : 'Unknown error'}`);
   }
-  console.log(`Fetched ${opportunities.length} opportunities for ${client.name}`);
   
   let hasMore = true;
   let startAfterId: string | undefined;
@@ -2079,14 +2085,20 @@ async function syncAllContactsUnlimited(
   console.log(`Starting unlimited contact sync for client: ${client.name}`);
   
   // Fetch opportunities for matching
-  const opportunities = await fetchGHLOpportunities(client.ghl_api_key, client.ghl_location_id);
+  // Wrapped in try-catch so contact sync continues even if pipeline fetch fails
   const opportunityByContactId = new Map<string, GHLOpportunity>();
-  for (const opp of opportunities) {
-    if (opp.contactId) {
-      opportunityByContactId.set(opp.contactId, opp);
+  try {
+    const opportunities = await fetchGHLOpportunities(client.ghl_api_key, client.ghl_location_id);
+    for (const opp of opportunities) {
+      if (opp.contactId) {
+        opportunityByContactId.set(opp.contactId, opp);
+      }
     }
+    console.log(`Fetched ${opportunities.length} opportunities for matching`);
+  } catch (err) {
+    console.error(`Failed to fetch opportunities for ${client.name}, continuing without pipeline data:`, err);
+    result.errors.push(`Pipeline fetch failed (non-blocking): ${err instanceof Error ? err.message : 'Unknown error'}`);
   }
-  console.log(`Fetched ${opportunities.length} opportunities for matching`);
   
   let hasMore = true;
   let startAfterId: string | undefined;
