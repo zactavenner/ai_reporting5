@@ -1,110 +1,117 @@
 
 
-# Comprehensive Sync Overhaul: Meta Ads Daily + GHL/HubSpot Every 6 Hours + Sync Panel Upgrade
+# Daily Accuracy Assurance System
 
-## Current State
+## Summary
 
-- **16 active/onboarding clients**, all have GHL API keys
-- **Only 3 clients** (Blue Capital, HRT, LSCRE) have their own Meta access token; the rest need the shared token
-- **1 client** (Paradyme) uses HubSpot instead of GHL
-- **8 clients** have Meta ad account IDs configured but no token -- they are currently skipped
-- The `metaApiCallCount` variable is module-level and never resets between warm invocations (bug)
-- No `META_SHARED_ACCESS_TOKEN` secret exists yet
+Build a standalone metrics reconciliation system that runs independently of the sync pipeline, ensuring `daily_metrics` always matches source-of-truth tables (`leads`, `calls`, `funded_investors`) while preserving Meta Ads data. This addresses 6 identified accuracy gaps including a critical bug where the current recalculation deletes ad spend data on days with zero CRM activity.
 
 ---
 
-## Part 1: Meta Ads -- Shared Token + Daily 4 AM PST Sync
+## Critical Bug Found
 
-### 1a. Add `META_SHARED_ACCESS_TOKEN` Secret
-- Prompt you to securely store the shared Graph API token as a backend secret
-
-### 1b. Fix `sync-meta-ads` Edge Function
-- Reset `metaApiCallCount = 0` at the top of every request (fixes warm isolate bug)
-- Add fallback logic: if a client has no `meta_access_token`, use the `META_SHARED_ACCESS_TOKEN` secret
-- Only error if BOTH are missing
-
-### 1c. New `sync-meta-ads-daily` Orchestrator Edge Function
-- Queries all active clients with a `meta_ad_account_id`
-- Loops through them sequentially with a 30-second delay between each client
-- Calls `sync-meta-ads` for each with yesterday's date as start and end
-- Returns a summary of successes/failures
-- Estimated runtime: ~8 minutes for 10 clients (well within Edge Function limits using `waitUntil`)
-
-### 1d. Cron Job: Daily at 4 AM PST (12:00 UTC)
-- Schedule `sync-meta-ads-daily` via `pg_cron` + `pg_net`
-- Replaces the current staggered 4-hour Meta sync approach
-
-### 1e. Enable Sync for All Clients with Ad Accounts
-- Set `meta_ads_sync_enabled = true` for all clients that have a `meta_ad_account_id`
+The existing `recalculateRecentMetrics` function (line 2751-2886 of `sync-ghl-contacts`) **deletes** all `daily_metrics` rows for the last 7 days, then only re-inserts rows where CRM activity exists. Any day with Meta ad spend but zero leads/calls/funded loses its ad_spend, impressions, and clicks data permanently. This must be fixed as part of this work.
 
 ---
 
-## Part 2: GHL Sync Every 6 Hours (Leads, Calls, Pipelines)
+## What Gets Built
 
-### 2a. New `sync-ghl-all-clients` Orchestrator Edge Function
-- Queries all active clients with `ghl_api_key` and `ghl_location_id`
-- Skips HubSpot clients (those with `hubspot_portal_id`)
-- For each GHL client (sequentially, 15-second delay):
-  - Invokes `sync-ghl-contacts` for leads (recent contacts)
-  - Invokes `sync-calendar-appointments` for calls/calendar
-  - Invokes `sync-ghl-pipelines` for pipeline opportunities
-- Logs results per client
+### 1. New `recalculate-daily-metrics` Edge Function (Highest Priority)
 
-### 2b. New `sync-hubspot-all-clients` Orchestrator Edge Function
-- Same pattern but for HubSpot clients (currently just Paradyme)
-- Invokes `sync-hubspot-contacts` for each
+A standalone function that recalculates CRM-sourced columns in `daily_metrics` for all active clients across a configurable date range, **without touching ad spend columns**.
 
-### 2c. Cron Jobs: Every 6 Hours
-- GHL orchestrator: `0 0,6,12,18 * * *` (midnight, 6am, noon, 6pm UTC)
-- HubSpot orchestrator: `30 0,6,12,18 * * *` (offset by 30 min to avoid overlap)
+Logic per client per date:
+- Count non-spam leads from `leads` where `created_at` falls on that date
+- Count spam leads separately
+- Count booked calls (non-reconnect) from `calls` where `booked_at` falls on that date
+- Count showed calls (non-reconnect) where `showed = true`
+- Count reconnect calls and reconnect showed
+- Sum funded investors and funded dollars from `funded_investors` where `funded_at` falls on that date
+- **UPSERT** into `daily_metrics` using `ON CONFLICT (client_id, date)` -- only updating CRM columns, never overwriting `ad_spend`, `impressions`, `clicks`, or `ctr`
+
+The function accepts optional `startDate`, `endDate`, and `clientId` parameters. Defaults to yesterday + today for all active clients.
+
+### 2. New `daily-accuracy-check` Edge Function
+
+A validation function that compares `daily_metrics` against live source table counts for yesterday across all clients. For each discrepancy found:
+- Logs it to a new `sync_accuracy_log` table
+- Triggers recalculation for that specific client/date
+- Returns a summary of discrepancies found and auto-fixed
+
+### 3. New `sync_accuracy_log` Database Table
+
+```text
+Columns:
+- id (uuid, PK)
+- client_id (uuid)
+- check_date (date) -- the date being validated
+- metric_type (text) -- 'leads', 'calls', 'showed_calls', 'funded_investors', etc.
+- expected_count (integer) -- from source tables
+- actual_count (integer) -- from daily_metrics
+- discrepancy (integer) -- difference
+- auto_fixed (boolean)
+- created_at (timestamptz)
+```
+
+### 4. Fix `recalculateRecentMetrics` in Both Sync Functions
+
+Change the DELETE + INSERT pattern to an UPSERT pattern that preserves ad spend columns. Instead of deleting rows and re-inserting, it will upsert only CRM columns (leads, calls, showed, funded, etc.) while leaving ad_spend/impressions/clicks/ctr untouched.
+
+This fix applies to:
+- `supabase/functions/sync-ghl-contacts/index.ts` (lines 2751-2893)
+- `supabase/functions/sync-hubspot-contacts/index.ts` (same pattern)
+
+### 5. New Cron Jobs
+
+| Job | Schedule | What it does |
+|-----|----------|--------------|
+| `daily-metrics-recalculate` | `0 13 * * *` (5 AM PST) | Runs `recalculate-daily-metrics` for yesterday + today |
+| `daily-accuracy-check` | `0 14 * * *` (6 AM PST) | Runs `daily-accuracy-check` to validate and auto-fix |
+
+### 6. Fix Pipeline Funded Investor External ID
+
+Normalize the `external_id` in the pipeline-based funded investor creation path to always use `contactId` (not `opp.contactId + opp.id`), consistent with the tag-based path. The existing unique constraint on `(client_id, external_id)` will then properly prevent duplicates across both paths.
+
+### 7. Accuracy Health in Agency Sync Panel
+
+Add a small accuracy indicator to `AgencySyncStatusPanel.tsx`:
+- Show last accuracy check timestamp
+- Show discrepancy count from yesterday
+- Green if 0 discrepancies, yellow if auto-fixed, red if unfixed
 
 ---
 
-## Part 3: Agency Sync Status Panel Overhaul
+## Files to Create
 
-### 3a. Add CRM Type Column
-- Show "GHL" or "HubSpot" badge per client so it's immediately clear which system is in use
-- For HubSpot clients, Calendar and Pipeline columns should reflect HubSpot sync dates (not GHL)
+1. `supabase/functions/recalculate-daily-metrics/index.ts`
+2. `supabase/functions/daily-accuracy-check/index.ts`
 
-### 3b. Add Missing Integration Columns
-- **CRM Contacts**: Already exists (Leads column) -- ensure it shows the correct source
-- **Calls/Calendar**: Already exists -- ensure HubSpot clients show their meeting sync status
-- **Pipeline**: Already exists -- ensure HubSpot clients show deal sync status
-- **Meta Ads**: Already exists
-- Add a **"Last Full Sync"** timestamp showing the most recent orchestrator run
+## Files to Modify
 
-### 3c. Health Thresholds Update
-- Meta Ads: Healthy if synced within 26 hours (daily sync + buffer), Stale if within 48h, Error if older
-- GHL/HubSpot: Keep current thresholds (Healthy <=6h, Stale <=24h, Error >24h)
+1. `supabase/functions/sync-ghl-contacts/index.ts` -- Fix `recalculateRecentMetrics` to use upsert instead of delete+insert; fix pipeline funded investor external_id
+2. `supabase/functions/sync-hubspot-contacts/index.ts` -- Same upsert fix for its copy of `recalculateRecentMetrics`
+3. `supabase/config.toml` -- Register 2 new functions with `verify_jwt = false`
+4. `src/components/dashboard/AgencySyncStatusPanel.tsx` -- Add accuracy health indicator
 
-### 3d. CRM Source Badge
-- Each client row shows a small colored badge: "GHL" (blue) or "HS" (purple) next to the client name
-- If both are configured, show both
+## Database Changes
+
+1. Create `sync_accuracy_log` table (via migration)
+2. Add 2 new cron jobs (via insert tool, not migration)
+
+## Existing Cron Jobs to Keep
+
+The existing hourly sync jobs (GHL contacts, calendar, pipelines, HubSpot) and the 6-hour orchestrators remain unchanged. The new daily recalculation runs *after* all syncs complete, acting as a safety net.
 
 ---
 
-## Technical Details
+## Implementation Order
 
-### Files to Create
-1. `supabase/functions/sync-meta-ads-daily/index.ts` -- Meta orchestrator
-2. `supabase/functions/sync-ghl-all-clients/index.ts` -- GHL orchestrator
-3. `supabase/functions/sync-hubspot-all-clients/index.ts` -- HubSpot orchestrator
-
-### Files to Edit
-1. `supabase/functions/sync-meta-ads/index.ts` -- Reset counter + shared token fallback
-2. `supabase/config.toml` -- Register new functions with `verify_jwt = false`
-3. `src/components/dashboard/AgencySyncStatusPanel.tsx` -- Add CRM type badge, update health thresholds for Meta (26h), ensure HubSpot clients show correct sync dates for Calendar/Pipeline columns
-
-### Database Operations (via insert tool, not migrations)
-1. Add `META_SHARED_ACCESS_TOKEN` secret
-2. Create 3 cron jobs:
-   - `daily-meta-ads-sync`: `0 12 * * *` (4 AM PST) calling `sync-meta-ads-daily`
-   - `six-hour-ghl-sync`: `0 0,6,12,18 * * *` calling `sync-ghl-all-clients`
-   - `six-hour-hubspot-sync`: `30 0,6,12,18 * * *` calling `sync-hubspot-all-clients`
-3. Enable `meta_ads_sync_enabled` for all clients with ad account IDs
-
-### Rate Limit Safety
-- Meta: 30s delay between clients, yesterday-only = ~15-20 API calls per client, well within 200/hour/token
-- GHL: 15s delay between clients, incremental sync only (recent data), respects existing pagination limits
-- HubSpot: 100ms request delay already built into existing function
+1. Fix the critical `recalculateRecentMetrics` bug (upsert pattern) in both sync functions
+2. Create `sync_accuracy_log` table
+3. Build `recalculate-daily-metrics` edge function
+4. Build `daily-accuracy-check` edge function
+5. Register functions in config.toml
+6. Add cron jobs
+7. Fix pipeline funded investor dedup
+8. Add accuracy health to sync panel
 
