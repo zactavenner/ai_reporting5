@@ -13,6 +13,8 @@ import {
   PenLine,
   Activity,
   Bell,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { useAllTasks, Task } from '@/hooks/useTasks';
 import { useClients, Client } from '@/hooks/useClients';
@@ -42,6 +44,7 @@ export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskB
   const { data: notifications = [] } = useNotifications(currentMember?.id);
   const unreadCount = Array.isArray(notifications) ? notifications.filter(n => !n.is_read).length : 0;
   const [showCreateTask, setShowCreateTask] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   // Deep-link: if ?task= is present, ensure we're on kanban view so KanbanBoard picks it up
   useEffect(() => {
@@ -74,7 +77,7 @@ export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskB
   const metrics = useTaskMetrics(tasks || []);
 
   return (
-    <Card className="border-2 border-border">
+    <Card className={`border-2 border-border transition-all ${expanded ? 'fixed inset-0 z-50 rounded-none overflow-auto' : ''}`}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
@@ -144,6 +147,14 @@ export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskB
                 )}
               </TabsList>
             </Tabs>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => setExpanded(!expanded)}
+              title={expanded ? 'Collapse' : 'Expand'}
+            >
+              {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
             <Button size="sm" onClick={() => setShowCreateTask(true)}>
               <Plus className="h-4 w-4 mr-1" />
               Add Task
