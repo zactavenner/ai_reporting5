@@ -20,15 +20,15 @@ interface DateFilterContextType {
 const DateFilterContext = createContext<DateFilterContextType | undefined>(undefined);
 
 export function DateFilterProvider({ children }: { children: ReactNode }) {
-  // Default to last 30 days
+  // Default to yesterday
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const thirtyDaysAgo = new Date(today);
-  thirtyDaysAgo.setDate(today.getDate() - 30);
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
 
   const [dateRange, setDateRange] = useState<DateRange>({
-    from: thirtyDaysAgo,
-    to: today,
+    from: yesterday,
+    to: yesterday,
   });
 
   // Source filter state
