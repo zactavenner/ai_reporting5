@@ -28,10 +28,10 @@ export function TeamMemberProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Restore session on mount
-    const storedId = sessionStorage.getItem(SESSION_MEMBER_ID);
-    const storedName = sessionStorage.getItem(SESSION_MEMBER_NAME);
-    const storedEmail = sessionStorage.getItem(SESSION_MEMBER_EMAIL);
-    const storedRole = sessionStorage.getItem(SESSION_MEMBER_ROLE);
+    const storedId = localStorage.getItem(SESSION_MEMBER_ID);
+    const storedName = localStorage.getItem(SESSION_MEMBER_NAME);
+    const storedEmail = localStorage.getItem(SESSION_MEMBER_EMAIL);
+    const storedRole = localStorage.getItem(SESSION_MEMBER_ROLE);
     
     if (storedId && storedName && storedEmail) {
       setCurrentMember({
@@ -46,10 +46,10 @@ export function TeamMemberProvider({ children }: { children: ReactNode }) {
 
   const login = async (member: TeamMember) => {
     // Store in session
-    sessionStorage.setItem(SESSION_MEMBER_ID, member.id);
-    sessionStorage.setItem(SESSION_MEMBER_NAME, member.name);
-    sessionStorage.setItem(SESSION_MEMBER_EMAIL, member.email);
-    sessionStorage.setItem(SESSION_MEMBER_ROLE, member.role);
+    localStorage.setItem(SESSION_MEMBER_ID, member.id);
+    localStorage.setItem(SESSION_MEMBER_NAME, member.name);
+    localStorage.setItem(SESSION_MEMBER_EMAIL, member.email);
+    localStorage.setItem(SESSION_MEMBER_ROLE, member.role);
     
     setCurrentMember(member);
     
@@ -71,10 +71,11 @@ export function TeamMemberProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    sessionStorage.removeItem(SESSION_MEMBER_ID);
-    sessionStorage.removeItem(SESSION_MEMBER_NAME);
-    sessionStorage.removeItem(SESSION_MEMBER_EMAIL);
-    sessionStorage.removeItem(SESSION_MEMBER_ROLE);
+    localStorage.removeItem(SESSION_MEMBER_ID);
+    localStorage.removeItem(SESSION_MEMBER_NAME);
+    localStorage.removeItem(SESSION_MEMBER_EMAIL);
+    localStorage.removeItem(SESSION_MEMBER_ROLE);
+    localStorage.removeItem('dashboard_auth');
     setCurrentMember(null);
   };
 

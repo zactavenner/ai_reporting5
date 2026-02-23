@@ -25,7 +25,7 @@ function PasswordGateContent({ children }: PasswordGateProps) {
 
   useEffect(() => {
     // Check if already authenticated in this session
-    const storedAuth = sessionStorage.getItem(SESSION_KEY);
+    const storedAuth = localStorage.getItem(SESSION_KEY);
     if (storedAuth === 'true') {
       setIsAuthenticated(true);
     }
@@ -78,7 +78,7 @@ function PasswordGateContent({ children }: PasswordGateProps) {
         role: data.member.role,
       });
 
-      sessionStorage.setItem(SESSION_KEY, 'true');
+      localStorage.setItem(SESSION_KEY, 'true');
       setIsAuthenticated(true);
       toast.success(`Welcome back, ${data.member.name}!`);
     } catch (err) {
