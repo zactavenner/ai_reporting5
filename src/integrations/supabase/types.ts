@@ -806,6 +806,7 @@ export type Database = {
           funded_investor_label: string | null
           funded_pipeline_id: string | null
           funded_stage_ids: string[] | null
+          funded_tag_pattern: string | null
           ghl_last_calls_sync: string | null
           ghl_last_contacts_sync: string | null
           ghl_sync_calls_enabled: boolean | null
@@ -870,6 +871,7 @@ export type Database = {
           funded_investor_label?: string | null
           funded_pipeline_id?: string | null
           funded_stage_ids?: string[] | null
+          funded_tag_pattern?: string | null
           ghl_last_calls_sync?: string | null
           ghl_last_contacts_sync?: string | null
           ghl_sync_calls_enabled?: boolean | null
@@ -934,6 +936,7 @@ export type Database = {
           funded_investor_label?: string | null
           funded_pipeline_id?: string | null
           funded_stage_ids?: string[] | null
+          funded_tag_pattern?: string | null
           ghl_last_calls_sync?: string | null
           ghl_last_contacts_sync?: string | null
           ghl_sync_calls_enabled?: boolean | null
@@ -1316,64 +1319,82 @@ export type Database = {
         Row: {
           ad_spend: number | null
           calls: number | null
+          calls_scheduled: number | null
+          calls_showed: number | null
           clicks: number | null
           client_id: string
           commitment_dollars: number | null
           commitments: number | null
+          commitments_on_day: number | null
           created_at: string
           ctr: number | null
           date: string
           funded_dollars: number | null
           funded_investors: number | null
+          funded_on_day: number | null
           id: string
           impressions: number | null
           leads: number | null
+          leads_created: number | null
           reconnect_calls: number | null
           reconnect_showed: number | null
           showed_calls: number | null
           spam_leads: number | null
+          unattributed_leads: number | null
           updated_at: string
         }
         Insert: {
           ad_spend?: number | null
           calls?: number | null
+          calls_scheduled?: number | null
+          calls_showed?: number | null
           clicks?: number | null
           client_id: string
           commitment_dollars?: number | null
           commitments?: number | null
+          commitments_on_day?: number | null
           created_at?: string
           ctr?: number | null
           date: string
           funded_dollars?: number | null
           funded_investors?: number | null
+          funded_on_day?: number | null
           id?: string
           impressions?: number | null
           leads?: number | null
+          leads_created?: number | null
           reconnect_calls?: number | null
           reconnect_showed?: number | null
           showed_calls?: number | null
           spam_leads?: number | null
+          unattributed_leads?: number | null
           updated_at?: string
         }
         Update: {
           ad_spend?: number | null
           calls?: number | null
+          calls_scheduled?: number | null
+          calls_showed?: number | null
           clicks?: number | null
           client_id?: string
           commitment_dollars?: number | null
           commitments?: number | null
+          commitments_on_day?: number | null
           created_at?: string
           ctr?: number | null
           date?: string
           funded_dollars?: number | null
           funded_investors?: number | null
+          funded_on_day?: number | null
           id?: string
           impressions?: number | null
           leads?: number | null
+          leads_created?: number | null
           reconnect_calls?: number | null
           reconnect_showed?: number | null
           showed_calls?: number | null
           spam_leads?: number | null
+          unattributed_leads?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -2856,6 +2877,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sync_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_warnings: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          message: string
+          metadata: Json | null
+          warning_type: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          message: string
+          metadata?: Json | null
+          warning_type: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          message?: string
+          metadata?: Json | null
+          warning_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_warnings_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"

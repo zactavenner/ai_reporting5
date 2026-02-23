@@ -5,6 +5,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/**
+ * METRIC DATE BASIS (Fix 3):
+ * - leads / leads_created: counted by leads.created_at (GHL dateAdded)
+ * - calls / calls_scheduled: counted by calls.booked_at (when appointment was created)
+ * - showed_calls / calls_showed: counted by calls.scheduled_at (actual appointment date when they showed)
+ * - funded_investors / funded_on_day: counted by funded_investors.funded_at (stage change date)
+ * - commitments / commitments_on_day: counted by funded_investors.funded_at where commitment_amount > 0
+ * - ad_spend / impressions / clicks / ctr: NEVER touched here — owned by sync-meta-ads
+ */
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -76,7 +86,7 @@ Deno.serve(async (req) => {
       const dayEnd = `${dateStr}T23:59:59.999Z`;
 
       try {
-        // Count non-spam leads
+        // ── Leads: by created_at ──
         const { count: leadsCount } = await supabase
           .from("leads")
           .select("*", { count: "exact", head: true })
@@ -103,7 +113,7 @@ Deno.serve(async (req) => {
 
         const totalValidLeads = (leadsCount || 0) + (nullSpamCount || 0);
 
-        // Count calls (non-reconnect)
+        // ── Calls booked: by booked_at (non-reconnect) ──
         const { count: callsCount } = await supabase
           .from("calls")
           .select("*", { count: "exact", head: true })
@@ -112,16 +122,26 @@ Deno.serve(async (req) => {
           .gte("booked_at", dayStart)
           .lte("booked_at", dayEnd);
 
+        // ── Fix 3: Showed calls by scheduled_at (actual appointment date) ──
         const { count: showedCount } = await supabase
           .from("calls")
           .select("*", { count: "exact", head: true })
           .eq("client_id", client.id)
           .eq("showed", true)
           .neq("is_reconnect", true)
-          .gte("booked_at", dayStart)
-          .lte("booked_at", dayEnd);
+          .gte("scheduled_at", dayStart)
+          .lte("scheduled_at", dayEnd);
 
-        // Reconnect calls
+        // ── Calls scheduled for that day: by scheduled_at ──
+        const { count: callsScheduledCount } = await supabase
+          .from("calls")
+          .select("*", { count: "exact", head: true })
+          .eq("client_id", client.id)
+          .neq("is_reconnect", true)
+          .gte("scheduled_at", dayStart)
+          .lte("scheduled_at", dayEnd);
+
+        // ── Reconnect calls by booked_at ──
         const { count: reconnectCount } = await supabase
           .from("calls")
           .select("*", { count: "exact", head: true })
@@ -130,16 +150,17 @@ Deno.serve(async (req) => {
           .gte("booked_at", dayStart)
           .lte("booked_at", dayEnd);
 
+        // ── Reconnect showed by scheduled_at ──
         const { count: reconnectShowedCount } = await supabase
           .from("calls")
           .select("*", { count: "exact", head: true })
           .eq("client_id", client.id)
           .eq("is_reconnect", true)
           .eq("showed", true)
-          .gte("booked_at", dayStart)
-          .lte("booked_at", dayEnd);
+          .gte("scheduled_at", dayStart)
+          .lte("scheduled_at", dayEnd);
 
-        // Funded investors
+        // ── Funded investors: by funded_at (stage change date) ──
         const { data: fundedData, count: fundedCount } = await supabase
           .from("funded_investors")
           .select("funded_amount, commitment_amount", { count: "exact" })
@@ -171,6 +192,12 @@ Deno.serve(async (req) => {
               funded_dollars: fundedDollars,
               commitments: commitmentCount,
               commitment_dollars: commitmentDollars,
+              // Fix 3: New day-specific columns
+              leads_created: totalValidLeads,
+              calls_scheduled: callsScheduledCount || 0,
+              calls_showed: showedCount || 0,
+              commitments_on_day: commitmentCount,
+              funded_on_day: fundedCount || 0,
               updated_at: new Date().toISOString(),
             },
             { onConflict: "client_id,date", ignoreDuplicates: false }

@@ -8,10 +8,27 @@ const corsHeaders = {
 
 const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
 
+// Fix 4: Configurable GHL status mapping — normalized to lowercase, trimmed
+const GHL_STATUS_MAP: Record<string, { outcome: string; showed: boolean }> = {
+  'showed': { outcome: 'showed', showed: true },
+  'completed': { outcome: 'showed', showed: true },
+  'noshow': { outcome: 'no_show', showed: false },
+  'no-show': { outcome: 'no_show', showed: false },
+  'no_show': { outcome: 'no_show', showed: false },
+  'cancelled': { outcome: 'cancelled', showed: false },
+  'canceled': { outcome: 'cancelled', showed: false },
+  'confirmed': { outcome: 'booked', showed: false },
+  'booked': { outcome: 'booked', showed: false },
+  'new': { outcome: 'booked', showed: false },
+  'pending': { outcome: 'booked', showed: false },
+  'rescheduled': { outcome: 'rescheduled', showed: false },
+};
+
 interface AppointmentResult {
   created: number;
   updated: number;
   skipped: number;
+  statusChanges: number;
   errors: string[];
   appointments: any[];
 }
@@ -96,6 +113,7 @@ async function fetchGHLContact(apiKey: string, contactId: string): Promise<{ nam
 }
 
 // Sync appointment to call record
+// Fix 4: Uses configurable GHL_STATUS_MAP, logs unknown statuses
 async function syncAppointmentToCall(
   supabase: any,
   clientId: string,
@@ -103,28 +121,40 @@ async function syncAppointmentToCall(
   leadsByContactId: Map<string, { id: string; name: string | null; email: string | null; phone: string | null }>,
   isReconnect: boolean,
   apiKey: string
-): Promise<{ action: 'created' | 'updated' | 'skipped' }> {
+): Promise<{ action: 'created' | 'updated' | 'skipped'; statusChanged?: boolean }> {
   const appointmentId = appt.id;
   const calendarId = appt.calendarId;
   const contactId = appt.contactId;
-  const status = (appt.status || appt.appointmentStatus || '').toLowerCase();
+  const rawStatus = (appt.status || appt.appointmentStatus || '').trim();
+  const status = rawStatus.toLowerCase();
   
-  // Map GHL appointment status to our call outcome
-  let outcome = isReconnect ? 'reconnect_booked' : 'booked';
-  let showed = false;
+  // Fix 4: Use configurable status map with normalized lookup
+  const mapped = GHL_STATUS_MAP[status];
+  let outcome: string;
+  let showed: boolean;
   
-  if (status === 'showed' || status === 'completed') {
-    outcome = isReconnect ? 'reconnect_showed' : 'showed';
-    showed = true;
-  } else if (status === 'noshow' || status === 'no-show' || status === 'no_show') {
-    outcome = 'no_show';
-    showed = false;
-  } else if (status === 'cancelled' || status === 'canceled') {
-    outcome = 'cancelled';
-    showed = false;
-  } else if (status === 'confirmed') {
+  if (mapped) {
+    outcome = isReconnect && mapped.showed ? 'reconnect_showed' : 
+              isReconnect && !mapped.showed && mapped.outcome === 'booked' ? 'reconnect_booked' :
+              mapped.outcome;
+    showed = mapped.showed;
+  } else {
+    // Unknown status — log warning and default to booked
+    console.warn(`[sync-calendar] Unknown GHL status: "${rawStatus}" for appointment ${appointmentId}`);
     outcome = isReconnect ? 'reconnect_booked' : 'booked';
     showed = false;
+    
+    // Log to sync_warnings table
+    try {
+      await supabase.from('sync_warnings').insert({
+        client_id: clientId,
+        warning_type: 'unknown_appointment_status',
+        message: `Unknown GHL appointment status: "${rawStatus}"`,
+        metadata: { appointmentId, rawStatus, contactId },
+      });
+    } catch (e) {
+      console.error('Failed to log sync warning:', e);
+    }
   }
   
   // Find lead by contact ID
@@ -180,6 +210,15 @@ async function syncAppointmentToCall(
     .maybeSingle();
   
   if (existingCall) {
+    // Fix 4: Track whether status actually changed for metrics recalculation
+    const { data: prevCall } = await supabase
+      .from('calls')
+      .select('showed, outcome')
+      .eq('id', existingCall.id)
+      .single();
+    
+    const statusChanged = prevCall && (prevCall.showed !== callData.showed || prevCall.outcome !== callData.outcome);
+    
     // Update existing call
     const { error: updateError } = await supabase
       .from('calls')
@@ -203,7 +242,11 @@ async function syncAppointmentToCall(
       console.error(`Failed to update call ${appointmentId}:`, updateError);
       return { action: 'skipped' };
     }
-    return { action: 'updated' };
+    
+    if (statusChanged) {
+      console.log(`[sync-calendar] Status changed for ${appointmentId}: ${prevCall?.outcome} → ${callData.outcome}`);
+    }
+    return { action: 'updated', statusChanged: !!statusChanged };
   }
   
   // Create new call
@@ -399,9 +442,13 @@ serve(async (req) => {
       created: 0,
       updated: 0,
       skipped: 0,
+      statusChanges: 0,
       errors: [],
       appointments: [],
     };
+    
+    // Fix 4: Track dates with status changes for metrics recalculation
+    const datesWithStatusChanges = new Set<string>();
 
     // Process tracked calendars (booked calls)
     for (const calendarId of trackedCalendarIds) {
@@ -418,6 +465,11 @@ serve(async (req) => {
           if (syncResult.action === 'created') result.created++;
           else if (syncResult.action === 'updated') result.updated++;
           else result.skipped++;
+          
+          if (syncResult.statusChanged && appt.startTime) {
+            result.statusChanges++;
+            datesWithStatusChanges.add(appt.startTime.split('T')[0]);
+          }
           
           result.appointments.push({
             id: appt.id,
@@ -450,6 +502,11 @@ serve(async (req) => {
           else if (syncResult.action === 'updated') result.updated++;
           else result.skipped++;
           
+          if (syncResult.statusChanged && appt.startTime) {
+            result.statusChanges++;
+            datesWithStatusChanges.add(appt.startTime.split('T')[0]);
+          }
+          
           result.appointments.push({
             id: appt.id,
             contactId: appt.contactId,
@@ -472,7 +529,13 @@ serve(async (req) => {
       .update({ ghl_last_calls_sync: new Date().toISOString() })
       .eq('client_id', clientId);
 
-    console.log(`Calendar sync complete for ${client.name}: created=${result.created}, updated=${result.updated}, skipped=${result.skipped}`);
+    console.log(`Calendar sync complete for ${client.name}: created=${result.created}, updated=${result.updated}, skipped=${result.skipped}, statusChanges=${result.statusChanges}`);
+
+    // Fix 4: Recalculate metrics for dates with status changes
+    if (datesWithStatusChanges.size > 0) {
+      console.log(`[sync-calendar] Recalculating metrics for ${datesWithStatusChanges.size} dates with status changes`);
+      await recalculateClientMetrics(supabase, clientId);
+    }
 
     // ============================================================
     // DEEP CONTACT SYNC: Trigger full contact + timeline sync

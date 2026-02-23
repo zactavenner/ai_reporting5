@@ -70,9 +70,26 @@ function hasFundedInvestorTag(contact: GHLContact): boolean {
   );
 }
 
-function isFundedOpportunity(opp: GHLOpportunity): boolean {
+// Fix 5: Configurable funded investor detection using client_settings
+function isFundedOpportunity(opp: GHLOpportunity, fundedStageIds?: string[], fundedTagPattern?: string): boolean {
+  // If configured stage IDs exist, use them (primary)
+  if (fundedStageIds && fundedStageIds.length > 0) {
+    return fundedStageIds.includes(opp.pipelineStageId || '');
+  }
+  
+  // Fallback to legacy hardcoded detection
   const stageName = (opp.stageName || opp.pipelineStageName || '').toLowerCase();
   const stageId = (opp.pipelineStageId || '').toLowerCase();
+  
+  // If custom tag pattern provided, use regex
+  if (fundedTagPattern) {
+    try {
+      const regex = new RegExp(fundedTagPattern, 'i');
+      if (regex.test(stageName) || regex.test(stageId)) return true;
+    } catch (e) {
+      console.error('Invalid funded_tag_pattern regex:', fundedTagPattern);
+    }
+  }
   
   return opp.status === 'won' || 
     stageName.includes('funded') ||
@@ -396,8 +413,18 @@ async function syncGHLData(supabase: any, client: any): Promise<{ leads: number;
       const oppsData = await oppsResponse.json();
       const opportunities: GHLOpportunity[] = oppsData.opportunities || [];
 
-      // Filter for funded opportunities using expanded logic
-      const fundedOpps = opportunities.filter(isFundedOpportunity);
+      // Fix 5: Load client settings for configurable funded detection
+      const { data: clientSettings } = await supabase
+        .from('client_settings')
+        .select('funded_stage_ids, committed_stage_ids, funded_tag_pattern, funded_pipeline_id')
+        .eq('client_id', client.id)
+        .maybeSingle();
+
+      const fundedStageIds = clientSettings?.funded_stage_ids || [];
+      const fundedTagPattern = clientSettings?.funded_tag_pattern || null;
+
+      // Filter for funded opportunities using configurable logic
+      const fundedOpps = opportunities.filter(opp => isFundedOpportunity(opp, fundedStageIds, fundedTagPattern));
 
       for (const opp of fundedOpps) {
         const { data: lead } = await supabase

@@ -64,17 +64,19 @@ function getTimeRange(startDate?: string, endDate?: string): string {
 }
 
 // ── Attribution: aggregate CRM data back onto meta tables ──
+// Fix 2: Improved attribution — removed fragile name substring matching,
+// uses UTM params as primary, lead source/medium fields as secondary,
+// single-ad-per-set as last resort. Tracks unattributed leads.
 async function attributeCRMData(supabase: any, clientId: string, startDate?: string, endDate?: string) {
   console.log(`Starting CRM attribution (date range: ${startDate || 'all'} to ${endDate || 'all'})...`);
 
-  // Build date filters for CRM queries
   const dateStart = startDate ? `${startDate}T00:00:00.000Z` : null;
   const dateEnd = endDate ? `${endDate}T23:59:59.999Z` : null;
 
   // 1. Get all meta campaigns for this client
   const { data: metaCampaigns } = await supabase
     .from("meta_campaigns")
-    .select("id, name, spend")
+    .select("id, name, spend, meta_campaign_id")
     .eq("client_id", clientId);
 
   if (!metaCampaigns || metaCampaigns.length === 0) {
@@ -94,17 +96,16 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
     .select("id, name, spend, ad_set_id, meta_ad_id, meta_adset_id")
     .eq("client_id", clientId);
 
-  // 4. Get leads with campaign attribution — filtered by date range
+  // 4. Get leads — now including UTM fields for improved matching
   let leadsQuery = supabase
     .from("leads")
-    .select("id, campaign_name, ad_set_name, ad_id, is_spam")
-    .eq("client_id", clientId)
-    .not("campaign_name", "is", null);
+    .select("id, campaign_name, ad_set_name, ad_id, is_spam, utm_source, utm_medium, utm_campaign, utm_content, source")
+    .eq("client_id", clientId);
   if (dateStart) leadsQuery = leadsQuery.gte("created_at", dateStart);
   if (dateEnd) leadsQuery = leadsQuery.lte("created_at", dateEnd);
   const { data: leads } = await leadsQuery;
 
-  // 5. Get all calls for this client's leads — filtered by date range
+  // 5. Get all calls
   let callsQuery = supabase
     .from("calls")
     .select("id, lead_id, showed")
@@ -113,7 +114,7 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
   if (dateEnd) callsQuery = callsQuery.lte("booked_at", dateEnd);
   const { data: calls } = await callsQuery;
 
-  // 6. Get all funded investors for this client's leads — filtered by date range
+  // 6. Get all funded investors
   let fundedQuery = supabase
     .from("funded_investors")
     .select("id, lead_id, funded_amount, commitment_amount")
@@ -142,7 +143,7 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
     fundedByLead.set(f.lead_id, existing);
   }
 
-  // Build ad-set-id to ads mapping for name-based matching
+  // Build ad-set-id to ads mapping
   const adsByAdSetId = new Map<string, any[]>();
   for (const ad of metaAds || []) {
     if (!ad.ad_set_id) continue;
@@ -157,16 +158,29 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
     metaAdByMetaId.set(ad.meta_ad_id, ad);
   }
 
-  // Build ad set name -> db id mapping
+  // Build campaign name -> campaign mapping (exact match)
+  const campaignByName = new Map<string, any>();
+  for (const c of metaCampaigns) {
+    campaignByName.set(c.name, c);
+  }
+
+  // Build ad set name -> db id mapping (exact match)
   const adSetByName = new Map<string, any>();
   for (const as of metaAdSets || []) {
     adSetByName.set(as.name, as);
   }
 
+  // Build campaign id -> name mapping
+  const campaignByMetaId = new Map<string, any>();
+  for (const c of metaCampaigns) {
+    campaignByMetaId.set(c.meta_campaign_id, c);
+  }
+
   type Stats = { leads: number; calls: number; showed: number; funded: number; fundedDollars: number };
   const campaignStats = new Map<string, Stats>();
   const adSetStats = new Map<string, Stats>();
-  const adStats = new Map<string, Stats>(); // keyed by meta_ads.id (DB UUID)
+  const adStats = new Map<string, Stats>();
+  let unattributedCount = 0;
 
   function addStats(map: Map<string, Stats>, key: string, leadId: string) {
     const stats = map.get(key) || { leads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
@@ -181,50 +195,55 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
   for (const lead of leads || []) {
     if (lead.is_spam) continue;
 
-    // Campaign level
-    if (lead.campaign_name) addStats(campaignStats, lead.campaign_name, lead.id);
+    let attributed = false;
 
-    // Ad set level
-    if (lead.ad_set_name) addStats(adSetStats, lead.ad_set_name, lead.id);
+    // Campaign level — match by campaign_name or utm_campaign
+    const campaignName = lead.campaign_name || lead.utm_campaign;
+    if (campaignName && campaignByName.has(campaignName)) {
+      addStats(campaignStats, campaignName, lead.id);
+      attributed = true;
+    }
 
-    // Ad level — two-pass approach
+    // Ad set level — match by ad_set_name
+    if (lead.ad_set_name && adSetByName.has(lead.ad_set_name)) {
+      addStats(adSetStats, lead.ad_set_name, lead.id);
+      attributed = true;
+    }
+
+    // Ad level — Fix 2: only UTM direct match + single-ad-per-set fallback
     let matchedAdId: string | null = null;
 
-    // Pass 1: Direct match via ad_id field (from UTM params)
-    if (lead.ad_id) {
-      const directAd = metaAdByMetaId.get(lead.ad_id);
+    // Pass 1: Direct match via ad_id field (from UTM params / utm_content)
+    const adIdToMatch = lead.ad_id || lead.utm_content;
+    if (adIdToMatch) {
+      const directAd = metaAdByMetaId.get(adIdToMatch);
       if (directAd) matchedAdId = directAd.id;
     }
 
-    // Pass 2: Name-based match — find ad whose name appears in the ad_set_name
+    // Pass 2 (Fix 2): REMOVED name substring matching — causes misattribution
+    // Pass 2: Single-ad-per-set fallback — ONLY when exactly one active ad in the set
     if (!matchedAdId && lead.ad_set_name) {
       const matchedAdSet = adSetByName.get(lead.ad_set_name);
       if (matchedAdSet) {
         const adsInSet = adsByAdSetId.get(matchedAdSet.id) || [];
-        let bestAd: any = null;
-        let bestLen = 0;
-        for (const ad of adsInSet) {
-          // Check if ad name is a substring of ad_set_name or vice versa
-          const adNameLower = (ad.name || '').toLowerCase();
-          const adSetNameLower = (lead.ad_set_name || '').toLowerCase();
-          if (adSetNameLower.includes(adNameLower) && adNameLower.length > bestLen) {
-            bestAd = ad;
-            bestLen = adNameLower.length;
-          } else if (adNameLower.includes(adSetNameLower) && adSetNameLower.length > bestLen) {
-            bestAd = ad;
-            bestLen = adSetNameLower.length;
-          }
+        if (adsInSet.length === 1) {
+          matchedAdId = adsInSet[0].id;
+          console.log(`Single-ad fallback: attributed lead ${lead.id} to ad ${adsInSet[0].name}`);
         }
-        // If only one ad in the set, attribute to it by default
-        if (!bestAd && adsInSet.length === 1) {
-          bestAd = adsInSet[0];
-        }
-        if (bestAd) matchedAdId = bestAd.id;
       }
     }
 
-    if (matchedAdId) addStats(adStats, matchedAdId, lead.id);
+    if (matchedAdId) {
+      addStats(adStats, matchedAdId, lead.id);
+      attributed = true;
+    }
+
+    if (!attributed) {
+      unattributedCount++;
+    }
   }
+
+  console.log(`Attribution: ${unattributedCount} leads unattributed out of ${(leads || []).filter((l: any) => !l.is_spam).length} total`);
 
   // Update meta_campaigns with attribution
   for (const campaign of metaCampaigns) {
@@ -274,7 +293,23 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
     }).eq("id", ad.id);
   }
 
-  console.log(`Attribution complete: ${campaignStats.size} campaigns, ${adSetStats.size} ad sets, ${adStats.size} ads`);
+  // Fix 2: Update unattributed_leads count in daily_metrics for the date range
+  if (unattributedCount > 0 && startDate) {
+    const { data: existing } = await supabase
+      .from("daily_metrics")
+      .select("id")
+      .eq("client_id", clientId)
+      .eq("date", startDate)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase.from("daily_metrics").update({
+        unattributed_leads: unattributedCount,
+      }).eq("id", existing.id);
+    }
+  }
+
+  console.log(`Attribution complete: ${campaignStats.size} campaigns, ${adSetStats.size} ad sets, ${adStats.size} ads, ${unattributedCount} unattributed`);
 }
 
 Deno.serve(async (req) => {
