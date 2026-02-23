@@ -97,7 +97,7 @@ export function useCreateNotification() {
   });
 }
 
-export function NotificationsTab() {
+export function NotificationsTab({ onTaskClick }: { onTaskClick?: (taskId: string) => void } = {}) {
   const { currentMember } = useTeamMember();
   const { data: notifications = [], isLoading } = useNotifications(currentMember?.id);
   const markRead = useMarkNotificationRead();
@@ -184,6 +184,7 @@ export function NotificationsTab() {
                 )}
                 onClick={() => {
                   if (!notification.is_read) markRead.mutate(notification.id);
+                  if (notification.task_id && onTaskClick) onTaskClick(notification.task_id);
                 }}
               >
                 <div className="mt-0.5 flex-shrink-0">

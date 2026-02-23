@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +34,7 @@ interface TaskBoardViewProps {
 }
 
 export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskBoardViewProps) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: allTasks = [], isLoading: tasksLoading } = useAllTasks();
   const { data: clients = [] } = useClients();
   const [view, setView] = useState<'kanban' | 'summary' | 'activity' | 'notifications'>('kanban');
@@ -40,6 +42,20 @@ export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskB
   const { data: notifications = [] } = useNotifications(currentMember?.id);
   const unreadCount = Array.isArray(notifications) ? notifications.filter(n => !n.is_read).length : 0;
   const [showCreateTask, setShowCreateTask] = useState(false);
+
+  // Deep-link: if ?task= is present, ensure we're on kanban view so KanbanBoard picks it up
+  useEffect(() => {
+    const taskId = searchParams.get('task');
+    if (taskId && view !== 'kanban') {
+      setView('kanban');
+    }
+  }, [searchParams]);
+
+  // Handler for notification click → switch to kanban with task deep-link
+  const handleNotificationTaskClick = useCallback((taskId: string) => {
+    setSearchParams({ task: taskId }, { replace: true });
+    setView('kanban');
+  }, [setSearchParams]);
 
   // In public view, only show tasks for the specific client
   const tasks = clientId ? allTasks.filter(t => t.client_id === clientId) : allTasks;
@@ -141,7 +157,7 @@ export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskB
         ) : view === 'summary' ? (
           <AgencyTaskSummary />
         ) : view === 'notifications' ? (
-          <NotificationsTab />
+          <NotificationsTab onTaskClick={handleNotificationTaskClick} />
         ) : (
           <TaskHistoryTab 
             tasks={tasks} 
