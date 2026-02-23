@@ -409,6 +409,7 @@ function ApiCallCard({ call }: { call: ApiCall }) {
 
 export function ApiReferenceTab() {
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
 
   const handleCopyEndpoint = () => {
     navigator.clipboard.writeText(API_ENDPOINT);
@@ -417,8 +418,79 @@ export function ApiReferenceTab() {
     setTimeout(() => setCopiedEndpoint(false), 2000);
   };
 
+  const handleCopyAll = () => {
+    const lines: string[] = [];
+    lines.push('# OpenClaw / Jarvis API Reference');
+    lines.push('');
+    lines.push(`## Endpoint`);
+    lines.push(`POST ${API_ENDPOINT}`);
+    lines.push('');
+    lines.push(`## Authentication`);
+    lines.push(`Password: ${PASSWORD}`);
+    lines.push('All requests are POST with JSON body. Every request must include the "password" field.');
+    lines.push('');
+    lines.push('## Filter Operators');
+    lines.push('eq (default), gt, gte, lt, lte, neq, like, ilike, in, is');
+    lines.push('Usage: {"field": {"op": "gte", "value": "2026-01-01"}}');
+    lines.push('');
+
+    for (const section of API_SECTIONS) {
+      lines.push(`## ${section.title}${section.badge ? ` [${section.badge}]` : ''}`);
+      lines.push('');
+      for (const call of section.calls) {
+        lines.push(`### ${call.title}`);
+        lines.push(call.description);
+        lines.push('```json');
+        lines.push(JSON.stringify(call.body, null, 2));
+        lines.push('```');
+        lines.push('');
+      }
+    }
+
+    lines.push('## All Available Tables');
+    lines.push([
+      'clients', 'leads', 'calls', 'funded_investors', 'daily_metrics',
+      'agency_members', 'agency_pods', 'agency_settings', 'agency_meetings',
+      'tasks', 'task_comments', 'task_files', 'task_history', 'task_assignees', 'task_notifications',
+      'creatives', 'client_settings', 'client_pipelines', 'client_custom_tabs',
+      'client_funnel_steps', 'client_live_ads', 'client_pod_assignments', 'client_voice_notes',
+      'pipeline_stages', 'pipeline_opportunities', 'funnel_campaigns', 'funnel_step_variants',
+      'ad_spend_reports', 'alert_configs', 'chat_conversations', 'chat_messages',
+      'ai_hub_conversations', 'ai_hub_messages', 'custom_gpts', 'gpt_files',
+      'gpt_knowledge_base', 'knowledge_base_documents', 'csv_import_logs',
+      'contact_timeline_events', 'data_discrepancies', 'sync_logs', 'sync_queue',
+      'sync_outbound_events', 'pixel_verifications', 'pixel_expected_events',
+      'email_parsed_investors', 'pending_meeting_tasks', 'member_activity_log',
+      'dashboard_preferences', 'spam_blacklist', 'webhook_logs',
+      'meta_campaigns', 'meta_ad_sets', 'meta_ads',
+    ].join(', '));
+    lines.push('');
+    lines.push('## Storage Buckets');
+    lines.push('creatives, task-files, gpt-files, live-ads');
+    lines.push('');
+    lines.push('## Available Actions');
+    lines.push('list_tables, select, count, insert, upsert, update, delete, create_task, get_ads_overview, list_storage, get_file_url, delete_file, upload_file_base64');
+
+    navigator.clipboard.writeText(lines.join('\n'));
+    setCopiedAll(true);
+    toast.success('Full API reference copied to clipboard');
+    setTimeout(() => setCopiedAll(false), 3000);
+  };
+
   return (
     <div className="space-y-4">
+      {/* Copy All Banner */}
+      <div className="flex items-center justify-between border-2 border-primary/30 bg-primary/5 rounded-md p-3">
+        <div>
+          <h4 className="font-medium text-sm">Full API Documentation</h4>
+          <p className="text-xs text-muted-foreground">Copy the entire API reference to paste into OpenClaw</p>
+        </div>
+        <Button variant="default" size="sm" onClick={handleCopyAll} className="shrink-0">
+          {copiedAll ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
+          {copiedAll ? 'Copied!' : 'Copy All'}
+        </Button>
+      </div>
+
       {/* Endpoint */}
       <div className="border-2 border-border p-4 space-y-2">
         <h4 className="font-medium text-sm">API Endpoint</h4>
