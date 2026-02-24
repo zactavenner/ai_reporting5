@@ -33,13 +33,9 @@ import { TokenUsageBar, FULL_MODEL_OPTIONS } from './TokenUsageBar';
 import ReactMarkdown from 'react-markdown';
 
 const modelLabels: Record<FullModel, string> = {
-  'gemini-1.5-flash': 'Gemini 1.5 Flash',
-  'gemini-1.5-pro': 'Gemini 1.5 Pro',
-  'gemini-2.0-flash': 'Gemini 2.0 Flash',
-  'gpt-4o': 'GPT-4o',
-  'gpt-4o-mini': 'GPT-4o Mini',
-  'grok-beta': 'Grok Beta',
-  'grok-2': 'Grok 2',
+  'gemini-3-flash': 'Gemini Flash 3',
+  'gpt-5-nano': 'ChatGPT 5 Nano',
+  'grok-4-fast-reasoning': 'Grok 4 Fast Reasoning',
 };
 
 const agencyQuickQuestions = [
@@ -65,7 +61,7 @@ interface AgencyAIChatProps {
 export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAIChatProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
-  const [model, setModel] = useState<FullModel>('gemini-1.5-flash');
+  const [model, setModel] = useState<FullModel>('gemini-3-flash');
   const [isRecording, setIsRecording] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);

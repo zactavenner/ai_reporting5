@@ -36,7 +36,7 @@ interface AgencyContext {
 }
 
 export type AIModel = 'gemini' | 'openai';
-export type FullModel = 'gemini-1.5-flash' | 'gemini-1.5-pro' | 'gemini-2.0-flash' | 'gpt-4o' | 'gpt-4o-mini' | 'grok-beta' | 'grok-2';
+export type FullModel = 'gemini-3-flash' | 'gpt-5-nano' | 'grok-4-fast-reasoning';
 
 export function useAgencyAIAnalysis() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -157,7 +157,7 @@ export function useAgencyAIAnalysis() {
   const sendFullContextMessage = useCallback(async (
     input: string,
     existingMessages: Message[],
-    fullModel: FullModel = 'gemini-1.5-flash',
+    fullModel: FullModel = 'gemini-3-flash',
     clientFilter: string = 'all',
     onTokenUsage?: (used: number, system: number) => void,
   ) => {

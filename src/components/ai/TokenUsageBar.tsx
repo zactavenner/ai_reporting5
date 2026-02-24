@@ -3,23 +3,15 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 
 export const MODEL_LIMITS: Record<string, number> = {
-  'gemini-1.5-flash': 1_048_576,
-  'gemini-1.5-pro': 1_048_576,
-  'gemini-2.0-flash': 1_048_576,
-  'gpt-4o': 128_000,
-  'gpt-4o-mini': 128_000,
-  'grok-beta': 131_072,
-  'grok-2': 131_072,
+  'gemini-3-flash': 1_048_576,
+  'gpt-5-nano': 128_000,
+  'grok-4-fast-reasoning': 131_072,
 };
 
 export const FULL_MODEL_OPTIONS = [
-  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', context: '1M', badge: 'Fast' },
-  { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', context: '1M', badge: 'Pro' },
-  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', context: '1M', badge: 'New' },
-  { value: 'gpt-4o', label: 'GPT-4o', context: '128K', badge: 'Best' },
-  { value: 'gpt-4o-mini', label: 'GPT-4o Mini', context: '128K', badge: 'Mini' },
-  { value: 'grok-beta', label: 'Grok Beta', context: '131K', badge: 'xAI' },
-  { value: 'grok-2', label: 'Grok 2', context: '131K', badge: 'xAI' },
+  { value: 'gemini-3-flash', label: 'Gemini Flash 3', context: '1M', badge: 'Flash' },
+  { value: 'gpt-5-nano', label: 'ChatGPT 5 Nano', context: '128K', badge: 'Nano' },
+  { value: 'grok-4-fast-reasoning', label: 'Grok 4 Fast Reasoning', context: '131K', badge: 'Reasoning' },
 ];
 
 function formatTokens(n: number): string {

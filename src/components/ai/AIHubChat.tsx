@@ -54,7 +54,7 @@ export function AIHubChat({ selectedGPT, onClearGPT, clients, clientMetrics, age
   const [input, setInput] = useState('');
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [model, setModel] = useState<FullModel>('gemini-1.5-flash');
+  const [model, setModel] = useState<FullModel>('gemini-3-flash');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [activeTool, setActiveTool] = useState<ToolMode | null>(null);

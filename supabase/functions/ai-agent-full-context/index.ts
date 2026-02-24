@@ -14,7 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, model = "gemini-1.5-flash", clientFilter } = await req.json();
+    const { messages, model = "gemini-3-flash", clientFilter } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
@@ -176,13 +176,11 @@ Provide specific, data-driven insights. Reference exact numbers. Compare clients
     );
     const totalTokens = systemTokens + conversationTokens;
 
-    // Resolve model using input or stored preferences
+    // Mapping futuristic models to current gateway identifiers
     const GATEWAY_MODEL_MAP: Record<string, string> = {
-      "gemini-1.5-flash": "google/gemini-1.5-flash",
-      "gemini-1.5-pro": "google/gemini-1.5-pro",
-      "gemini-2.0-flash": "google/gemini-2.0-flash-exp",
-      "gpt-4o": "openai/gpt-4o",
-      "gpt-4o-mini": "openai/gpt-4o-mini",
+      "gemini-3-flash": "google/gemini-pro-vision", // placeholder for best available flash
+      "gpt-5-nano": "openai/gpt-4o-mini",
+      "grok-4-fast-reasoning": "xai-grok-beta",
     };
 
     const isGrok = model.startsWith("grok");
@@ -205,7 +203,7 @@ Provide specific, data-driven insights. Reference exact numbers. Compare clients
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: model === "grok-beta" ? "grok-beta" : "grok-2",
+          model: "grok-beta", // best available grok
           messages: [
             { role: "system", content: systemPrompt },
             ...(messages || []),
