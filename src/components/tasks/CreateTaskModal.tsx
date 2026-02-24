@@ -24,16 +24,17 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { CalendarIcon, Loader2, User, Building2, Repeat } from 'lucide-react';
+import { CalendarIcon, Loader2, User, Building2, Repeat, Paperclip, X, FileIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn, addBusinessDays } from '@/lib/utils';
-import { useCreateTask, useAgencyMembers, AgencyMember } from '@/hooks/useTasks';
+import { useCreateTask, useAgencyMembers, AgencyMember, useUploadTaskFile, useAddTaskComment } from '@/hooks/useTasks';
 import { useAgencyPods } from '@/hooks/useAgencyPods';
 import { useSetTaskAssignees } from '@/hooks/useTaskAssignees';
 import { useCreateNotification } from './NotificationsTab';
 import { Client } from '@/hooks/useClients';
 import { Badge } from '@/components/ui/badge';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
+import { toast } from 'sonner';
 
 interface CreateTaskModalProps {
   open: boolean;
@@ -50,12 +51,12 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
   const { data: agencyMembers = [] } = useAgencyMembers();
   const { data: pods = [] } = useAgencyPods();
   const { currentMember } = useTeamMember();
+  const uploadTaskFile = useUploadTaskFile();
+  const addTaskComment = useAddTaskComment();
   
-  // Default due date: yesterday
+  // Default due date: 2 business days from today
   const defaultDueDate = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return d;
+    return addBusinessDays(new Date(), 2);
   }, []);
   
   const [title, setTitle] = useState('');
@@ -71,6 +72,8 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
   const [stage, setStage] = useState('todo');
   const [recurrenceType, setRecurrenceType] = useState<string>('none');
   const [recurrenceInterval, setRecurrenceInterval] = useState<number>(1);
+  const [initialComment, setInitialComment] = useState('');
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   
   useEffect(() => {
     if (defaultClientId) {
@@ -81,9 +84,7 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
   // Reset due date when modal opens
   useEffect(() => {
     if (open) {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      setDueDate(yesterday);
+      setDueDate(addBusinessDays(new Date(), 2));
       setDueDateManuallySet(false);
     }
   }, [open]);
@@ -180,6 +181,33 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
           message: `${creatorName} assigned you a new task "${title.trim()}" in ${stageName}`,
         });
       }
+      
+      // Upload attached files
+      const uploaderName = currentMember?.name || (isPublicView ? 'Client' : 'System');
+      for (const file of attachedFiles) {
+        try {
+          await uploadTaskFile.mutateAsync({
+            taskId: taskData.id,
+            file,
+            uploadedBy: uploaderName,
+          });
+        } catch (e) {
+          console.error('Failed to upload file:', e);
+        }
+      }
+      
+      // Add initial comment if provided
+      if (initialComment.trim()) {
+        try {
+          await addTaskComment.mutateAsync({
+            taskId: taskData.id,
+            authorName: uploaderName,
+            content: initialComment.trim(),
+          });
+        } catch (e) {
+          console.error('Failed to add comment:', e);
+        }
+      }
     }
     
     // Reset form
@@ -187,8 +215,7 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
     setDescription('');
     setClientId(defaultClientId || '');
     setPriority('medium');
-    const resetYesterday = new Date(); resetYesterday.setDate(resetYesterday.getDate() - 1);
-    setDueDate(resetYesterday);
+    setDueDate(addBusinessDays(new Date(), 2));
     setDueDateManuallySet(false);
     setAssignedTo('');
     setSelectedMemberId('');
@@ -197,6 +224,8 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
     setStage('todo');
     setRecurrenceType('none');
     setRecurrenceInterval(1);
+    setInitialComment('');
+    setAttachedFiles([]);
     onOpenChange(false);
   };
 
@@ -219,12 +248,12 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Create New Task</DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto pr-1">
           <div>
             <Label>Title *</Label>
             <Input
@@ -312,7 +341,7 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
               <Label>
                 Due Date
                 {!dueDateManuallySet && dueDate && (
-                  <span className="text-xs text-muted-foreground ml-2">(auto: yesterday)</span>
+                  <span className="text-xs text-muted-foreground ml-2">(auto: +2 business days)</span>
                 )}
               </Label>
               <Popover>
@@ -507,6 +536,81 @@ export function CreateTaskModal({ open, onOpenChange, clients, defaultClientId, 
                     placeholder={`${selectedClient.name} contact...`}
                     className="flex-1 h-8 text-sm"
                   />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Initial Comment */}
+          <div>
+            <Label>Comment (optional)</Label>
+            <Textarea
+              value={initialComment}
+              onChange={(e) => setInitialComment(e.target.value)}
+              placeholder="Add an initial comment or note..."
+              rows={2}
+            />
+          </div>
+
+          {/* File Attachments */}
+          <div>
+            <Label>Attachments</Label>
+            <div className="space-y-2">
+              <div
+                className="border-2 border-dashed rounded-lg p-3 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const files = Array.from(e.dataTransfer.files);
+                  setAttachedFiles(prev => [...prev, ...files]);
+                }}
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.multiple = true;
+                  input.onchange = (e) => {
+                    const files = Array.from((e.target as HTMLInputElement).files || []);
+                    setAttachedFiles(prev => [...prev, ...files]);
+                  };
+                  input.click();
+                }}
+                onPaste={(e) => {
+                  const files = Array.from(e.clipboardData.files);
+                  if (files.length > 0) {
+                    e.preventDefault();
+                    setAttachedFiles(prev => [...prev, ...files]);
+                  }
+                }}
+                tabIndex={0}
+              >
+                <Paperclip className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">
+                  Click, drag & drop, or paste files
+                </p>
+              </div>
+              {attachedFiles.length > 0 && (
+                <div className="space-y-1">
+                  {attachedFiles.map((file, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-sm bg-muted/50 rounded px-2 py-1">
+                      <FileIcon className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <span className="truncate flex-1">{file.name}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {(file.size / 1024).toFixed(0)}KB
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAttachedFiles(prev => prev.filter((_, i) => i !== idx));
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
