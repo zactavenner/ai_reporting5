@@ -21,12 +21,20 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3, TrendingUp, TrendingDown, Minus, ArrowUp, ArrowDown, ArrowUpDown, AlertCircle, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3, TrendingUp, TrendingDown, Minus, ArrowUp, ArrowDown, ArrowUpDown, AlertCircle, CheckCircle, Clock, XCircle, Columns } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -135,6 +143,31 @@ export function DraggableClientTable({
   const navigate = useNavigate();
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ column: '', direction: null });
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem('client-table-columns');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return {};
+      }
+    }
+    return {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('client-table-columns', JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
+
+  const toggleColumn = (column: string) => {
+    setVisibleColumns(prev => ({
+      ...prev,
+      [column]: prev[column] === false ? true : false
+    }));
+  };
+
+  const isColumnVisible = (column: string) => visibleColumns[column] !== false;
+
   const updateClient = useUpdateClient();
 
   // Calculate computed values for sorting
@@ -430,46 +463,84 @@ export function DraggableClientTable({
 
   return (
     <div className="space-y-2">
-      {/* Save sorted order button when sorting is active */}
-      {sortConfig.column && sortConfig.direction && (
-        <div className="flex items-center justify-between px-2 py-1 bg-muted/50 rounded border border-border">
-          <span className="text-sm text-muted-foreground">
-            Sorted by <strong>{sortConfig.column}</strong> ({sortConfig.direction === 'asc' ? 'Low to High' : 'High to Low'})
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSaveOrderAfterSort}
-          >
-            Save This Order
-          </Button>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {/* Save sorted order button when sorting is active */}
+          {sortConfig.column && sortConfig.direction && (
+            <div className="flex items-center gap-2 px-2 py-1 bg-muted/50 rounded border border-border">
+              <span className="text-xs text-muted-foreground">
+                Sorted by <strong>{sortConfig.column}</strong>
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs px-2"
+                onClick={handleSaveOrderAfterSort}
+              >
+                Save Order
+              </Button>
+            </div>
+          )}
         </div>
-      )}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 gap-2">
+              <Columns className="h-4 w-4" />
+              <span>Columns</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Toggle Columns</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem checked={isColumnVisible('status')} onCheckedChange={() => toggleColumn('status')}>Status</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('adSpend')} onCheckedChange={() => toggleColumn('adSpend')}>Ad Spend</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('pacing')} onCheckedChange={() => toggleColumn('pacing')}>Pacing</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('ctr')} onCheckedChange={() => toggleColumn('ctr')}>CTR</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('leads')} onCheckedChange={() => toggleColumn('leads')}>Leads</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('spam')} onCheckedChange={() => toggleColumn('spam')}>Spam/Bad</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('cpl')} onCheckedChange={() => toggleColumn('cpl')}>CPL</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('calls')} onCheckedChange={() => toggleColumn('calls')}>Calls</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('costPerCall')} onCheckedChange={() => toggleColumn('costPerCall')}>Cost/Call</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('showed')} onCheckedChange={() => toggleColumn('showed')}>Showed</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('showedPercent')} onCheckedChange={() => toggleColumn('showedPercent')}>Showed %</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('costPerShow')} onCheckedChange={() => toggleColumn('costPerShow')}>Cost/Show</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('commit')} onCheckedChange={() => toggleColumn('commit')}>Commit</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('commitDollars')} onCheckedChange={() => toggleColumn('commitDollars')}>Commit $</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('funded')} onCheckedChange={() => toggleColumn('funded')}>Funded</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('fundedDollars')} onCheckedChange={() => toggleColumn('fundedDollars')}>Funded $</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('costPerInvestor')} onCheckedChange={() => toggleColumn('costPerInvestor')}>Cost/Inv</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={isColumnVisible('coc')} onCheckedChange={() => toggleColumn('coc')}>CoC %</DropdownMenuCheckboxItem>
+            {isAdmin && <DropdownMenuCheckboxItem checked={isColumnVisible('estRev')} onCheckedChange={() => toggleColumn('estRev')}>Est. Rev</DropdownMenuCheckboxItem>}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       <div className="border-2 border-border bg-card overflow-x-auto scrollbar-thin">
-        <Table className="min-w-[1800px]">
+        <Table className="min-w-[1200px]">
         <TableHeader>
           <TableRow className="border-b-2">
             <TableHead className="w-10 sticky left-0 bg-card z-10"></TableHead>
             <TableHead className="font-bold text-sm sticky left-10 bg-card z-10 min-w-[140px]">Client</TableHead>
-            <TableHead className="font-bold text-sm min-w-[130px]">Status</TableHead>
-            <SortableHeader column="adSpend" label="Ad Spend" sortConfig={sortConfig} onSort={handleSort} />
-            <TableHead className="font-bold text-sm text-center min-w-[90px]">Pacing</TableHead>
-            <SortableHeader column="ctr" label="CTR" sortConfig={sortConfig} onSort={handleSort} />
-            <SortableHeader column="leads" label="Leads" sortConfig={sortConfig} onSort={handleSort} />
-            <SortableHeader column="spam" label="Spam/Bad" sortConfig={sortConfig} onSort={handleSort} />
-            <SortableHeader column="cpl" label="CPL" sortConfig={sortConfig} onSort={handleSort} />
-            <SortableHeader column="calls" label="Calls" sortConfig={sortConfig} onSort={handleSort} />
-            <SortableHeader column="costPerCall" label="Cost/Call" sortConfig={sortConfig} onSort={handleSort} />
-            <SortableHeader column="showed" label="Showed" sortConfig={sortConfig} onSort={handleSort} />
-            <SortableHeader column="showedPercent" label="Showed %" sortConfig={sortConfig} onSort={handleSort} />
-            <SortableHeader column="costPerShow" label="Cost/Show" sortConfig={sortConfig} onSort={handleSort} />
-            <SortableHeader column="commit" label="Commit" sortConfig={sortConfig} onSort={handleSort} />
-            <SortableHeader column="commitDollars" label="Commit $" sortConfig={sortConfig} onSort={handleSort} />
-            <SortableHeader column="funded" label="Funded" sortConfig={sortConfig} onSort={handleSort} />
-            <SortableHeader column="fundedDollars" label="Funded $" sortConfig={sortConfig} onSort={handleSort} />
-            <SortableHeader column="costPerInvestor" label="Cost/Inv" sortConfig={sortConfig} onSort={handleSort} />
-            <SortableHeader column="coc" label="CoC %" sortConfig={sortConfig} onSort={handleSort} />
-            {isAdmin && <SortableHeader column="estRev" label="Est. Rev" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('status') && <TableHead className="font-bold text-sm min-w-[130px]">Status</TableHead>}
+            {isColumnVisible('adSpend') && <SortableHeader column="adSpend" label="Ad Spend" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('pacing') && <TableHead className="font-bold text-sm text-center min-w-[90px]">Pacing</TableHead>}
+            {isColumnVisible('ctr') && <SortableHeader column="ctr" label="CTR" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('leads') && <SortableHeader column="leads" label="Leads" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('spam') && <SortableHeader column="spam" label="Spam/Bad" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('cpl') && <SortableHeader column="cpl" label="CPL" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('calls') && <SortableHeader column="calls" label="Calls" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('costPerCall') && <SortableHeader column="costPerCall" label="Cost/Call" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('showed') && <SortableHeader column="showed" label="Showed" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('showedPercent') && <SortableHeader column="showedPercent" label="Showed %" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('costPerShow') && <SortableHeader column="costPerShow" label="Cost/Show" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('commit') && <SortableHeader column="commit" label="Commit" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('commitDollars') && <SortableHeader column="commitDollars" label="Commit $" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('funded') && <SortableHeader column="funded" label="Funded" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('fundedDollars') && <SortableHeader column="fundedDollars" label="Funded $" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('costPerInvestor') && <SortableHeader column="costPerInvestor" label="Cost/Inv" sortConfig={sortConfig} onSort={handleSort} />}
+            {isColumnVisible('coc') && <SortableHeader column="coc" label="CoC %" sortConfig={sortConfig} onSort={handleSort} />}
+            {isAdmin && isColumnVisible('estRev') && <SortableHeader column="estRev" label="Est. Rev" sortConfig={sortConfig} onSort={handleSort} />}
             <TableHead className="font-bold text-sm min-w-[100px]">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -549,91 +620,109 @@ export function DraggableClientTable({
                   </div>
                 </TableCell>
                 <TableCell className="font-semibold text-sm sticky left-10 bg-card z-10">{client.name}</TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <Select
-                    value={client.status}
-                    onValueChange={(value) => handleStatusChange(client.id, value)}
-                  >
-                    <SelectTrigger className="w-[120px] h-8">
-                      <SelectValue>
-                        <Badge variant={getStatusVariant(client.status)} className="text-xs">
-                          {STATUS_OPTIONS.find(s => s.value === client.status)?.label || client.status}
-                        </Badge>
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          <Badge variant={getStatusVariant(option.value)} className="text-xs">
-                            {option.label}
+                {isColumnVisible('status') && (
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Select
+                      value={client.status}
+                      onValueChange={(value) => handleStatusChange(client.id, value)}
+                    >
+                      <SelectTrigger className="w-[120px] h-8">
+                        <SelectValue>
+                          <Badge variant={getStatusVariant(client.status)} className="text-xs">
+                            {STATUS_OPTIONS.find(s => s.value === client.status)?.label || client.status}
                           </Badge>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell className="text-right font-mono tabular-nums text-sm">{formatCurrency(m.totalAdSpend || 0)}</TableCell>
-                <TableCell className="text-center">
-                  {pacing.status !== 'none' ? (
-                    <div className={cn("flex items-center justify-center gap-1", pacing.color)}>
-                      <PacingIcon className="h-4 w-4" />
-                      <span className="text-xs capitalize">{pacing.status === 'on-track' ? 'On Track' : pacing.status}</span>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">-</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right font-mono tabular-nums text-sm">{formatPercent(m.ctr || 0)}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums text-sm">{m.totalLeads || 0}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums text-sm">{m.spamLeads || 0}</TableCell>
-                <TableCell className={cn(
-                  "text-right font-mono tabular-nums text-sm",
-                  getThresholdColor(m.costPerLead || 0, t.costPerLead)
-                )}>
-                  {formatCurrency(m.costPerLead || 0)}
-                </TableCell>
-                <TableCell className="text-right font-mono tabular-nums text-sm">{m.totalCalls || 0}</TableCell>
-                <TableCell className={cn(
-                  "text-right font-mono tabular-nums text-sm",
-                  getThresholdColor(m.costPerCall || 0, t.costPerCall)
-                )}>
-                  {formatCurrency(m.costPerCall || 0)}
-                </TableCell>
-                <TableCell className="text-right font-mono tabular-nums text-sm">{m.showedCalls || 0}</TableCell>
-                <TableCell className={cn(
-                  "text-right font-mono tabular-nums text-sm",
-                  getShowedPercentColor(computed.showedPercent)
-                )}>
-                  {formatPercent(computed.showedPercent)}
-                </TableCell>
-                <TableCell className={cn(
-                  "text-right font-mono tabular-nums text-sm",
-                  getThresholdColor(m.costPerShow || 0, t.costPerShow)
-                )}>
-                  {formatCurrency(m.costPerShow || 0)}
-                </TableCell>
-                <TableCell className="text-right font-mono tabular-nums text-sm">{m.totalCommitments || 0}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums text-sm">{formatCurrency(m.commitmentDollars || 0)}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums text-sm">{m.fundedInvestors || 0}</TableCell>
-                <TableCell className={cn(
-                  "text-right font-mono tabular-nums text-sm",
-                  getFundedColor(m.fundedDollars || 0)
-                )}>
-                  {formatCurrency(m.fundedDollars || 0)}
-                </TableCell>
-                <TableCell className={cn(
-                  "text-right font-mono tabular-nums text-sm",
-                  getThresholdColor(computed.costPerInvestor, t.costPerInvestor)
-                )}>
-                  {formatCurrency(computed.costPerInvestor)}
-                </TableCell>
-                <TableCell className={cn(
-                  "text-right font-mono tabular-nums text-sm",
-                  getCostOfCapitalColor(computed.costOfCapital, t.costOfCapital)
-                )}>
-                  {formatPercent(computed.costOfCapital)}
-                </TableCell>
-                {isAdmin && (
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            <Badge variant={getStatusVariant(option.value)} className="text-xs">
+                              {option.label}
+                            </Badge>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                )}
+                {isColumnVisible('adSpend') && <TableCell className="text-right font-mono tabular-nums text-sm">{formatCurrency(m.totalAdSpend || 0)}</TableCell>}
+                {isColumnVisible('pacing') && (
+                  <TableCell className="text-center">
+                    {pacing.status !== 'none' ? (
+                      <div className={cn("flex items-center justify-center gap-1", pacing.color)}>
+                        <PacingIcon className="h-4 w-4" />
+                        <span className="text-xs capitalize">{pacing.status === 'on-track' ? 'On Track' : pacing.status}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                )}
+                {isColumnVisible('ctr') && <TableCell className="text-right font-mono tabular-nums text-sm">{formatPercent(m.ctr || 0)}</TableCell>}
+                {isColumnVisible('leads') && <TableCell className="text-right font-mono tabular-nums text-sm">{m.totalLeads || 0}</TableCell>}
+                {isColumnVisible('spam') && <TableCell className="text-right font-mono tabular-nums text-sm">{m.spamLeads || 0}</TableCell>}
+                {isColumnVisible('cpl') && (
+                  <TableCell className={cn(
+                    "text-right font-mono tabular-nums text-sm",
+                    getThresholdColor(m.costPerLead || 0, t.costPerLead)
+                  )}>
+                    {formatCurrency(m.costPerLead || 0)}
+                  </TableCell>
+                )}
+                {isColumnVisible('calls') && <TableCell className="text-right font-mono tabular-nums text-sm">{m.totalCalls || 0}</TableCell>}
+                {isColumnVisible('costPerCall') && (
+                  <TableCell className={cn(
+                    "text-right font-mono tabular-nums text-sm",
+                    getThresholdColor(m.costPerCall || 0, t.costPerCall)
+                  )}>
+                    {formatCurrency(m.costPerCall || 0)}
+                  </TableCell>
+                )}
+                {isColumnVisible('showed') && <TableCell className="text-right font-mono tabular-nums text-sm">{m.showedCalls || 0}</TableCell>}
+                {isColumnVisible('showedPercent') && (
+                  <TableCell className={cn(
+                    "text-right font-mono tabular-nums text-sm",
+                    getShowedPercentColor(computed.showedPercent)
+                  )}>
+                    {formatPercent(computed.showedPercent)}
+                  </TableCell>
+                )}
+                {isColumnVisible('costPerShow') && (
+                  <TableCell className={cn(
+                    "text-right font-mono tabular-nums text-sm",
+                    getThresholdColor(m.costPerShow || 0, t.costPerShow)
+                  )}>
+                    {formatCurrency(m.costPerShow || 0)}
+                  </TableCell>
+                )}
+                {isColumnVisible('commit') && <TableCell className="text-right font-mono tabular-nums text-sm">{m.totalCommitments || 0}</TableCell>}
+                {isColumnVisible('commitDollars') && <TableCell className="text-right font-mono tabular-nums text-sm">{formatCurrency(m.commitmentDollars || 0)}</TableCell>}
+                {isColumnVisible('funded') && <TableCell className="text-right font-mono tabular-nums text-sm">{m.fundedInvestors || 0}</TableCell>}
+                {isColumnVisible('fundedDollars') && (
+                  <TableCell className={cn(
+                    "text-right font-mono tabular-nums text-sm",
+                    getFundedColor(m.fundedDollars || 0)
+                  )}>
+                    {formatCurrency(m.fundedDollars || 0)}
+                  </TableCell>
+                )}
+                {isColumnVisible('costPerInvestor') && (
+                  <TableCell className={cn(
+                    "text-right font-mono tabular-nums text-sm",
+                    getThresholdColor(computed.costPerInvestor, t.costPerInvestor)
+                  )}>
+                    {formatCurrency(computed.costPerInvestor)}
+                  </TableCell>
+                )}
+                {isColumnVisible('coc') && (
+                  <TableCell className={cn(
+                    "text-right font-mono tabular-nums text-sm",
+                    getCostOfCapitalColor(computed.costOfCapital, t.costOfCapital)
+                  )}>
+                    {formatPercent(computed.costOfCapital)}
+                  </TableCell>
+                )}
+                {isAdmin && isColumnVisible('estRev') && (
                   <TableCell className="text-right font-mono tabular-nums text-sm text-chart-2 font-semibold">
                     {computed.estRevenue > 0 ? formatCurrency(computed.estRevenue) : '-'}
                   </TableCell>

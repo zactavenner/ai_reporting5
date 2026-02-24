@@ -94,13 +94,16 @@ export function aggregateFromSourceData(
   const reconnectCalls = calls.filter(c => c.is_reconnect);
   const reconnectShowed = reconnectCalls.filter(c => c.showed);
 
-  // Calculate funded from source
+  // Calculate funded & commitments from source
   // Use commitment_amount as fallback when funded_amount is 0
   const fundedCount = fundedInvestors.length;
   const fundedDollars = fundedInvestors.reduce((sum, f) => {
     const amount = (f.funded_amount && f.funded_amount > 0) ? f.funded_amount : (f.commitment_amount || 0);
     return sum + amount;
   }, 0);
+
+  const commitmentCount = fundedInvestors.filter(f => (f.commitment_amount || 0) > 0).length;
+  const commitmentDollars = fundedInvestors.reduce((sum, f) => sum + (f.commitment_amount || 0), 0);
 
   // Calculate funded investor averages from source
   const fundedWithTimeData = fundedInvestors.filter(f => f.time_to_fund_days !== null);
@@ -139,8 +142,8 @@ export function aggregateFromSourceData(
     showedCalls: showedCount,
     reconnectCalls: reconnectCalls.length,
     reconnectShowed: reconnectShowed.length,
-    totalCommitments: dailyTotals.totalCommitments,
-    commitmentDollars: dailyTotals.commitmentDollars,
+    totalCommitments: commitmentCount,
+    commitmentDollars: commitmentDollars,
     fundedInvestors: fundedCount,
     fundedDollars,
     ctr: dailyTotals.totalImpressions > 0 ? (dailyTotals.totalClicks / dailyTotals.totalImpressions) * 100 : 0,

@@ -6,12 +6,12 @@ import { KnowledgeBasePanel } from './KnowledgeBasePanel';
 import { CustomGPTsPanel } from './CustomGPTsPanel';
 import { CustomGPT } from '@/hooks/useCustomGPTs';
 import { Client } from '@/hooks/useClients';
-import { AggregatedMetrics } from '@/hooks/useMetrics';
+import { SourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
 
 interface AIHubTabProps {
   clients: Client[];
-  clientMetrics: Record<string, AggregatedMetrics>;
-  agencyMetrics: AggregatedMetrics;
+  clientMetrics: Record<string, SourceAggregatedMetrics>;
+  agencyMetrics: SourceAggregatedMetrics;
 }
 
 export function AIHubTab({ clients, clientMetrics, agencyMetrics }: AIHubTabProps) {

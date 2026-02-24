@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-interface Message {
+export interface Message {
   role: 'user' | 'assistant';
   content: string;
   attachments?: File[];
@@ -35,8 +35,8 @@ interface AgencyContext {
   clients: (ClientMetrics | null)[];
 }
 
-type AIModel = 'gemini' | 'openai';
-type FullModel = 'gemini-2.5-pro' | 'gemini-3-flash' | 'gemini-3-pro' | 'gpt-5' | 'grok' | 'grok-4-reasoning';
+export type AIModel = 'gemini' | 'openai';
+export type FullModel = 'gemini-1.5-flash' | 'gemini-1.5-pro' | 'gemini-2.0-flash' | 'gpt-4o' | 'gpt-4o-mini' | 'grok-beta' | 'grok-2';
 
 export function useAgencyAIAnalysis() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -157,7 +157,7 @@ export function useAgencyAIAnalysis() {
   const sendFullContextMessage = useCallback(async (
     input: string,
     existingMessages: Message[],
-    fullModel: FullModel = 'gemini-2.5-pro',
+    fullModel: FullModel = 'gemini-1.5-flash',
     clientFilter: string = 'all',
     onTokenUsage?: (used: number, system: number) => void,
   ) => {

@@ -89,7 +89,7 @@ export function buildClientMetricsFromRPC(
       reconnectCalls,
       reconnectShowed,
       totalCommitments: dailyTotals.totalCommitments,
-      commitmentDollars: dailyTotals.commitmentDollars,
+      commitmentDollars: Number(row.commitment_dollars),
       fundedInvestors: fundedCount,
       fundedDollars,
       ctr: dailyTotals.totalImpressions > 0 ? (dailyTotals.totalClicks / dailyTotals.totalImpressions) * 100 : 0,
