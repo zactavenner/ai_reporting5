@@ -1,6 +1,8 @@
-import { Settings, Zap, Settings2, Shield, Database, LogOut, User } from 'lucide-react';
+import { Settings, Zap, Settings2, Shield, Database, LogOut, User, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
+import { formatDistanceToNow } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface DashboardHeaderProps {
   title: string;
@@ -11,6 +13,8 @@ interface DashboardHeaderProps {
   onDatabase?: () => void;
   currentMemberName?: string;
   onLogout?: () => void;
+  lastSync?: Date;
+  isRefreshing?: boolean;
 }
 
 export function DashboardHeader({ 
@@ -22,6 +26,8 @@ export function DashboardHeader({
   onDatabase,
   currentMemberName,
   onLogout,
+  lastSync,
+  isRefreshing,
 }: DashboardHeaderProps) {
   return (
     <header className="border-b-2 border-border bg-card px-6 py-4">
@@ -32,8 +38,17 @@ export function DashboardHeader({
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 text-xs text-muted-foreground mr-2">
-            <Zap className="h-3 w-3 text-chart-2" />
-            <span>Last sync: 2 min ago</span>
+            {isRefreshing ? (
+              <RefreshCw className="h-3 w-3 animate-spin text-primary" />
+            ) : (
+              <Zap className="h-3 w-3 text-chart-2" />
+            )}
+            <span>
+              {isRefreshing
+                ? 'Syncing...'
+                : `Last sync: ${lastSync ? formatDistanceToNow(lastSync, { addSuffix: true }) : 'Just now'}`
+              }
+            </span>
           </div>
           {onAgencySettings && (
             <Button variant="outline" size="sm" onClick={onAgencySettings}>

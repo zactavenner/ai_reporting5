@@ -58,6 +58,8 @@ const Index = () => {
   const [pendingTasksOpen, setPendingTasksOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedFunnelClientId, setSelectedFunnelClientId] = useState<string | null>(null);
+  const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
+  const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
   const queryClient = useQueryClient();
   const updateClientOrder = useUpdateClientOrder();
 
@@ -223,16 +225,34 @@ const Index = () => {
     setDeleteClient(client);
   };
 
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['all-daily-metrics'] });
-    queryClient.invalidateQueries({ queryKey: ['funded-investors'] });
-    queryClient.invalidateQueries({ queryKey: ['clients'] });
-    queryClient.invalidateQueries({ queryKey: ['all-client-settings'] });
-    queryClient.invalidateQueries({ queryKey: ['leads'] });
-    queryClient.invalidateQueries({ queryKey: ['calls'] });
-    queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });
-    toast.success('Refreshed dashboard data');
+  const handleRefresh = async (silent: boolean | any = false) => {
+    const isSilent = silent === true;
+    if (!isSilent) setIsAutoRefreshing(true);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['all-daily-metrics'] }),
+      queryClient.invalidateQueries({ queryKey: ['funded-investors'] }),
+      queryClient.invalidateQueries({ queryKey: ['clients'] }),
+      queryClient.invalidateQueries({ queryKey: ['all-client-settings'] }),
+      queryClient.invalidateQueries({ queryKey: ['leads'] }),
+      queryClient.invalidateQueries({ queryKey: ['calls'] }),
+      queryClient.invalidateQueries({ queryKey: ['daily-metrics'] }),
+      queryClient.invalidateQueries({ queryKey: ['client-source-metrics'] }),
+    ]);
+    setLastSyncTime(new Date());
+    if (!silent) {
+      toast.success('Refreshed dashboard data');
+      setIsAutoRefreshing(false);
+    }
   };
+
+  // Implement auto-refresh every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      handleRefresh(true);
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleReorder = (orderedIds: string[]) => {
     // Persist the new order to the database
@@ -251,13 +271,15 @@ const Index = () => {
         onDatabase={() => navigate('/database')}
         currentMemberName={currentMember?.name}
         onLogout={currentMember ? logout : undefined}
+        lastSync={lastSyncTime}
+        isRefreshing={isAutoRefreshing}
       />
 
       <main className="p-6 space-y-6">
         <DateRangeFilter
           onExportCSV={handleExportCSV}
           onAddClient={handleAddClient}
-          onRefresh={handleRefresh}
+          onRefresh={() => handleRefresh(false)}
         />
 
 
