@@ -3,8 +3,9 @@ import { Creative } from '@/hooks/useCreatives';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, ThumbsUp, Share2, Play, Volume2, Pause } from 'lucide-react';
+import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, ThumbsUp, Share2, Play, Volume2, Pause, X, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getAspectFitClasses } from '@/lib/aspectRatioUtils';
 
 interface PlatformAdPreviewProps {
   creative: Creative;
@@ -29,30 +30,55 @@ export function PlatformAdPreview({ creative, platform, clientName }: PlatformAd
     }
   };
 
-  const renderVideoPlayer = (ref: React.RefObject<HTMLVideoElement>, showOverlay = true) => (
-    <div className="relative w-full h-full group cursor-pointer" onClick={() => toggleVideo(ref)}>
-      <video 
-        ref={ref}
-        src={creative.file_url}
-        className="w-full h-full object-cover"
-        loop
-        playsInline
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-      />
-      {showOverlay && (
-        <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${isPlaying ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'}`}>
-          <div className="bg-black/50 rounded-full p-4">
-            {isPlaying ? (
-              <Pause className="h-8 w-8 text-white fill-white" />
-            ) : (
-              <Play className="h-8 w-8 text-white fill-white" />
-            )}
+  // Aspect-ratio-aware media renderer
+  const renderMediaBlock = (ref: React.RefObject<HTMLVideoElement>, containerAspect: string) => {
+    const { objectFit, bgClass } = getAspectFitClasses(containerAspect, creative.aspect_ratio);
+
+    if (creative.type === 'image' && creative.file_url) {
+      return (
+        <div className={`relative w-full h-full ${bgClass}`}>
+          <img 
+            src={creative.file_url} 
+            alt={creative.title}
+            className={`w-full h-full ${objectFit}`}
+          />
+        </div>
+      );
+    }
+    if (creative.type === 'video' && creative.file_url) {
+      return (
+        <div className={`relative w-full h-full group cursor-pointer ${bgClass}`} onClick={() => toggleVideo(ref)}>
+          <video 
+            ref={ref}
+            src={creative.file_url}
+            className={`w-full h-full ${objectFit}`}
+            loop
+            playsInline
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
+          />
+          <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${isPlaying ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'}`}>
+            <div className="bg-black/50 rounded-full p-4">
+              {isPlaying ? (
+                <Pause className="h-8 w-8 text-white fill-white" />
+              ) : (
+                <Play className="h-8 w-8 text-white fill-white" />
+              )}
+            </div>
           </div>
         </div>
-      )}
-    </div>
-  );
+      );
+    }
+    // Text/copy fallback
+    return (
+      <div className="w-full h-full flex items-center justify-center p-6 text-center">
+        <div>
+          <p className="text-lg font-bold">{creative.headline}</p>
+          <p className="text-sm text-muted-foreground mt-2">{creative.body_copy}</p>
+        </div>
+      </div>
+    );
+  };
 
   const renderMetaPreview = () => (
     <div className="space-y-6">
@@ -81,24 +107,9 @@ export function PlatformAdPreview({ creative, platform, clientName }: PlatformAd
             </div>
           )}
 
-          {/* Media */}
-          <div className="aspect-square bg-muted relative">
-            {creative.type === 'image' && creative.file_url ? (
-              <img 
-                src={creative.file_url} 
-                alt={creative.title}
-                className="w-full h-full object-cover"
-              />
-            ) : creative.type === 'video' && creative.file_url ? (
-              renderVideoPlayer(videoRef1)
-            ) : (
-              <div className="w-full h-full flex items-center justify-center p-6 text-center">
-                <div>
-                  <p className="text-lg font-bold">{creative.headline}</p>
-                  <p className="text-sm text-muted-foreground mt-2">{creative.body_copy}</p>
-                </div>
-              </div>
-            )}
+          {/* Media - 4:5 for feed */}
+          <div className="aspect-[4/5] bg-muted relative">
+            {renderMediaBlock(videoRef1, '4:5')}
           </div>
 
           {/* CTA Bar */}
@@ -143,24 +154,9 @@ export function PlatformAdPreview({ creative, platform, clientName }: PlatformAd
             <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
           </div>
 
-          {/* Media */}
-          <div className="aspect-square bg-muted relative">
-            {creative.type === 'image' && creative.file_url ? (
-              <img 
-                src={creative.file_url} 
-                alt={creative.title}
-                className="w-full h-full object-cover"
-              />
-            ) : creative.type === 'video' && creative.file_url ? (
-              renderVideoPlayer(videoRef2)
-            ) : (
-              <div className="w-full h-full flex items-center justify-center p-6 text-center bg-gradient-to-br from-purple-500 to-pink-500">
-                <div className="text-white">
-                  <p className="text-xl font-bold">{creative.headline}</p>
-                  <p className="text-sm mt-2 opacity-90">{creative.body_copy}</p>
-                </div>
-              </div>
-            )}
+          {/* Media - 4:5 for feed */}
+          <div className="aspect-[4/5] bg-muted relative">
+            {renderMediaBlock(videoRef2, '4:5')}
           </div>
 
           {/* CTA */}
@@ -211,37 +207,9 @@ export function PlatformAdPreview({ creative, platform, clientName }: PlatformAd
         <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
       </div>
 
-      {/* Media */}
-      <div className="aspect-square bg-muted relative">
-        {creative.type === 'image' && creative.file_url ? (
-          <img 
-            src={creative.file_url} 
-            alt={creative.title}
-            className="w-full h-full object-cover"
-          />
-        ) : creative.type === 'video' && creative.file_url ? (
-          <div className="relative w-full h-full">
-            <video 
-              src={creative.file_url}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="bg-black/50 rounded-full p-4">
-                <Play className="h-8 w-8 text-white fill-white" />
-              </div>
-            </div>
-            <div className="absolute bottom-4 right-4">
-              <Volume2 className="h-5 w-5 text-white" />
-            </div>
-          </div>
-        ) : (
-          <div className="w-full h-full flex items-center justify-center p-6 text-center bg-gradient-to-br from-purple-500 to-pink-500">
-            <div className="text-white">
-              <p className="text-xl font-bold">{creative.headline}</p>
-              <p className="text-sm mt-2 opacity-90">{creative.body_copy}</p>
-            </div>
-          </div>
-        )}
+      {/* Media - 4:5 for feed */}
+      <div className="aspect-[4/5] bg-muted relative">
+        {renderMediaBlock(videoRef1, '4:5')}
       </div>
 
       {/* CTA */}
@@ -278,25 +246,7 @@ export function PlatformAdPreview({ creative, platform, clientName }: PlatformAd
     <div className="bg-black rounded-lg overflow-hidden max-w-xs mx-auto aspect-[9/16] relative">
       {/* Media Background */}
       <div className="absolute inset-0">
-        {creative.type === 'image' && creative.file_url ? (
-          <img 
-            src={creative.file_url} 
-            alt={creative.title}
-            className="w-full h-full object-cover"
-          />
-        ) : creative.type === 'video' && creative.file_url ? (
-          <video 
-            src={creative.file_url}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center p-6 bg-gradient-to-br from-cyan-500 via-purple-500 to-pink-500">
-            <div className="text-white text-center">
-              <p className="text-2xl font-bold">{creative.headline}</p>
-              <p className="text-sm mt-4 opacity-90">{creative.body_copy}</p>
-            </div>
-          </div>
-        )}
+        {renderMediaBlock(videoRef1, '9:16')}
       </div>
 
       {/* Overlay */}
@@ -350,32 +300,7 @@ export function PlatformAdPreview({ creative, platform, clientName }: PlatformAd
     <div className="bg-background rounded-lg border overflow-hidden max-w-md mx-auto">
       {/* Video Thumbnail */}
       <div className="aspect-video bg-muted relative">
-        {creative.type === 'image' && creative.file_url ? (
-          <img 
-            src={creative.file_url} 
-            alt={creative.title}
-            className="w-full h-full object-cover"
-          />
-        ) : creative.type === 'video' && creative.file_url ? (
-          <div className="relative w-full h-full">
-            <video 
-              src={creative.file_url}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="bg-red-600 rounded-full px-4 py-2 flex items-center gap-2">
-                <Play className="h-8 w-8 text-white fill-white" />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="w-full h-full flex items-center justify-center p-6 text-center bg-gradient-to-br from-red-600 to-red-800">
-            <div className="text-white">
-              <p className="text-xl font-bold">{creative.headline}</p>
-              <p className="text-sm mt-2 opacity-90">{creative.body_copy}</p>
-            </div>
-          </div>
-        )}
+        {renderMediaBlock(videoRef1, '16:9')}
         
         {/* Ad Badge */}
         <div className="absolute top-2 left-2">
