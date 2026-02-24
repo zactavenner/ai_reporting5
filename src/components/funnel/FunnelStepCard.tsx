@@ -232,14 +232,14 @@ export function FunnelStepCard({
               {renderDeviceMockup(url, `${stepNumber}. ${step.name}`)}
               {/* Only show action buttons under first variant (A) */}
               {index === 0 && renderActionButtons()}
-              {index === 0 && <PageMetadataPreview url={url} />}
+              {index === 0 && <PageMetadataPreview url={url} stepId={step.id} />}
             </div>
           ))
         ) : (
           <div className="flex flex-col items-center">
             {renderDeviceMockup(step.url, `${stepNumber}. ${step.name}`)}
             {renderActionButtons()}
-            <PageMetadataPreview url={step.url} />
+            <PageMetadataPreview url={step.url} stepId={step.id} />
           </div>
         )}
       </div>
