@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Globe, Image as ImageIcon, FileText, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Globe, FileText, Loader2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatDistanceToNow } from 'date-fns';
 
 interface PageMetadata {
   title: string | null;
@@ -8,45 +11,49 @@ interface PageMetadata {
   image: string | null;
   siteName: string | null;
   favicon: string | null;
+  fetchedAt: string | null;
+  cached: boolean;
 }
 
 interface PageMetadataPreviewProps {
   url: string;
+  stepId?: string;
   className?: string;
 }
 
-export function PageMetadataPreview({ url, className }: PageMetadataPreviewProps) {
+export function PageMetadataPreview({ url, stepId, className }: PageMetadataPreviewProps) {
   const [metadata, setMetadata] = useState<PageMetadata | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
   const [imgError, setImgError] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
+  const fetchMetadata = useCallback(async (forceRefresh = false) => {
+    if (forceRefresh) setRefreshing(true);
+    else setLoading(true);
     setError(false);
     setImgError(false);
 
-    supabase.functions
-      .invoke('fetch-page-metadata', { body: { url } })
-      .then(({ data, error: fnError }) => {
-        if (cancelled) return;
-        if (fnError || !data || data.error) {
-          setError(true);
-        } else {
-          setMetadata(data);
-        }
-        setLoading(false);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setError(true);
-          setLoading(false);
-        }
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('fetch-page-metadata', {
+        body: { url, stepId, forceRefresh },
       });
+      if (fnError || !data || data.error) {
+        setError(true);
+      } else {
+        setMetadata(data);
+      }
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [url, stepId]);
 
-    return () => { cancelled = true; };
-  }, [url]);
+  useEffect(() => {
+    fetchMetadata(false);
+  }, [fetchMetadata]);
 
   if (loading) {
     return (
@@ -66,7 +73,6 @@ export function PageMetadataPreview({ url, className }: PageMetadataPreviewProps
     );
   }
 
-  const hasImage = metadata.image && !imgError;
   const hasContent = metadata.title || metadata.description;
 
   if (!hasContent && !metadata.image) {
@@ -94,13 +100,12 @@ export function PageMetadataPreview({ url, className }: PageMetadataPreviewProps
 
       {/* Text Content */}
       <div className="p-2.5 space-y-1">
-        {/* Site name / favicon */}
         {(metadata.siteName || metadata.favicon) && (
           <div className="flex items-center gap-1.5">
             {metadata.favicon && (
-              <img 
-                src={metadata.favicon} 
-                alt="" 
+              <img
+                src={metadata.favicon}
+                alt=""
                 className="h-3.5 w-3.5 rounded-sm"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
@@ -113,19 +118,43 @@ export function PageMetadataPreview({ url, className }: PageMetadataPreviewProps
           </div>
         )}
 
-        {/* Title */}
         {metadata.title && (
           <h4 className="text-xs font-semibold text-card-foreground leading-tight line-clamp-2">
             {metadata.title}
           </h4>
         )}
 
-        {/* Description */}
         {metadata.description && (
           <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
             {metadata.description}
           </p>
         )}
+
+        {/* Last updated + manual sync */}
+        <div className="flex items-center justify-between pt-1 border-t">
+          <span className="text-[10px] text-muted-foreground">
+            {metadata.fetchedAt
+              ? `Updated ${formatDistanceToNow(new Date(metadata.fetchedAt), { addSuffix: true })}`
+              : 'Just fetched'}
+            {metadata.cached && ' (cached)'}
+          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0"
+                onClick={() => fetchMetadata(true)}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <span className="text-xs">Refresh metadata</span>
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
     </div>
   );

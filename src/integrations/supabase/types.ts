@@ -1702,6 +1702,53 @@ export type Database = {
           },
         ]
       }
+      funnel_step_metadata: {
+        Row: {
+          created_at: string
+          description: string | null
+          favicon: string | null
+          fetched_at: string
+          id: string
+          image: string | null
+          site_name: string | null
+          step_id: string
+          title: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          favicon?: string | null
+          fetched_at?: string
+          id?: string
+          image?: string | null
+          site_name?: string | null
+          step_id: string
+          title?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          favicon?: string | null
+          fetched_at?: string
+          id?: string
+          image?: string | null
+          site_name?: string | null
+          step_id?: string
+          title?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnel_step_metadata_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: true
+            referencedRelation: "client_funnel_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       funnel_step_variants: {
         Row: {
           created_at: string | null
