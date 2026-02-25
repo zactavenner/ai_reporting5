@@ -24,25 +24,24 @@ import { useKnowledgeDocuments } from '@/hooks/useKnowledgeBase';
 import { useGPTFiles } from '@/hooks/useGPTFiles';
 import { CustomGPT } from '@/hooks/useCustomGPTs';
 import { Client } from '@/hooks/useClients';
-import { AggregatedMetrics } from '@/hooks/useMetrics';
+import { SourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
 import { AIToolsMenu, TOOL_MODES, ToolMode } from './AIToolsMenu';
-import { TokenUsageBar, FULL_MODEL_OPTIONS, MODEL_LIMITS } from './TokenUsageBar';
+import { TokenUsageBar, FULL_MODEL_OPTIONS } from './TokenUsageBar';
 import { cn } from '@/lib/utils';
+import { FullModel } from '@/hooks/useAgencyAIAnalysis';
 
 interface AIHubChatProps {
   selectedGPT: CustomGPT | null;
   onClearGPT: () => void;
   clients: Client[];
-  clientMetrics: Record<string, AggregatedMetrics>;
-  agencyMetrics: AggregatedMetrics;
+  clientMetrics: Record<string, SourceAggregatedMetrics>;
+  agencyMetrics: SourceAggregatedMetrics;
 }
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
 }
-
-type AIModel = 'gemini-2.5-pro' | 'gemini-3-flash' | 'gemini-3-pro' | 'gpt-5' | 'grok';
 
 const QUICK_ACTIONS = [
   { label: 'Compare all clients', prompt: 'Compare the performance of all active clients and identify the top performer.' },
@@ -55,7 +54,7 @@ export function AIHubChat({ selectedGPT, onClearGPT, clients, clientMetrics, age
   const [input, setInput] = useState('');
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [model, setModel] = useState<AIModel>('gemini-2.5-pro');
+  const [model, setModel] = useState<FullModel>('gemini-3-flash');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [activeTool, setActiveTool] = useState<ToolMode | null>(null);
@@ -238,12 +237,7 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
         );
       } else {
         // Legacy: use ai-analysis
-        const modelMap: Record<string, string> = {
-          'gemini-2.5-pro': 'gemini',
-          'gemini-3-flash': 'gemini',
-          'gemini-3-pro': 'gemini-pro',
-          'gpt-5': 'openai',
-        };
+        const legacyModel = model.startsWith('gpt') ? 'openai' as const : 'gemini' as const;
         response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analysis`,
           {
@@ -262,7 +256,7 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
                 clientFilter: selectedClientFilter !== 'all' ? selectedClientFilter : undefined,
                 toolMode: activeTool?.id,
               },
-              model: modelMap[model] || 'gemini',
+              model: legacyModel,
               files: fileContents,
             }),
           }
@@ -492,7 +486,7 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
             </Select>
             
             {/* Model Selection */}
-            <Select value={model} onValueChange={(v) => setModel(v as AIModel)}>
+            <Select value={model} onValueChange={(v) => setModel(v as FullModel)}>
               <SelectTrigger className="w-[160px] h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>

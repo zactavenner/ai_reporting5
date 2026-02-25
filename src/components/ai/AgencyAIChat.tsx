@@ -11,7 +11,7 @@ import {
   ChevronDown,
   Loader2,
   FileText,
-  Image as ImageIcon,
+  ImageIcon,
   Film,
   Database
 } from 'lucide-react';
@@ -25,26 +25,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useAgencyAIAnalysis } from '@/hooks/useAgencyAIAnalysis';
+import { useAgencyAIAnalysis, FullModel } from '@/hooks/useAgencyAIAnalysis';
 import { Client } from '@/hooks/useClients';
-import { AggregatedMetrics } from '@/hooks/useMetrics';
+import { SourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
 import { useMeetings } from '@/hooks/useMeetings';
-import { TokenUsageBar, FULL_MODEL_OPTIONS, MODEL_LIMITS } from './TokenUsageBar';
+import { TokenUsageBar, FULL_MODEL_OPTIONS } from './TokenUsageBar';
 import ReactMarkdown from 'react-markdown';
 
-type AIModel = 'gemini-2.5-pro' | 'gemini-3-flash' | 'gemini-3-pro' | 'gpt-5';
-
-interface AgencyAIChatProps {
-  clients: Client[];
-  clientMetrics: Record<string, AggregatedMetrics>;
-  agencyMetrics: AggregatedMetrics;
-}
-
-const modelLabels: Record<AIModel, string> = {
-  'gemini-2.5-pro': 'Gemini 2.5 Pro',
-  'gemini-3-flash': 'Gemini 3 Flash',
-  'gemini-3-pro': 'Gemini 3 Pro',
-  'gpt-5': 'GPT-5',
+const modelLabels: Record<FullModel, string> = {
+  'gemini-3-flash': 'Gemini Flash 3',
+  'gpt-5-nano': 'ChatGPT 5 Nano',
+  'grok-4-fast-reasoning': 'Grok 4 Fast Reasoning',
 };
 
 const agencyQuickQuestions = [
@@ -61,10 +52,16 @@ const clientQuickQuestions = [
   "What's their cost efficiency trend?",
 ];
 
+interface AgencyAIChatProps {
+  clients: Client[];
+  clientMetrics: Record<string, SourceAggregatedMetrics>;
+  agencyMetrics: SourceAggregatedMetrics;
+}
+
 export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAIChatProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
-  const [model, setModel] = useState<AIModel>('gemini-2.5-pro');
+  const [model, setModel] = useState<FullModel>('gemini-3-flash');
   const [isRecording, setIsRecording] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -194,7 +191,7 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
       );
     } else {
       const context = buildContext();
-      const legacyModel = model === 'gpt-5' ? 'openai' as const : 'gemini' as const;
+      const legacyModel = model.startsWith('gpt') ? 'openai' as const : 'gemini' as const;
       await sendMessage(message, context, messages, legacyModel, files);
     }
   };
@@ -352,7 +349,7 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {FULL_MODEL_OPTIONS.map((opt) => (
-                  <DropdownMenuItem key={opt.value} onClick={() => setModel(opt.value as AIModel)}>
+                  <DropdownMenuItem key={opt.value} onClick={() => setModel(opt.value as FullModel)}>
                     {opt.label} ({opt.badge})
                   </DropdownMenuItem>
                 ))}
@@ -401,7 +398,7 @@ export function AgencyAIChat({ clients, clientMetrics, agencyMetrics }: AgencyAI
                     onClick={() => {
                       if (!isLoading) {
                         const context = buildContext();
-                        const legacyModel = model === 'gpt-5' ? 'openai' as const : 'gemini' as const;
+                        const legacyModel = model.startsWith('gpt') ? 'openai' as const : 'gemini' as const;
                         sendMessage(q, context, messages, legacyModel);
                       }
                     }}

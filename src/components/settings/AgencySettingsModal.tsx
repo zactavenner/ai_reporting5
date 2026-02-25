@@ -21,24 +21,20 @@ import { Brain, Settings2, Key, DollarSign, Eye, EyeOff, Video, Copy, RefreshCw,
 import { ApiReferenceTab } from './ApiReferenceTab';
 
 const OPENAI_MODELS = [
-  { value: 'gpt-5', label: 'GPT-5' },
-  { value: 'gpt-5-mini', label: 'GPT-5 Mini' },
-  { value: 'gpt-5-nano', label: 'GPT-5 Nano' },
-  { value: 'gpt-5.2', label: 'GPT-5.2' },
+  { value: 'gpt-5-nano', label: 'ChatGPT 5 Nano' },
+  { value: 'gpt-4o', label: 'GPT-4o' },
+  { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
 ];
 
 const GEMINI_MODELS = [
-  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-  { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
-  { value: 'gemini-3-pro', label: 'Gemini 3 Pro' },
-  { value: 'gemini-3-flash', label: 'Gemini 3 Flash' },
+  { value: 'gemini-3-flash', label: 'Gemini Flash 3' },
+  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+  { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
 ];
 
 const GROK_MODELS = [
   { value: 'grok-4-fast-reasoning', label: 'Grok 4 Fast Reasoning' },
-  { value: 'grok-3', label: 'Grok 3' },
-  { value: 'grok-3-mini', label: 'Grok 3 Mini' },
+  { value: 'grok-beta', label: 'Grok Beta' },
   { value: 'grok-2', label: 'Grok 2' },
 ];
 
@@ -65,9 +61,9 @@ export function AgencySettingsModal({ open, onOpenChange }: AgencySettingsModalP
   const [showXaiKey, setShowXaiKey] = useState(false);
 
   // Model selections
-  const [selectedOpenaiModel, setSelectedOpenaiModel] = useState('gpt-5');
-  const [selectedGeminiModel, setSelectedGeminiModel] = useState('gemini-2.5-pro');
-  const [selectedGrokModel, setSelectedGrokModel] = useState('grok-3');
+  const [selectedOpenaiModel, setSelectedOpenaiModel] = useState('gpt-5-nano');
+  const [selectedGeminiModel, setSelectedGeminiModel] = useState('gemini-3-flash');
+  const [selectedGrokModel, setSelectedGrokModel] = useState('grok-4-fast-reasoning');
   
   // MeetGeek Integration
   const [meetgeekApiKey, setMeetgeekApiKey] = useState('');
@@ -85,9 +81,9 @@ export function AgencySettingsModal({ open, onOpenChange }: AgencySettingsModalP
       setXaiKey((settings as any).xai_api_key || '');
       setApiUsageLimit(String(settings.api_usage_limit || 100));
       setMeetgeekApiKey((settings as any).meetgeek_api_key || '');
-      setSelectedOpenaiModel((settings as any).selected_openai_model || 'gpt-5');
-      setSelectedGeminiModel((settings as any).selected_gemini_model || 'gemini-2.5-pro');
-      setSelectedGrokModel((settings as any).selected_grok_model || 'grok-3');
+      setSelectedOpenaiModel((settings as any).selected_openai_model || 'gpt-5-nano');
+      setSelectedGeminiModel((settings as any).selected_gemini_model || 'gemini-3-flash');
+      setSelectedGrokModel((settings as any).selected_grok_model || 'grok-4-fast-reasoning');
     }
   }, [settings]);
 

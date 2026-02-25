@@ -3,21 +3,15 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 
 export const MODEL_LIMITS: Record<string, number> = {
-  'gemini-2.5-pro': 1_048_576,
-  'gemini-3-pro': 1_048_576,
   'gemini-3-flash': 1_048_576,
-  'gpt-5': 128_000,
-  'grok': 131_072,
-  'grok-4-reasoning': 131_072,
+  'gpt-5-nano': 128_000,
+  'grok-4-fast-reasoning': 131_072,
 };
 
 export const FULL_MODEL_OPTIONS = [
-  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', context: '1M', badge: '1M' },
-  { value: 'gemini-3-flash', label: 'Gemini 3 Flash', context: '1M', badge: 'Fast' },
-  { value: 'gemini-3-pro', label: 'Gemini 3 Pro', context: '1M', badge: 'Pro' },
-  { value: 'gpt-5', label: 'GPT-5', context: '128K', badge: '128K' },
-  { value: 'grok', label: 'Grok', context: '131K', badge: 'xAI' },
-  { value: 'grok-4-reasoning', label: 'Grok 4 Reasoning', context: '131K', badge: 'xAI' },
+  { value: 'gemini-3-flash', label: 'Gemini Flash 3', context: '1M', badge: 'Flash' },
+  { value: 'gpt-5-nano', label: 'ChatGPT 5 Nano', context: '128K', badge: 'Nano' },
+  { value: 'grok-4-fast-reasoning', label: 'Grok 4 Fast Reasoning', context: '131K', badge: 'Reasoning' },
 ];
 
 function formatTokens(n: number): string {

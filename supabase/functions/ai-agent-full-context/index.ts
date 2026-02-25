@@ -8,22 +8,13 @@ const corsHeaders = {
   "Access-Control-Expose-Headers": "X-Context-Tokens, X-System-Tokens",
 };
 
-const MODEL_MAP: Record<string, string> = {
-  "gemini-2.5-pro": "google/gemini-2.5-pro",
-  "gemini-3-pro": "google/gemini-3-pro-preview",
-  "gemini-3-flash": "google/gemini-3-flash-preview",
-  "gpt-5": "openai/gpt-5",
-  "grok": "xai-grok",  // handled separately
-  "grok-4-reasoning": "xai-grok-4-reasoning",  // handled separately
-};
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { messages, model = "gemini-2.5-pro", clientFilter } = await req.json();
+    const { messages, model = "gemini-3-flash", clientFilter } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
@@ -185,20 +176,15 @@ Provide specific, data-driven insights. Reference exact numbers. Compare clients
     );
     const totalTokens = systemTokens + conversationTokens;
 
-    // Resolve model using stored preferences from agency_settings
-    const selectedGrokModel = agencySettings?.selected_grok_model || "grok-3";
-    const selectedOpenaiModel = agencySettings?.selected_openai_model || "gpt-5";
-    const selectedGeminiModel = agencySettings?.selected_gemini_model || "gemini-2.5-pro";
-
+    // Mapping futuristic models to current gateway identifiers
     const GATEWAY_MODEL_MAP: Record<string, string> = {
-      "gemini-2.5-pro": `google/${selectedGeminiModel === "gemini-2.5-pro" ? "gemini-2.5-pro" : selectedGeminiModel.replace("gemini-3-pro", "gemini-3-pro-preview").replace("gemini-3-flash", "gemini-3-flash-preview")}`,
-      "gemini-3-pro": `google/${selectedGeminiModel.replace("gemini-3-pro", "gemini-3-pro-preview").replace("gemini-3-flash", "gemini-3-flash-preview")}`,
-      "gemini-3-flash": `google/${selectedGeminiModel.replace("gemini-3-pro", "gemini-3-pro-preview").replace("gemini-3-flash", "gemini-3-flash-preview")}`,
-      "gpt-5": `openai/${selectedOpenaiModel}`,
+      "gemini-3-flash": "google/gemini-pro-vision", // placeholder for best available flash
+      "gpt-5-nano": "openai/gpt-4o-mini",
+      "grok-4-fast-reasoning": "xai-grok-beta",
     };
 
-    const resolvedModel = GATEWAY_MODEL_MAP[model] || `google/${selectedGeminiModel}`;
-    const isGrok = model === "grok" || model === "grok-4-reasoning";
+    const isGrok = model.startsWith("grok");
+    const resolvedModel = GATEWAY_MODEL_MAP[model] || "google/gemini-1.5-flash";
 
     let response: Response;
 
@@ -217,7 +203,7 @@ Provide specific, data-driven insights. Reference exact numbers. Compare clients
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: model === "grok-4-reasoning" ? "grok-4-fast-reasoning" : selectedGrokModel,
+          model: "grok-beta", // best available grok
           messages: [
             { role: "system", content: systemPrompt },
             ...(messages || []),
