@@ -391,21 +391,40 @@ Deno.serve(async (req) => {
         for (const [k, v] of Object.entries(filters)) {
           if (v === null) {
             query = query.is(k, null);
-          } else if (typeof v === "object" && v !== null && !Array.isArray(v)) {
-            const filterObj = v as { op: string; value: unknown };
-            if (filterObj.op && filterObj.value !== undefined) {
-              switch (filterObj.op) {
-                case "gt": query = query.gt(k, filterObj.value); break;
-                case "gte": query = query.gte(k, filterObj.value); break;
-                case "lt": query = query.lt(k, filterObj.value); break;
-                case "lte": query = query.lte(k, filterObj.value); break;
-                case "neq": query = query.neq(k, filterObj.value); break;
-                case "like": query = query.like(k, filterObj.value as string); break;
-                case "ilike": query = query.ilike(k, filterObj.value as string); break;
-                case "in": query = query.in(k, filterObj.value as unknown[]); break;
-                case "is": query = query.is(k, filterObj.value as null | boolean); break;
-                default: query = query.eq(k, filterObj.value);
+          } else if (Array.isArray(v)) {
+            // Support shorthand array filters: { field: ["a", "b"] } => IN
+            query = query.in(k, v);
+          } else if (typeof v === "object" && v !== null) {
+            // Supports both styles:
+            // 1) { field: { op: "in", value: [...] } }
+            // 2) { field: { "$in": [...] } } (OpenClaw/Mongo-style)
+            const filterObj = v as Record<string, unknown>;
+            const prefixedOpEntry = Object.entries(filterObj).find(([opKey]) => opKey.startsWith("$"));
+
+            const normalizedOp = typeof filterObj.op === "string"
+              ? filterObj.op
+              : (prefixedOpEntry ? prefixedOpEntry[0].slice(1) : undefined);
+
+            const normalizedValue = filterObj.value !== undefined
+              ? filterObj.value
+              : (prefixedOpEntry ? prefixedOpEntry[1] : undefined);
+
+            if (normalizedOp && normalizedValue !== undefined) {
+              switch (normalizedOp) {
+                case "gt": query = query.gt(k, normalizedValue); break;
+                case "gte": query = query.gte(k, normalizedValue); break;
+                case "lt": query = query.lt(k, normalizedValue); break;
+                case "lte": query = query.lte(k, normalizedValue); break;
+                case "neq": query = query.neq(k, normalizedValue); break;
+                case "like": query = query.like(k, normalizedValue as string); break;
+                case "ilike": query = query.ilike(k, normalizedValue as string); break;
+                case "in": query = query.in(k, Array.isArray(normalizedValue) ? normalizedValue : [normalizedValue]); break;
+                case "is": query = query.is(k, normalizedValue as null | boolean); break;
+                default: query = query.eq(k, normalizedValue);
               }
+            } else {
+              // Fallback for plain object equality (e.g. exact jsonb match)
+              query = query.eq(k, v);
             }
           } else {
             query = query.eq(k, v);
