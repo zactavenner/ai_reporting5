@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Plus, FolderPlus } from 'lucide-react';
+import { Plus, FolderPlus, FileText, Globe } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,6 +61,7 @@ export function FunnelPreviewTab({ clientId, isPublicView = false }: FunnelPrevi
   const [addStepCampaignId, setAddStepCampaignId] = useState<string | null>(null);
   const [newStepName, setNewStepName] = useState('');
   const [newStepUrl, setNewStepUrl] = useState('');
+  const [newStepType, setNewStepType] = useState<'url' | 'fb_lead_form'>('url');
   
   const [editStepOpen, setEditStepOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<FunnelStep | null>(null);
@@ -99,10 +101,11 @@ export function FunnelPreviewTab({ clientId, isPublicView = false }: FunnelPrevi
   };
 
   const handleAddStep = async () => {
-    if (!newStepName.trim() || !newStepUrl.trim() || !addStepCampaignId) return;
+    if (!newStepName.trim() || !addStepCampaignId) return;
+    if (newStepType === 'url' && !newStepUrl.trim()) return;
     
-    let validUrl = newStepUrl;
-    if (!newStepUrl.startsWith('http://') && !newStepUrl.startsWith('https://')) {
+    let validUrl = newStepType === 'fb_lead_form' ? 'fb://lead-form' : newStepUrl;
+    if (newStepType === 'url' && !newStepUrl.startsWith('http://') && !newStepUrl.startsWith('https://')) {
       validUrl = 'https://' + newStepUrl;
     }
     
@@ -118,6 +121,7 @@ export function FunnelPreviewTab({ clientId, isPublicView = false }: FunnelPrevi
     
     setNewStepName('');
     setNewStepUrl('');
+    setNewStepType('url');
     setAddStepOpen(false);
     setAddStepCampaignId(null);
   };
@@ -318,33 +322,76 @@ export function FunnelPreviewTab({ clientId, isPublicView = false }: FunnelPrevi
           <DialogHeader>
             <DialogTitle>Add Funnel Step</DialogTitle>
             <DialogDescription>
-              Add a new page to this campaign
+              Add a new page or form to this campaign
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 pt-4">
+            {/* Step Type Selector */}
+            <div className="space-y-2">
+              <Label>Step Type</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setNewStepType('url')}
+                  className={cn(
+                    "flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all text-sm",
+                    newStepType === 'url' 
+                      ? "border-primary bg-primary/5" 
+                      : "border-border hover:border-muted-foreground"
+                  )}
+                >
+                  <Globe className="h-5 w-5" />
+                  <span className="font-medium">Web Page</span>
+                  <span className="text-[10px] text-muted-foreground">Landing page URL</span>
+                </button>
+                <button
+                  onClick={() => setNewStepType('fb_lead_form')}
+                  className={cn(
+                    "flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all text-sm",
+                    newStepType === 'fb_lead_form' 
+                      ? "border-[#1877F2] bg-[#1877F2]/5" 
+                      : "border-border hover:border-muted-foreground"
+                  )}
+                >
+                  <FileText className="h-5 w-5 text-[#1877F2]" />
+                  <span className="font-medium">FB Lead Form</span>
+                  <span className="text-[10px] text-muted-foreground">Native form preview</span>
+                </button>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="step-name">Step Name</Label>
               <Input
                 id="step-name"
                 value={newStepName}
                 onChange={(e) => setNewStepName(e.target.value)}
-                placeholder="e.g., Landing Page, Book A Call, Thank You"
+                placeholder={newStepType === 'fb_lead_form' ? "e.g., Lead Qualification Form" : "e.g., Landing Page, Book A Call, Thank You"}
               />
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="step-url">Page URL</Label>
-              <Input
-                id="step-url"
-                value={newStepUrl}
-                onChange={(e) => setNewStepUrl(e.target.value)}
-                placeholder="https://example.com/landing-page"
-              />
-              <p className="text-xs text-muted-foreground">
-                Make sure the URL allows embedding (some sites block iframes)
-              </p>
-            </div>
+            {newStepType === 'url' && (
+              <div className="space-y-2">
+                <Label htmlFor="step-url">Page URL</Label>
+                <Input
+                  id="step-url"
+                  value={newStepUrl}
+                  onChange={(e) => setNewStepUrl(e.target.value)}
+                  placeholder="https://example.com/landing-page"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Make sure the URL allows embedding (some sites block iframes)
+                </p>
+              </div>
+            )}
+
+            {newStepType === 'fb_lead_form' && (
+              <div className="rounded-lg bg-[#1877F2]/5 border border-[#1877F2]/20 p-3">
+                <p className="text-xs text-muted-foreground">
+                  This will add a native Facebook Lead Form mockup to your funnel flow, showing accredited investor qualification, liquidity range, and contact fields.
+                </p>
+              </div>
+            )}
             
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setAddStepOpen(false)}>
@@ -352,7 +399,7 @@ export function FunnelPreviewTab({ clientId, isPublicView = false }: FunnelPrevi
               </Button>
               <Button 
                 onClick={handleAddStep}
-                disabled={!newStepName.trim() || !newStepUrl.trim() || createStep.isPending}
+                disabled={!newStepName.trim() || (newStepType === 'url' && !newStepUrl.trim()) || createStep.isPending}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Step

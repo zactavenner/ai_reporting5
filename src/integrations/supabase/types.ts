@@ -565,6 +565,7 @@ export type Database = {
           id: string
           name: string
           sort_order: number | null
+          step_type: string
           updated_at: string | null
           url: string
         }
@@ -575,6 +576,7 @@ export type Database = {
           id?: string
           name: string
           sort_order?: number | null
+          step_type?: string
           updated_at?: string | null
           url: string
         }
@@ -585,6 +587,7 @@ export type Database = {
           id?: string
           name?: string
           sort_order?: number | null
+          step_type?: string
           updated_at?: string | null
           url?: string
         }
