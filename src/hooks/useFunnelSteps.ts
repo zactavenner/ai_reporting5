@@ -8,6 +8,7 @@ export interface FunnelStep {
   campaign_id: string | null;
   name: string;
   url: string;
+  step_type: string;
   sort_order: number;
   created_at: string;
   updated_at: string;

@@ -22,6 +22,7 @@ import { PageSpeedModal } from './PageSpeedModal';
 import { PixelVerificationModal } from './PixelVerificationModal';
 import { SplitTestModal } from './SplitTestModal';
 import { supabase } from '@/integrations/supabase/client';
+import { FacebookLeadFormMockup } from './FacebookLeadFormMockup';
 import { useLatestPixelVerification, getVerificationStatusInfo } from '@/hooks/usePixelVerification';
 import type { FunnelStep } from '@/hooks/useFunnelSteps';
 import type { FunnelStepVariant } from '@/hooks/useFunnelStepVariants';
@@ -69,6 +70,7 @@ export function FunnelStepCard({
 
   const { data: latestVerification } = useLatestPixelVerification(step.id);
   const verificationStatus = getVerificationStatusInfo(latestVerification?.status);
+  const isFbLeadForm = step.url === 'fb://lead-form';
   
   const hasVariants = variants.length > 0;
 
@@ -91,6 +93,9 @@ export function FunnelStepCard({
   };
 
   const renderDeviceMockup = (url: string, title: string, variantLabel?: string) => {
+    if (url === 'fb://lead-form') {
+      return <FacebookLeadFormMockup stepName={title} deviceType={deviceType} />;
+    }
     switch (deviceType) {
       case 'desktop':
         return <DesktopMockup url={url} title={title} />;
@@ -140,44 +145,48 @@ export function FunnelStepCard({
   const renderActionButtons = () => (
     <div className="flex flex-col items-center gap-2 mt-3">
       {/* Verification Status Badge */}
-      {renderVerificationBadge()}
+      {!isFbLeadForm && renderVerificationBadge()}
       
       <div className="flex items-center gap-1">
-        <Button
-          variant={hasVariants ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setSplitTestModalOpen(true)}
-          className="h-7 px-2 text-xs"
-          title="A/B Split Test"
-        >
-          <TestTube2 className="h-3 w-3 mr-1" />
-          {hasVariants ? `${allUrls.length} Tests` : 'A/B'}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={runSpeedTest}
-          disabled={speedTestLoading}
-          className="h-7 px-2 text-xs"
-          title="Speed Test"
-        >
-          {speedTestLoading ? (
-            <Loader2 className="h-3 w-3 animate-spin mr-1" />
-          ) : (
-            <Gauge className="h-3 w-3 mr-1" />
-          )}
-          Speed
-        </Button>
-        <Button
-          variant={latestVerification ? "outline" : "ghost"}
-          size="sm"
-          onClick={() => setPixelModalOpen(true)}
-          className="h-7 px-2 text-xs"
-          title="Verify Pixels"
-        >
-          <Radio className="h-3 w-3 mr-1" />
-          Pixels
-        </Button>
+        {!isFbLeadForm && (
+          <>
+            <Button
+              variant={hasVariants ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setSplitTestModalOpen(true)}
+              className="h-7 px-2 text-xs"
+              title="A/B Split Test"
+            >
+              <TestTube2 className="h-3 w-3 mr-1" />
+              {hasVariants ? `${allUrls.length} Tests` : 'A/B'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={runSpeedTest}
+              disabled={speedTestLoading}
+              className="h-7 px-2 text-xs"
+              title="Speed Test"
+            >
+              {speedTestLoading ? (
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+              ) : (
+                <Gauge className="h-3 w-3 mr-1" />
+              )}
+              Speed
+            </Button>
+            <Button
+              variant={latestVerification ? "outline" : "ghost"}
+              size="sm"
+              onClick={() => setPixelModalOpen(true)}
+              className="h-7 px-2 text-xs"
+              title="Verify Pixels"
+            >
+              <Radio className="h-3 w-3 mr-1" />
+              Pixels
+            </Button>
+          </>
+        )}
         {!isPublicView && (
         <>
           <Button variant="ghost" size="sm" onClick={onEdit} className="h-7 w-7 p-0">
@@ -204,14 +213,16 @@ export function FunnelStepCard({
           </AlertDialog>
         </>
       )}
-        <a
-          href={step.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="h-7 w-7 inline-flex items-center justify-center hover:bg-accent rounded"
-        >
-          <ExternalLink className="h-3 w-3" />
-        </a>
+        {!isFbLeadForm && (
+          <a
+            href={step.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="h-7 w-7 inline-flex items-center justify-center hover:bg-accent rounded"
+          >
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
       </div>
     </div>
   );
