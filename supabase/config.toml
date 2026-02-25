@@ -92,3 +92,6 @@ verify_jwt = false
 
 [functions.daily-accuracy-check]
 verify_jwt = false
+
+[functions.daily-master-sync]
+verify_jwt = false
