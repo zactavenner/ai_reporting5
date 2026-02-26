@@ -19,6 +19,7 @@ export interface Task {
   meeting_id: string | null;
   parent_task_id: string | null;
   show_subtasks_to_client: boolean;
+  visible_to_client: boolean;
   recurrence_type: string | null;
   recurrence_interval: number | null;
   recurrence_next_at: string | null;
@@ -328,6 +329,7 @@ export function useCompleteRecurringTask() {
           created_by: task.created_by,
           parent_task_id: task.parent_task_id,
           show_subtasks_to_client: task.show_subtasks_to_client,
+          visible_to_client: task.visible_to_client,
           recurrence_type: task.recurrence_type,
           recurrence_interval: task.recurrence_interval,
           recurrence_next_at: nextDue.toISOString(),

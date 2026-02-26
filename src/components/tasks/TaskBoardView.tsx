@@ -60,8 +60,10 @@ export function TaskBoardView({ clientId, onClose, isPublicView = false }: TaskB
     setView('kanban');
   }, [setSearchParams]);
 
-  // In public view, only show tasks for the specific client
-  const tasks = clientId ? allTasks.filter(t => t.client_id === clientId) : allTasks;
+  // In public view, only show tasks for the specific client and filter hidden tasks
+  const tasks = clientId 
+    ? allTasks.filter(t => t.client_id === clientId && (!isPublicView || t.visible_to_client !== false))
+    : allTasks;
   
   // In public view, only show this client in the clients list
   const filteredClients = isPublicView && clientId 

@@ -9,6 +9,7 @@ import {
   Check,
   CheckCircle2,
   Repeat,
+  EyeOff,
 } from 'lucide-react';
 import { Task, AgencyMember, useUpdateTask, useTaskFiles, useCompleteRecurringTask } from '@/hooks/useTasks';
 import { format, isToday, isPast, parseISO, startOfDay } from 'date-fns';
@@ -187,6 +188,16 @@ export function KanbanTaskCard({
             </Badge>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
+            {task.visible_to_client === false && !isPublicView && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <EyeOff className="h-3 w-3 text-muted-foreground/70" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">Hidden from client</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             {files.length > 0 && (
               <div className="flex items-center gap-0.5 text-muted-foreground/70">
                 <Paperclip className="h-3 w-3" />
