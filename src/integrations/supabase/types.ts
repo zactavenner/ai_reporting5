@@ -1758,6 +1758,92 @@ export type Database = {
           },
         ]
       }
+      funnel_snapshots: {
+        Row: {
+          client_id: string
+          conversion_rate: number | null
+          count: number
+          created_at: string
+          id: string
+          snapshot_date: string
+          stage_id: string
+        }
+        Insert: {
+          client_id: string
+          conversion_rate?: number | null
+          count?: number
+          created_at?: string
+          id?: string
+          snapshot_date: string
+          stage_id: string
+        }
+        Update: {
+          client_id?: string
+          conversion_rate?: number | null
+          count?: number
+          created_at?: string
+          id?: string
+          snapshot_date?: string
+          stage_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnel_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funnel_snapshots_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "funnel_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      funnel_stages: {
+        Row: {
+          client_id: string
+          conversion_count: number
+          created_at: string
+          id: string
+          stage_name: string
+          stage_order: number
+          stage_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          conversion_count?: number
+          created_at?: string
+          id?: string
+          stage_name: string
+          stage_order?: number
+          stage_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          conversion_count?: number
+          created_at?: string
+          id?: string
+          stage_name?: string
+          stage_order?: number
+          stage_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnel_stages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       funnel_step_metadata: {
         Row: {
           created_at: string
