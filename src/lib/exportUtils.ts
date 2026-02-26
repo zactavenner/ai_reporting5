@@ -1,18 +1,31 @@
 import { toast } from 'sonner';
 
-export function exportToCSV<T extends object>(data: T[], filename: string) {
+export function exportToCSV<T extends object>(
+  data: T[],
+  filename: string,
+  dateRange?: { startDate?: string; endDate?: string }
+) {
   if (data.length === 0) {
     toast.error('No data to export');
     return;
   }
 
   const headers = Object.keys(data[0]);
+  
+  // Add date range info rows at top if provided
+  const metaRows: string[] = [];
+  if (dateRange) {
+    if (dateRange.startDate) metaRows.push(`"Date Range Start","${dateRange.startDate}"`);
+    if (dateRange.endDate) metaRows.push(`"Date Range End","${dateRange.endDate}"`);
+    if (metaRows.length > 0) metaRows.push(''); // blank separator row
+  }
+
   const csvRows = [
+    ...metaRows,
     headers.join(','),
     ...data.map(row =>
       headers.map(header => {
         const value = (row as any)[header];
-        // Handle nulls, strings with commas, and other edge cases
         if (value === null || value === undefined) return '';
         const stringValue = String(value);
         if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
@@ -44,7 +57,6 @@ export function exportToGoogleSheets<T extends object>(data: T[], title: string)
     return;
   }
 
-  // Convert data to TSV format (Google Sheets friendly)
   const headers = Object.keys(data[0]);
   const tsvRows = [
     headers.join('\t'),
@@ -59,18 +71,23 @@ export function exportToGoogleSheets<T extends object>(data: T[], title: string)
 
   const tsvContent = tsvRows.join('\n');
   
-  // Encode content for URL
-  const encodedData = encodeURIComponent(tsvContent);
   const encodedTitle = encodeURIComponent(title);
   
-  // Google Sheets import URL - opens in new tab with data ready to paste
-  // Users can paste from clipboard into a new Google Sheet
   navigator.clipboard.writeText(tsvContent).then(() => {
-    // Open Google Sheets with a new blank sheet
     const googleSheetsUrl = `https://docs.google.com/spreadsheets/create?title=${encodedTitle}`;
     window.open(googleSheetsUrl, '_blank');
     toast.success('Data copied to clipboard! Paste it into the new Google Sheet (Ctrl+V or Cmd+V)');
   }).catch(() => {
     toast.error('Failed to copy data to clipboard');
   });
+}
+
+export function exportDashboardPDF() {
+  // Use the browser's print functionality to generate a PDF snapshot
+  toast.info('Preparing PDF export...');
+  
+  // Small delay to let toast render then print
+  setTimeout(() => {
+    window.print();
+  }, 300);
 }

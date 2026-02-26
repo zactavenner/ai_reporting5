@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { ConfidenceLevel, CONFIDENCE_CONFIG } from '@/lib/metricConfidence';
+import { Sparkline } from './Sparkline';
 import {
   Tooltip,
   TooltipContent,
@@ -22,10 +23,10 @@ interface KPICardProps {
   onClick?: () => void;
   format?: 'currency' | 'percent' | 'number' | 'days';
   threshold?: KPIThreshold;
-  /** For cost metrics, higher is worse. For percent metrics like show rate, lower is worse */
   invertThreshold?: boolean;
-  /** Data confidence level for this metric */
   confidence?: ConfidenceLevel;
+  sparklineData?: number[];
+  invertTrend?: boolean;
 }
 
 export function KPICard({
@@ -39,6 +40,8 @@ export function KPICard({
   threshold,
   invertThreshold = false,
   confidence,
+  sparklineData,
+  invertTrend = false,
 }: KPICardProps) {
   const formatValue = (val: string | number): string => {
     if (typeof val === 'string') return val;
@@ -61,8 +64,9 @@ export function KPICard({
   };
 
   const getTrendColor = () => {
-    if (change > 0) return 'text-success';
-    if (change < 0) return 'text-destructive';
+    const effectiveChange = invertTrend ? -change : change;
+    if (effectiveChange > 0) return 'text-success';
+    if (effectiveChange < 0) return 'text-destructive';
     return 'text-muted-foreground';
   };
 
@@ -72,12 +76,10 @@ export function KPICard({
     const numValue = value;
     
     if (invertThreshold) {
-      // For metrics where lower is worse (e.g., show rate %)
       if (numValue <= threshold.red) return 'border-destructive bg-destructive/5';
       if (numValue <= threshold.yellow) return 'border-yellow-500 bg-yellow-500/5';
       return 'border-chart-2 bg-chart-2/5';
     } else {
-      // For cost metrics where higher is worse
       if (numValue >= threshold.red) return 'border-destructive bg-destructive/5';
       if (numValue >= threshold.yellow) return 'border-yellow-500 bg-yellow-500/5';
       return 'border-chart-2 bg-chart-2/5';
@@ -87,7 +89,7 @@ export function KPICard({
   return (
     <div
       className={cn(
-        'border bg-card p-4 transition-all rounded-lg',
+        'border bg-card p-4 transition-all duration-200 ease-in-out rounded-lg',
         threshold ? getThresholdColor() : 'border-border',
         clickable && 'cursor-pointer hover:shadow-sm hover:-translate-y-0.5'
       )}
@@ -113,7 +115,14 @@ export function KPICard({
           </TooltipProvider>
         )}
       </div>
-      <p className="text-3xl font-semibold mt-2 tracking-tight tabular-nums">{formatValue(value)}</p>
+      <div className="flex items-end justify-between mt-1">
+        <p className="text-3xl font-semibold tracking-tight tabular-nums">{formatValue(value)}</p>
+        {sparklineData && sparklineData.length >= 2 && (
+          <div className="w-16 h-8 ml-2 flex-shrink-0">
+            <Sparkline data={sparklineData} height={32} invertTrend={invertTrend} />
+          </div>
+        )}
+      </div>
       <div className={cn('flex items-center gap-1 mt-2 text-sm', getTrendColor())}>
         {getTrendIcon()}
         <span className="tabular-nums">{change > 0 ? '+' : ''}{change.toFixed(0)}%</span>

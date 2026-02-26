@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { KPICard, KPIThreshold } from './KPICard';
 import { getMetricConfidence } from '@/lib/metricConfidence';
 
@@ -24,13 +25,11 @@ interface KPIMetrics {
   costOfCapital?: number;
   avgTimeToFund?: number;
   avgCallsToFund?: number;
-  // New KPIs
   leadToBookedPercent?: number;
   reconnectCalls?: number;
   reconnectShowed?: number;
   closeRate?: number;
   pipelineValue?: number;
-  // Additional cost metrics
   costPerReconnectCall?: number;
   costPerReconnectShowed?: number;
 }
@@ -93,6 +92,11 @@ function calculateChange(current: number, prior: number): number {
   return ((current - prior) / prior) * 100;
 }
 
+interface DailySnapshot {
+  date: string;
+  [key: string]: any;
+}
+
 interface KPIGridProps {
   metrics: KPIMetrics;
   priorMetrics?: PriorMetrics;
@@ -101,6 +105,7 @@ interface KPIGridProps {
   thresholds?: KPIThresholds;
   fundedInvestorLabel?: string;
   showConfidence?: boolean;
+  dailySnapshots?: DailySnapshot[];
 }
 
 export function KPIGrid({ 
@@ -111,24 +116,49 @@ export function KPIGrid({
   thresholds,
   fundedInvestorLabel = 'Funded Investors',
   showConfidence = false,
+  dailySnapshots = [],
 }: KPIGridProps) {
   
   // Calculate change vs prior for a metric, inverting for cost metrics
   const getChangeForMetric = (key: string, currentValue: number): number => {
     if (!priorMetrics) return 0;
     
-    // Check for key alias first, then fall back to original key
     const priorKey = KEY_ALIASES[key] || key;
     const priorValue = (priorMetrics as any)[priorKey] ?? (priorMetrics as any)[key] ?? 0;
     const rawChange = calculateChange(currentValue, priorValue);
     
-    // For cost metrics, invert the change (lower is better, so negative change shows as positive/green)
     if (COST_METRICS.has(key)) {
       return -rawChange;
     }
     
     return rawChange;
   };
+
+  // Build sparkline data from daily snapshots
+  const sparklineMap = useMemo(() => {
+    if (!dailySnapshots || dailySnapshots.length < 2) return {};
+    
+    const map: Record<string, number[]> = {};
+    // Map KPI keys to daily_metrics columns
+    const keyToColumn: Record<string, string> = {
+      totalAdSpend: 'ad_spend',
+      leads: 'leads',
+      spamBadLeads: 'spam_leads',
+      calls: 'calls',
+      showedCalls: 'showed_calls',
+      commitments: 'commitments',
+      commitmentDollars: 'commitment_dollars',
+      fundedInvestors: 'funded_investors',
+      fundedDollars: 'funded_dollars',
+      reconnectCalls: 'reconnect_calls',
+      reconnectShowed: 'reconnect_showed',
+    };
+
+    for (const [kpiKey, col] of Object.entries(keyToColumn)) {
+      map[kpiKey] = dailySnapshots.map(d => Number((d as any)[col]) || 0);
+    }
+    return map;
+  }, [dailySnapshots]);
 
   const kpis = [
     { key: 'totalAdSpend', label: 'Total Ad Spend', value: metrics.totalAdSpend ?? 0, format: 'currency' as const },
@@ -152,7 +182,6 @@ export function KPIGrid({
     { key: 'costOfCapital', label: 'Cost of Capital', value: metrics.costOfCapital ?? 0, format: 'percent' as const, threshold: thresholds?.costOfCapital },
   ];
 
-  // Add funded investor metrics if enabled
   const fundedMetrics = showFundedMetrics ? [
     { key: 'avgTimeToFund', label: 'Avg Time to Fund', value: metrics.avgTimeToFund ?? 0, format: 'days' as const, clickable: false },
     { key: 'avgCallsToFund', label: 'Avg Calls to Fund', value: metrics.avgCallsToFund ?? 0, format: 'number' as const, clickable: false },
@@ -161,10 +190,11 @@ export function KPIGrid({
   const allKpis = [...kpis, ...fundedMetrics];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
       {allKpis.map((kpi) => {
         const change = getChangeForMetric(kpi.key, kpi.value);
         const metricConfidence = showConfidence ? getMetricConfidence(kpi.key) : undefined;
+        const isCostMetric = COST_METRICS.has(kpi.key);
         
         return (
           <KPICard
@@ -178,6 +208,8 @@ export function KPIGrid({
             onClick={kpi.clickable ? () => onMetricClick?.(kpi.key) : undefined}
             threshold={'threshold' in kpi ? kpi.threshold : undefined}
             confidence={metricConfidence?.level}
+            sparklineData={sparklineMap[kpi.key]}
+            invertTrend={isCostMetric}
           />
         );
       })}

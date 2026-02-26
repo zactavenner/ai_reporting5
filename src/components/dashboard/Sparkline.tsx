@@ -5,9 +5,10 @@ interface SparklineProps {
   data: number[];
   color?: string;
   height?: number;
+  invertTrend?: boolean;
 }
 
-export function Sparkline({ data, color = 'hsl(var(--chart-1))', height = 24 }: SparklineProps) {
+export function Sparkline({ data, height = 24, invertTrend = false }: SparklineProps) {
   const chartData = useMemo(() => {
     return data.map((value, index) => ({ value, index }));
   }, [data]);
@@ -23,7 +24,9 @@ export function Sparkline({ data, color = 'hsl(var(--chart-1))', height = 24 }: 
   const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
   
   const trendUp = secondAvg > firstAvg;
-  const trendColor = trendUp ? 'hsl(var(--chart-2))' : 'hsl(var(--destructive))';
+  // For cost metrics (invertTrend), up is bad (red), down is good (green)
+  const isPositive = invertTrend ? !trendUp : trendUp;
+  const trendColor = isPositive ? 'hsl(var(--chart-2))' : 'hsl(var(--destructive))';
 
   return (
     <div style={{ height, width: '100%', minWidth: 60 }}>

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -40,7 +41,9 @@ import {
   Trash2,
   Eye,
   Sparkles,
+  CheckSquare,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface CreativeWithClient extends Creative {
   clientName?: string;
@@ -56,6 +59,7 @@ export function CreativesTab() {
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedCreative, setSelectedCreative] = useState<CreativeWithClient | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Map client names to creatives
   const clientMap = clients.reduce((acc, client) => {
@@ -141,6 +145,38 @@ export function CreativesTab() {
     }
   };
 
+  // Bulk actions
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredCreatives.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredCreatives.map(c => c.id)));
+    }
+  };
+
+  const handleBulkAction = (status: 'approved' | 'rejected') => {
+    const selected = filteredCreatives.filter(c => selectedIds.has(c.id));
+    selected.forEach(creative => {
+      updateStatus.mutate({
+        id: creative.id,
+        status,
+        clientId: creative.client_id,
+        creativeTitle: creative.title,
+      });
+    });
+    toast.success(`${selected.length} creative(s) ${status}`);
+    setSelectedIds(new Set());
+  };
+
   if (creativesLoading) {
     return <CashBagLoader message="Loading creatives..." />;
   }
@@ -186,6 +222,25 @@ export function CreativesTab() {
         </Select>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+          <CheckSquare className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <Button size="sm" variant="default" onClick={() => handleBulkAction('approved')}>
+            <Check className="h-3 w-3 mr-1" />
+            Approve All
+          </Button>
+          <Button size="sm" variant="destructive" onClick={() => handleBulkAction('rejected')}>
+            <X className="h-3 w-3 mr-1" />
+            Reject All
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+            Clear
+          </Button>
+        </div>
+      )}
+
       {/* Status Summary */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <div className="bg-muted/50 rounded-lg p-3 text-center">
@@ -227,6 +282,15 @@ export function CreativesTab() {
         </TabsList>
 
         <TabsContent value="creatives" className="space-y-4">
+          {filteredCreatives.length > 0 && (
+            <div className="flex items-center gap-2 mb-2">
+              <Checkbox
+                checked={selectedIds.size === filteredCreatives.length && filteredCreatives.length > 0}
+                onCheckedChange={toggleSelectAll}
+              />
+              <span className="text-sm text-muted-foreground">Select all</span>
+            </div>
+          )}
           {filteredCreatives.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
@@ -240,7 +304,14 @@ export function CreativesTab() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredCreatives.map((creative) => (
-                <Card key={creative.id} className="overflow-hidden hover:border-primary/50 transition-colors">
+                <Card key={creative.id} className="overflow-hidden hover:border-primary/50 transition-all duration-200 relative">
+                  {/* Checkbox overlay */}
+                  <div className="absolute top-2 left-2 z-10" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedIds.has(creative.id)}
+                      onCheckedChange={() => toggleSelect(creative.id)}
+                    />
+                  </div>
                   <div className="aspect-video bg-muted relative overflow-hidden">
                     {creative.type === 'image' && creative.file_url ? (
                       <img
@@ -318,7 +389,7 @@ export function CreativesTab() {
                   {recentActivity.map((creative) => (
                     <div
                       key={creative.id}
-                      className="flex items-start gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                      className="flex items-start gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors duration-200 cursor-pointer"
                       onClick={() => setSelectedCreative(creative)}
                     >
                       <div className="w-16 h-16 rounded-md bg-muted overflow-hidden flex-shrink-0">
@@ -370,7 +441,7 @@ export function CreativesTab() {
 
       {/* Creative Detail Modal - Horizontal Layout */}
       <Dialog open={!!selectedCreative} onOpenChange={(open) => !open && setSelectedCreative(null)}>
-        <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto">
+        <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto sm:max-w-[95vw]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {selectedCreative && getTypeIcon(selectedCreative.type)}
@@ -410,21 +481,21 @@ export function CreativesTab() {
                       variant="default"
                       onClick={() => handleStatusChange(selectedCreative, 'approved')}
                     >
-                      <Check className="h-4 w-4 mr-2" />
+                      <Check className="h-4 w-4 mr-1" />
                       Approve
                     </Button>
                     <Button
                       variant="outline"
                       onClick={() => handleStatusChange(selectedCreative, 'revisions')}
                     >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Request Revisions
+                      <RefreshCw className="h-4 w-4 mr-1" />
+                      Revisions
                     </Button>
                     <Button
                       variant="destructive"
                       onClick={() => handleStatusChange(selectedCreative, 'rejected')}
                     >
-                      <X className="h-4 w-4 mr-2" />
+                      <X className="h-4 w-4 mr-1" />
                       Reject
                     </Button>
                   </>
@@ -434,31 +505,76 @@ export function CreativesTab() {
                     variant="default"
                     onClick={() => handleStatusChange(selectedCreative, 'launched')}
                   >
-                    <Rocket className="h-4 w-4 mr-2" />
-                    Mark as Launched
+                    <Rocket className="h-4 w-4 mr-1" />
+                    Launch
                   </Button>
                 )}
+                <Button
+                  variant="ghost"
+                  onClick={() => handleDelete(selectedCreative)}
+                >
+                  <Trash2 className="h-4 w-4 mr-1 text-destructive" />
+                  Delete
+                </Button>
+              </div>
+
+              {/* Approval History Timeline */}
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  History
+                </h4>
+                <div className="space-y-2 text-xs text-muted-foreground">
+                  <div className="flex gap-2">
+                    <span className="text-muted-foreground/70">Created:</span>
+                    <span>{format(new Date(selectedCreative.created_at), 'MMM d, yyyy h:mm a')}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-muted-foreground/70">Last Updated:</span>
+                    <span>{format(new Date(selectedCreative.updated_at), 'MMM d, yyyy h:mm a')}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-muted-foreground/70">Current Status:</span>
+                    <Badge className={`${getStatusColor(selectedCreative.status)} text-xs`}>
+                      {selectedCreative.status}
+                    </Badge>
+                  </div>
+                </div>
               </div>
 
               {/* Comments */}
-              {selectedCreative.comments.length > 0 && (
-                <div className="space-y-2 border-t pt-4">
-                  <h4 className="font-medium">Comments ({selectedCreative.comments.length})</h4>
-                  <ScrollArea className="h-[200px]">
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Comments ({selectedCreative.comments.length})
+                </h4>
+                {selectedCreative.comments.length > 0 ? (
+                  <ScrollArea className="h-[200px] border rounded-lg p-3 mb-2">
                     <div className="space-y-2">
                       {selectedCreative.comments.map((comment) => (
-                        <div key={comment.id} className="bg-muted/50 p-3 rounded-lg">
-                          <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                            <span className="font-medium">{comment.author}</span>
-                            <span>{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}</span>
+                        <div
+                          key={comment.id}
+                          className={`p-2 rounded-lg text-sm ${
+                            comment.author === 'Client'
+                              ? 'bg-primary/10 ml-4'
+                              : 'bg-muted mr-4'
+                          }`}
+                        >
+                          <div className="flex justify-between mb-0.5">
+                            <span className="text-xs font-medium">{comment.author}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {format(new Date(comment.createdAt), 'MMM d, h:mm a')}
+                            </span>
                           </div>
-                          <p className="text-sm">{comment.text}</p>
+                          <p>{comment.text}</p>
                         </div>
                       ))}
                     </div>
                   </ScrollArea>
-                </div>
-              )}
+                ) : (
+                  <p className="text-sm text-muted-foreground mb-2">No comments yet</p>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>

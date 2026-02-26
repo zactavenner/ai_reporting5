@@ -180,7 +180,10 @@ const Index = () => {
   };
 
   const handleExportCSV = () => {
-    exportToCSV(dailyMetrics, 'all-clients-metrics');
+    exportToCSV(dailyMetrics, 'all-clients-metrics', {
+      startDate: startDate ? String(startDate).split('T')[0] : undefined,
+      endDate: endDate ? String(endDate).split('T')[0] : undefined,
+    });
   };
 
   const handleAddClient = () => {
@@ -357,6 +360,7 @@ const Index = () => {
                     metrics={aggregatedMetrics} 
                     showFundedMetrics 
                     onMetricClick={(metric) => setDrillDownModal(metric)}
+                    dailySnapshots={dailyMetrics.slice(-7)}
                   />
                 )}
               </section>
