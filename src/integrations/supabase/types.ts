@@ -3632,6 +3632,7 @@ export type Database = {
           status: string
           title: string
           updated_at: string
+          visible_to_client: boolean
         }
         Insert: {
           assigned_client_name?: string | null
@@ -3655,6 +3656,7 @@ export type Database = {
           status?: string
           title: string
           updated_at?: string
+          visible_to_client?: boolean
         }
         Update: {
           assigned_client_name?: string | null
@@ -3678,6 +3680,7 @@ export type Database = {
           status?: string
           title?: string
           updated_at?: string
+          visible_to_client?: boolean
         }
         Relationships: [
           {

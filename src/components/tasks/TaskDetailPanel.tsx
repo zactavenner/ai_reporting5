@@ -285,6 +285,15 @@ import { toast } from 'sonner';
     });
   };
 
+  const handleToggleVisibleToClient = async () => {
+    if (!task) return;
+    await updateTask.mutateAsync({
+      id: task.id,
+      visible_to_client: !task.visible_to_client,
+    });
+    toast.success(task.visible_to_client ? 'Task hidden from client' : 'Task visible to client');
+  };
+
   const completeRecurring = useCompleteRecurringTask();
 
   if (!task) return null;
@@ -625,7 +634,21 @@ const getHistoryIcon = (action: string) => {
                    <p className="text-sm text-muted-foreground mt-1">Client: {clientName}</p>
                  )}
                </div>
-              <div className="flex items-center gap-2">
+               <div className="flex items-center gap-2">
+                  {!isPublicView && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs gap-1"
+                      onClick={handleToggleVisibleToClient}
+                    >
+                      {task.visible_to_client !== false ? (
+                        <><Eye className="h-3.5 w-3.5" /> Visible to client</>
+                      ) : (
+                        <><EyeOff className="h-3.5 w-3.5" /> Hidden from client</>
+                      )}
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
