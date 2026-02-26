@@ -1573,6 +1573,106 @@ export type Database = {
           },
         ]
       }
+      deal_activities: {
+        Row: {
+          activity_type: string
+          created_at: string
+          created_by: string | null
+          deal_id: string
+          description: string | null
+          id: string
+        }
+        Insert: {
+          activity_type?: string
+          created_at?: string
+          created_by?: string | null
+          deal_id: string
+          description?: string | null
+          id?: string
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string
+          description?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_activities_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deals: {
+        Row: {
+          assigned_to: string | null
+          client_id: string
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          deal_name: string
+          deal_value: number
+          expected_close_date: string | null
+          id: string
+          last_activity_at: string | null
+          notes: string | null
+          probability: number
+          source: string | null
+          stage: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          client_id: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          deal_name: string
+          deal_value?: number
+          expected_close_date?: string | null
+          id?: string
+          last_activity_at?: string | null
+          notes?: string | null
+          probability?: number
+          source?: string | null
+          stage?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          client_id?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          deal_name?: string
+          deal_value?: number
+          expected_close_date?: string | null
+          id?: string
+          last_activity_at?: string | null
+          notes?: string | null
+          probability?: number
+          source?: string | null
+          stage?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_parsed_investors: {
         Row: {
           client_id: string
@@ -2842,6 +2942,102 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      reconciliation_items: {
+        Row: {
+          client_id: string
+          created_at: string
+          dashboard_value: number | null
+          delta: number | null
+          delta_percent: number | null
+          id: string
+          is_mismatch: boolean
+          metric_name: string
+          notes: string | null
+          run_id: string
+          source_name: string
+          source_value: number | null
+          threshold_percent: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          dashboard_value?: number | null
+          delta?: number | null
+          delta_percent?: number | null
+          id?: string
+          is_mismatch?: boolean
+          metric_name: string
+          notes?: string | null
+          run_id: string
+          source_name: string
+          source_value?: number | null
+          threshold_percent?: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          dashboard_value?: number | null
+          delta?: number | null
+          delta_percent?: number | null
+          id?: string
+          is_mismatch?: boolean
+          metric_name?: string
+          notes?: string | null
+          run_id?: string
+          source_name?: string
+          source_value?: number | null
+          threshold_percent?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliation_items_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliation_items_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliation_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reconciliation_runs: {
+        Row: {
+          created_at: string
+          finished_at: string | null
+          id: string
+          mismatches_found: number
+          run_date: string
+          started_at: string | null
+          status: string
+          total_checks: number
+        }
+        Insert: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          mismatches_found?: number
+          run_date?: string
+          started_at?: string | null
+          status?: string
+          total_checks?: number
+        }
+        Update: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          mismatches_found?: number
+          run_date?: string
+          started_at?: string | null
+          status?: string
+          total_checks?: number
+        }
+        Relationships: []
       }
       spam_blacklist: {
         Row: {

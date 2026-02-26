@@ -25,11 +25,13 @@ import { SectionErrorBoundary } from '@/components/ui/SectionErrorBoundary';
 
 import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
 import { AgencyBillingTab } from '@/components/billing/AgencyBillingTab';
+import { DealPipelineBoard } from '@/components/deals/DealPipelineBoard';
+import { DataHealthCard } from '@/components/dashboard/DataHealthCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { Sliders, Video, CheckCircle, RefreshCw, Upload, LayoutDashboard, Smartphone, Bot, Wifi, LayoutGrid, Receipt } from 'lucide-react';
+import { Sliders, Video, CheckCircle, RefreshCw, Upload, LayoutDashboard, Smartphone, Bot, Wifi, LayoutGrid, Receipt, Handshake } from 'lucide-react';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, useFundedInvestors, aggregateMetrics, AggregatedMetrics } from '@/hooks/useMetrics';
 import { aggregateFromSourceData, SourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
@@ -264,6 +266,10 @@ const Index = () => {
                 <Smartphone className="h-4 w-4" />
                 <span className="hidden sm:inline">Funnel</span>
               </TabsTrigger>
+              <TabsTrigger value="deals" className="gap-2">
+                <Handshake className="h-4 w-4" />
+                <span className="hidden sm:inline">Deals</span>
+              </TabsTrigger>
               {currentMember?.role === 'admin' && (
                 <TabsTrigger value="billing" className="gap-2">
                   <Receipt className="h-4 w-4" />
@@ -362,6 +368,10 @@ const Index = () => {
                 clientFullSettings={clientFullSettings}
                 clientMetrics={clientMetrics}
               />
+            </SectionErrorBoundary>
+            {/* Data Health Card */}
+            <SectionErrorBoundary sectionName="Data Health">
+              <DataHealthCard />
             </SectionErrorBoundary>
 
           </TabsContent>
@@ -463,6 +473,13 @@ const Index = () => {
                   <p className="text-muted-foreground">Select a client to view their funnel</p>
                 </div>
               )}
+            </SectionErrorBoundary>
+          </TabsContent>
+
+          {/* Deals Tab */}
+          <TabsContent value="deals" className="space-y-6">
+            <SectionErrorBoundary sectionName="Deal Pipeline">
+              <DealPipelineBoard />
             </SectionErrorBoundary>
           </TabsContent>
 
