@@ -27,6 +27,7 @@ import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
 import { AgencyBillingTab } from '@/components/billing/AgencyBillingTab';
 import { DealPipelineBoard } from '@/components/deals/DealPipelineBoard';
 import { DataHealthCard } from '@/components/dashboard/DataHealthCard';
+import { IntegrationStatusCards } from '@/components/dashboard/IntegrationStatusCards';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -358,6 +359,14 @@ const Index = () => {
                     onMetricClick={(metric) => setDrillDownModal(metric)}
                   />
                 )}
+              </section>
+            </SectionErrorBoundary>
+
+            {/* Integration Health */}
+            <SectionErrorBoundary sectionName="Integration Health">
+              <section>
+                <h2 className="text-lg font-bold mb-2">Integration Health</h2>
+                <IntegrationStatusCards onNavigateToSettings={() => setActiveTab('settings')} />
               </section>
             </SectionErrorBoundary>
 

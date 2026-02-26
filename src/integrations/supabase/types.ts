@@ -2112,6 +2112,59 @@ export type Database = {
           },
         ]
       }
+      integration_status: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          error_count: number
+          id: string
+          integration_name: string
+          is_connected: boolean
+          last_error_message: string | null
+          last_sync_at: string | null
+          last_sync_status: string | null
+          records_synced: number
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          error_count?: number
+          id?: string
+          integration_name: string
+          is_connected?: boolean
+          last_error_message?: string | null
+          last_sync_at?: string | null
+          last_sync_status?: string | null
+          records_synced?: number
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          error_count?: number
+          id?: string
+          integration_name?: string
+          is_connected?: boolean
+          last_error_message?: string | null
+          last_sync_at?: string | null
+          last_sync_status?: string | null
+          records_synced?: number
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_status_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_base_documents: {
         Row: {
           character_count: number | null
@@ -3103,6 +3156,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sync_accuracy_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_errors: {
+        Row: {
+          attempt_number: number
+          client_id: string | null
+          created_at: string
+          endpoint: string | null
+          error_message: string | null
+          id: string
+          integration_name: string
+          status_code: number | null
+        }
+        Insert: {
+          attempt_number?: number
+          client_id?: string | null
+          created_at?: string
+          endpoint?: string | null
+          error_message?: string | null
+          id?: string
+          integration_name: string
+          status_code?: number | null
+        }
+        Update: {
+          attempt_number?: number
+          client_id?: string | null
+          created_at?: string
+          endpoint?: string | null
+          error_message?: string | null
+          id?: string
+          integration_name?: string
+          status_code?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_errors_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
