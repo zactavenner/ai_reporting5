@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import { DeviceSwitcher, DeviceType } from './DeviceSwitcher';
 import { CampaignFlowSection } from './CampaignFlowSection';
-import { FunnelVisualization } from './FunnelVisualization';
+
 import { IPhoneMockup } from './IPhoneMockup';
 import { TabletMockup } from './TabletMockup';
 import { DesktopMockup } from './DesktopMockup';
@@ -208,8 +208,6 @@ export function FunnelPreviewTab({ clientId, isPublicView = false }: FunnelPrevi
         </div>
       </div>
 
-      {/* Conversion Funnel Visualization */}
-      <FunnelVisualization clientId={clientId} isPublicView={isPublicView} />
 
       {/* Campaign Sections */}
       {campaigns.length === 0 && uncategorizedSteps.length === 0 ? (
