@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { formatDistanceToNow } from 'date-fns';
 import { 
   useCreatives, 
   useCreateCreative, 
@@ -21,6 +22,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
 import { PlatformAdPreview } from './PlatformAdPreview';
+import { CreativeHorizontalPreview } from './CreativeHorizontalPreview';
+import { CreativeAIActions } from './CreativeAIActions';
 import { 
   Upload, 
   Check, 
@@ -31,7 +34,12 @@ import {
   FileText,
   Trash2,
   Send,
-  RefreshCw
+  RefreshCw,
+  Play,
+  Pause,
+  Eye,
+  Clock,
+  Sparkles
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -520,57 +528,80 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
                 <p className="text-sm">Upload your first creative to get started</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {filteredCreatives.map((creative) => (
                   <Card 
                     key={creative.id} 
-                    className="border hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => setSelectedCreative(creative)}
+                    className="border hover:shadow-md transition-shadow overflow-hidden"
                   >
-                    <CardContent className="p-4">
-                      {/* Preview */}
-                      <div className="aspect-video bg-muted rounded-lg mb-3 overflow-hidden flex items-center justify-center">
-                        {creative.type === 'image' && creative.file_url ? (
-                          <img 
-                            src={creative.file_url} 
-                            alt={creative.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : creative.type === 'video' && creative.file_url ? (
-                          <video 
-                            src={creative.file_url}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="text-center p-4">
-                            {getTypeIcon(creative.type)}
-                            <p className="text-sm text-muted-foreground mt-2">
-                              {creative.headline || 'Ad Copy'}
-                            </p>
-                          </div>
-                        )}
+                    <CardContent className="p-0">
+                      {/* Full platform preview inline */}
+                      <div className="relative">
+                        {/* Status badge overlay */}
+                        <Badge className={`absolute top-3 right-3 z-10 ${getStatusColor(creative.status)}`}>
+                          <Clock className="h-3 w-3 mr-1" />
+                          {creative.status.charAt(0).toUpperCase() + creative.status.slice(1)}
+                        </Badge>
+                        
+                        {/* Inline media with click-to-play for video */}
+                        <div className="aspect-[4/5] bg-muted relative overflow-hidden">
+                          {creative.type === 'image' && creative.file_url ? (
+                            <img 
+                              src={creative.file_url} 
+                              alt={creative.title}
+                              className="w-full h-full object-contain bg-black/5"
+                            />
+                          ) : creative.type === 'video' && creative.file_url ? (
+                            <InlineVideoPlayer src={creative.file_url} />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center p-6 text-center">
+                              {getTypeIcon(creative.type)}
+                              <p className="text-sm text-muted-foreground mt-2">
+                                {creative.headline || 'Ad Copy'}
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       
-                      {/* Info */}
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <h4 className="font-medium text-sm">{creative.title}</h4>
+                      {/* Info bar */}
+                      <div className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-medium text-sm truncate">{creative.title}</h4>
+                            <p className="text-xs text-muted-foreground">{clientName}</p>
+                          </div>
+                          <Badge variant="outline" className="text-xs ml-2 flex-shrink-0">
+                            {creative.platform}
+                          </Badge>
+                        </div>
+                        
+                        <div className="flex items-center justify-between mt-3">
                           <p className="text-xs text-muted-foreground">
-                            {new Date(creative.created_at).toLocaleDateString()}
+                            {formatDistanceToNow(new Date(creative.created_at), { addSuffix: true })}
                           </p>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedCreative(creative)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            {!isPublicView && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  deleteCreative.mutate({ id: creative.id, clientId });
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                        <Badge className={getStatusColor(creative.status)}>
-                          {creative.status}
-                        </Badge>
                       </div>
-
-                      {/* Comments indicator */}
-                      {creative.comments && creative.comments.length > 0 && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <MessageSquare className="h-3 w-3" />
-                          {creative.comments.length} comment{creative.comments.length !== 1 ? 's' : ''}
-                        </div>
-                      )}
                     </CardContent>
                   </Card>
                 ))}
@@ -579,9 +610,9 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
           </TabsContent>
         </Tabs>
 
-        {/* Creative Detail Modal */}
+        {/* Creative Detail Modal - Full horizontal preview */}
         <Dialog open={!!selectedCreative} onOpenChange={() => setSelectedCreative(null)}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto sm:max-w-[95vw]">
             {selectedCreative && (
               <>
                 <DialogHeader>
@@ -593,153 +624,122 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
                   </div>
                 </DialogHeader>
                 
-                <div className="flex-1 overflow-auto">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Platform-specific Preview */}
-                    <div>
-                      <h4 className="font-medium mb-3 text-sm text-muted-foreground">
-                        {selectedCreative.platform === 'meta' && 'Meta/Facebook Preview'}
-                        {selectedCreative.platform === 'tiktok' && 'TikTok Preview'}
-                        {selectedCreative.platform === 'youtube' && 'YouTube Preview'}
-                        {selectedCreative.platform === 'google' && 'Google Ads Preview'}
-                        {!selectedCreative.platform && 'Ad Preview'}
-                      </h4>
-                      <PlatformAdPreview 
-                        creative={selectedCreative} 
-                        platform={selectedCreative.platform || 'meta'} 
-                        clientName={clientName} 
-                      />
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge className={getStatusColor(selectedCreative.status)}>
+                      {selectedCreative.status}
+                    </Badge>
+                    <Badge variant="outline">{selectedCreative.platform}</Badge>
+                    <span className="text-sm text-muted-foreground">Client: {clientName}</span>
+                  </div>
 
-                      {/* Copy details */}
-                      {selectedCreative.headline && (
-                        <div className="mb-3">
-                          <label className="text-xs font-medium text-muted-foreground">Headline</label>
-                          <p className="font-medium">{selectedCreative.headline}</p>
-                        </div>
-                      )}
-                      {selectedCreative.body_copy && (
-                        <div className="mb-3">
-                          <label className="text-xs font-medium text-muted-foreground">Body Copy</label>
-                          <p className="text-sm">{selectedCreative.body_copy}</p>
-                        </div>
-                      )}
-                      {selectedCreative.cta_text && (
-                        <div className="mb-3">
-                          <label className="text-xs font-medium text-muted-foreground">CTA</label>
-                          <p className="text-sm">{selectedCreative.cta_text}</p>
-                        </div>
-                      )}
+                  {/* Horizontal Platform Preview - All platforms side by side */}
+                  <CreativeHorizontalPreview 
+                    creative={selectedCreative} 
+                    clientName={clientName}
+                  />
 
-                      {/* Action Buttons */}
-                      <div className="flex flex-wrap gap-2 mt-4">
-                        {selectedCreative.status === 'approved' && !isPublicView && (
-                          <Button
-                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                            onClick={() => handleLaunch(selectedCreative)}
-                          >
-                            🚀 Launch
-                          </Button>
-                        )}
-                        {selectedCreative.status !== 'launched' && (
-                          <>
-                            <Button
-                              variant="outline"
-                              className="flex-1 border-green-500 text-green-600 hover:bg-green-50"
-                              onClick={() => handleStatusChange(selectedCreative, 'approved')}
-                            >
-                              <Check className="h-4 w-4 mr-1" />
-                              Approve
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="flex-1 border-orange-500 text-orange-600 hover:bg-orange-50"
-                              onClick={() => handleStatusChange(selectedCreative, 'revisions')}
-                            >
-                              <RefreshCw className="h-4 w-4 mr-1" />
-                              Revisions
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="flex-1 border-red-500 text-red-600 hover:bg-red-50"
-                              onClick={() => handleStatusChange(selectedCreative, 'rejected')}
-                            >
-                              <X className="h-4 w-4 mr-1" />
-                              Reject
-                            </Button>
-                          </>
-                        )}
-                      </div>
-
-                      {!isPublicView && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="mt-2 text-destructive"
-                          onClick={() => {
-                            deleteCreative.mutate({ id: selectedCreative.id, clientId });
-                            setSelectedCreative(null);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Delete Creative
-                        </Button>
-                      )}
+                  {/* AI Tools - agency only */}
+                  {!isPublicView && (
+                    <div className="flex items-center gap-2 flex-wrap border-t pt-4">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium mr-2">AI Tools:</span>
+                      <CreativeAIActions creative={selectedCreative} />
                     </div>
+                  )}
 
-                    {/* Comments */}
-                    <div className="flex flex-col h-full">
-                      <h4 className="font-medium mb-3 flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4" />
-                        Comments
-                      </h4>
-                      <ScrollArea className="flex-1 h-[300px] border rounded-lg p-3">
-                        {selectedCreative.comments && selectedCreative.comments.length > 0 ? (
-                          <div className="space-y-3">
-                            {selectedCreative.comments.map((comment) => (
-                              <div 
-                                key={comment.id}
-                                className={`p-3 rounded-lg ${
-                                  comment.author === 'Client' 
-                                    ? 'bg-blue-50 dark:bg-blue-900/20 ml-4' 
-                                    : 'bg-muted mr-4'
-                                }`}
-                              >
-                                <div className="flex justify-between mb-1">
-                                  <span className="text-xs font-medium">{comment.author}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {new Date(comment.createdAt).toLocaleString()}
-                                  </span>
-                                </div>
-                                <p className="text-sm">{comment.text}</p>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground text-center py-8">
-                            No comments yet
-                          </p>
-                        )}
-                      </ScrollArea>
-                      
-                      {/* Add comment */}
-                      <div className="flex gap-2 mt-3">
-                        <Input
-                          value={commentText}
-                          onChange={(e) => setCommentText(e.target.value)}
-                          placeholder="Add a comment..."
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleAddComment(selectedCreative);
-                            }
-                          }}
-                        />
-                        <Button 
-                          size="icon"
-                          onClick={() => handleAddComment(selectedCreative)}
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 flex-wrap border-t pt-4">
+                    {selectedCreative.status !== 'launched' && (
+                      <>
+                        <Button
+                          variant="default"
+                          onClick={() => handleStatusChange(selectedCreative, 'approved')}
                         >
-                          <Send className="h-4 w-4" />
+                          <Check className="h-4 w-4 mr-1" />
+                          Approve
                         </Button>
-                      </div>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleStatusChange(selectedCreative, 'revisions')}
+                        >
+                          <RefreshCw className="h-4 w-4 mr-1" />
+                          Revisions
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          onClick={() => handleStatusChange(selectedCreative, 'rejected')}
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          Reject
+                        </Button>
+                      </>
+                    )}
+                    {!isPublicView && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          deleteCreative.mutate({ id: selectedCreative.id, clientId });
+                          setSelectedCreative(null);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1 text-destructive" />
+                        Delete
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Comments */}
+                  <div className="border-t pt-4">
+                    <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Comments ({selectedCreative.comments?.length || 0})
+                    </h4>
+                    {selectedCreative.comments && selectedCreative.comments.length > 0 ? (
+                      <ScrollArea className="h-[200px] border rounded-lg p-3 mb-2">
+                        <div className="space-y-2">
+                          {selectedCreative.comments.map((comment) => (
+                            <div 
+                              key={comment.id}
+                              className={`p-2 rounded-lg text-sm ${
+                                comment.author === 'Client' 
+                                  ? 'bg-primary/10 ml-4' 
+                                  : 'bg-muted mr-4'
+                              }`}
+                            >
+                              <div className="flex justify-between mb-0.5">
+                                <span className="text-xs font-medium">{comment.author}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(comment.createdAt).toLocaleString()}
+                                </span>
+                              </div>
+                              <p>{comment.text}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <p className="text-sm text-muted-foreground mb-2">No comments yet</p>
+                    )}
+                    
+                    {/* Add comment */}
+                    <div className="flex gap-2 mt-2">
+                      <Input
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                        placeholder="Add a comment..."
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleAddComment(selectedCreative);
+                          }
+                        }}
+                      />
+                      <Button 
+                        size="icon"
+                        onClick={() => handleAddComment(selectedCreative)}
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -749,5 +749,48 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
         </Dialog>
       </CardContent>
     </Card>
+  );
+}
+
+// Inline video player component for card grid
+function InlineVideoPlayer({ src }: { src: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+
+  const toggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play();
+        setPlaying(true);
+      } else {
+        videoRef.current.pause();
+        setPlaying(false);
+      }
+    }
+  };
+
+  return (
+    <div className="relative w-full h-full group cursor-pointer" onClick={toggle}>
+      <video 
+        ref={videoRef}
+        src={src}
+        className="w-full h-full object-contain bg-black/5"
+        loop
+        playsInline
+        muted
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+      />
+      <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${playing ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'}`}>
+        <div className="bg-black/50 rounded-full p-4">
+          {playing ? (
+            <Pause className="h-8 w-8 text-white fill-white" />
+          ) : (
+            <Play className="h-8 w-8 text-white fill-white" />
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
