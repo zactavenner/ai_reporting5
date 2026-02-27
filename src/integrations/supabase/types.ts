@@ -2359,6 +2359,7 @@ export type Database = {
           attributed_funded_dollars: number | null
           attributed_leads: number | null
           attributed_showed: number | null
+          attributed_spam_leads: number | null
           bid_strategy: string | null
           billing_event: string | null
           budget_remaining: number | null
@@ -2397,6 +2398,7 @@ export type Database = {
           attributed_funded_dollars?: number | null
           attributed_leads?: number | null
           attributed_showed?: number | null
+          attributed_spam_leads?: number | null
           bid_strategy?: string | null
           billing_event?: string | null
           budget_remaining?: number | null
@@ -2435,6 +2437,7 @@ export type Database = {
           attributed_funded_dollars?: number | null
           attributed_leads?: number | null
           attributed_showed?: number | null
+          attributed_spam_leads?: number | null
           bid_strategy?: string | null
           billing_event?: string | null
           budget_remaining?: number | null
@@ -2492,6 +2495,7 @@ export type Database = {
           attributed_funded_dollars: number | null
           attributed_leads: number | null
           attributed_showed: number | null
+          attributed_spam_leads: number | null
           body: string | null
           call_to_action_type: string | null
           clicks: number | null
@@ -2533,6 +2537,7 @@ export type Database = {
           attributed_funded_dollars?: number | null
           attributed_leads?: number | null
           attributed_showed?: number | null
+          attributed_spam_leads?: number | null
           body?: string | null
           call_to_action_type?: string | null
           clicks?: number | null
@@ -2574,6 +2579,7 @@ export type Database = {
           attributed_funded_dollars?: number | null
           attributed_leads?: number | null
           attributed_showed?: number | null
+          attributed_spam_leads?: number | null
           body?: string | null
           call_to_action_type?: string | null
           clicks?: number | null
@@ -2632,6 +2638,7 @@ export type Database = {
           attributed_funded_dollars: number | null
           attributed_leads: number | null
           attributed_showed: number | null
+          attributed_spam_leads: number | null
           budget_remaining: number | null
           buying_type: string | null
           clicks: number | null
@@ -2665,6 +2672,7 @@ export type Database = {
           attributed_funded_dollars?: number | null
           attributed_leads?: number | null
           attributed_showed?: number | null
+          attributed_spam_leads?: number | null
           budget_remaining?: number | null
           buying_type?: string | null
           clicks?: number | null
@@ -2698,6 +2706,7 @@ export type Database = {
           attributed_funded_dollars?: number | null
           attributed_leads?: number | null
           attributed_showed?: number | null
+          attributed_spam_leads?: number | null
           budget_remaining?: number | null
           buying_type?: string | null
           clicks?: number | null

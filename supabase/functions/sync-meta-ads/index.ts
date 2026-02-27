@@ -176,37 +176,44 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
     campaignByMetaId.set(c.meta_campaign_id, c);
   }
 
-  type Stats = { leads: number; calls: number; showed: number; funded: number; fundedDollars: number };
+  type Stats = { leads: number; spamLeads: number; calls: number; showed: number; funded: number; fundedDollars: number };
   const campaignStats = new Map<string, Stats>();
   const adSetStats = new Map<string, Stats>();
   const adStats = new Map<string, Stats>();
   let unattributedCount = 0;
 
-  function addStats(map: Map<string, Stats>, key: string, leadId: string) {
-    const stats = map.get(key) || { leads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
-    stats.leads++;
-    const leadCalls = callsByLead.get(leadId);
-    if (leadCalls) { stats.calls += leadCalls.total; stats.showed += leadCalls.showed; }
-    const leadFunded = fundedByLead.get(leadId);
-    if (leadFunded) { stats.funded += leadFunded.count; stats.fundedDollars += leadFunded.dollars; }
+  function addStats(map: Map<string, Stats>, key: string, leadId: string, isSpam: boolean) {
+    const stats = map.get(key) || { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
+    if (isSpam) {
+      stats.spamLeads++;
+    } else {
+      stats.leads++;
+    }
+    if (!isSpam) {
+      const leadCalls = callsByLead.get(leadId);
+      if (leadCalls) { stats.calls += leadCalls.total; stats.showed += leadCalls.showed; }
+      const leadFunded = fundedByLead.get(leadId);
+      if (leadFunded) { stats.funded += leadFunded.count; stats.fundedDollars += leadFunded.dollars; }
+    }
     map.set(key, stats);
   }
 
   for (const lead of leads || []) {
-    if (lead.is_spam) continue;
+    const isSpam = !!lead.is_spam;
+    // Don't skip spam leads anymore — we attribute them separately
 
     let attributed = false;
 
     // Campaign level — match by campaign_name or utm_campaign
     const campaignName = lead.campaign_name || lead.utm_campaign;
     if (campaignName && campaignByName.has(campaignName)) {
-      addStats(campaignStats, campaignName, lead.id);
+      addStats(campaignStats, campaignName, lead.id, isSpam);
       attributed = true;
     }
 
     // Ad set level — match by ad_set_name
     if (lead.ad_set_name && adSetByName.has(lead.ad_set_name)) {
-      addStats(adSetStats, lead.ad_set_name, lead.id);
+      addStats(adSetStats, lead.ad_set_name, lead.id, isSpam);
       attributed = true;
     }
 
@@ -220,7 +227,6 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
       if (directAd) matchedAdId = directAd.id;
     }
 
-    // Pass 2 (Fix 2): REMOVED name substring matching — causes misattribution
     // Pass 2: Single-ad-per-set fallback — ONLY when exactly one active ad in the set
     if (!matchedAdId && lead.ad_set_name) {
       const matchedAdSet = adSetByName.get(lead.ad_set_name);
@@ -234,11 +240,11 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
     }
 
     if (matchedAdId) {
-      addStats(adStats, matchedAdId, lead.id);
+      addStats(adStats, matchedAdId, lead.id, isSpam);
       attributed = true;
     }
 
-    if (!attributed) {
+    if (!attributed && !isSpam) {
       unattributedCount++;
     }
   }
@@ -247,10 +253,11 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
 
   // Update meta_campaigns with attribution
   for (const campaign of metaCampaigns) {
-    const stats = campaignStats.get(campaign.name) || { leads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
+    const stats = campaignStats.get(campaign.name) || { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
     const spend = Number(campaign.spend) || 0;
     await supabase.from("meta_campaigns").update({
       attributed_leads: stats.leads,
+      attributed_spam_leads: stats.spamLeads,
       attributed_calls: stats.calls,
       attributed_showed: stats.showed,
       attributed_funded: stats.funded,
@@ -263,10 +270,11 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
 
   // Update meta_ad_sets with attribution
   for (const adSet of metaAdSets || []) {
-    const stats = adSetStats.get(adSet.name) || { leads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
+    const stats = adSetStats.get(adSet.name) || { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
     const spend = Number(adSet.spend) || 0;
     await supabase.from("meta_ad_sets").update({
       attributed_leads: stats.leads,
+      attributed_spam_leads: stats.spamLeads,
       attributed_calls: stats.calls,
       attributed_showed: stats.showed,
       attributed_funded: stats.funded,
@@ -279,10 +287,11 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
 
   // Update meta_ads with attribution
   for (const ad of metaAds || []) {
-    const stats = adStats.get(ad.id) || { leads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
+    const stats = adStats.get(ad.id) || { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
     const spend = Number(ad.spend) || 0;
     await supabase.from("meta_ads").update({
       attributed_leads: stats.leads,
+      attributed_spam_leads: stats.spamLeads,
       attributed_calls: stats.calls,
       attributed_showed: stats.showed,
       attributed_funded: stats.funded,

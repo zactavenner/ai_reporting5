@@ -90,6 +90,7 @@ const METRIC_HEADERS = [
   { column: 'ctr', label: 'CTR' },
   { column: 'cpc', label: 'CPC' },
   { column: 'attributed_leads', label: 'Leads' },
+  { column: 'attributed_spam_leads', label: 'Bad' },
   { column: 'cost_per_lead', label: 'CPL' },
   { column: 'attributed_calls', label: 'Calls' },
   { column: 'attributed_showed', label: 'Showed' },
@@ -99,6 +100,7 @@ const METRIC_HEADERS = [
 ];
 
 function MetricCells({ row }: { row: any }) {
+  const spamCount = Number(row.attributed_spam_leads) || 0;
   return (
     <>
       <TableCell className="text-right tabular-nums font-medium">{fmt$(row.spend)}</TableCell>
@@ -108,6 +110,9 @@ function MetricCells({ row }: { row: any }) {
       <TableCell className="text-right tabular-nums">{fmtPct(row.ctr)}</TableCell>
       <TableCell className="text-right tabular-nums">{fmt$(row.cpc)}</TableCell>
       <TableCell className="text-right tabular-nums">{fmtN(row.attributed_leads)}</TableCell>
+      <TableCell className={`text-right tabular-nums ${spamCount > 0 ? 'text-destructive font-semibold' : ''}`}>
+        {spamCount > 0 ? spamCount : '—'}
+      </TableCell>
       <TableCell className="text-right tabular-nums">{fmt$(row.cost_per_lead)}</TableCell>
       <TableCell className="text-right tabular-nums">{fmtN(row.attributed_calls)}</TableCell>
       <TableCell className="text-right tabular-nums">{fmtN(row.attributed_showed)}</TableCell>

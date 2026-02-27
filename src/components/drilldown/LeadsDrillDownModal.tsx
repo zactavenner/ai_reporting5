@@ -291,9 +291,10 @@ export function LeadsDrillDownModal({ clientId, open, onOpenChange }: LeadsDrill
                     <TableHead className="font-bold">Name</TableHead>
                     <TableHead className="font-bold">Email</TableHead>
                     <TableHead className="font-bold">Phone</TableHead>
-                    <TableHead className="font-bold">Source</TableHead>
+                     <TableHead className="font-bold">Source</TableHead>
                     <TableHead className="font-bold">Campaign</TableHead>
                     <TableHead className="font-bold">Ad Set</TableHead>
+                    <TableHead className="font-bold">Ad ID</TableHead>
                     <TableHead className="font-bold">Questions</TableHead>
                     <TableHead className="font-bold">Status</TableHead>
                     <TableHead className="font-bold">Actions</TableHead>
@@ -316,6 +317,9 @@ export function LeadsDrillDownModal({ clientId, open, onOpenChange }: LeadsDrill
                       </TableCell>
                       <TableCell className="max-w-[120px] truncate text-xs" title={lead.ad_set_name || ''}>
                         {lead.ad_set_name || '-'}
+                      </TableCell>
+                      <TableCell className="max-w-[100px] truncate text-xs" title={lead.ad_id || ''}>
+                        {lead.ad_id || '-'}
                       </TableCell>
                       <TableCell>
                         {lead.questions && Array.isArray(lead.questions) && lead.questions.length > 0 ? (
