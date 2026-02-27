@@ -66,6 +66,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
   const [commentText, setCommentText] = useState('');
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const [cardComments, setCardComments] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
   const [bulkFiles, setBulkFiles] = useState<File[]>([]);
@@ -530,80 +531,22 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {filteredCreatives.map((creative) => (
-                  <Card 
-                    key={creative.id} 
-                    className="border hover:shadow-md transition-shadow overflow-hidden"
-                  >
-                    <CardContent className="p-0">
-                      {/* Full platform preview inline */}
-                      <div className="relative">
-                        {/* Status badge overlay */}
-                        <Badge className={`absolute top-3 right-3 z-10 ${getStatusColor(creative.status)}`}>
-                          <Clock className="h-3 w-3 mr-1" />
-                          {creative.status.charAt(0).toUpperCase() + creative.status.slice(1)}
-                        </Badge>
-                        
-                        {/* Inline media with click-to-play for video */}
-                        <div className="aspect-[4/5] bg-muted relative overflow-hidden">
-                          {creative.type === 'image' && creative.file_url ? (
-                            <img 
-                              src={creative.file_url} 
-                              alt={creative.title}
-                              className="w-full h-full object-contain bg-black/5"
-                            />
-                          ) : creative.type === 'video' && creative.file_url ? (
-                            <InlineVideoPlayer src={creative.file_url} />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center p-6 text-center">
-                              {getTypeIcon(creative.type)}
-                              <p className="text-sm text-muted-foreground mt-2">
-                                {creative.headline || 'Ad Copy'}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Info bar */}
-                      <div className="p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="min-w-0 flex-1">
-                            <h4 className="font-medium text-sm truncate">{creative.title}</h4>
-                            <p className="text-xs text-muted-foreground">{clientName}</p>
-                          </div>
-                          <Badge variant="outline" className="text-xs ml-2 flex-shrink-0">
-                            {creative.platform}
-                          </Badge>
-                        </div>
-                        
-                        <div className="flex items-center justify-between mt-3">
-                          <p className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(creative.created_at), { addSuffix: true })}
-                          </p>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setSelectedCreative(creative)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {!isPublicView && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  deleteCreative.mutate({ id: creative.id, clientId });
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <CreativeCard
+                    key={creative.id}
+                    creative={creative}
+                    clientName={clientName}
+                    clientId={clientId}
+                    isPublicView={isPublicView}
+                    getStatusColor={getStatusColor}
+                    getTypeIcon={getTypeIcon}
+                    onPreview={() => setSelectedCreative(creative)}
+                    onStatusChange={handleStatusChange}
+                    onAddComment={handleAddComment}
+                    onDelete={() => deleteCreative.mutate({ id: creative.id, clientId })}
+                    commentText={cardComments[creative.id] || ''}
+                    onCommentTextChange={(text) => setCardComments(prev => ({ ...prev, [creative.id]: text }))}
+                    addCommentMutation={addComment}
+                  />
                 ))}
               </div>
             )}
@@ -792,5 +735,182 @@ function InlineVideoPlayer({ src }: { src: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// Creative card with inline actions
+function CreativeCard({ 
+  creative, clientName, clientId, isPublicView, getStatusColor, getTypeIcon,
+  onPreview, onStatusChange, onDelete, commentText, onCommentTextChange, addCommentMutation
+}: {
+  creative: Creative;
+  clientName: string;
+  clientId: string;
+  isPublicView: boolean;
+  getStatusColor: (s: string) => string;
+  getTypeIcon: (t: string) => React.ReactNode;
+  onPreview: () => void;
+  onStatusChange: (c: Creative, s: 'approved' | 'revisions' | 'rejected') => void;
+  onAddComment: (c: Creative) => void;
+  onDelete: () => void;
+  commentText: string;
+  onCommentTextChange: (t: string) => void;
+  addCommentMutation: ReturnType<typeof useAddCreativeComment>;
+}) {
+  const handleCardComment = () => {
+    if (!commentText.trim()) return;
+    const comment: CreativeComment = {
+      id: Date.now().toString(),
+      author: isPublicView ? 'Client' : 'Agency',
+      text: commentText,
+      createdAt: new Date().toISOString(),
+    };
+    addCommentMutation.mutate({ id: creative.id, comment, clientId });
+    onCommentTextChange('');
+  };
+
+  const commentCount = creative.comments?.length || 0;
+
+  return (
+    <Card className="border hover:shadow-md transition-shadow overflow-hidden">
+      <CardContent className="p-0">
+        {/* Media area */}
+        <div className="relative">
+          <Badge className={`absolute top-3 right-3 z-10 ${getStatusColor(creative.status)}`}>
+            <Clock className="h-3 w-3 mr-1" />
+            {creative.status.charAt(0).toUpperCase() + creative.status.slice(1)}
+          </Badge>
+          
+          <div className="aspect-[4/5] bg-muted relative overflow-hidden">
+            {creative.type === 'image' && creative.file_url ? (
+              <img 
+                src={creative.file_url} 
+                alt={creative.title}
+                className="w-full h-full object-contain bg-black/5 cursor-pointer"
+                onClick={onPreview}
+              />
+            ) : creative.type === 'video' && creative.file_url ? (
+              <InlineVideoPlayer src={creative.file_url} />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center cursor-pointer" onClick={onPreview}>
+                {getTypeIcon(creative.type)}
+                <p className="text-sm text-muted-foreground mt-2">
+                  {creative.headline || 'Ad Copy'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Info + title row */}
+        <div className="px-4 pt-3 pb-2">
+          <div className="flex items-start justify-between">
+            <div className="min-w-0 flex-1">
+              <h4 className="font-medium text-sm truncate">{creative.title}</h4>
+              <p className="text-xs text-muted-foreground">{clientName}</p>
+            </div>
+            <Badge variant="outline" className="text-xs ml-2 flex-shrink-0">
+              {creative.platform}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            {formatDistanceToNow(new Date(creative.created_at), { addSuffix: true })}
+          </p>
+        </div>
+
+        {/* Action buttons row */}
+        <div className="px-4 pb-2 flex items-center gap-2 flex-wrap">
+          {creative.status !== 'launched' && (
+            <>
+              <Button
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={() => onStatusChange(creative, 'approved')}
+              >
+                <Check className="h-3 w-3" />
+                Approve
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={() => onStatusChange(creative, 'revisions')}
+              >
+                <RefreshCw className="h-3 w-3" />
+                Revisions
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={() => onStatusChange(creative, 'rejected')}
+              >
+                <X className="h-3 w-3" />
+                Reject
+              </Button>
+            </>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-7 text-xs gap-1 ml-auto"
+            onClick={onPreview}
+          >
+            <Eye className="h-3 w-3" />
+            Preview
+          </Button>
+          {!isPublicView && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={onDelete}
+            >
+              <Trash2 className="h-3 w-3 text-destructive" />
+            </Button>
+          )}
+        </div>
+
+        {/* Inline comment section */}
+        <div className="px-4 pb-3 border-t border-border mt-1 pt-2">
+          {commentCount > 0 && (
+            <div className="mb-2 max-h-24 overflow-y-auto space-y-1">
+              {creative.comments.slice(-2).map((comment) => (
+                <div key={comment.id} className="text-xs bg-muted rounded px-2 py-1">
+                  <span className="font-medium">{comment.author}:</span>{' '}
+                  <span className="text-muted-foreground">{comment.text}</span>
+                </div>
+              ))}
+              {commentCount > 2 && (
+                <button 
+                  className="text-xs text-primary hover:underline"
+                  onClick={onPreview}
+                >
+                  View all {commentCount} comments
+                </button>
+              )}
+            </div>
+          )}
+          <div className="flex gap-1.5">
+            <Input
+              value={commentText}
+              onChange={(e) => onCommentTextChange(e.target.value)}
+              placeholder="Add a comment..."
+              className="h-7 text-xs"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCardComment();
+              }}
+            />
+            <Button 
+              size="icon"
+              className="h-7 w-7 flex-shrink-0"
+              onClick={handleCardComment}
+            >
+              <Send className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
