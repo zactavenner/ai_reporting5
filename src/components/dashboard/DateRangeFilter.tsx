@@ -83,30 +83,31 @@ export function DateRangeFilter({
     const daysDiff = Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
     const isToday = to.getTime() === today.getTime();
     
-    if (isToday && from.getTime() === today.getTime()) return 'today';
-    
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
-    if (from.getTime() === yesterday.getTime() && to.getTime() === yesterday.getTime()) return 'yesterday';
+    const isYesterday = to.getTime() === yesterday.getTime();
     
-    if (isToday && daysDiff === 7) return 'last7';
-    if (isToday && daysDiff === 14) return 'last14';
-    if (isToday && daysDiff === 30) return 'last30';
-    if (isToday && daysDiff === 90) return 'last90';
+    if (isToday && from.getTime() === today.getTime()) return 'today';
+    if (from.getTime() === yesterday.getTime() && isYesterday) return 'yesterday';
+    
+    if (isYesterday && daysDiff === 7) return 'last7';
+    if (isYesterday && daysDiff === 14) return 'last14';
+    if (isYesterday && daysDiff === 30) return 'last30';
+    if (isYesterday && daysDiff === 90) return 'last90';
     
     const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    if (from.getTime() === thisMonthStart.getTime() && isToday) return 'thisMonth';
+    if (from.getTime() === thisMonthStart.getTime() && isYesterday) return 'thisMonth';
     
     const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
     const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
     if (from.getTime() === lastMonthStart.getTime() && to.getTime() === lastMonthEnd.getTime()) return 'lastMonth';
     
     const yearStart = new Date(today.getFullYear(), 0, 1);
-    if (from.getTime() === yearStart.getTime() && isToday) return 'ytd';
+    if (from.getTime() === yearStart.getTime() && isYesterday) return 'ytd';
     
     // Check for "all" - very old start date
     const allStartDate = new Date(2020, 0, 1);
-    if (from.getTime() <= allStartDate.getTime() && isToday) return 'all';
+    if (from.getTime() <= allStartDate.getTime() && isYesterday) return 'all';
     
     return 'custom';
   }, [dateRange]);
@@ -122,6 +123,8 @@ export function DateRangeFilter({
     setPreset(value);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
     let from = new Date(today);
     let to = new Date(today);
     
@@ -130,23 +133,32 @@ export function DateRangeFilter({
         // from and to already set to today
         break;
       case 'yesterday':
-        from.setDate(today.getDate() - 1);
-        to = new Date(from);
+        from = new Date(yesterday);
+        to = new Date(yesterday);
         break;
       case 'last7':
-        from.setDate(today.getDate() - 7);
+        from = new Date(yesterday);
+        from.setDate(yesterday.getDate() - 6);
+        to = new Date(yesterday);
         break;
       case 'last14':
-        from.setDate(today.getDate() - 14);
+        from = new Date(yesterday);
+        from.setDate(yesterday.getDate() - 13);
+        to = new Date(yesterday);
         break;
       case 'last30':
-        from.setDate(today.getDate() - 30);
+        from = new Date(yesterday);
+        from.setDate(yesterday.getDate() - 29);
+        to = new Date(yesterday);
         break;
       case 'last90':
-        from.setDate(today.getDate() - 90);
+        from = new Date(yesterday);
+        from.setDate(yesterday.getDate() - 89);
+        to = new Date(yesterday);
         break;
       case 'thisMonth':
         from = new Date(today.getFullYear(), today.getMonth(), 1);
+        to = new Date(yesterday);
         break;
       case 'lastMonth':
         from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
@@ -154,10 +166,12 @@ export function DateRangeFilter({
         break;
       case 'ytd':
         from = new Date(today.getFullYear(), 0, 1);
+        to = new Date(yesterday);
         break;
       case 'all':
         // Set to a very old date to show all data
         from = new Date(2020, 0, 1);
+        to = new Date(yesterday);
         break;
     }
     
