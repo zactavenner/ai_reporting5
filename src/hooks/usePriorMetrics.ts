@@ -46,14 +46,15 @@ export function usePriorPeriodMetrics(
 
       // Fetch prior period funded investors (paginated)
       const priorStartLocal = new Date(priorStartStr + 'T00:00:00');
-      const priorEndLocal = new Date(priorEndStr + 'T23:59:59.999');
+      const priorEndNext = new Date(priorEndStr + 'T00:00:00');
+      priorEndNext.setDate(priorEndNext.getDate() + 1);
 
       const fundedInvestors = await fetchAllRows<FundedInvestor>((sb) => {
         let query = sb
           .from('funded_investors')
           .select('*')
           .gte('funded_at', priorStartLocal.toISOString())
-          .lte('funded_at', priorEndLocal.toISOString());
+          .lt('funded_at', priorEndNext.toISOString());
 
         if (clientId) {
           query = query.eq('client_id', clientId);

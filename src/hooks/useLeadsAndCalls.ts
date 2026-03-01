@@ -92,8 +92,9 @@ export function useLeads(clientId?: string, startDate?: string, endDate?: string
           query = query.gte('created_at', startLocal.toISOString());
         }
         if (endDate) {
-          const endLocal = new Date(endDate + 'T23:59:59.999');
-          query = query.lte('created_at', endLocal.toISOString());
+          const endNext = new Date(endDate + 'T00:00:00');
+          endNext.setDate(endNext.getDate() + 1);
+          query = query.lt('created_at', endNext.toISOString());
         }
         
         return query;
@@ -130,8 +131,9 @@ export function useCalls(clientId?: string, showedOnly?: boolean, startDate?: st
           query = query.gte('booked_at', startLocal.toISOString());
         }
         if (endDate) {
-          const endLocal = new Date(endDate + 'T23:59:59.999');
-          query = query.lte('booked_at', endLocal.toISOString());
+          const endNext = new Date(endDate + 'T00:00:00');
+          endNext.setDate(endNext.getDate() + 1);
+          query = query.lt('booked_at', endNext.toISOString());
         }
         
         return query;

@@ -28,7 +28,7 @@ export function useClientSourceMetrics(startDate?: string, endDate?: string) {
     queryFn: async () => {
       const params: Record<string, string | null> = {
         p_start_date: startDate ? new Date(startDate + 'T00:00:00').toISOString() : null,
-        p_end_date: endDate ? new Date(endDate + 'T23:59:59.999').toISOString() : null,
+        p_end_date: endDate ? (() => { const d = new Date(endDate + 'T00:00:00'); d.setDate(d.getDate() + 1); return d.toISOString(); })() : null,
       };
 
       const { data, error } = await supabase.rpc('get_client_source_metrics', params);

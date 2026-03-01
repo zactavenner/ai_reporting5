@@ -51,7 +51,7 @@ export default function DatabaseView() {
         .from('leads')
         .select('*')
         .gte('created_at', startDate)
-        .lte('created_at', `${endDate}T23:59:59`)
+        .lt('created_at', `${endDate}T24:00:00`)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -67,7 +67,7 @@ export default function DatabaseView() {
         .from('calls')
         .select('*, leads(name, email, phone)')
         .gte('created_at', startDate)
-        .lte('created_at', `${endDate}T23:59:59`)
+        .lt('created_at', `${endDate}T24:00:00`)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -86,7 +86,7 @@ export default function DatabaseView() {
         .from('funded_investors')
         .select('*, leads(name, email, phone)')
         .gte('funded_at', startDate)
-        .lte('funded_at', `${endDate}T23:59:59`)
+        .lt('funded_at', `${endDate}T24:00:00`)
         .order('funded_at', { ascending: false });
       
       if (error) throw error;
