@@ -41,7 +41,7 @@ export function DateRangeFilter({
   showImport = false,
 }: DateRangeFilterProps) {
   const { dateRange, setDateRange, sourceFilter, setSourceFilter, availableSources } = useDateFilter();
-  const [preset, setPreset] = useState('last30');
+  const [preset, setPreset] = useState('yesterday');
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [sourceSearch, setSourceSearch] = useState('');
