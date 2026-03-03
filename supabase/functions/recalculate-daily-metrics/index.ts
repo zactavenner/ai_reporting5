@@ -84,7 +84,9 @@ Deno.serve(async (req) => {
       while (current <= end) {
         const dateStr = current.toISOString().split("T")[0];
         const dayStart = `${dateStr}T00:00:00.000Z`;
-        const dayEnd = `${dateStr}T23:59:59.999Z`;
+        const next = new Date(current);
+        next.setUTCDate(next.getUTCDate() + 1);
+        const dayNext = `${next.toISOString().split("T")[0]}T00:00:00.000Z`;
 
         try {
           // ── Leads: by created_at ──
@@ -94,7 +96,7 @@ Deno.serve(async (req) => {
             .eq("client_id", client.id)
             .eq("is_spam", false)
             .gte("created_at", dayStart)
-            .lte("created_at", dayEnd);
+            .lt("created_at", dayNext);
 
           const { count: nullSpamCount } = await supabase
             .from("leads")
@@ -102,7 +104,7 @@ Deno.serve(async (req) => {
             .eq("client_id", client.id)
             .is("is_spam", null)
             .gte("created_at", dayStart)
-            .lte("created_at", dayEnd);
+            .lt("created_at", dayNext);
 
           const { count: spamCount } = await supabase
             .from("leads")
@@ -110,7 +112,7 @@ Deno.serve(async (req) => {
             .eq("client_id", client.id)
             .eq("is_spam", true)
             .gte("created_at", dayStart)
-            .lte("created_at", dayEnd);
+            .lt("created_at", dayNext);
 
           const totalValidLeads = (leadsCount || 0) + (nullSpamCount || 0);
 
@@ -121,17 +123,17 @@ Deno.serve(async (req) => {
             .eq("client_id", client.id)
             .neq("is_reconnect", true)
             .gte("booked_at", dayStart)
-            .lte("booked_at", dayEnd);
+            .lt("booked_at", dayNext);
 
-          // ── Showed calls by booked_at (same date axis as calls) ──
+          // ── Showed calls: by scheduled_at (actual appointment date) ──
           const { count: showedCount } = await supabase
             .from("calls")
             .select("*", { count: "exact", head: true })
             .eq("client_id", client.id)
             .eq("showed", true)
             .neq("is_reconnect", true)
-            .gte("booked_at", dayStart)
-            .lte("booked_at", dayEnd);
+            .gte("scheduled_at", dayStart)
+            .lt("scheduled_at", dayNext);
 
           // ── Calls scheduled for that day: by scheduled_at ──
           const { count: callsScheduledCount } = await supabase
@@ -140,7 +142,7 @@ Deno.serve(async (req) => {
             .eq("client_id", client.id)
             .neq("is_reconnect", true)
             .gte("scheduled_at", dayStart)
-            .lte("scheduled_at", dayEnd);
+            .lt("scheduled_at", dayNext);
 
           // ── Reconnect calls by booked_at ──
           const { count: reconnectCount } = await supabase
@@ -149,17 +151,17 @@ Deno.serve(async (req) => {
             .eq("client_id", client.id)
             .eq("is_reconnect", true)
             .gte("booked_at", dayStart)
-            .lte("booked_at", dayEnd);
+            .lt("booked_at", dayNext);
 
-          // ── Reconnect showed by booked_at (same date axis as reconnect calls) ──
+          // ── Reconnect showed by scheduled_at ──
           const { count: reconnectShowedCount } = await supabase
             .from("calls")
             .select("*", { count: "exact", head: true })
             .eq("client_id", client.id)
             .eq("is_reconnect", true)
             .eq("showed", true)
-            .gte("booked_at", dayStart)
-            .lte("booked_at", dayEnd);
+            .gte("scheduled_at", dayStart)
+            .lt("scheduled_at", dayNext);
 
           // ── Funded investors: by funded_at (stage change date) ──
           const { data: fundedData, count: fundedCount } = await supabase
@@ -167,7 +169,7 @@ Deno.serve(async (req) => {
             .select("funded_amount, commitment_amount", { count: "exact" })
             .eq("client_id", client.id)
             .gte("funded_at", dayStart)
-            .lte("funded_at", dayEnd);
+            .lt("funded_at", dayNext);
 
           const fundedDollars = (fundedData || []).reduce((sum: number, f: any) => {
             const amount = f.funded_amount && f.funded_amount > 0 ? f.funded_amount : f.commitment_amount || 0;
