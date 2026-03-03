@@ -527,10 +527,16 @@ export function DraggableClientTable({
                         </TooltipTrigger>
                         <TooltipContent side="right" className="max-w-xs">
                           <div className="text-sm">
-                            <strong>GHL Sync: </strong>
+                            <strong>{syncInfo.source === 'hubspot' ? 'HubSpot' : 'GHL'} Sync: </strong>
                             {syncInfo.status === 'healthy' && 'Synced'}
                             {syncInfo.status === 'stale' && 'Stale (>2 hours)'}
-                            {syncInfo.status === 'error' && 'Error'}
+                            {syncInfo.status === 'error' && (
+                              syncInfo.error?.includes('401') || syncInfo.error?.includes('Invalid Private Integration token')
+                                ? '⚠️ Invalid API Token — update in Settings'
+                                : syncInfo.error?.includes('403') || syncInfo.error?.includes('does not have access')
+                                  ? '⚠️ Token lacks access to this location'
+                                  : 'Sync Error'
+                            )}
                             {syncInfo.status === 'not_configured' && 'Not Configured'}
                             {syncInfo.lastSyncAt && (
                               <div className="text-xs text-muted-foreground mt-1">
@@ -538,8 +544,8 @@ export function DraggableClientTable({
                               </div>
                             )}
                             {syncInfo.error && (
-                              <div className="text-xs text-destructive mt-1">
-                                {syncInfo.error}
+                              <div className="text-xs text-destructive mt-1 break-words">
+                                {syncInfo.error.length > 120 ? syncInfo.error.substring(0, 120) + '…' : syncInfo.error}
                               </div>
                             )}
                           </div>
