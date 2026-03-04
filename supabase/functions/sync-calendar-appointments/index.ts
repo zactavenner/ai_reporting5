@@ -418,15 +418,26 @@ serve(async (req) => {
 
     console.log(`Starting calendar sync for ${client.name}: tracked=${trackedCalendarIds.length}, reconnect=${reconnectCalendarIds.length}`);
 
-    // Build lead lookup map
-    const { data: leads } = await supabase
-      .from('leads')
-      .select('id, external_id, name, email, phone')
-      .eq('client_id', clientId)
-      .not('external_id', 'is', null);
+    // Build lead lookup map — paginated to handle >1000 leads
+    const allLeads: any[] = [];
+    let leadFrom = 0;
+    const LEAD_PAGE = 1000;
+    let hasMoreLeads = true;
+    while (hasMoreLeads) {
+      const { data: leadsPage } = await supabase
+        .from('leads')
+        .select('id, external_id, name, email, phone')
+        .eq('client_id', clientId)
+        .not('external_id', 'is', null)
+        .range(leadFrom, leadFrom + LEAD_PAGE - 1);
+      if (!leadsPage || leadsPage.length === 0) break;
+      allLeads.push(...leadsPage);
+      hasMoreLeads = leadsPage.length === LEAD_PAGE;
+      leadFrom += LEAD_PAGE;
+    }
 
     const leadsByContactId = new Map<string, { id: string; name: string | null; email: string | null; phone: string | null }>();
-    for (const lead of leads || []) {
+    for (const lead of allLeads) {
       if (lead.external_id) {
         leadsByContactId.set(lead.external_id, {
           id: lead.id,
@@ -436,7 +447,7 @@ serve(async (req) => {
         });
       }
     }
-    console.log(`Built lead lookup map with ${leadsByContactId.size} entries`);
+    console.log(`Built lead lookup map with ${leadsByContactId.size} entries (paginated)`);
 
     const result: AppointmentResult = {
       created: 0,

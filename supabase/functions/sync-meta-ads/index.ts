@@ -67,6 +67,30 @@ function getTimeRange(startDate?: string, endDate?: string): string {
 // Fix 2: Improved attribution — removed fragile name substring matching,
 // uses UTM params as primary, lead source/medium fields as secondary,
 // single-ad-per-set as last resort. Tracks unattributed leads.
+// Helper to fetch all rows with pagination (bypasses 1000-row default limit)
+async function fetchAllRowsPaginated(supabase: any, table: string, select: string, filters: { column: string; op: string; value: any }[]): Promise<any[]> {
+  const PAGE_SIZE = 1000;
+  const all: any[] = [];
+  let from = 0;
+  let hasMore = true;
+  while (hasMore) {
+    let query = supabase.from(table).select(select).range(from, from + PAGE_SIZE - 1);
+    for (const f of filters) {
+      if (f.op === 'eq') query = query.eq(f.column, f.value);
+      else if (f.op === 'gte') query = query.gte(f.column, f.value);
+      else if (f.op === 'lte') query = query.lte(f.column, f.value);
+      else if (f.op === 'not.is') query = query.not(f.column, 'is', f.value);
+    }
+    const { data, error } = await query;
+    if (error) { console.error(`Pagination error on ${table}:`, error); break; }
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    hasMore = data.length === PAGE_SIZE;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
 async function attributeCRMData(supabase: any, clientId: string, startDate?: string, endDate?: string) {
   console.log(`Starting CRM attribution (date range: ${startDate || 'all'} to ${endDate || 'all'})...`);
 
@@ -96,32 +120,30 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
     .select("id, name, spend, ad_set_id, meta_ad_id, meta_adset_id")
     .eq("client_id", clientId);
 
-  // 4. Get leads — now including UTM fields for improved matching
-  let leadsQuery = supabase
-    .from("leads")
-    .select("id, campaign_name, ad_set_name, ad_id, is_spam, utm_source, utm_medium, utm_campaign, utm_content, source")
-    .eq("client_id", clientId);
-  if (dateStart) leadsQuery = leadsQuery.gte("created_at", dateStart);
-  if (dateEnd) leadsQuery = leadsQuery.lte("created_at", dateEnd);
-  const { data: leads } = await leadsQuery;
+  // 4. Get leads with pagination (bypasses 1000-row limit)
+  const leadFilters: { column: string; op: string; value: any }[] = [
+    { column: "client_id", op: "eq", value: clientId },
+  ];
+  if (dateStart) leadFilters.push({ column: "created_at", op: "gte", value: dateStart });
+  if (dateEnd) leadFilters.push({ column: "created_at", op: "lte", value: dateEnd });
+  const leads = await fetchAllRowsPaginated(supabase, "leads", "id, campaign_name, ad_set_name, ad_id, is_spam, utm_source, utm_medium, utm_campaign, utm_content, source", leadFilters);
+  console.log(`Attribution: fetched ${leads.length} leads (paginated)`);
 
-  // 5. Get all calls
-  let callsQuery = supabase
-    .from("calls")
-    .select("id, lead_id, showed")
-    .eq("client_id", clientId);
-  if (dateStart) callsQuery = callsQuery.gte("booked_at", dateStart);
-  if (dateEnd) callsQuery = callsQuery.lte("booked_at", dateEnd);
-  const { data: calls } = await callsQuery;
+  // 5. Get all calls with pagination
+  const callFilters: { column: string; op: string; value: any }[] = [
+    { column: "client_id", op: "eq", value: clientId },
+  ];
+  if (dateStart) callFilters.push({ column: "booked_at", op: "gte", value: dateStart });
+  if (dateEnd) callFilters.push({ column: "booked_at", op: "lte", value: dateEnd });
+  const calls = await fetchAllRowsPaginated(supabase, "calls", "id, lead_id, showed", callFilters);
 
-  // 6. Get all funded investors
-  let fundedQuery = supabase
-    .from("funded_investors")
-    .select("id, lead_id, funded_amount, commitment_amount")
-    .eq("client_id", clientId);
-  if (dateStart) fundedQuery = fundedQuery.gte("funded_at", dateStart);
-  if (dateEnd) fundedQuery = fundedQuery.lte("funded_at", dateEnd);
-  const { data: funded } = await fundedQuery;
+  // 6. Get all funded investors with pagination
+  const fundedFilters: { column: string; op: string; value: any }[] = [
+    { column: "client_id", op: "eq", value: clientId },
+  ];
+  if (dateStart) fundedFilters.push({ column: "funded_at", op: "gte", value: dateStart });
+  if (dateEnd) fundedFilters.push({ column: "funded_at", op: "lte", value: dateEnd });
+  const funded = await fetchAllRowsPaginated(supabase, "funded_investors", "id, lead_id, funded_amount, commitment_amount", fundedFilters);
 
   // Build lookup maps
   const callsByLead = new Map<string, { total: number; showed: number }>();
