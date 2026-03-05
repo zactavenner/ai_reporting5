@@ -85,7 +85,9 @@ function SortableStep({ step, index, deviceType, isPublicView, isLast, variants,
         />
       </div>
       {!isLast && (
-        <ChevronRight className="mx-3 h-6 w-6 text-muted-foreground flex-shrink-0" />
+        <div className="flex-shrink-0 self-stretch flex items-start">
+          <ChevronRight className="mx-3 mt-[200px] h-6 w-6 text-muted-foreground" />
+        </div>
       )}
     </div>
   );
@@ -221,7 +223,7 @@ export function CampaignFlowSection({
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={steps.map(s => s.id)} strategy={horizontalListSortingStrategy}>
-            <div className="flex items-center gap-2 overflow-x-auto pb-4 pl-6">
+            <div className="flex items-start gap-2 overflow-x-auto pb-4 pl-6">
               {steps.map((step, index) => (
                 <SortableStep
                   key={step.id}
