@@ -85,7 +85,9 @@ function SortableStep({ step, index, deviceType, isPublicView, isLast, variants,
         />
       </div>
       {!isLast && (
-        <ChevronRight className="mx-3 mt-[240px] h-6 w-6 text-muted-foreground flex-shrink-0" />
+        <div className="flex-shrink-0 self-stretch flex items-start">
+          <ChevronRight className="mx-3 mt-[200px] h-6 w-6 text-muted-foreground" />
+        </div>
       )}
     </div>
   );
