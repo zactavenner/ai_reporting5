@@ -130,12 +130,11 @@ export function useFundedInvestors(clientId?: string, startDate?: string, endDat
         }
 
         if (startDate) {
-          const startLocal = new Date(startDate + 'T00:00:00');
-          query = query.gte('funded_at', startLocal.toISOString());
+          query = query.gte('funded_at', startDate + 'T00:00:00.000Z');
         }
         if (endDate) {
-          const endNext = new Date(endDate + 'T00:00:00');
-          endNext.setDate(endNext.getDate() + 1);
+          const endNext = new Date(endDate + 'T00:00:00.000Z');
+          endNext.setUTCDate(endNext.getUTCDate() + 1);
           query = query.lt('funded_at', endNext.toISOString());
         }
         

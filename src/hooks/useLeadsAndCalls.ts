@@ -88,12 +88,13 @@ export function useLeads(clientId?: string, startDate?: string, endDate?: string
         }
 
         if (startDate) {
-          const startLocal = new Date(startDate + 'T00:00:00');
-          query = query.gte('created_at', startLocal.toISOString());
+          query = query.gte('created_at', startDate + 'T00:00:00.000Z');
         }
         if (endDate) {
-          const endNext = new Date(endDate + 'T00:00:00');
-          endNext.setDate(endNext.getDate() + 1);
+          query = query.lt('created_at', endDate + 'T00:00:00.000Z');
+          // Add 1 day in the query string to cover full end date in UTC
+          const endNext = new Date(endDate + 'T00:00:00.000Z');
+          endNext.setUTCDate(endNext.getUTCDate() + 1);
           query = query.lt('created_at', endNext.toISOString());
         }
         
@@ -127,12 +128,11 @@ export function useCalls(clientId?: string, showedOnly?: boolean, startDate?: st
         }
 
         if (startDate) {
-          const startLocal = new Date(startDate + 'T00:00:00');
-          query = query.gte('booked_at', startLocal.toISOString());
+          query = query.gte('booked_at', startDate + 'T00:00:00.000Z');
         }
         if (endDate) {
-          const endNext = new Date(endDate + 'T00:00:00');
-          endNext.setDate(endNext.getDate() + 1);
+          const endNext = new Date(endDate + 'T00:00:00.000Z');
+          endNext.setUTCDate(endNext.getUTCDate() + 1);
           query = query.lt('booked_at', endNext.toISOString());
         }
         
