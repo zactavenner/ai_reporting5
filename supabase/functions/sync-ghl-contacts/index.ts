@@ -671,6 +671,9 @@ async function syncContactToDatabase(
   const opportunityStage = opportunity?.stageName || opportunity?.pipelineStageName || null;
   const opportunityStageId = opportunity?.pipelineStageId || null;
   const opportunityValue = opportunity?.monetaryValue ?? opportunity?.monetary_value ?? 0;
+  
+  // Extract pipeline value from opportunity or custom fields
+  const pipelineValue = extractPipelineValue(contact, opportunity);
 
   // --- NORMALIZE SOURCE ---
   // Apply source normalization to utm_source
