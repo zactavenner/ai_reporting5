@@ -12,6 +12,167 @@ const corsHeaders = {
 };
 
 const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
+const RETARGETIQ_API_BASE = 'https://app.retargetiq.com/api/v2';
+
+// --- RETARGETIQ INLINE ENRICHMENT ---
+// Enrich a single lead immediately after it's synced to the database.
+// Returns enrichment data or null if not available.
+interface RetargetIQConfig {
+  apiKey: string;
+  website: string;
+}
+
+async function retargetiqEnrichLead(
+  supabase: any,
+  leadId: string,
+  email: string | null,
+  phone: string | null,
+  existingCustomFields: Record<string, any> | null,
+  config: RetargetIQConfig
+): Promise<boolean> {
+  // Skip if already enriched
+  if (existingCustomFields?.retargetiq_enriched_at) return false;
+  // Need email or phone
+  if (!email && !phone) return false;
+
+  try {
+    let identity: any = null;
+
+    // Try email first
+    if (email) {
+      const response = await fetch(`${RETARGETIQ_API_BASE}/GetDataByEmail`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: config.apiKey, website: config.website, email }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data?.identities?.length > 0) {
+          identity = data.data.identities[0];
+        }
+      }
+    }
+
+    // Fallback to phone
+    if (!identity && phone) {
+      const cleanPhone = phone.replace(/\D/g, '');
+      if (cleanPhone.length >= 10) {
+        const response = await fetch(`${RETARGETIQ_API_BASE}/GetDataByPhone`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ api_key: config.apiKey, website: config.website, phone: cleanPhone }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data?.identities?.length > 0) {
+            identity = data.data.identities[0];
+          }
+        }
+      }
+    }
+
+    if (!identity) return false;
+
+    // Build enrichment payload
+    const enrichment: Record<string, any> = {};
+    if (identity.gender) enrichment.gender = identity.gender;
+    if (identity.age) enrichment.age = identity.age;
+    if (identity.maritalStatus) enrichment.marital_status = identity.maritalStatus;
+    if (identity.language) enrichment.language = identity.language;
+    if (identity.address) enrichment.address = identity.address;
+    if (identity.city) enrichment.city = identity.city;
+    if (identity.state) enrichment.state = identity.state;
+    if (identity.zip) enrichment.zip = identity.zip;
+    if (identity.latitude) enrichment.latitude = identity.latitude;
+    if (identity.longitude) enrichment.longitude = identity.longitude;
+    if (identity.householdIncome) enrichment.household_income = identity.householdIncome;
+    if (identity.householdNetWorth) enrichment.household_net_worth = identity.householdNetWorth;
+    if (identity.homeOwnership) enrichment.home_ownership = identity.homeOwnership;
+    if (identity.homeValue) enrichment.home_value = identity.homeValue;
+    if (identity.creditRange) enrichment.credit_range = identity.creditRange;
+    if (identity.discretionaryIncome) enrichment.discretionary_income = identity.discretionaryIncome;
+    if (identity.ownsInvestments) enrichment.owns_investments = identity.ownsInvestments;
+    if (identity.ownsStocksAndBonds) enrichment.owns_stocks_bonds = identity.ownsStocksAndBonds;
+    if (identity.investor) enrichment.investor = identity.investor;
+    if (identity.education) enrichment.education = identity.education;
+    if (identity.occupationDetail) enrichment.occupation = identity.occupationDetail;
+    if (identity.phones?.length) {
+      enrichment.additional_phones = identity.phones
+        .filter((p: any) => p.phone)
+        .map((p: any) => ({ phone: p.phone, carrier: p.carrier, dnc: p.dnc }));
+    }
+    if (identity.emails?.length) {
+      enrichment.additional_emails = identity.emails
+        .filter((e: any) => e.email)
+        .map((e: any) => e.email);
+    }
+    if (identity.companies?.length) {
+      enrichment.companies = identity.companies.map((c: any) => ({
+        title: c.title,
+        company: c.company,
+        linkedin_url: c.linkedInUrl || c.linkedin,
+      }));
+    }
+    if (identity.vehicles?.length) {
+      enrichment.vehicles = identity.vehicles.map((v: any) => ({
+        make: v.make,
+        model: v.model,
+        year: v.year,
+      }));
+    }
+
+    // Merge into custom_fields
+    const updatedCustomFields = {
+      ...(existingCustomFields || {}),
+      retargetiq: enrichment,
+      retargetiq_enriched_at: new Date().toISOString(),
+    };
+
+    const { error: updateError } = await supabase
+      .from('leads')
+      .update({ custom_fields: updatedCustomFields })
+      .eq('id', leadId);
+
+    if (updateError) {
+      console.error(`[retargetiq] Failed to save enrichment for lead ${leadId}:`, updateError);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    // Non-blocking: enrichment failure should never stop contact sync
+    console.error(`[retargetiq] Enrichment error for lead ${leadId}:`, err);
+    return false;
+  }
+}
+
+// Fetch RetargetIQ config from agency_settings or environment
+async function getRetargetIQConfig(supabase: any): Promise<RetargetIQConfig | null> {
+  // Try environment first
+  const envKey = typeof Deno !== 'undefined' ? Deno.env.get('RETARGETIQ_API_KEY') : null;
+  const envWebsite = typeof Deno !== 'undefined' ? Deno.env.get('RETARGETIQ_WEBSITE') : null;
+  if (envKey) {
+    return { apiKey: envKey, website: envWebsite || 'default' };
+  }
+
+  // Fall back to agency_settings
+  try {
+    const { data } = await supabase
+      .from('agency_settings')
+      .select('retargetiq_api_key, retargetiq_website')
+      .not('retargetiq_api_key', 'is', null)
+      .limit(1)
+      .maybeSingle();
+
+    if (data?.retargetiq_api_key) {
+      return { apiKey: data.retargetiq_api_key, website: data.retargetiq_website || 'default' };
+    }
+  } catch (err) {
+    console.warn('[retargetiq] Could not fetch agency_settings:', err);
+  }
+
+  return null;
+}
 
 // --- GHL API FETCH WITH RETRY & EXPONENTIAL BACKOFF ---
 // Handles 429 rate limits and transient network errors
@@ -1238,8 +1399,8 @@ async function syncClientContacts(
   syncLogId?: string,
   sinceDateDays?: number,
   syncTimeline: boolean = false
-): Promise<{ created: number; updated: number; skipped: number; fundedFromTags: number; fundedFromPipeline: number; committedFromPipeline: number; callsCreated: number; callsUpdated: number; errors: string[]; totalApiContacts: number; contactsInDateRange: number; timelineSynced: number }> {
-  const result = { created: 0, updated: 0, skipped: 0, fundedFromTags: 0, fundedFromPipeline: 0, committedFromPipeline: 0, callsCreated: 0, callsUpdated: 0, errors: [] as string[], totalApiContacts: 0, contactsInDateRange: 0, timelineSynced: 0 };
+): Promise<{ created: number; updated: number; skipped: number; fundedFromTags: number; fundedFromPipeline: number; committedFromPipeline: number; callsCreated: number; callsUpdated: number; errors: string[]; totalApiContacts: number; contactsInDateRange: number; timelineSynced: number; enriched: number }> {
+  const result = { created: 0, updated: 0, skipped: 0, fundedFromTags: 0, fundedFromPipeline: 0, committedFromPipeline: 0, callsCreated: 0, callsUpdated: 0, errors: [] as string[], totalApiContacts: 0, contactsInDateRange: 0, timelineSynced: 0, enriched: 0 };
   
   console.log(`Starting GHL sync for client: ${client.name} (${client.id}), sinceDateDays: ${sinceDateDays || 'all'}, syncTimeline: ${syncTimeline}`);
   
@@ -1288,6 +1449,12 @@ async function syncClientContacts(
     if (lead.phone) leadsByPhone.set(lead.phone, lead);
   }
   console.log(`Pre-fetched ${(existingLeads || []).length} existing leads for lookup`);
+
+  // Load RetargetIQ config for inline enrichment
+  const retargetiqConfig = await getRetargetIQConfig(supabase);
+  if (retargetiqConfig) {
+    console.log(`[syncClientContacts] RetargetIQ enrichment enabled for ${client.name}`);
+  }
 
   // Track contacts that need timeline sync
   const contactsForTimeline: string[] = [];
@@ -1341,6 +1508,27 @@ async function syncClientContacts(
           opp
         );
         if (created) result.fundedFromTags++;
+      }
+
+      // Inline RetargetIQ enrichment for newly created leads
+      if (retargetiqConfig && syncResult.action === 'created' && syncResult.leadId) {
+        try {
+          const enriched = await retargetiqEnrichLead(
+            supabase,
+            syncResult.leadId,
+            contact.email || null,
+            contact.phone || null,
+            null, // New lead, no existing custom_fields with retargetiq
+            retargetiqConfig
+          );
+          if (enriched) {
+            result.enriched++;
+            console.log(`[retargetiq] Enriched new lead ${syncResult.leadId} (${contact.email || contact.phone})`);
+          }
+        } catch (enrichErr) {
+          // Non-blocking: enrichment failure should never stop sync
+          console.warn(`[retargetiq] Enrichment failed for ${contact.id}:`, enrichErr);
+        }
       }
     } catch (err) {
       result.errors.push(`Contact ${contact.id}: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -3947,7 +4135,7 @@ serve(async (req) => {
     const results: Array<{
       client_id: string;
       client_name: string;
-      contacts?: { created: number; updated: number; skipped: number; fundedFromTags: number; fundedFromPipeline: number; committedFromPipeline: number; callsCreated: number; callsUpdated: number; timelineSynced: number; errors: string[] };
+      contacts?: { created: number; updated: number; skipped: number; fundedFromTags: number; fundedFromPipeline: number; committedFromPipeline: number; callsCreated: number; callsUpdated: number; timelineSynced: number; enriched: number; errors: string[] };
       calls?: { enriched: number; skipped: number; errors: string[] };
     }> = [];
 

@@ -9,7 +9,8 @@ declare const EdgeRuntime: { waitUntil: (promise: Promise<any>) => void } | unde
 
 const RETARGETIQ_API_BASE = "https://app.retargetiq.com/api/v2";
 const BATCH_DELAY_MS = 200; // Rate limit delay between API calls
-const MAX_ENRICHMENTS_PER_RUN = 500; // Safety cap per invocation
+const DEFAULT_BATCH_SIZE = 500; // Default leads per batch
+const DB_FETCH_LIMIT = 1000; // Max leads to fetch per DB query page
 
 interface RetargetIQIdentity {
   firstName?: string;
@@ -30,11 +31,21 @@ interface RetargetIQIdentity {
   householdNetWorth?: string;
   homeOwnership?: string;
   homeValue?: string;
+  creditRange?: string;
+  discretionaryIncome?: string;
+  ownsInvestments?: string;
+  ownsStocksAndBonds?: string;
+  ownsMutualFunds?: string;
+  investor?: string;
+  education?: string;
+  occupationDetail?: string;
+  occupationType?: string;
   companies?: Array<{
     title?: string;
     company?: string;
     address?: string;
     linkedInUrl?: string;
+    linkedin?: string;
   }>;
   vehicles?: Array<{
     make?: string;
@@ -78,7 +89,6 @@ async function enrichByPhone(
   phone: string
 ): Promise<RetargetIQIdentity | null> {
   try {
-    // Clean phone number - remove non-digits
     const cleanPhone = phone.replace(/\D/g, "");
     if (cleanPhone.length < 10) return null;
 
@@ -127,6 +137,16 @@ function buildEnrichmentData(identity: RetargetIQIdentity): Record<string, any> 
   if (identity.homeOwnership) enrichment.home_ownership = identity.homeOwnership;
   if (identity.homeValue) enrichment.home_value = identity.homeValue;
   if (identity.creditRange) enrichment.credit_range = identity.creditRange;
+  if (identity.discretionaryIncome) enrichment.discretionary_income = identity.discretionaryIncome;
+  if (identity.ownsInvestments) enrichment.owns_investments = identity.ownsInvestments;
+  if (identity.ownsStocksAndBonds) enrichment.owns_stocks_bonds = identity.ownsStocksAndBonds;
+  if (identity.ownsMutualFunds) enrichment.owns_mutual_funds = identity.ownsMutualFunds;
+  if (identity.investor) enrichment.investor = identity.investor;
+
+  // Education & Occupation
+  if (identity.education) enrichment.education = identity.education;
+  if (identity.occupationDetail) enrichment.occupation = identity.occupationDetail;
+  if (identity.occupationType) enrichment.occupation_type = identity.occupationType;
 
   // Additional phones/emails from enrichment
   if (identity.phones?.length) {
@@ -145,7 +165,7 @@ function buildEnrichmentData(identity: RetargetIQIdentity): Record<string, any> 
     enrichment.companies = identity.companies.map((c) => ({
       title: c.title,
       company: c.company,
-      linkedin_url: c.linkedInUrl,
+      linkedin_url: c.linkedInUrl || c.linkedin,
     }));
   }
 
@@ -170,148 +190,223 @@ Deno.serve(async (req) => {
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // RetargetIQ credentials from env (set as Supabase secrets)
-  const retargetiqApiKey = Deno.env.get("RETARGETIQ_API_KEY");
-  const retargetiqWebsite = Deno.env.get("RETARGETIQ_WEBSITE") || "default";
+  // RetargetIQ credentials from env or agency_settings
+  let retargetiqApiKey = Deno.env.get("RETARGETIQ_API_KEY");
+  let retargetiqWebsite = Deno.env.get("RETARGETIQ_WEBSITE") || "default";
+
+  // Fall back to agency_settings if env not set
+  if (!retargetiqApiKey) {
+    const { data: agencyData } = await supabase
+      .from("agency_settings")
+      .select("retargetiq_api_key, retargetiq_website")
+      .not("retargetiq_api_key", "is", null)
+      .limit(1)
+      .maybeSingle();
+
+    if (agencyData?.retargetiq_api_key) {
+      retargetiqApiKey = agencyData.retargetiq_api_key;
+      retargetiqWebsite = agencyData.retargetiq_website || "default";
+    }
+  }
 
   if (!retargetiqApiKey) {
     return new Response(
-      JSON.stringify({ success: false, error: "RETARGETIQ_API_KEY not configured" }),
+      JSON.stringify({ success: false, error: "RETARGETIQ_API_KEY not configured (env or agency_settings)" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
   let clientId: string | null = null;
   let forceReEnrich = false;
-  let maxLeads = MAX_ENRICHMENTS_PER_RUN;
+  let enrichAll = false;
+  let maxLeads = DEFAULT_BATCH_SIZE;
 
   try {
     const body = await req.json();
     clientId = body.clientId || body.client_id || null;
     forceReEnrich = body.forceReEnrich || false;
-    if (body.maxLeads) maxLeads = Math.min(body.maxLeads, MAX_ENRICHMENTS_PER_RUN);
+    enrichAll = body.enrichAll || false;
+    if (body.maxLeads) maxLeads = body.maxLeads; // No cap when enrichAll is true
+    if (!enrichAll && !body.maxLeads) maxLeads = DEFAULT_BATCH_SIZE;
   } catch {}
 
-  console.log(`[enrich-retargetiq] Starting enrichment. Client: ${clientId || "all"}, force: ${forceReEnrich}, max: ${maxLeads}`);
+  console.log(`[enrich-retargetiq] Starting enrichment. Client: ${clientId || "all"}, force: ${forceReEnrich}, enrichAll: ${enrichAll}, max: ${enrichAll ? "unlimited" : maxLeads}`);
+
+  const apiKey = retargetiqApiKey;
+  const website = retargetiqWebsite;
 
   const doEnrich = async () => {
-    // Get leads that need enrichment (have email or phone, not yet enriched)
-    let query = supabase
-      .from("leads")
-      .select("id, client_id, email, phone, name, custom_fields")
-      .order("created_at", { ascending: false })
-      .limit(maxLeads);
+    let totalEnriched = 0;
+    let totalSkipped = 0;
+    let totalFailed = 0;
+    let totalProcessed = 0;
+    let hasMoreLeads = true;
+    let lastId: string | null = null;
 
-    if (clientId) {
-      query = query.eq("client_id", clientId);
-    }
+    while (hasMoreLeads) {
+      // Calculate batch size for this iteration
+      const remainingQuota = enrichAll ? DB_FETCH_LIMIT : Math.min(maxLeads - totalProcessed, DB_FETCH_LIMIT);
+      if (remainingQuota <= 0) break;
 
-    if (!forceReEnrich) {
-      // Only enrich leads that haven't been enriched yet
-      // Check if custom_fields doesn't have retargetiq_enriched_at
-      query = query.or("custom_fields.is.null,custom_fields->retargetiq_enriched_at.is.null");
-    }
+      // Build query for unenriched leads with cursor-based pagination
+      let query = supabase
+        .from("leads")
+        .select("id, client_id, email, phone, name, custom_fields")
+        .order("id", { ascending: true })
+        .limit(remainingQuota);
 
-    // Must have email or phone to enrich
-    query = query.or("email.neq.,phone.neq.");
+      if (clientId) {
+        query = query.eq("client_id", clientId);
+      }
 
-    const { data: leads, error: leadsError } = await query;
+      if (!forceReEnrich) {
+        query = query.or("custom_fields.is.null,custom_fields->retargetiq_enriched_at.is.null");
+      }
 
-    if (leadsError) {
-      console.error("[enrich-retargetiq] Failed to fetch leads:", leadsError);
-      return { success: false, error: leadsError.message, enriched: 0, skipped: 0, failed: 0 };
-    }
+      // Must have email or phone to enrich
+      query = query.or("email.neq.,phone.neq.");
 
-    if (!leads || leads.length === 0) {
-      console.log("[enrich-retargetiq] No leads to enrich");
-      return { success: true, enriched: 0, skipped: 0, failed: 0, message: "No leads to enrich" };
-    }
+      // Cursor pagination: fetch leads after the last processed ID
+      if (lastId) {
+        query = query.gt("id", lastId);
+      }
 
-    console.log(`[enrich-retargetiq] Found ${leads.length} leads to enrich`);
+      const { data: leads, error: leadsError } = await query;
 
-    let enriched = 0;
-    let skipped = 0;
-    let failed = 0;
+      if (leadsError) {
+        console.error("[enrich-retargetiq] Failed to fetch leads:", leadsError);
+        break;
+      }
 
-    for (const lead of leads) {
-      try {
-        let identity: RetargetIQIdentity | null = null;
+      if (!leads || leads.length === 0) {
+        hasMoreLeads = false;
+        break;
+      }
 
-        // Try email first, then phone
-        if (lead.email) {
-          identity = await enrichByEmail(retargetiqApiKey, retargetiqWebsite, lead.email);
+      console.log(`[enrich-retargetiq] Processing batch of ${leads.length} leads (total so far: ${totalProcessed})`);
+
+      for (const lead of leads) {
+        try {
+          let identity: RetargetIQIdentity | null = null;
+
+          if (lead.email) {
+            identity = await enrichByEmail(apiKey, website, lead.email);
+          }
+
+          if (!identity && lead.phone) {
+            identity = await enrichByPhone(apiKey, website, lead.phone);
+          }
+
+          if (!identity) {
+            // Mark as attempted so we don't retry endlessly
+            const existingCF = (lead.custom_fields as Record<string, any>) || {};
+            if (!existingCF.retargetiq_enriched_at) {
+              await supabase
+                .from("leads")
+                .update({
+                  custom_fields: {
+                    ...existingCF,
+                    retargetiq_enriched_at: new Date().toISOString(),
+                    retargetiq_no_match: true,
+                  },
+                })
+                .eq("id", lead.id);
+            }
+            totalSkipped++;
+            totalProcessed++;
+            continue;
+          }
+
+          const enrichmentData = buildEnrichmentData(identity);
+          const existingCustomFields = (lead.custom_fields as Record<string, any>) || {};
+          const updatedCustomFields = {
+            ...existingCustomFields,
+            retargetiq: enrichmentData,
+            retargetiq_enriched_at: new Date().toISOString(),
+            retargetiq_no_match: undefined, // Clear previous no-match flag
+          };
+
+          const updatePayload: Record<string, any> = {
+            custom_fields: updatedCustomFields,
+          };
+
+          if (!lead.name && (identity.firstName || identity.lastName)) {
+            updatePayload.name = [identity.firstName, identity.lastName].filter(Boolean).join(" ");
+          }
+
+          const { error: updateError } = await supabase
+            .from("leads")
+            .update(updatePayload)
+            .eq("id", lead.id);
+
+          if (updateError) {
+            console.error(`[enrich-retargetiq] Failed to update lead ${lead.id}:`, updateError);
+            totalFailed++;
+          } else {
+            totalEnriched++;
+          }
+
+          await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
+        } catch (err) {
+          console.error(`[enrich-retargetiq] Error enriching lead ${lead.id}:`, err);
+          totalFailed++;
         }
 
-        if (!identity && lead.phone) {
-          identity = await enrichByPhone(retargetiqApiKey, retargetiqWebsite, lead.phone);
-        }
+        totalProcessed++;
+      }
 
-        if (!identity) {
-          skipped++;
-          continue;
-        }
+      // Update cursor for next batch
+      lastId = leads[leads.length - 1].id;
 
-        // Build enrichment data
-        const enrichmentData = buildEnrichmentData(identity);
+      // Stop if this was the last page or we've hit our quota
+      if (leads.length < remainingQuota) {
+        hasMoreLeads = false;
+      }
+      if (!enrichAll && totalProcessed >= maxLeads) {
+        hasMoreLeads = false;
+      }
 
-        // Merge into custom_fields preserving existing data
-        const existingCustomFields = (lead.custom_fields as Record<string, any>) || {};
-        const updatedCustomFields = {
-          ...existingCustomFields,
-          retargetiq: enrichmentData,
-          retargetiq_enriched_at: new Date().toISOString(),
-        };
+      // Log progress for large enrichment runs
+      if (enrichAll && totalProcessed > 0 && totalProcessed % 500 === 0) {
+        console.log(`[enrich-retargetiq] Progress: ${totalProcessed} processed, ${totalEnriched} enriched, ${totalSkipped} skipped, ${totalFailed} failed`);
 
-        // Update lead with enriched data
-        const updatePayload: Record<string, any> = {
-          custom_fields: updatedCustomFields,
-        };
-
-        // Fill in missing name from enrichment
-        if (!lead.name && (identity.firstName || identity.lastName)) {
-          updatePayload.name = [identity.firstName, identity.lastName].filter(Boolean).join(" ");
-        }
-
-        const { error: updateError } = await supabase
-          .from("leads")
-          .update(updatePayload)
-          .eq("id", lead.id);
-
-        if (updateError) {
-          console.error(`[enrich-retargetiq] Failed to update lead ${lead.id}:`, updateError);
-          failed++;
-        } else {
-          enriched++;
-        }
-
-        // Rate limiting
-        await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
-      } catch (err) {
-        console.error(`[enrich-retargetiq] Error enriching lead ${lead.id}:`, err);
-        failed++;
+        // Save progress to sync_logs
+        await supabase.from("sync_logs").insert({
+          client_id: clientId || "00000000-0000-0000-0000-000000000000",
+          sync_type: "retargetiq-enrichment-progress",
+          status: "running",
+          records_synced: totalEnriched,
+          error_message: `In progress: ${totalProcessed} processed, ${totalSkipped} skipped, ${totalFailed} failed`,
+          completed_at: new Date().toISOString(),
+        });
       }
     }
 
-    console.log(`[enrich-retargetiq] Complete: enriched=${enriched}, skipped=${skipped}, failed=${failed}`);
+    console.log(`[enrich-retargetiq] Complete: enriched=${totalEnriched}, skipped=${totalSkipped}, failed=${totalFailed}, total=${totalProcessed}`);
 
-    // Log to sync_logs
+    // Final sync_logs entry
     await supabase.from("sync_logs").insert({
       client_id: clientId || "00000000-0000-0000-0000-000000000000",
       sync_type: "retargetiq-enrichment",
-      status: failed === 0 ? "completed" : "partial",
-      records_synced: enriched,
-      error_message: failed > 0 ? `${failed} leads failed to enrich` : null,
+      status: totalFailed === 0 ? "completed" : "partial",
+      records_synced: totalEnriched,
+      error_message: totalFailed > 0 ? `${totalFailed} leads failed to enrich out of ${totalProcessed} processed` : null,
       completed_at: new Date().toISOString(),
     });
 
-    return { success: true, enriched, skipped, failed };
+    return { success: true, enriched: totalEnriched, skipped: totalSkipped, failed: totalFailed, totalProcessed };
   };
 
-  // Run in background for large batches
-  if (typeof EdgeRuntime !== "undefined" && !clientId) {
+  // Always run in background for enrichAll or large batches
+  if (typeof EdgeRuntime !== "undefined" && (enrichAll || !clientId)) {
     EdgeRuntime.waitUntil(doEnrich());
     return new Response(
-      JSON.stringify({ success: true, message: "RetargetIQ enrichment started (background)" }),
+      JSON.stringify({
+        success: true,
+        message: enrichAll
+          ? "RetargetIQ full database enrichment started (background). Check sync_logs for progress."
+          : "RetargetIQ enrichment started (background)",
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } else {
