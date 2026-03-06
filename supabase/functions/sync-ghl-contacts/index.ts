@@ -1143,7 +1143,7 @@ async function syncClientContacts(
   let hasMore = true;
   let currentPage = 1;
   let totalProcessed = 0;
-  const MAX_CONTACTS = syncTimeline ? 500 : 10000; // Higher limit for regular sync to capture all contacts
+  const MAX_CONTACTS = syncTimeline ? 500 : 50000; // Higher limit for larger accounts
   
   // Calculate cutoff date if sinceDateDays is specified
   const cutoffDate = sinceDateDays ? new Date(Date.now() - sinceDateDays * 24 * 60 * 60 * 1000) : null;
@@ -2137,7 +2137,7 @@ async function syncAllContactsUnlimited(
   let hasMore = true;
   let startAfterId: string | undefined;
   let totalProcessed = 0;
-  const MAX_CONTACTS = 10000; // High limit for historical sync
+  const MAX_CONTACTS = 50000; // High limit for larger accounts
   
   try {
     while (hasMore && totalProcessed < MAX_CONTACTS) {
