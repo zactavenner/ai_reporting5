@@ -265,7 +265,7 @@ async function syncAppointmentToCall(
   return { action: 'created' };
 }
 
-// Recalculate daily_metrics for a client based on actual calls data
+// Recalculate daily_metrics for a client based on actual calls + leads data
 async function recalculateClientMetrics(supabase: any, clientId: string) {
   // Get all calls for this client - need both booked_at and scheduled_at
   const { data: callStats } = await supabase
@@ -273,83 +273,105 @@ async function recalculateClientMetrics(supabase: any, clientId: string) {
     .select('booked_at, scheduled_at, showed, is_reconnect')
     .eq('client_id', clientId);
 
-  if (!callStats || callStats.length === 0) {
-    console.log('No calls to recalculate');
-    return;
-  }
-
   // Aggregate booked calls by booked_at date, showed calls by scheduled_at date
   const metricsByDate = new Map<string, {
     calls: number;
     showed_calls: number;
     reconnect_calls: number;
     reconnect_showed: number;
+    calls_scheduled: number;
   }>();
 
   const ensureDate = (dateStr: string) => {
     const date = dateStr.split('T')[0];
     if (!metricsByDate.has(date)) {
-      metricsByDate.set(date, { calls: 0, showed_calls: 0, reconnect_calls: 0, reconnect_showed: 0 });
+      metricsByDate.set(date, { calls: 0, showed_calls: 0, reconnect_calls: 0, reconnect_showed: 0, calls_scheduled: 0 });
     }
     return metricsByDate.get(date)!;
   };
 
-  for (const call of callStats) {
-    // Count booked calls by booked_at date
-    if (call.booked_at) {
-      const metrics = ensureDate(call.booked_at);
-      if (call.is_reconnect) {
-        metrics.reconnect_calls++;
-      } else {
-        metrics.calls++;
+  if (callStats && callStats.length > 0) {
+    for (const call of callStats) {
+      // Count booked calls by booked_at date
+      if (call.booked_at) {
+        const metrics = ensureDate(call.booked_at);
+        if (call.is_reconnect) {
+          metrics.reconnect_calls++;
+        } else {
+          metrics.calls++;
+        }
       }
-    }
 
-    // Count showed/no-show by scheduled_at date (the actual appointment date)
-    if (call.showed && call.scheduled_at) {
-      const metrics = ensureDate(call.scheduled_at);
-      if (call.is_reconnect) {
-        metrics.reconnect_showed++;
-      } else {
-        metrics.showed_calls++;
+      // Count calls scheduled for a given date and showed by scheduled_at
+      if (call.scheduled_at) {
+        const metrics = ensureDate(call.scheduled_at);
+        if (!call.is_reconnect) {
+          metrics.calls_scheduled++;
+        }
+        if (call.showed) {
+          if (call.is_reconnect) {
+            metrics.reconnect_showed++;
+          } else {
+            metrics.showed_calls++;
+          }
+        }
       }
     }
   }
 
   console.log(`Updating metrics for ${metricsByDate.size} dates`);
 
-  // Update daily_metrics for each date
+  // Update daily_metrics for each date — only update call columns, preserve leads/ads data
   for (const [date, metrics] of metricsByDate) {
-    const { data: existing } = await supabase
-      .from('daily_metrics')
-      .select('id')
-      .eq('client_id', clientId)
-      .eq('date', date)
-      .maybeSingle();
+    const dayStart = `${date}T00:00:00.000Z`;
+    const dayEnd = `${date}T23:59:59.999Z`;
 
-    if (existing) {
-      await supabase
-        .from('daily_metrics')
-        .update({
-          calls: metrics.calls,
-          showed_calls: metrics.showed_calls,
-          reconnect_calls: metrics.reconnect_calls,
-          reconnect_showed: metrics.reconnect_showed,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existing.id);
-    } else {
-      await supabase
-        .from('daily_metrics')
-        .insert({
-          client_id: clientId,
-          date,
-          calls: metrics.calls,
-          showed_calls: metrics.showed_calls,
-          reconnect_calls: metrics.reconnect_calls,
-          reconnect_showed: metrics.reconnect_showed,
-        });
-    }
+    // Also count leads for this date so inserts don't lose lead data
+    const { count: leadsCount } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('client_id', clientId)
+      .eq('is_spam', false)
+      .gte('created_at', dayStart)
+      .lte('created_at', dayEnd);
+
+    const { count: nullSpamCount } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('client_id', clientId)
+      .is('is_spam', null)
+      .gte('created_at', dayStart)
+      .lte('created_at', dayEnd);
+
+    const { count: spamCount } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('client_id', clientId)
+      .eq('is_spam', true)
+      .gte('created_at', dayStart)
+      .lte('created_at', dayEnd);
+
+    const totalValidLeads = (leadsCount || 0) + (nullSpamCount || 0);
+
+    await supabase
+      .from('daily_metrics')
+      .upsert({
+        client_id: clientId,
+        date,
+        leads: totalValidLeads,
+        leads_created: totalValidLeads,
+        spam_leads: spamCount || 0,
+        calls: metrics.calls,
+        showed_calls: metrics.showed_calls,
+        calls_scheduled: metrics.calls_scheduled,
+        calls_showed: metrics.showed_calls,
+        reconnect_calls: metrics.reconnect_calls,
+        reconnect_showed: metrics.reconnect_showed,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'client_id,date',
+        ignoreDuplicates: false,
+      });
   }
 
   console.log('Metrics recalculation complete');

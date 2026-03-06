@@ -1,4 +1,4 @@
-import { User, Mail, Phone, DollarSign, Calendar, Tag, ExternalLink, Hash, Globe, FileText, ChevronDown, Link2, StickyNote, Clock, Target, RefreshCw, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, DollarSign, Calendar, Tag, ExternalLink, Hash, Globe, FileText, ChevronDown, Link2, StickyNote, Clock, Target, RefreshCw, Loader2, Sparkles, Building2, MapPin, Banknote } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -90,6 +90,7 @@ export function UniversalRecordPanel({
     opportunity: true,
     attribution: true,
     questions: true,
+    enrichment: false,
     ghl: false,
     timeline: true,
   });
@@ -476,6 +477,101 @@ export function UniversalRecordPanel({
               <Separator />
             </>
           )}
+
+          {/* RetargetIQ Enrichment Data */}
+          {(() => {
+            const customFields = (linkedLead?.custom_fields || record?.custom_fields) as Record<string, any> | null;
+            const enrichment = customFields?.retargetiq;
+            if (!enrichment) return null;
+
+            const enrichedAt = customFields?.retargetiq_enriched_at;
+
+            return (
+              <>
+                <Collapsible open={sectionsOpen.enrichment} onOpenChange={() => toggleSection('enrichment')}>
+                  <CollapsibleTrigger className="flex items-center justify-between w-full py-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors">
+                    <span className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4" />
+                      Enriched Profile
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">RetargetIQ</Badge>
+                    </span>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${sectionsOpen.enrichment ? 'rotate-180' : ''}`} />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-2 space-y-3">
+                    {/* Demographics */}
+                    {(enrichment.age || enrichment.gender || enrichment.marital_status) && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase">Demographics</p>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          {enrichment.age && <p><span className="text-muted-foreground">Age:</span> {enrichment.age}</p>}
+                          {enrichment.gender && <p><span className="text-muted-foreground">Gender:</span> {enrichment.gender}</p>}
+                          {enrichment.marital_status && <p><span className="text-muted-foreground">Marital:</span> {enrichment.marital_status}</p>}
+                          {enrichment.language && <p><span className="text-muted-foreground">Language:</span> {enrichment.language}</p>}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Location */}
+                    {(enrichment.city || enrichment.state || enrichment.address) && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase flex items-center gap-1">
+                          <MapPin className="h-3 w-3" /> Location
+                        </p>
+                        <div className="text-sm space-y-0.5">
+                          {enrichment.address && <p>{enrichment.address}</p>}
+                          {(enrichment.city || enrichment.state || enrichment.zip) && (
+                            <p>{[enrichment.city, enrichment.state, enrichment.zip].filter(Boolean).join(', ')}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Financial */}
+                    {(enrichment.household_income || enrichment.household_net_worth || enrichment.home_value) && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase flex items-center gap-1">
+                          <Banknote className="h-3 w-3" /> Financial
+                        </p>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          {enrichment.household_income && <p><span className="text-muted-foreground">Income:</span> {enrichment.household_income}</p>}
+                          {enrichment.household_net_worth && <p><span className="text-muted-foreground">Net Worth:</span> {enrichment.household_net_worth}</p>}
+                          {enrichment.home_value && <p><span className="text-muted-foreground">Home Value:</span> {enrichment.home_value}</p>}
+                          {enrichment.home_ownership && <p><span className="text-muted-foreground">Ownership:</span> {enrichment.home_ownership}</p>}
+                          {enrichment.credit_range && <p><span className="text-muted-foreground">Credit:</span> {enrichment.credit_range}</p>}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Employment */}
+                    {enrichment.companies?.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase flex items-center gap-1">
+                          <Building2 className="h-3 w-3" /> Employment
+                        </p>
+                        {enrichment.companies.map((c: any, i: number) => (
+                          <div key={i} className="bg-muted/50 p-2 rounded text-sm">
+                            {c.title && <p className="font-medium">{c.title}</p>}
+                            {c.company && <p className="text-muted-foreground">{c.company}</p>}
+                            {c.linkedin_url && (
+                              <a href={c.linkedin_url} target="_blank" rel="noreferrer" className="text-primary text-xs hover:underline">LinkedIn</a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Enriched timestamp */}
+                    {enrichedAt && (
+                      <p className="text-xs text-muted-foreground pt-1">
+                        Enriched {formatDistanceToNow(new Date(enrichedAt), { addSuffix: true })}
+                      </p>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
+                <Separator />
+              </>
+            );
+          })()}
 
           {/* GHL Integration Details */}
           {(ghlNotes?.length || ghlSyncedAt) && (

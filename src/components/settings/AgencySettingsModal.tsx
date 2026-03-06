@@ -17,7 +17,7 @@ import { useAgencySettings, useUpdateAgencySettings } from '@/hooks/useAgencySet
 import { useSyncMeetings } from '@/hooks/useMeetings';
 import { TeamManagementTab } from './TeamManagementTab';
 import { SyncQueueStatus } from './SyncQueueStatus';
-import { Brain, Settings2, Key, DollarSign, Eye, EyeOff, Video, Copy, RefreshCw, Users, Database, Cpu, Code2 } from 'lucide-react';
+import { Brain, Settings2, Key, DollarSign, Eye, EyeOff, Video, Copy, RefreshCw, Users, Database, Cpu, Code2, Sparkles } from 'lucide-react';
 import { ApiReferenceTab } from './ApiReferenceTab';
 
 const OPENAI_MODELS = [
@@ -73,6 +73,11 @@ export function AgencySettingsModal({ open, onOpenChange }: AgencySettingsModalP
   const [meetgeekApiKey, setMeetgeekApiKey] = useState('');
   const [showMeetgeekKey, setShowMeetgeekKey] = useState(false);
   const syncMeetings = useSyncMeetings();
+
+  // RetargetIQ Integration
+  const [retargetiqApiKey, setRetargetiqApiKey] = useState('');
+  const [retargetiqWebsite, setRetargetiqWebsite] = useState('default');
+  const [showRetargetiqKey, setShowRetargetiqKey] = useState(false);
   
   const webhookUrl = `https://jgwwmtuvjlmzapwqiabu.supabase.co/functions/v1/meetgeek-webhook`;
 
@@ -85,6 +90,8 @@ export function AgencySettingsModal({ open, onOpenChange }: AgencySettingsModalP
       setXaiKey((settings as any).xai_api_key || '');
       setApiUsageLimit(String(settings.api_usage_limit || 100));
       setMeetgeekApiKey((settings as any).meetgeek_api_key || '');
+      setRetargetiqApiKey((settings as any).retargetiq_api_key || '');
+      setRetargetiqWebsite((settings as any).retargetiq_website || 'default');
       setSelectedOpenaiModel((settings as any).selected_openai_model || 'gpt-5');
       setSelectedGeminiModel((settings as any).selected_gemini_model || 'gemini-2.5-pro');
       setSelectedGrokModel((settings as any).selected_grok_model || 'grok-3');
@@ -102,6 +109,8 @@ export function AgencySettingsModal({ open, onOpenChange }: AgencySettingsModalP
         xai_api_key: xaiKey || null,
         api_usage_limit: parseFloat(apiUsageLimit) || 100,
         meetgeek_api_key: meetgeekApiKey || null,
+        retargetiq_api_key: retargetiqApiKey || null,
+        retargetiq_website: retargetiqWebsite || 'default',
         selected_openai_model: selectedOpenaiModel,
         selected_gemini_model: selectedGeminiModel,
         selected_grok_model: selectedGrokModel,
@@ -502,6 +511,67 @@ export function AgencySettingsModal({ open, onOpenChange }: AgencySettingsModalP
                   </p>
                 )}
               </div>
+            </div>
+
+            {/* RetargetIQ Integration */}
+            <div className="border-2 border-border p-4 space-y-4">
+              <div>
+                <h4 className="font-medium mb-1 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  RetargetIQ Contact Enrichment
+                </h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Automatically enrich all contact records with demographics, financial data, employment info, and more.
+                  Enriched data syncs back to GHL/HubSpot daily.
+                </p>
+
+                <Label htmlFor="retargetiqKey">API Key</Label>
+                <div className="relative mt-1">
+                  <Input
+                    id="retargetiqKey"
+                    type={showRetargetiqKey ? 'text' : 'password'}
+                    value={retargetiqApiKey}
+                    onChange={(e) => setRetargetiqApiKey(e.target.value)}
+                    placeholder="Your RetargetIQ API key..."
+                    className="font-mono pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full"
+                    onClick={() => setShowRetargetiqKey(!showRetargetiqKey)}
+                  >
+                    {showRetargetiqKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="retargetiqWebsite">Website Slug</Label>
+                <Input
+                  id="retargetiqWebsite"
+                  value={retargetiqWebsite}
+                  onChange={(e) => setRetargetiqWebsite(e.target.value)}
+                  placeholder="your-website-slug"
+                  className="font-mono mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  The website identifier provided by RetargetIQ for your account.
+                </p>
+              </div>
+
+              {retargetiqApiKey && (
+                <div className="bg-muted/50 p-3 rounded text-sm space-y-1">
+                  <p className="font-medium">Enrichment runs automatically during daily sync:</p>
+                  <ul className="text-muted-foreground text-xs space-y-0.5 ml-3 list-disc">
+                    <li>New leads enriched by email or phone</li>
+                    <li>Demographics, financial, employment data added</li>
+                    <li>Enriched data synced back to GHL/HubSpot</li>
+                    <li>View enriched data in any lead's record panel</li>
+                  </ul>
+                </div>
+              )}
             </div>
           </TabsContent>
 

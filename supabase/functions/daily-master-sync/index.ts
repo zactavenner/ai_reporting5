@@ -184,7 +184,43 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Step 6: Meta Token Expiry Check ──
+    // ── Step 6: RetargetIQ Contact Enrichment ──
+    if (!skipSteps.includes("retargetiq")) {
+      const retargetiqKey = Deno.env.get("RETARGETIQ_API_KEY");
+      if (retargetiqKey) {
+        const start = Date.now();
+        console.log(`[daily-master-sync] Step 6: enrich-retargetiq`);
+        const res = await callFunction(supabaseUrl, supabaseKey, "enrich-retargetiq");
+        const duration = Date.now() - start;
+        results.push({
+          step: "enrich-retargetiq",
+          success: res.success,
+          duration_ms: duration,
+          details: `${res.data?.enriched || 0} enriched, ${res.data?.skipped || 0} skipped`,
+          error: res.error,
+        });
+        await new Promise(r => setTimeout(r, 5000));
+
+        // Step 6b: Sync enriched data back to CRM
+        if (res.success && (res.data?.enriched || 0) > 0) {
+          const syncStart = Date.now();
+          console.log(`[daily-master-sync] Step 6b: sync-enrichment-to-crm`);
+          const syncRes = await callFunction(supabaseUrl, supabaseKey, "sync-enrichment-to-crm");
+          results.push({
+            step: "sync-enrichment-to-crm",
+            success: syncRes.success,
+            duration_ms: Date.now() - syncStart,
+            details: `${syncRes.data?.synced || 0} synced back`,
+            error: syncRes.error,
+          });
+          await new Promise(r => setTimeout(r, 5000));
+        }
+      } else {
+        console.log(`[daily-master-sync] Step 6: skipped (RETARGETIQ_API_KEY not configured)`);
+      }
+    }
+
+    // ── Step 7: Meta Token Expiry Check ──
     if (!skipSteps.includes("token_check")) {
       const start = Date.now();
       console.log(`[daily-master-sync] Step 6: Meta token health check`);

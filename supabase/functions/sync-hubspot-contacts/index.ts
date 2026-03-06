@@ -468,8 +468,7 @@ async function syncMeetings(
         ? Math.round((endTime.getTime() - startTime.getTime()) / 1000)
         : null;
 
-      const showed = props.hs_meeting_outcome === 'COMPLETED' || 
-                     props.hs_meeting_outcome === 'SCHEDULED';
+      const showed = props.hs_meeting_outcome === 'COMPLETED';
 
       const call = {
         client_id: clientId,
@@ -586,7 +585,7 @@ async function recalculateRecentMetrics(
         
         const totalValidLeads = (leadsCount || 0) + (nullSpamCount || 0);
         
-        // Count calls
+        // Count calls booked on this day (by booked_at)
         const { count: callsCount } = await supabase
           .from('calls')
           .select('*', { count: 'exact', head: true })
@@ -594,16 +593,26 @@ async function recalculateRecentMetrics(
           .neq('is_reconnect', true)
           .gte('booked_at', dayStart)
           .lte('booked_at', dayEnd);
-        
+
+        // Count showed calls by scheduled_at (actual appointment date they showed up)
         const { count: showedCount } = await supabase
           .from('calls')
           .select('*', { count: 'exact', head: true })
           .eq('client_id', clientId)
           .eq('showed', true)
           .neq('is_reconnect', true)
-          .gte('booked_at', dayStart)
-          .lte('booked_at', dayEnd);
-        
+          .gte('scheduled_at', dayStart)
+          .lte('scheduled_at', dayEnd);
+
+        // Count calls scheduled for this day (by scheduled_at)
+        const { count: callsScheduledCount } = await supabase
+          .from('calls')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .neq('is_reconnect', true)
+          .gte('scheduled_at', dayStart)
+          .lte('scheduled_at', dayEnd);
+
         const { count: reconnectCount } = await supabase
           .from('calls')
           .select('*', { count: 'exact', head: true })
@@ -611,15 +620,16 @@ async function recalculateRecentMetrics(
           .eq('is_reconnect', true)
           .gte('booked_at', dayStart)
           .lte('booked_at', dayEnd);
-        
+
+        // Count reconnect showed by scheduled_at
         const { count: reconnectShowedCount } = await supabase
           .from('calls')
           .select('*', { count: 'exact', head: true })
           .eq('client_id', clientId)
           .eq('is_reconnect', true)
           .eq('showed', true)
-          .gte('booked_at', dayStart)
-          .lte('booked_at', dayEnd);
+          .gte('scheduled_at', dayStart)
+          .lte('scheduled_at', dayEnd);
         
         // Get funded investors
         const { data: fundedData, count: fundedCount } = await supabase
@@ -636,34 +646,38 @@ async function recalculateRecentMetrics(
         const commitmentDollars = (fundedData || []).reduce((sum: number, f: any) => sum + (f.commitment_amount || 0), 0);
         const commitmentCount = (fundedData || []).filter((f: any) => f.commitment_amount && f.commitment_amount > 0).length;
         
-        if (totalValidLeads > 0 || (spamCount || 0) > 0 || (callsCount || 0) > 0 || (reconnectCount || 0) > 0 || (fundedCount || 0) > 0) {
-          // Use upsert to preserve ad_spend, impressions, clicks, ctr from Meta sync
-          const { error: upsertError } = await supabase
-            .from('daily_metrics')
-            .upsert({
-              client_id: clientId,
-              date: dateStr,
-              leads: totalValidLeads,
-              spam_leads: spamCount || 0,
-              calls: callsCount || 0,
-              showed_calls: showedCount || 0,
-              reconnect_calls: reconnectCount || 0,
-              reconnect_showed: reconnectShowedCount || 0,
-              funded_investors: fundedCount || 0,
-              funded_dollars: fundedDollars,
-              commitments: commitmentCount,
-              commitment_dollars: commitmentDollars,
-              updated_at: new Date().toISOString(),
-            }, {
-              onConflict: 'client_id,date',
-              ignoreDuplicates: false,
-            });
-          
-          if (upsertError) {
-            result.errors.push(`Upsert error for ${dateStr}: ${upsertError.message}`);
-          } else {
-            result.daysUpdated++;
-          }
+        // Always upsert to ensure daily_metrics rows exist for every day
+        // Use upsert to preserve ad_spend, impressions, clicks, ctr from Meta sync
+        const { error: upsertError } = await supabase
+          .from('daily_metrics')
+          .upsert({
+            client_id: clientId,
+            date: dateStr,
+            leads: totalValidLeads,
+            spam_leads: spamCount || 0,
+            calls: callsCount || 0,
+            showed_calls: showedCount || 0,
+            reconnect_calls: reconnectCount || 0,
+            reconnect_showed: reconnectShowedCount || 0,
+            funded_investors: fundedCount || 0,
+            funded_dollars: fundedDollars,
+            commitments: commitmentCount,
+            commitment_dollars: commitmentDollars,
+            leads_created: totalValidLeads,
+            calls_scheduled: callsScheduledCount || 0,
+            calls_showed: showedCount || 0,
+            commitments_on_day: commitmentCount,
+            funded_on_day: fundedCount || 0,
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'client_id,date',
+            ignoreDuplicates: false,
+          });
+
+        if (upsertError) {
+          result.errors.push(`Upsert error for ${dateStr}: ${upsertError.message}`);
+        } else {
+          result.daysUpdated++;
         }
       } catch (err) {
         result.errors.push(`Date ${dateStr}: ${err instanceof Error ? err.message : 'Unknown error'}`);
