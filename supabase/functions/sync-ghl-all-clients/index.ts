@@ -54,10 +54,10 @@ Deno.serve(async (req) => {
       const clientResult = { clientId: client.id, name: client.name, contacts: false, calendar: false, pipelines: false, errors: [] as string[] };
       console.log(`[sync-ghl-all-clients] (${i + 1}/${ghlClients.length}) Syncing ${client.name}...`);
 
-      // 1. Sync contacts (leads) - pass sinceDateDays if provided
+      // 1. Sync contacts (leads) - use syncType: "contacts" and default to 14 days for incremental sync
       try {
-        const contactsBody: Record<string, unknown> = { client_id: client.id, mode: "contacts" };
-        if (sinceDateDays) contactsBody.sinceDateDays = sinceDateDays;
+        const effectiveSinceDays = sinceDateDays || 14; // Default to 14 days for daily syncs
+        const contactsBody: Record<string, unknown> = { client_id: client.id, syncType: "contacts", sinceDateDays: effectiveSinceDays };
         
         const res = await fetch(`${supabaseUrl}/functions/v1/sync-ghl-contacts`, {
           method: "POST",

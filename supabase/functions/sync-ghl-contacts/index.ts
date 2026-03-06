@@ -250,6 +250,96 @@ async function fetchGHLContacts(
   };
 }
 
+// --- SEARCH CONTACTS BY DATE (POST /contacts/search) ---
+// Uses the recommended Search Contacts endpoint which supports date filtering and sorting.
+// This ensures we always fetch the most recent contacts first, regardless of total contact count.
+// Falls back to the legacy GET endpoint if the search endpoint fails.
+async function searchGHLContactsByDate(
+  apiKey: string,
+  locationId: string,
+  sinceDate: Date,
+  limit: number = 100,
+  page: number = 1
+): Promise<{ contacts: GHLContact[]; total: number; hasMore: boolean }> {
+  const headers = {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'Version': '2021-07-28',
+  };
+
+  const body = {
+    locationId,
+    page,
+    pageLimit: limit,
+    filters: [
+      {
+        field: 'dateAdded',
+        operator: 'GTE',
+        value: sinceDate.toISOString(),
+      },
+    ],
+    sort: {
+      field: 'dateAdded',
+      direction: 'desc',
+    },
+  };
+
+  const response = await fetchWithRetry(
+    `${GHL_BASE_URL}/contacts/search`,
+    { method: 'POST', headers, body: JSON.stringify(body) }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`GHL Search API error: ${response.status} - ${error}`);
+  }
+
+  const data = await response.json();
+  const contacts: GHLContact[] = data.contacts || [];
+  const total = data.total || data.meta?.total || 0;
+  const hasMore = contacts.length === limit && (page * limit) < total;
+
+  return { contacts, total, hasMore };
+}
+
+// Wrapper that fetches ALL recent contacts using the search endpoint with pagination
+async function fetchAllRecentGHLContacts(
+  apiKey: string,
+  locationId: string,
+  sinceDays: number,
+  maxContacts: number = 10000
+): Promise<{ contacts: GHLContact[]; usedSearchEndpoint: boolean }> {
+  const sinceDate = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
+  const allContacts: GHLContact[] = [];
+
+  try {
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore && allContacts.length < maxContacts) {
+      const result = await searchGHLContactsByDate(apiKey, locationId, sinceDate, 100, page);
+      allContacts.push(...result.contacts);
+      hasMore = result.hasMore;
+      page++;
+
+      console.log(`[searchGHLContacts] Page ${page - 1}: fetched ${result.contacts.length} contacts (total so far: ${allContacts.length}, API total: ${result.total})`);
+
+      // Rate limit: small delay between pages
+      if (hasMore) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+
+    console.log(`[searchGHLContacts] Fetched ${allContacts.length} contacts created since ${sinceDate.toISOString()} using search endpoint`);
+    return { contacts: allContacts, usedSearchEndpoint: true };
+  } catch (err) {
+    // If the search endpoint fails (e.g., not available for this API key type),
+    // fall back to the legacy GET endpoint
+    console.warn(`[searchGHLContacts] Search endpoint failed, falling back to legacy GET: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    return { contacts: [], usedSearchEndpoint: false };
+  }
+}
+
 async function fetchGHLOpportunities(
   apiKey: string,
   locationId: string
@@ -1199,109 +1289,180 @@ async function syncClientContacts(
   }
   console.log(`Pre-fetched ${(existingLeads || []).length} existing leads for lookup`);
 
-  let hasMore = true;
-  let startAfterId: string | undefined;
-  let totalProcessed = 0;
-  const MAX_CONTACTS = syncTimeline ? 500 : 5000; // Higher limit for regular sync to capture all contacts
-
-  // Calculate cutoff date if sinceDateDays is specified
-  const cutoffDate = sinceDateDays ? new Date(Date.now() - sinceDateDays * 24 * 60 * 60 * 1000) : null;
-
-
   // Track contacts that need timeline sync
   const contactsForTimeline: string[] = [];
 
+  // Helper to process a single contact through the sync pipeline
+  const processContact = async (contact: GHLContact) => {
+    try {
+      const contactOpportunity = opportunityByContactId.get(contact.id);
+      const syncResult = await syncContactToDatabase(supabase, client.id, contact, contactOpportunity, {
+        byExternalId: leadsByExternalId,
+        byEmail: leadsByEmail,
+        byPhone: leadsByPhone,
+      });
+      if (syncResult.action === 'created') {
+        result.created++;
+        if (syncResult.leadId) {
+          const newLead = { id: syncResult.leadId, external_id: contact.id, email: contact.email, phone: contact.phone };
+          leadsByExternalId.set(contact.id, newLead);
+          if (contact.email) leadsByEmail.set(contact.email, newLead);
+          if (contact.phone) leadsByPhone.set(contact.phone, newLead);
+        }
+      } else if (syncResult.action === 'updated') result.updated++;
+      else result.skipped++;
+
+      // Fetch and store GHL notes for this contact
+      try {
+        const notes = await fetchGHLNotes(client.ghl_api_key, contact.id);
+        if (notes.length > 0 && syncResult.leadId) {
+          await supabase
+            .from('leads')
+            .update({ ghl_notes: notes })
+            .eq('id', syncResult.leadId);
+        }
+      } catch (noteErr) {
+        // Non-blocking: notes fetch failure shouldn't stop contact sync
+      }
+
+      // Queue for timeline sync if requested
+      if (syncTimeline && contact.id) {
+        contactsForTimeline.push(contact.id);
+      }
+
+      // Check if contact has funded investor tag
+      if (hasFundedInvestorTag(contact)) {
+        const opp = opportunityByContactId.get(contact.id);
+        const created = await createFundedInvestorFromContact(
+          supabase,
+          client.id,
+          contact,
+          syncResult.leadId || null,
+          opp
+        );
+        if (created) result.fundedFromTags++;
+      }
+    } catch (err) {
+      result.errors.push(`Contact ${contact.id}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      result.skipped++;
+    }
+  };
+
+  let totalProcessed = 0;
+
   try {
-    while (hasMore && totalProcessed < MAX_CONTACTS) {
-      const { contacts, nextPageUrl } = await fetchGHLContacts(
+    // STRATEGY: When sinceDateDays is set, use the POST /contacts/search endpoint
+    // which supports date filtering and sorting by dateAdded desc. This ensures we
+    // always get the most recent contacts first, regardless of total contact count.
+    // Falls back to legacy GET /contacts/ if the search endpoint isn't available.
+    if (sinceDateDays) {
+      console.log(`[syncClientContacts] Using search endpoint to fetch contacts from last ${sinceDateDays} days for ${client.name}`);
+
+      const { contacts: recentContacts, usedSearchEndpoint } = await fetchAllRecentGHLContacts(
         client.ghl_api_key,
         client.ghl_location_id,
-        100,
-        startAfterId
+        sinceDateDays,
+        syncTimeline ? 500 : 10000
       );
 
-      console.log(`Fetched ${contacts.length} contacts for ${client.name}`);
+      if (usedSearchEndpoint && recentContacts.length > 0) {
+        console.log(`[syncClientContacts] Search endpoint returned ${recentContacts.length} recent contacts for ${client.name}`);
 
-      for (const contact of contacts) {
-        
-        // If sinceDateDays is set and contact is older than cutoff, skip (but count for total)
-        if (cutoffDate && contact.dateAdded) {
-          const contactDate = new Date(contact.dateAdded);
-          if (contactDate < cutoffDate) {
-            result.skipped++;
-            totalProcessed++;
-            continue;
-          }
+        for (const contact of recentContacts) {
+          await processContact(contact);
+          totalProcessed++;
         }
-        
-        try {
-          // Get opportunity for this contact to sync opportunity data
-          const contactOpportunity = opportunityByContactId.get(contact.id);
-          const syncResult = await syncContactToDatabase(supabase, client.id, contact, contactOpportunity, {
-            byExternalId: leadsByExternalId,
-            byEmail: leadsByEmail,
-            byPhone: leadsByPhone,
-          });
-          if (syncResult.action === 'created') {
-            result.created++;
-            // Update lookup maps for subsequent contacts in this batch
-            if (syncResult.leadId) {
-              const newLead = { id: syncResult.leadId, external_id: contact.id, email: contact.email, phone: contact.phone };
-              leadsByExternalId.set(contact.id, newLead);
-              if (contact.email) leadsByEmail.set(contact.email, newLead);
-              if (contact.phone) leadsByPhone.set(contact.phone, newLead);
-            }
-          } else if (syncResult.action === 'updated') result.updated++;
-          else result.skipped++;
 
-          // Fetch and store GHL notes for this contact
-          try {
-            const notes = await fetchGHLNotes(client.ghl_api_key, contact.id);
-            if (notes.length > 0 && syncResult.leadId) {
-              await supabase
-                .from('leads')
-                .update({ ghl_notes: notes })
-                .eq('id', syncResult.leadId);
-            }
-          } catch (noteErr) {
-            // Non-blocking: notes fetch failure shouldn't stop contact sync
-          }
-
-          // Queue for timeline sync if requested
-          if (syncTimeline && contact.id) {
-            contactsForTimeline.push(contact.id);
-          }
-
-          // Check if contact has funded investor tag
-          if (hasFundedInvestorTag(contact)) {
-            const opp = opportunityByContactId.get(contact.id);
-            const created = await createFundedInvestorFromContact(
-              supabase, 
-              client.id, 
-              contact, 
-              syncResult.leadId || null,
-              opp
-            );
-            if (created) result.fundedFromTags++;
-          }
-        } catch (err) {
-          result.errors.push(`Contact ${contact.id}: ${err instanceof Error ? err.message : 'Unknown error'}`);
-          result.skipped++;
-        }
-        totalProcessed++;
-      }
-
-      if (nextPageUrl && contacts.length === 100) {
-        startAfterId = contacts[contacts.length - 1].id;
+        result.totalApiContacts = recentContacts.length;
+        result.contactsInDateRange = recentContacts.length;
       } else {
-        hasMore = false;
+        // Fallback: use legacy GET endpoint with date-based skip
+        console.log(`[syncClientContacts] Falling back to legacy GET endpoint for ${client.name}`);
+        const cutoffDate = new Date(Date.now() - sinceDateDays * 24 * 60 * 60 * 1000);
+        const MAX_CONTACTS = syncTimeline ? 500 : 20000; // Higher limit to ensure we reach recent contacts
+        let hasMore = true;
+        let startAfterId: string | undefined;
+        let consecutiveOldContacts = 0;
+        const MAX_CONSECUTIVE_OLD = 500; // Stop if we hit 500 old contacts in a row (likely past the recent window)
+
+        while (hasMore && totalProcessed < MAX_CONTACTS) {
+          const { contacts, nextPageUrl } = await fetchGHLContacts(
+            client.ghl_api_key,
+            client.ghl_location_id,
+            100,
+            startAfterId
+          );
+
+          console.log(`Fetched ${contacts.length} contacts for ${client.name} (legacy fallback)`);
+
+          for (const contact of contacts) {
+            if (cutoffDate && contact.dateAdded) {
+              const contactDate = new Date(contact.dateAdded);
+              if (contactDate < cutoffDate) {
+                result.skipped++;
+                totalProcessed++;
+                consecutiveOldContacts++;
+                // Early stop: if we've seen many consecutive old contacts, the rest are likely old too
+                if (consecutiveOldContacts >= MAX_CONSECUTIVE_OLD) {
+                  console.log(`[syncClientContacts] Hit ${MAX_CONSECUTIVE_OLD} consecutive old contacts, stopping pagination early for ${client.name}`);
+                  hasMore = false;
+                  break;
+                }
+                continue;
+              }
+              consecutiveOldContacts = 0; // Reset counter when we find a recent contact
+            }
+
+            await processContact(contact);
+            totalProcessed++;
+            consecutiveOldContacts = 0;
+          }
+
+          if (hasMore && nextPageUrl && contacts.length === 100) {
+            startAfterId = contacts[contacts.length - 1].id;
+          } else {
+            hasMore = false;
+          }
+
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        result.totalApiContacts = totalProcessed;
+        result.contactsInDateRange = totalProcessed - result.skipped;
+      }
+    } else {
+      // No sinceDateDays: full sync using legacy GET endpoint with higher limit
+      const MAX_CONTACTS = syncTimeline ? 500 : 20000;
+      let hasMore = true;
+      let startAfterId: string | undefined;
+
+      while (hasMore && totalProcessed < MAX_CONTACTS) {
+        const { contacts, nextPageUrl } = await fetchGHLContacts(
+          client.ghl_api_key,
+          client.ghl_location_id,
+          100,
+          startAfterId
+        );
+
+        console.log(`Fetched ${contacts.length} contacts for ${client.name}`);
+
+        for (const contact of contacts) {
+          await processContact(contact);
+          totalProcessed++;
+        }
+
+        if (nextPageUrl && contacts.length === 100) {
+          startAfterId = contacts[contacts.length - 1].id;
+        } else {
+          hasMore = false;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      result.totalApiContacts = totalProcessed;
+      result.contactsInDateRange = totalProcessed;
     }
-    
-    result.totalApiContacts = totalProcessed;
-    result.contactsInDateRange = totalProcessed;
     
     // Sync timeline for queued contacts (in batches to avoid timeout)
     if (syncTimeline && contactsForTimeline.length > 0) {
