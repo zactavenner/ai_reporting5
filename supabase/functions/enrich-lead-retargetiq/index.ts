@@ -51,6 +51,7 @@ Deno.serve(async (req) => {
       // Clean phone number - digits only
       const cleanPhone = phone.replace(/\D/g, '');
       if (cleanPhone.length >= 10) {
+        console.log(`[RetargetIQ] Enriching by phone: ${cleanPhone}, website: ${slug}`);
         const res = await fetch('https://app.retargetiq.com/api/v2/GetDataByPhone', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -61,10 +62,17 @@ Deno.serve(async (req) => {
           }),
         });
 
+        const responseText = await res.text();
+        console.log(`[RetargetIQ] Phone response (${res.status}): ${responseText.substring(0, 500)}`);
+        
         if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.data?.identities?.length > 0) {
-            enrichData = data.data.identities[0];
+          try {
+            const data = JSON.parse(responseText);
+            if (data.success && data.data?.identities?.length > 0) {
+              enrichData = data.data.identities[0];
+            }
+          } catch (e) {
+            console.error('[RetargetIQ] Failed to parse phone response:', e);
           }
         }
       }
