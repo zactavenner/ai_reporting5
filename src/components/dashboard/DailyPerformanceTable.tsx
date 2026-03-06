@@ -128,32 +128,32 @@ export function DailyPerformanceTable({ dailyMetrics, onExportCSV, clientName = 
 
   if (dailyMetrics.length === 0) {
     return (
-      <div className="border-2 border-border bg-card p-4">
-        <div className="flex items-center justify-between mb-4">
+      <div className="border border-border bg-card rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div>
-            <h3 className="font-bold text-lg">Daily Performance Data</h3>
-            <p className="text-sm text-muted-foreground">Detailed metrics by date</p>
+            <h3 className="font-semibold text-base tracking-tight">Daily Performance</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Detailed metrics by date</p>
           </div>
           <Button variant="outline" size="sm" onClick={onExportCSV}>
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
         </div>
-        <div className="text-center py-8 text-muted-foreground">
+        <div className="text-center py-12 text-muted-foreground">
           <p>No data available yet</p>
-          <p className="text-sm">Configure webhooks or import CSV to add data</p>
+          <p className="text-xs mt-1">Configure webhooks or import CSV to add data</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="border-2 border-border bg-card p-4">
-      <div className="flex items-center justify-between mb-4">
+    <div className="border border-border bg-card rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
         <div>
-          <h3 className="font-bold text-lg">Daily Performance Data</h3>
-          <p className="text-sm text-muted-foreground">
-            Detailed metrics by date • Showing {paginatedMetrics.length} of {sortedMetrics.length} days
+          <h3 className="font-semibold text-base tracking-tight">Daily Performance</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {paginatedMetrics.length} of {sortedMetrics.length} days
           </p>
         </div>
         <DropdownMenu>
@@ -177,7 +177,7 @@ export function DailyPerformanceTable({ dailyMetrics, onExportCSV, clientName = 
       </div>
 
       {/* Sparkline Trend Row */}
-      <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
+      <div className="mx-5 mt-4 mb-4 p-3 bg-muted/30 rounded-lg border border-border/50">
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium">14-Day Trends</span>
@@ -214,47 +214,47 @@ export function DailyPerformanceTable({ dailyMetrics, onExportCSV, clientName = 
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto px-5">
         <Table>
           <TableHeader>
-            <TableRow className="border-b-2">
-              <TableHead className="font-bold whitespace-nowrap">Date</TableHead>
-              <TableHead className="font-bold text-right whitespace-nowrap">Ad Spend</TableHead>
-              <TableHead className="font-bold text-right whitespace-nowrap">Leads</TableHead>
-              <TableHead className="font-bold text-right whitespace-nowrap">CPL</TableHead>
-              <TableHead className="font-bold text-right whitespace-nowrap">Calls</TableHead>
-              <TableHead className="font-bold text-right whitespace-nowrap">Cost/Call</TableHead>
-              <TableHead className="font-bold text-right whitespace-nowrap">Showed</TableHead>
-              <TableHead className="font-bold text-right whitespace-nowrap">Show %</TableHead>
-              <TableHead className="font-bold text-right whitespace-nowrap">Cost/Show</TableHead>
-              <TableHead className="font-bold text-right whitespace-nowrap">Commits</TableHead>
-              <TableHead className="font-bold text-right whitespace-nowrap">Commit $</TableHead>
-              <TableHead className="font-bold text-right whitespace-nowrap">Funded</TableHead>
-              <TableHead className="font-bold text-right whitespace-nowrap">Funded $</TableHead>
-              <TableHead className="font-bold text-right whitespace-nowrap">Cost/Investor</TableHead>
-              <TableHead className="font-bold text-right whitespace-nowrap">CoC %</TableHead>
+            <TableRow className="border-b border-border hover:bg-transparent">
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Date</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">Spend</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">Leads</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">CPL</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">Calls</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">$/Call</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">Showed</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">Show%</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">$/Show</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">Commits</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">Commit$</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">Funded</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">Funded$</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">$/Inv</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right whitespace-nowrap">CoC%</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedMetrics.map((day: DailyMetric) => {
+            {paginatedMetrics.map((day: DailyMetric, idx: number) => {
               const computed = getComputedMetrics(day);
               return (
-                <TableRow key={day.id} className="border-b">
-                  <TableCell className="font-medium whitespace-nowrap">{day.date}</TableCell>
-                  <TableCell className="text-right font-mono">${Number(day.ad_spend).toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-mono">{day.leads || 0}</TableCell>
-                  <TableCell className="text-right font-mono">${computed.cpl.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-mono">{day.calls || 0}</TableCell>
-                  <TableCell className="text-right font-mono">${computed.costPerCall.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-mono">{day.showed_calls || 0}</TableCell>
-                  <TableCell className="text-right font-mono">{computed.showRate.toFixed(1)}%</TableCell>
-                  <TableCell className="text-right font-mono">${computed.costPerShow.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-mono">{day.commitments || 0}</TableCell>
-                  <TableCell className="text-right font-mono">${Number(day.commitment_dollars || 0).toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-mono">{day.funded_investors || 0}</TableCell>
-                  <TableCell className="text-right font-mono text-chart-2">${Number(day.funded_dollars || 0).toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-mono">${computed.costPerInvestor.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-mono">{computed.costOfCapital.toFixed(2)}%</TableCell>
+                <TableRow key={day.id} className={idx % 2 === 0 ? 'bg-transparent' : 'bg-muted/30'}>
+                  <TableCell className="font-medium whitespace-nowrap text-sm">{day.date}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">${Number(day.ad_spend).toFixed(0)}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">{day.leads || 0}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">${computed.cpl.toFixed(0)}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">{day.calls || 0}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">${computed.costPerCall.toFixed(0)}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">{day.showed_calls || 0}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">{computed.showRate.toFixed(0)}%</TableCell>
+                  <TableCell className="text-right font-mono text-sm">${computed.costPerShow.toFixed(0)}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">{day.commitments || 0}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">${Number(day.commitment_dollars || 0).toLocaleString()}</TableCell>
+                  <TableCell className="text-right font-mono text-sm font-semibold">{day.funded_investors || 0}</TableCell>
+                  <TableCell className="text-right font-mono text-sm text-emerald-400 font-semibold">${Number(day.funded_dollars || 0).toLocaleString()}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">${computed.costPerInvestor.toFixed(0)}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">{computed.costOfCapital.toFixed(1)}%</TableCell>
                 </TableRow>
               );
             })}
@@ -264,8 +264,8 @@ export function DailyPerformanceTable({ dailyMetrics, onExportCSV, clientName = 
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-          <p className="text-sm text-muted-foreground">
+        <div className="flex items-center justify-between px-5 py-3 border-t border-border">
+          <p className="text-xs text-muted-foreground">
             Page {currentPage + 1} of {totalPages}
           </p>
           <div className="flex items-center gap-2">

@@ -399,8 +399,20 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
     }
   };
 
-  // Color coding removed — all values render plain
-  const getKpiColorClass = (_metric: MetricRowConfig, _value: number): string => {
+  // Color coding for cost metrics based on client thresholds
+  const getKpiColorClass = (metric: MetricRowConfig, value: number): string => {
+    if (!thresholds || value === 0) return '';
+    const key = metric.key;
+    if (key === 'cpl' && thresholds.cpl_threshold_red && value > thresholds.cpl_threshold_red) return 'text-destructive font-medium';
+    if (key === 'cpl' && thresholds.cpl_threshold_yellow && value > thresholds.cpl_threshold_yellow) return 'text-amber-500 font-medium';
+    if (key === 'costPerCall' && thresholds.cost_per_call_threshold_red && value > thresholds.cost_per_call_threshold_red) return 'text-destructive font-medium';
+    if (key === 'costPerCall' && thresholds.cost_per_call_threshold_yellow && value > thresholds.cost_per_call_threshold_yellow) return 'text-amber-500 font-medium';
+    if (key === 'costPerShow' && thresholds.cost_per_show_threshold_red && value > thresholds.cost_per_show_threshold_red) return 'text-destructive font-medium';
+    if (key === 'costPerShow' && thresholds.cost_per_show_threshold_yellow && value > thresholds.cost_per_show_threshold_yellow) return 'text-amber-500 font-medium';
+    if (key === 'costPerInvestor' && thresholds.cost_per_investor_threshold_red && value > thresholds.cost_per_investor_threshold_red) return 'text-destructive font-medium';
+    if (key === 'costPerInvestor' && thresholds.cost_per_investor_threshold_yellow && value > thresholds.cost_per_investor_threshold_yellow) return 'text-amber-500 font-medium';
+    if (key === 'costOfCapital' && thresholds.cost_of_capital_threshold_red && value > thresholds.cost_of_capital_threshold_red) return 'text-destructive font-medium';
+    if (key === 'costOfCapital' && thresholds.cost_of_capital_threshold_yellow && value > thresholds.cost_of_capital_threshold_yellow) return 'text-amber-500 font-medium';
     return '';
   };
 
@@ -474,14 +486,14 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
   }
 
   return (
-    <section className="border border-border bg-card p-3">
-      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+    <section className="border border-border bg-card rounded-lg shadow-sm">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-wrap gap-2">
         <div>
-          <h3 className="font-bold text-lg">
-            {periodLabels[periodType]} Performance Summary
+          <h3 className="font-semibold text-lg tracking-tight">
+            {periodLabels[periodType]} Performance
           </h3>
-          <p className="text-xs text-muted-foreground">
-            Aggregated metrics by {periodType === 'daily' ? 'day' : periodType === 'weekly' ? 'week' : 'month'} for {selectedYear}
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {selectedYear} {periodType === 'daily' ? 'daily' : periodType === 'weekly' ? 'weekly' : 'monthly'} breakdown
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -570,45 +582,46 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
           )}
 
           {/* Transposed Table: Metrics as rows, Periods as columns */}
-          <div className="overflow-x-auto -mx-2">
-            <Table className="text-sm">
+          <div className="overflow-x-auto">
+            <Table className="text-sm font-mono">
               <TableHeader>
-                <TableRow className="border-b">
-                  <TableHead className="font-bold whitespace-nowrap sticky left-0 bg-card z-10 w-[100px] py-2 px-2 text-left">
+                <TableRow className="border-b-2 border-border">
+                  <TableHead className="font-semibold whitespace-nowrap sticky left-0 bg-card z-10 w-[120px] py-2.5 px-4 text-left font-sans">
                     Metric
                   </TableHead>
-                  <TableHead className="font-bold text-right whitespace-nowrap bg-muted/30 py-2 px-3">
+                  <TableHead className="font-semibold text-right whitespace-nowrap bg-muted/40 py-2.5 px-4 border-x border-border">
                     TOTAL
                   </TableHead>
                   {displayStats.map(period => (
-                    <TableHead key={period.period} className="font-bold text-right whitespace-nowrap py-2 px-3">
+                    <TableHead key={period.period} className="font-semibold text-right whitespace-nowrap py-2.5 px-4 text-xs">
                       {period.periodLabel}
                     </TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {METRIC_ROWS.map((metric) => {
+                {METRIC_ROWS.map((metric, idx) => {
                   const totalValue = totals[metric.key] as number;
-                  const totalColorClass = metric.highlight ? 'text-success font-semibold' : getKpiColorClass(metric, totalValue);
-                  
+                  const totalColorClass = metric.highlight ? 'text-emerald-500 font-semibold' : getKpiColorClass(metric, totalValue);
+                  const isEven = idx % 2 === 0;
+
                   return (
-                    <TableRow key={metric.key} className={metric.highlight ? 'bg-success/5' : ''}>
-                      <TableCell className="font-medium whitespace-nowrap sticky left-0 bg-card z-10 py-1.5 px-2 text-left">
+                    <TableRow key={metric.key} className={`${metric.highlight ? 'bg-emerald-500/5' : isEven ? 'bg-muted/10' : ''} hover:bg-muted/20 transition-colors`}>
+                      <TableCell className="font-medium whitespace-nowrap sticky left-0 bg-card z-10 py-2 px-4 text-left text-xs font-sans tracking-wide uppercase text-muted-foreground">
                         {metric.label}
                       </TableCell>
-                      <TableCell className="text-right bg-muted/30 py-1.5 px-3 font-semibold">
+                      <TableCell className="text-right bg-muted/40 py-2 px-4 font-semibold border-x border-border">
                         <span className={totalColorClass}>
                           {metric.format(totalValue)}
                         </span>
                       </TableCell>
                       {displayStats.map(period => {
                         const value = period[metric.key] as number;
-                        const colorClass = metric.highlight ? 'text-success font-semibold' : getKpiColorClass(metric, value);
-                        
+                        const colorClass = metric.highlight ? 'text-emerald-500 font-semibold' : getKpiColorClass(metric, value);
+
                         return (
-                          <TableCell key={period.period} className="text-right py-1.5 px-3">
-                            {metric.editable 
+                          <TableCell key={period.period} className="text-right py-2 px-4">
+                            {metric.editable
                               ? renderEditableCell(period, metric, value)
                               : <span className={colorClass}>{metric.format(value)}</span>
                             }
