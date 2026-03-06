@@ -3647,6 +3647,58 @@ serve(async (req) => {
 
     console.log(`GHL sync complete: ${totalContactsCreated} contacts created, ${totalContactsUpdated} updated, ${totalFundedFromTags} funded from tags, ${totalFundedFromPipeline} funded from pipeline, ${totalCommittedFromPipeline} committed from pipeline, ${totalCallsCreated} calls created, ${totalCallsUpdated} calls updated, ${totalCallsEnriched} calls enriched, ${totalTimelineSynced} timelines synced`);
 
+    // Background: Auto-enrich newly created contacts via RetargetIQ
+    if (totalContactsCreated > 0 && typeof EdgeRuntime !== 'undefined') {
+      EdgeRuntime.waitUntil((async () => {
+        try {
+          for (const client of clients) {
+            // Check if auto-enrich is enabled
+            const { data: cs } = await supabase
+              .from('client_settings')
+              .select('retargetiq_auto_enrich, retargetiq_website_slug')
+              .eq('client_id', client.id)
+              .single();
+            
+            if (!cs?.retargetiq_auto_enrich || !cs?.retargetiq_website_slug) continue;
+            
+            // Get recently created leads that don't have enrichment yet
+            const { data: unenriched } = await supabase
+              .from('leads')
+              .select('id, external_id, phone, email')
+              .eq('client_id', client.id)
+              .not('external_id', 'in', `(select external_id from lead_enrichment where client_id = '${client.id}')`)
+              .order('created_at', { ascending: false })
+              .limit(50);
+            
+            if (!unenriched || unenriched.length === 0) continue;
+            
+            console.log(`[RetargetIQ] Auto-enriching ${unenriched.length} leads for ${client.name}`);
+            
+            for (const lead of unenriched) {
+              if (!lead.phone && !lead.email) continue;
+              try {
+                await supabase.functions.invoke('enrich-lead-retargetiq', {
+                  body: {
+                    client_id: client.id,
+                    lead_id: lead.id,
+                    external_id: lead.external_id,
+                    phone: lead.phone,
+                    email: lead.email,
+                  },
+                });
+                // Rate limit: 200ms between calls
+                await new Promise(r => setTimeout(r, 200));
+              } catch (e) {
+                console.error(`[RetargetIQ] Failed to enrich ${lead.external_id}:`, e);
+              }
+            }
+          }
+        } catch (e) {
+          console.error('[RetargetIQ] Auto-enrich background task failed:', e);
+        }
+      })());
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
