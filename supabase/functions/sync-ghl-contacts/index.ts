@@ -1246,8 +1246,8 @@ async function syncClientContacts(
     }
     
     // HOURLY PIPELINE SYNC: Sync pipeline opportunities to create funded/committed investors
-    // This runs on every hourly sync to catch new funded investors from pipeline stages
-    if (fundedPipelineId) {
+    // Skip this in lightweight lead-only sync mode
+    if (!lightweightLeadSync && fundedPipelineId) {
       console.log(`Running incremental pipeline sync for ${client.name}...`);
       const pipelineResult = await syncPipelineOpportunitiesIncremental(
         supabase,
@@ -1264,8 +1264,8 @@ async function syncClientContacts(
     }
     
     // HOURLY CALENDAR SYNC: Sync appointments from configured calendars
-    // This runs on every sync to catch new booked calls and reconnects
-    if (trackedCalendarIds.length > 0 || reconnectCalendarIds.length > 0) {
+    // Skip this in lightweight lead-only sync mode
+    if (!lightweightLeadSync && (trackedCalendarIds.length > 0 || reconnectCalendarIds.length > 0)) {
       console.log(`Running incremental calendar sync for ${client.name}: tracked=${trackedCalendarIds.length}, reconnect=${reconnectCalendarIds.length}`);
       try {
         const callResult = await syncAllCalendarAppointments(
@@ -1287,17 +1287,19 @@ async function syncClientContacts(
     }
     
     // HOURLY METRICS UPDATE: Recalculate daily_metrics for recent days
-    // This ensures KPIs stay up-to-date after every hourly sync
-    console.log(`Recalculating recent daily_metrics for ${client.name}...`);
-    try {
-      const metricsResult = await recalculateRecentMetrics(supabase, client.id, 7); // Last 7 days
-      console.log(`Metrics update for ${client.name}: ${metricsResult.daysUpdated} days updated`);
-      if (metricsResult.errors.length > 0) {
-        result.errors.push(...metricsResult.errors.slice(0, 3));
+    // Skip this in lightweight lead-only sync mode
+    if (!lightweightLeadSync) {
+      console.log(`Recalculating recent daily_metrics for ${client.name}...`);
+      try {
+        const metricsResult = await recalculateRecentMetrics(supabase, client.id, 7); // Last 7 days
+        console.log(`Metrics update for ${client.name}: ${metricsResult.daysUpdated} days updated`);
+        if (metricsResult.errors.length > 0) {
+          result.errors.push(...metricsResult.errors.slice(0, 3));
+        }
+      } catch (err) {
+        console.error(`Metrics recalculation error for ${client.name}:`, err);
+        result.errors.push(`Metrics recalc failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
-    } catch (err) {
-      console.error(`Metrics recalculation error for ${client.name}:`, err);
-      result.errors.push(`Metrics recalc failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
     
   } catch (err) {
