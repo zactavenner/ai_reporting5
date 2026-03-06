@@ -2925,6 +2925,13 @@ serve(async (req) => {
       singleContactId = body?.contactId || null;
       mode = body?.mode || null;
       syncTimeline = body?.syncTimeline === true;
+
+      // Backward compatibility: accept mode as sync selector for orchestrators
+      if (!body?.syncType && typeof mode === 'string') {
+        if (mode === 'contacts') syncType = 'contacts';
+        if (mode === 'calls') syncType = 'calls';
+        if (mode === 'all') syncType = 'all';
+      }
       
       // Support historical sync with sinceDateDays parameter (default: 7, max: 365)
       if (body?.sinceDateDays) {
