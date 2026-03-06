@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { client_id, lead_id, external_id, phone, email, website_slug, mode } = await req.json();
+    const { client_id, lead_id, external_id, phone, email, address, city, state, zip, website_slug, mode, first_name, last_name } = await req.json();
 
     const apiKey = Deno.env.get('RETARGETIQ_API_KEY');
     if (!apiKey) {
@@ -38,38 +38,32 @@ Deno.serve(async (req) => {
     }
 
     if (!slug) {
-      return new Response(JSON.stringify({ success: false, error: 'RetargetIQ website slug not configured. Set it in client settings.' }), {
+      return new Response(JSON.stringify({ success: false, error: 'RetargetIQ website slug not configured.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Determine which endpoint to use
     let enrichData: any = null;
 
-    if (phone) {
-      // Clean phone number - digits only
+    // 1) Try phone first
+    if (!enrichData && phone) {
       const cleanPhone = phone.replace(/\D/g, '');
       if (cleanPhone.length >= 10) {
         console.log(`[RetargetIQ] Enriching by phone: ${cleanPhone}, website: ${slug}`);
         const res = await fetch('https://app.retargetiq.com/api/v2/GetDataByPhone', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            api_key: apiKey,
-            website: slug,
-            phone: cleanPhone,
-          }),
+          body: JSON.stringify({ api_key: apiKey, website: slug, phone: cleanPhone }),
         });
-
         const responseText = await res.text();
         console.log(`[RetargetIQ] Phone response (${res.status}): ${responseText.substring(0, 500)}`);
-        
         if (res.ok) {
           try {
             const data = JSON.parse(responseText);
             if (data.success && data.data?.identities?.length > 0) {
               enrichData = data.data.identities[0];
+              console.log(`[RetargetIQ] ✓ Phone match found`);
             }
           } catch (e) {
             console.error('[RetargetIQ] Failed to parse phone response:', e);
@@ -78,22 +72,56 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fallback to email if phone didn't work
+    // 2) Fallback to email
     if (!enrichData && email) {
+      console.log(`[RetargetIQ] Enriching by email: ${email}`);
       const res = await fetch('https://app.retargetiq.com/api/v2/GetDataByEmail', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          api_key: apiKey,
-          website: slug,
-          email: email,
-        }),
+        body: JSON.stringify({ api_key: apiKey, website: slug, email: email.trim() }),
       });
-
+      const responseText = await res.text();
+      console.log(`[RetargetIQ] Email response (${res.status}): ${responseText.substring(0, 500)}`);
       if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.data?.identities?.length > 0) {
-          enrichData = data.data.identities[0];
+        try {
+          const data = JSON.parse(responseText);
+          if (data.success && data.data?.identities?.length > 0) {
+            enrichData = data.data.identities[0];
+            console.log(`[RetargetIQ] ✓ Email match found`);
+          }
+        } catch (e) {
+          console.error('[RetargetIQ] Failed to parse email response:', e);
+        }
+      }
+    }
+
+    // 3) Fallback to address (name + address)
+    if (!enrichData && (address || (city && state))) {
+      const addressQuery: any = { api_key: apiKey, website: slug };
+      if (first_name) addressQuery.firstName = first_name;
+      if (last_name) addressQuery.lastName = last_name;
+      if (address) addressQuery.address = address;
+      if (city) addressQuery.city = city;
+      if (state) addressQuery.state = state;
+      if (zip) addressQuery.zip = zip;
+
+      console.log(`[RetargetIQ] Enriching by address: ${JSON.stringify(addressQuery)}`);
+      const res = await fetch('https://app.retargetiq.com/api/v2/GetDataByAddress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(addressQuery),
+      });
+      const responseText = await res.text();
+      console.log(`[RetargetIQ] Address response (${res.status}): ${responseText.substring(0, 500)}`);
+      if (res.ok) {
+        try {
+          const data = JSON.parse(responseText);
+          if (data.success && data.data?.identities?.length > 0) {
+            enrichData = data.data.identities[0];
+            console.log(`[RetargetIQ] ✓ Address match found`);
+          }
+        } catch (e) {
+          console.error('[RetargetIQ] Failed to parse address response:', e);
         }
       }
     }
@@ -143,6 +171,69 @@ Deno.serve(async (req) => {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Write enrichment data back to leads table if we have a lead_id or external_id
+    if (lead_id || external_id) {
+      const leadUpdate: any = {};
+      
+      // Add enriched phone if lead doesn't have one
+      if (enrichData.phones?.length > 0) {
+        const bestPhone = enrichData.phones[0]?.phone || enrichData.phones[0];
+        if (bestPhone) leadUpdate.phone = bestPhone;
+      }
+      
+      // Add enriched email if lead doesn't have one
+      if (enrichData.emails?.length > 0) {
+        const bestEmail = enrichData.emails[0]?.email || enrichData.emails[0];
+        if (bestEmail) leadUpdate.email = bestEmail;
+      }
+      
+      // Add name if available
+      if (enrichData.firstName || enrichData.lastName) {
+        const fullName = [enrichData.firstName, enrichData.lastName].filter(Boolean).join(' ');
+        if (fullName) leadUpdate.name = fullName;
+      }
+
+      if (Object.keys(leadUpdate).length > 0) {
+        // Only update fields that are currently null/empty
+        if (lead_id) {
+          const { data: existingLead } = await supabase
+            .from('leads')
+            .select('name, phone, email')
+            .eq('id', lead_id)
+            .single();
+          
+          if (existingLead) {
+            if (existingLead.phone) delete leadUpdate.phone;
+            if (existingLead.email) delete leadUpdate.email;
+            if (existingLead.name) delete leadUpdate.name;
+          }
+          
+          if (Object.keys(leadUpdate).length > 0) {
+            await supabase.from('leads').update(leadUpdate).eq('id', lead_id);
+            console.log(`[RetargetIQ] Updated lead ${lead_id} with enriched data:`, leadUpdate);
+          }
+        } else if (external_id && client_id) {
+          const { data: existingLead } = await supabase
+            .from('leads')
+            .select('id, name, phone, email')
+            .eq('external_id', external_id)
+            .eq('client_id', client_id)
+            .single();
+          
+          if (existingLead) {
+            if (existingLead.phone) delete leadUpdate.phone;
+            if (existingLead.email) delete leadUpdate.email;
+            if (existingLead.name) delete leadUpdate.name;
+            
+            if (Object.keys(leadUpdate).length > 0) {
+              await supabase.from('leads').update(leadUpdate).eq('id', existingLead.id);
+              console.log(`[RetargetIQ] Updated lead ${existingLead.id} with enriched data:`, leadUpdate);
+            }
+          }
+        }
+      }
     }
 
     return new Response(JSON.stringify({ success: true, enrichment: upserted }), {
