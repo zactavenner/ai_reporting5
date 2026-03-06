@@ -31,6 +31,8 @@ export function useSyncClient(clientId: string | undefined) {
     queryClient.invalidateQueries({ queryKey: ['sync-health', clientId] });
     queryClient.invalidateQueries({ queryKey: ['gap-leads'] });
     queryClient.invalidateQueries({ queryKey: ['data-discrepancies'] });
+    queryClient.invalidateQueries({ queryKey: ['contact-timeline'] });
+    queryClient.invalidateQueries({ queryKey: ['funded-investors'] });
   }, [queryClient, clientId]);
 
   const syncLeads = useCallback(async (): Promise<SyncResult> => {

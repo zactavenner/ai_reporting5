@@ -1164,12 +1164,25 @@ async function syncClientContacts(
           if (syncResult.action === 'created') result.created++;
           else if (syncResult.action === 'updated') result.updated++;
           else result.skipped++;
-          
+
+          // Fetch and store GHL notes for this contact
+          try {
+            const notes = await fetchGHLNotes(client.ghl_api_key, contact.id);
+            if (notes.length > 0 && syncResult.leadId) {
+              await supabase
+                .from('leads')
+                .update({ ghl_notes: notes })
+                .eq('id', syncResult.leadId);
+            }
+          } catch (noteErr) {
+            // Non-blocking: notes fetch failure shouldn't stop contact sync
+          }
+
           // Queue for timeline sync if requested
           if (syncTimeline && contact.id) {
             contactsForTimeline.push(contact.id);
           }
-          
+
           // Check if contact has funded investor tag
           if (hasFundedInvestorTag(contact)) {
             const opp = opportunityByContactId.get(contact.id);
@@ -2084,8 +2097,8 @@ async function syncAllContactsUnlimited(
   client: { id: string; name: string; ghl_api_key: string; ghl_location_id: string },
   fundedStageIds: string[],
   committedStageIds: string[]
-): Promise<{ created: number; updated: number; fundedFromTags: number; errors: string[] }> {
-  const result = { created: 0, updated: 0, fundedFromTags: 0, errors: [] as string[] };
+): Promise<{ created: number; updated: number; fundedFromTags: number; notesSynced: number; timelineSynced: number; errors: string[] }> {
+  const result = { created: 0, updated: 0, fundedFromTags: 0, notesSynced: 0, timelineSynced: 0, errors: [] as string[] };
   
   console.log(`Starting unlimited contact sync for client: ${client.name}`);
   
@@ -2125,10 +2138,25 @@ async function syncAllContactsUnlimited(
         try {
           const contactOpportunity = opportunityByContactId.get(contact.id);
           const syncResult = await syncContactToDatabase(supabase, client.id, contact, contactOpportunity);
-          
+
           if (syncResult.action === 'created') result.created++;
           else if (syncResult.action === 'updated') result.updated++;
-          
+
+          // Fetch and store GHL notes for this contact
+          try {
+            const notes = await fetchGHLNotes(client.ghl_api_key, contact.id);
+            if (notes.length > 0 && syncResult.leadId) {
+              await supabase
+                .from('leads')
+                .update({ ghl_notes: notes })
+                .eq('id', syncResult.leadId);
+              result.notesSynced++;
+            }
+          } catch (noteErr) {
+            // Non-blocking: notes fetch failure shouldn't stop contact sync
+            console.error(`Notes fetch failed for contact ${contact.id}:`, noteErr);
+          }
+
           // Check for funded investor tag
           if (hasFundedInvestorTag(contact)) {
             const created = await createFundedInvestorFromContact(
@@ -2160,7 +2188,57 @@ async function syncAllContactsUnlimited(
     result.errors.push(`Sync failed: ${errorMsg}`);
   }
   
-  console.log(`Unlimited contact sync complete: created=${result.created}, updated=${result.updated}, fundedFromTags=${result.fundedFromTags}`);
+  // Sync timeline for recently created/updated contacts (batch to avoid timeout)
+  // Only sync timeline for contacts that were created or updated (not all 10K)
+  if (result.created + result.updated > 0 && client.ghl_location_id) {
+    console.log(`Syncing timeline for up to 50 recently synced contacts...`);
+
+    // Get the most recently updated leads to sync timeline for
+    const { data: recentLeads } = await supabase
+      .from('leads')
+      .select('external_id')
+      .eq('client_id', client.id)
+      .not('external_id', 'is', null)
+      .order('updated_at', { ascending: false })
+      .limit(50);
+
+    if (recentLeads && recentLeads.length > 0) {
+      const BATCH_SIZE = 5;
+      for (let i = 0; i < recentLeads.length; i += BATCH_SIZE) {
+        const batch = recentLeads.slice(i, i + BATCH_SIZE);
+
+        await Promise.allSettled(
+          batch.map(async (lead: { external_id: string }) => {
+            try {
+              const timelineResult = await syncContactDeepTimeline(
+                supabase,
+                client.id,
+                lead.external_id,
+                client.ghl_api_key,
+                client.ghl_location_id
+              );
+              if (timelineResult.success) {
+                result.timelineSynced++;
+              }
+            } catch (err) {
+              console.error(`Timeline sync error for ${lead.external_id}:`, err);
+            }
+          })
+        );
+
+        // Rate limiting between batches
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+
+    // Update last_timeline_sync_at
+    await supabase
+      .from('clients')
+      .update({ last_timeline_sync_at: new Date().toISOString() })
+      .eq('id', client.id);
+  }
+
+  console.log(`Unlimited contact sync complete: created=${result.created}, updated=${result.updated}, fundedFromTags=${result.fundedFromTags}, notesSynced=${result.notesSynced}, timelineSynced=${result.timelineSynced}`);
   return result;
 }
 
@@ -3247,6 +3325,8 @@ serve(async (req) => {
           funded_investors_created: 0,
           opportunities_synced: 0,
           orphaned_calls_linked: 0,
+          notes_synced: 0,
+          timelines_synced: 0,
           discrepancies_cleared: 0,
           metrics_days_updated: 0,
           errors: [] as string[],
@@ -3260,6 +3340,8 @@ serve(async (req) => {
             summary.contacts_created = contactResult.created;
             summary.contacts_updated = contactResult.updated;
             summary.funded_investors_created += contactResult.fundedFromTags;
+            summary.notes_synced = contactResult.notesSynced;
+            summary.timelines_synced = contactResult.timelineSynced;
             if (contactResult.errors.length > 0) {
               summary.errors.push(...contactResult.errors.slice(0, 5));
             }
