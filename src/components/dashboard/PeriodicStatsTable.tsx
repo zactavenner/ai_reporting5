@@ -104,6 +104,11 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
   const updateDailyMetric = useUpdateDailyMetric();
   
   const thresholds = useMemo(() => getThresholdsFromSettings(clientSettings), [clientSettings]);
+  
+  // Custom metric labels from settings
+  const metricLabels: Record<string, string> = useMemo(() => {
+    return (clientSettings as any)?.metric_labels || {};
+  }, [clientSettings]);
 
   const metricsToUse = clientId ? yearlyMetrics : (externalMetrics || []);
 
