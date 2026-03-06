@@ -78,16 +78,15 @@ export default function DatabaseView() {
   // Fetch all showed calls
   const showedCalls = useMemo(() => allCalls.filter(c => c.showed), [allCalls]);
 
-  // Fetch all funded investors
+  // Fetch all funded investors (no date filter - shows all imported records)
   const { data: allFunded = [], isLoading: fundedLoading } = useQuery({
-    queryKey: ['all-funded', startDate, endDate],
+    queryKey: ['all-funded'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('funded_investors')
         .select('*, leads(name, email, phone)')
-        .gte('funded_at', startDate)
-        .lt('funded_at', `${endDate}T24:00:00`)
-        .order('funded_at', { ascending: false });
+        .order('funded_at', { ascending: false })
+        .limit(5000);
       
       if (error) throw error;
       return data || [];
