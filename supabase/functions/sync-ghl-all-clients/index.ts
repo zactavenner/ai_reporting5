@@ -119,6 +119,21 @@ Deno.serve(async (req) => {
 
     const successCount = results.filter(r => r.errors.length === 0).length;
     console.log(`[sync-ghl-all-clients] Complete: ${successCount}/${results.length} clients fully synced`);
+
+    // Trigger daily metrics recalculation for all clients after sync
+    console.log(`[sync-ghl-all-clients] Triggering daily metrics recalculation...`);
+    try {
+      const res = await fetch(`${supabaseUrl}/functions/v1/recalculate-daily-metrics`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseKey}` },
+        body: JSON.stringify({ days: sinceDateDays || 7 }),
+      });
+      const data = await res.json();
+      console.log(`[sync-ghl-all-clients] Metrics recalculation result:`, JSON.stringify(data));
+    } catch (err) {
+      console.error(`[sync-ghl-all-clients] Metrics recalculation failed:`, err);
+    }
+
     return results;
   };
 

@@ -177,20 +177,27 @@ async function fetchGHLContacts(
   apiKey: string,
   locationId: string,
   limit: number = 100,
-  startAfterId?: string
-): Promise<{ contacts: GHLContact[]; nextPageUrl?: string }> {
+  startAfterId?: string,
+  page?: number
+): Promise<{ contacts: GHLContact[]; nextPage?: number; total?: number }> {
   const headers = {
     'Authorization': `Bearer ${apiKey}`,
     'Content-Type': 'application/json',
     'Version': '2021-07-28',
   };
 
-  let url = `${GHL_BASE_URL}/contacts/?locationId=${locationId}&limit=${limit}`;
-  if (startAfterId) {
-    url += `&startAfterId=${startAfterId}`;
-  }
+  // Use the recommended POST /contacts/search endpoint (GET /contacts/ is deprecated)
+  const body: Record<string, any> = {
+    locationId,
+    pageLimit: limit,
+    page: page || 1,
+  };
 
-  const response = await fetch(url, { method: 'GET', headers });
+  const response = await fetch(`${GHL_BASE_URL}/contacts/search`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
   
   if (!response.ok) {
     const error = await response.text();
@@ -198,9 +205,15 @@ async function fetchGHLContacts(
   }
 
   const data = await response.json();
+  const contacts = data.contacts || [];
+  const total = data.total || data.meta?.total || 0;
+  const currentPage = data.currentPage || data.meta?.currentPage || page || 1;
+  const nextPage = contacts.length === limit ? currentPage + 1 : undefined;
+
   return {
-    contacts: data.contacts || [],
-    nextPageUrl: data.meta?.nextPageUrl,
+    contacts,
+    nextPage,
+    total,
   };
 }
 
@@ -1128,9 +1141,9 @@ async function syncClientContacts(
   }
   
   let hasMore = true;
-  let startAfterId: string | undefined;
+  let currentPage = 1;
   let totalProcessed = 0;
-  const MAX_CONTACTS = syncTimeline ? 500 : 5000; // Higher limit for regular sync to capture all contacts
+  const MAX_CONTACTS = syncTimeline ? 500 : 10000; // Higher limit for regular sync to capture all contacts
   
   // Calculate cutoff date if sinceDateDays is specified
   const cutoffDate = sinceDateDays ? new Date(Date.now() - sinceDateDays * 24 * 60 * 60 * 1000) : null;
@@ -1141,14 +1154,23 @@ async function syncClientContacts(
 
   try {
     while (hasMore && totalProcessed < MAX_CONTACTS) {
-      const { contacts, nextPageUrl } = await fetchGHLContacts(
+      const { contacts, nextPage, total } = await fetchGHLContacts(
         client.ghl_api_key,
         client.ghl_location_id,
         100,
-        startAfterId
+        undefined,
+        currentPage
       );
 
-      console.log(`Fetched ${contacts.length} contacts for ${client.name}`);
+      if (totalProcessed === 0 && total) {
+        console.log(`Total contacts in GHL for ${client.name}: ${total}`);
+      }
+      console.log(`Fetched page ${currentPage}: ${contacts.length} contacts for ${client.name}`);
+
+      if (contacts.length === 0) {
+        hasMore = false;
+        break;
+      }
 
       for (const contact of contacts) {
         
@@ -1194,8 +1216,8 @@ async function syncClientContacts(
         totalProcessed++;
       }
 
-      if (nextPageUrl && contacts.length === 100) {
-        startAfterId = contacts[contacts.length - 1].id;
+      if (nextPage) {
+        currentPage = nextPage;
       } else {
         hasMore = false;
       }
