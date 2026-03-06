@@ -409,7 +409,7 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
 
     if (isEditing) {
       return (
-        <div className="flex items-center justify-end gap-1">
+        <div className="flex items-center justify-center gap-1">
           <Input
             type="number"
             value={editing.value}
@@ -441,7 +441,7 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
     const colorClass = metric.highlight ? 'text-chart-2 font-semibold' : getKpiColorClass(metric, value);
 
     return (
-      <div className="flex items-center justify-end gap-1 group">
+      <div className="flex items-center justify-center gap-1 group">
         <span className={colorClass}>{metric.format(value)}</span>
         {clientId && metric.editable && (
           <Button
