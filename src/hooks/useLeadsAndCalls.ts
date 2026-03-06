@@ -111,29 +111,34 @@ export function useCalls(clientId?: string, showedOnly?: boolean, startDate?: st
   return useQuery({
     queryKey: ['calls', clientId, showedOnly, startDate, endDate],
     queryFn: async () => {
+      // Showed calls are counted by scheduled_at (actual appointment date) in daily_metrics,
+      // while booked calls are counted by booked_at (creation date).
+      // Use the matching date column so drilldown records match the KPI numbers.
+      const dateColumn = showedOnly ? 'scheduled_at' : 'booked_at';
+
       const data = await fetchAllRows((sb) => {
         let query = sb
           .from('calls')
           .select('*')
-          .order('booked_at', { ascending: false });
-        
+          .order(dateColumn, { ascending: false });
+
         if (clientId) {
           query = query.eq('client_id', clientId);
         }
-        
+
         if (showedOnly) {
           query = query.eq('showed', true);
         }
 
         if (startDate) {
-          query = query.gte('booked_at', startDate + 'T00:00:00.000Z');
+          query = query.gte(dateColumn, startDate + 'T00:00:00.000Z');
         }
         if (endDate) {
           const endNext = new Date(endDate + 'T00:00:00.000Z');
           endNext.setUTCDate(endNext.getUTCDate() + 1);
-          query = query.lt('booked_at', endNext.toISOString());
+          query = query.lt(dateColumn, endNext.toISOString());
         }
-        
+
         return query;
       });
 
