@@ -27,13 +27,12 @@ Deno.serve(async (req) => {
 
   console.log(`[sync-ghl-all-clients] Starting GHL sync${sinceDateDays ? ` (${sinceDateDays} days back)` : ''}`);
 
-  // Get all active GHL clients (exclude HubSpot-only clients)
+  // Get all clients with valid GHL credentials (sync every credentialed client)
   const { data: clients, error } = await supabase
     .from("clients")
     .select("id, name, ghl_api_key, ghl_location_id, hubspot_portal_id")
     .not("ghl_api_key", "is", null)
-    .not("ghl_location_id", "is", null)
-    .in("status", ["active", "onboarding"]);
+    .not("ghl_location_id", "is", null);
 
   if (error || !clients) {
     console.error("Failed to fetch clients:", error);
@@ -56,7 +55,7 @@ Deno.serve(async (req) => {
 
       // 1. Sync contacts (leads) - pass sinceDateDays if provided
       try {
-        const contactsBody: Record<string, unknown> = { client_id: client.id, mode: "contacts" };
+        const contactsBody: Record<string, unknown> = { client_id: client.id, syncType: "contacts" };
         if (sinceDateDays) contactsBody.sinceDateDays = sinceDateDays;
         
         const res = await fetch(`${supabaseUrl}/functions/v1/sync-ghl-contacts`, {
