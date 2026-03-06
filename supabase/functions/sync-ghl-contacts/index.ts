@@ -3760,7 +3760,7 @@ serve(async (req) => {
     let query = supabase
       .from('clients')
       .select('id, name, ghl_api_key, ghl_location_id')
-      .eq('status', 'active')
+      .in('status', ['active', 'onboarding'])
       .not('ghl_api_key', 'is', null)
       .not('ghl_location_id', 'is', null);
 
