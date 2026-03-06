@@ -60,6 +60,9 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
   const [costOfCapitalRed, setCostOfCapitalRed] = useState('10');
   const [fundedInvestorLabel, setFundedInvestorLabel] = useState('Funded Investors');
   const [businessManagerUrl, setBusinessManagerUrl] = useState('');
+  
+  // Custom metric labels
+  const [metricLabels, setMetricLabels] = useState<Record<string, string>>({});
 
   // New KPI fields
   const [mrr, setMrr] = useState('0');
@@ -107,6 +110,7 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
       setCostOfCapitalYellow(String(settings.cost_of_capital_threshold_yellow));
       setCostOfCapitalRed(String(settings.cost_of_capital_threshold_red));
       setFundedInvestorLabel(settings.funded_investor_label);
+      setMetricLabels((settings as any).metric_labels || {});
       setMrr(String(settings.mrr || 0));
       setAdSpendFeeThreshold(String(settings.ad_spend_fee_threshold || 30000));
       setAdSpendFeePercent(String(settings.ad_spend_fee_percent || 10));
@@ -226,6 +230,7 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
         cost_of_capital_threshold_yellow: parseFloat(costOfCapitalYellow),
         cost_of_capital_threshold_red: parseFloat(costOfCapitalRed),
         funded_investor_label: fundedInvestorLabel,
+        metric_labels: metricLabels,
         mrr: parseFloat(mrr) || 0,
         ad_spend_fee_threshold: parseFloat(adSpendFeeThreshold) || 30000,
         ad_spend_fee_percent: parseFloat(adSpendFeePercent) || 10,
@@ -1128,14 +1133,70 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
               <div>
                 <h4 className="font-medium mb-1">Custom Terminology</h4>
                 <p className="text-sm text-muted-foreground mb-3">Rename metrics to match your business terms</p>
-                <div className="space-y-2">
-                  <Label htmlFor="fundedLabel">Funded Investors Label</Label>
-                  <Input
-                    id="fundedLabel"
-                    value={fundedInvestorLabel}
-                    onChange={(e) => setFundedInvestorLabel(e.target.value)}
-                    placeholder="Funded Investors"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="fundedLabel">Funded Investors Label</Label>
+                    <Input
+                      id="fundedLabel"
+                      value={fundedInvestorLabel}
+                      onChange={(e) => setFundedInvestorLabel(e.target.value)}
+                      placeholder="Funded Investors"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="commitmentsLabel">Commitments Label</Label>
+                    <Input
+                      id="commitmentsLabel"
+                      value={metricLabels.commitments || ''}
+                      onChange={(e) => setMetricLabels({ ...metricLabels, commitments: e.target.value })}
+                      placeholder="Commitments"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="commitDollarsLabel">Commit $ Label</Label>
+                    <Input
+                      id="commitDollarsLabel"
+                      value={metricLabels.commitmentDollars || ''}
+                      onChange={(e) => setMetricLabels({ ...metricLabels, commitmentDollars: e.target.value })}
+                      placeholder="Commit $"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fundedHashLabel">Funded # Label</Label>
+                    <Input
+                      id="fundedHashLabel"
+                      value={metricLabels.fundedInvestors || ''}
+                      onChange={(e) => setMetricLabels({ ...metricLabels, fundedInvestors: e.target.value })}
+                      placeholder="Funded #"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fundedDollarsLabel">Funded $ Label</Label>
+                    <Input
+                      id="fundedDollarsLabel"
+                      value={metricLabels.fundedDollars || ''}
+                      onChange={(e) => setMetricLabels({ ...metricLabels, fundedDollars: e.target.value })}
+                      placeholder="Funded $"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cpaLabel">CPA Label</Label>
+                    <Input
+                      id="cpaLabel"
+                      value={metricLabels.costPerInvestor || ''}
+                      onChange={(e) => setMetricLabels({ ...metricLabels, costPerInvestor: e.target.value })}
+                      placeholder="CPA"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="costOfCapitalLabel">Cost of Capital % Label</Label>
+                    <Input
+                      id="costOfCapitalLabel"
+                      value={metricLabels.costOfCapital || ''}
+                      onChange={(e) => setMetricLabels({ ...metricLabels, costOfCapital: e.target.value })}
+                      placeholder="Cost of Capital %"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
