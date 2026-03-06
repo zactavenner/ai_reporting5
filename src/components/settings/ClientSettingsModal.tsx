@@ -1044,6 +1044,52 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
               <MeetGeekIntegrationSection clientId={client.id} settings={settings} />
             </div>
 
+            {/* RetargetIQ Enrichment Section */}
+            <div className="border-t-2 border-border pt-6 mt-6">
+              <div>
+                <h4 className="font-medium mb-1 flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  RetargetIQ Lead Enrichment
+                </h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Enrich leads with identity, financial, and company data via RetargetIQ
+                </p>
+              </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Website Slug</Label>
+                  <Input
+                    value={(settings as any)?.retargetiq_website_slug || ''}
+                    onChange={async (e) => {
+                      await updateSettings.mutateAsync({
+                        client_id: client.id,
+                        retargetiq_website_slug: e.target.value || null,
+                      } as any);
+                    }}
+                    placeholder="your-website-slug"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Find this in your RetargetIQ dashboard under website settings
+                  </p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Auto-Enrich New Leads</Label>
+                    <p className="text-xs text-muted-foreground">Automatically enrich leads when they sync from GHL</p>
+                  </div>
+                  <Switch
+                    checked={(settings as any)?.retargetiq_auto_enrich || false}
+                    onCheckedChange={async (checked) => {
+                      await updateSettings.mutateAsync({
+                        client_id: client.id,
+                        retargetiq_auto_enrich: checked,
+                      } as any);
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Stripe Billing Section */}
             <div className="border-t-2 border-border pt-6 mt-6">
               <div>
