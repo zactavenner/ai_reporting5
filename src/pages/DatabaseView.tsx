@@ -540,6 +540,11 @@ export default function DatabaseView() {
                   💵 {amountMinFilter ? `$${Number(amountMinFilter).toLocaleString()}` : '$0'} – {amountMaxFilter ? `$${Number(amountMaxFilter).toLocaleString()}` : '∞'} <X className="h-3 w-3" />
                 </Badge>
               )}
+              {enrichedFilter !== 'all' && (
+                <Badge variant="outline" className="gap-1 cursor-pointer" onClick={() => setEnrichedFilter('all')}>
+                  ✨ {enrichedFilter === 'enriched' ? 'Enriched' : 'Not Enriched'} <X className="h-3 w-3" />
+                </Badge>
+              )}
             </div>
           )}
         </div>
