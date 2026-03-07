@@ -30,14 +30,22 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { client_id, csv_text, trigger_enrich } = await req.json();
+    const { client_id, csv_url, trigger_enrich } = await req.json();
 
-    if (!client_id || !csv_text) {
-      return new Response(JSON.stringify({ success: false, error: 'client_id and csv_text required' }), {
+    if (!client_id || !csv_url) {
+      return new Response(JSON.stringify({ success: false, error: 'client_id and csv_url required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Fetch CSV from URL
+    console.log(`[ImportCSV] Fetching CSV from ${csv_url}`);
+    const csvResponse = await fetch(csv_url);
+    if (!csvResponse.ok) {
+      throw new Error(`Failed to fetch CSV: ${csvResponse.status}`);
+    }
+    const csv_text = await csvResponse.text();
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -45,8 +53,7 @@ Deno.serve(async (req) => {
     );
 
     const lines = csv_text.split('\n').filter((l: string) => l.trim());
-    // Skip header
-    const dataLines = lines.slice(1);
+    const dataLines = lines.slice(1); // Skip header
     console.log(`[ImportCSV] Processing ${dataLines.length} lines`);
 
     // Headers: Date, First Name, Last Name, Phone Number, Email, Funded Amount, City, State, Zip Code, Client Name, Industry
@@ -59,9 +66,10 @@ Deno.serve(async (req) => {
       const date = (cols[0] || '').trim();
       const first_name = (cols[1] || '').trim();
       const last_name = (cols[2] || '').trim();
-      const phone = (cols[3] || '').trim().replace(/[^\d+()-\s]/g, '');
+      const phone = (cols[3] || '').trim();
       let email = (cols[4] || '').trim().toLowerCase().replace(/\\/g, '').replace(/\s+/g, '');
-      const funded_amount = parseFloat((cols[5] || '0').replace(/[$,]/g, '')) || 0;
+      const funded_str = (cols[5] || '0').replace(/[$,"""]/g, '');
+      const funded_amount = parseFloat(funded_str) || 0;
       const city = (cols[6] || '').trim();
       const state = (cols[7] || '').trim();
       const zip = (cols[8] || '').trim();
@@ -75,13 +83,25 @@ Deno.serve(async (req) => {
       const external_id = `bulk-${(email || phone || `${first_name}${last_name}`).replace(/[^a-zA-Z0-9@._-]/g, '')}`;
       const name = [first_name, last_name].filter(Boolean).join(' ') || null;
 
+      let funded_at: string;
+      if (date) {
+        try {
+          const d = new Date(date);
+          funded_at = isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+        } catch {
+          funded_at = new Date().toISOString();
+        }
+      } else {
+        funded_at = new Date().toISOString();
+      }
+
       fundedRecords.push({
         client_id,
         external_id,
         name,
         funded_amount,
         source: 'bulk-import',
-        funded_at: date ? new Date(date).toISOString() : new Date().toISOString(),
+        funded_at,
       });
 
       enrichRecords.push({
@@ -118,6 +138,7 @@ Deno.serve(async (req) => {
     }
 
     // Batch insert lead_enrichment
+    let enrichInserted = 0;
     for (let i = 0; i < enrichRecords.length; i += 200) {
       const chunk = enrichRecords.slice(i, i + 200);
       const { error } = await supabase
@@ -125,10 +146,12 @@ Deno.serve(async (req) => {
         .upsert(chunk, { onConflict: 'external_id,client_id', ignoreDuplicates: true });
       if (error) {
         console.error(`[ImportCSV] Enrichment chunk ${i} error:`, error);
+      } else {
+        enrichInserted += chunk.length;
       }
     }
 
-    console.log(`[ImportCSV] Complete: imported=${importedCount}, failed=${failedCount}`);
+    console.log(`[ImportCSV] Complete: funded=${importedCount}, enrichment=${enrichInserted}, failed=${failedCount}`);
 
     // Trigger enrichment in background if requested
     if (trigger_enrich) {
@@ -187,6 +210,7 @@ Deno.serve(async (req) => {
       imported: importedCount,
       failed: failedCount,
       unique_records: fundedRecords.length,
+      enrichment_records: enrichInserted,
       enriching: trigger_enrich || false,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
