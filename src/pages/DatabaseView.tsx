@@ -158,7 +158,7 @@ export default function DatabaseView() {
     setSearchQuery('');
   };
 
-  const hasAttributeFilters = stateFilter.length > 0 || incomeFilter.length > 0 || sourceFilter.length > 0 || amountMinFilter || amountMaxFilter;
+  const hasAttributeFilters = stateFilter.length > 0 || incomeFilter.length > 0 || sourceFilter.length > 0 || amountMinFilter || amountMaxFilter || enrichedFilter !== 'all';
 
   const clearAllFilters = () => {
     setStateFilter([]);
@@ -166,6 +166,7 @@ export default function DatabaseView() {
     setSourceFilter([]);
     setAmountMinFilter('');
     setAmountMaxFilter('');
+    setEnrichedFilter('all');
   };
 
   // Helper: check if a lead passes enrichment-based attribute filters
