@@ -1952,9 +1952,9 @@ async function fetchGHLConversationMessages(
   return messages;
 }
 
-// Link orphaned calls to their corresponding leads by matching external_id
-// Also copies contact details from the lead to the call for display
-// Additionally backfills lead_id on funded_investors and timeline events
+// Link orphaned calls to their corresponding leads by matching external_id,
+// contact_email, or contact_name. Also copies contact details from the lead to the call.
+// Additionally backfills lead_id on funded_investors and timeline events.
 async function linkOrphanedCallsToLeads(
   supabase: any,
   clientId: string
@@ -1965,25 +1965,58 @@ async function linkOrphanedCallsToLeads(
   const { data: leads } = await supabase
     .from('leads')
     .select('id, external_id, name, email, phone')
-    .eq('client_id', clientId)
-    .not('external_id', 'is', null);
+    .eq('client_id', clientId);
 
   const leadsByExternalId = new Map<string, { id: string; name: string | null; email: string | null; phone: string | null }>();
+  const leadsByEmail = new Map<string, { id: string; name: string | null; email: string | null; phone: string | null }>();
+  const leadsByName = new Map<string, { id: string; name: string | null; email: string | null; phone: string | null }>();
+  const leadsByPhone = new Map<string, { id: string; name: string | null; email: string | null; phone: string | null }>();
   for (const lead of leads || []) {
+    const leadData = { id: lead.id, name: lead.name, email: lead.email, phone: lead.phone };
     if (lead.external_id) {
-      leadsByExternalId.set(lead.external_id, {
-        id: lead.id,
-        name: lead.name,
-        email: lead.email,
-        phone: lead.phone,
-      });
+      leadsByExternalId.set(lead.external_id, leadData);
     }
+    if (lead.email) {
+      leadsByEmail.set(lead.email.toLowerCase().trim(), leadData);
+    }
+    if (lead.name) {
+      leadsByName.set(lead.name.toLowerCase().trim(), leadData);
+    }
+    if (lead.phone) {
+      leadsByPhone.set(lead.phone.replace(/\D/g, ''), leadData);
+    }
+  }
+
+  // Helper to find a lead by multiple strategies
+  function findLead(
+    externalId: string | null,
+    email: string | null,
+    name: string | null,
+    phone: string | null
+  ): { id: string; name: string | null; email: string | null; phone: string | null } | undefined {
+    if (externalId) {
+      const byExtId = leadsByExternalId.get(externalId);
+      if (byExtId) return byExtId;
+    }
+    if (email) {
+      const byEmail = leadsByEmail.get(email.toLowerCase().trim());
+      if (byEmail) return byEmail;
+    }
+    if (phone) {
+      const byPhone = leadsByPhone.get(phone.replace(/\D/g, ''));
+      if (byPhone) return byPhone;
+    }
+    if (name) {
+      const byName = leadsByName.get(name.toLowerCase().trim());
+      if (byName) return byName;
+    }
+    return undefined;
   }
 
   // 1. Link orphaned calls
   const { data: orphanedCalls, error: fetchError } = await supabase
     .from('calls')
-    .select('id, external_id')
+    .select('id, external_id, contact_name, contact_email, contact_phone')
     .eq('client_id', clientId)
     .is('lead_id', null);
 
@@ -1993,16 +2026,19 @@ async function linkOrphanedCallsToLeads(
     console.log(`Found ${orphanedCalls.length} orphaned calls for client ${clientId}`);
 
     for (const call of orphanedCalls) {
-      const matchingLead = leadsByExternalId.get(call.external_id);
+      const matchingLead = findLead(call.external_id, call.contact_email, call.contact_name, call.contact_phone);
 
       if (matchingLead) {
         const { error: updateError } = await supabase
           .from('calls')
           .update({
             lead_id: matchingLead.id,
-            contact_name: matchingLead.name,
-            contact_email: matchingLead.email,
-            contact_phone: matchingLead.phone,
+            external_id: matchingLead.email ? (leadsByExternalId.has(call.external_id) ? call.external_id :
+              // Fix external_id to contactId if we matched by email/name/phone
+              [...leadsByExternalId.entries()].find(([, v]) => v.id === matchingLead.id)?.[0] || call.external_id) : call.external_id,
+            contact_name: call.contact_name || matchingLead.name,
+            contact_email: call.contact_email || matchingLead.email,
+            contact_phone: call.contact_phone || matchingLead.phone,
             ghl_synced_at: new Date().toISOString()
           })
           .eq('id', call.id);
@@ -2020,7 +2056,7 @@ async function linkOrphanedCallsToLeads(
   // 2. Backfill funded_investors missing lead_id
   const { data: orphanedFunded } = await supabase
     .from('funded_investors')
-    .select('id, external_id')
+    .select('id, external_id, name')
     .eq('client_id', clientId)
     .is('lead_id', null);
 
@@ -2028,7 +2064,8 @@ async function linkOrphanedCallsToLeads(
     console.log(`Found ${orphanedFunded.length} funded_investors without lead_id`);
 
     for (const fi of orphanedFunded) {
-      const matchingLead = leadsByExternalId.get(fi.external_id);
+      // Try matching by external_id first, then by name
+      const matchingLead = findLead(fi.external_id, null, fi.name, null);
       if (matchingLead) {
         // Also compute first_contact_at and time_to_fund_days
         const { data: fullLead } = await supabase

@@ -185,7 +185,7 @@ async function syncAppointmentToCall(
   const callData = {
     client_id: clientId,
     lead_id: leadId,
-    external_id: appointmentId,
+    external_id: contactId || appointmentId,
     ghl_appointment_id: appointmentId,
     ghl_calendar_id: calendarId,
     scheduled_at: appt.startTime || appt.dateAdded,
