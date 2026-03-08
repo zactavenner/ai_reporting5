@@ -6,6 +6,7 @@ import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { DraggableClientTable } from '@/components/dashboard/DraggableClientTable';
 import { AgencyStatsBar } from '@/components/dashboard/AgencyStatsBar';
 import { AgencySyncStatusPanel } from '@/components/dashboard/AgencySyncStatusPanel';
+import { AccountsSyncVerification } from '@/components/dashboard/AccountsSyncVerification';
 import { ClientSettingsModal } from '@/components/settings/ClientSettingsModal';
 import { AgencySettingsModal } from '@/components/settings/AgencySettingsModal';
 import { AddClientModal } from '@/components/settings/AddClientModal';
@@ -385,6 +386,15 @@ const Index = () => {
                 clientMetrics={clientMetrics}
               />
             </SectionErrorBoundary>
+            {/* Accounts Sync Verification for Leads */}
+            <SectionErrorBoundary sectionName="Accounts Sync Verification">
+              <AccountsSyncVerification
+                clients={clients}
+                clientFullSettings={clientFullSettings}
+                clientMetrics={clientMetrics}
+              />
+            </SectionErrorBoundary>
+
             {/* Data Health Card */}
             <SectionErrorBoundary sectionName="Data Health">
               <DataHealthCard />
