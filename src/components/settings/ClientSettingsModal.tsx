@@ -1045,6 +1045,11 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
               <MeetGeekIntegrationSection clientId={client.id} settings={settings} />
             </div>
 
+            {/* Fathom.ai Integration Section */}
+            <div className="border-t-2 border-border pt-6 mt-6">
+              <FathomIntegrationSection clientId={client.id} settings={settings} />
+            </div>
+
             {/* RetargetIQ Enrichment Section */}
             <div className="border-t-2 border-border pt-6 mt-6">
               <div>
