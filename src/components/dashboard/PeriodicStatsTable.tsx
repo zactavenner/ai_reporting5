@@ -75,19 +75,19 @@ const MONTH_NAMES = [
 
 // Metric row definitions for transposed table
 const METRIC_ROWS: MetricRowConfig[] = [
-  { label: 'Ad Spend', key: 'adSpend', format: (v) => `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, editable: true, dbField: 'ad_spend' },
+  { label: 'Ad Spend', key: 'adSpend', format: (v) => `$${Math.round(v).toLocaleString()}`, editable: true, dbField: 'ad_spend' },
   { label: 'Leads', key: 'leads', format: (v) => v.toLocaleString(), editable: true, dbField: 'leads' },
-  { label: 'CPL', key: 'cpl', format: (v) => `$${v.toFixed(2)}`, editable: false },
+  { label: 'CPL', key: 'cpl', format: (v) => `$${Math.round(v).toLocaleString()}`, editable: false },
   { label: 'Calls', key: 'calls', format: (v) => v.toLocaleString(), editable: true, dbField: 'calls' },
-  { label: '$/Call', key: 'costPerCall', format: (v) => `$${v.toFixed(2)}`, editable: false },
+  { label: '$/Call', key: 'costPerCall', format: (v) => `$${Math.round(v).toLocaleString()}`, editable: false },
   { label: 'Showed', key: 'showedCalls', format: (v) => v.toLocaleString(), editable: true, dbField: 'showed_calls' },
-  { label: 'Show %', key: 'showRate', format: (v) => `${v.toFixed(1)}%`, editable: false },
-  { label: '$/Show', key: 'costPerShow', format: (v) => `$${v.toFixed(2)}`, editable: false },
+  { label: 'Show %', key: 'showRate', format: (v) => `${Math.round(v)}%`, editable: false },
+  { label: '$/Show', key: 'costPerShow', format: (v) => `$${Math.round(v).toLocaleString()}`, editable: false },
   { label: 'Commitments', key: 'commitments', format: (v) => v.toLocaleString(), editable: true, dbField: 'commitments' },
-  { label: 'Commit $', key: 'commitmentDollars', format: (v) => `$${v.toLocaleString()}`, editable: true, dbField: 'commitment_dollars' },
+  { label: 'Commit $', key: 'commitmentDollars', format: (v) => `$${Math.round(v).toLocaleString()}`, editable: true, dbField: 'commitment_dollars' },
   { label: 'Funded #', key: 'fundedInvestors', format: (v) => v.toLocaleString(), editable: true, dbField: 'funded_investors' },
-  { label: 'Funded $', key: 'fundedDollars', format: (v) => `$${v.toLocaleString()}`, editable: true, dbField: 'funded_dollars', highlight: true },
-  { label: 'CPA', key: 'costPerInvestor', format: (v) => `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, editable: false },
+  { label: 'Funded $', key: 'fundedDollars', format: (v) => `$${Math.round(v).toLocaleString()}`, editable: true, dbField: 'funded_dollars', highlight: true },
+  { label: 'CPA', key: 'costPerInvestor', format: (v) => `$${Math.round(v).toLocaleString()}`, editable: false },
   { label: 'Cost of Capital %', key: 'costOfCapital', format: (v) => `${v.toFixed(2)}%`, editable: false, highlight: true },
 ];
 
@@ -583,7 +583,7 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
                     <TableHead className="font-bold whitespace-nowrap bg-card w-[120px] py-2 px-3 text-left sticky left-0 z-20 shadow-[2px_0_4px_-2px_hsl(var(--border))]">
                       Metric
                     </TableHead>
-                    <TableHead className="font-bold text-center whitespace-nowrap bg-muted/30 min-w-[110px] py-2 px-3 sticky left-[120px] z-20 shadow-[2px_0_4px_-2px_hsl(var(--border))]">
+                    <TableHead className="font-bold text-center whitespace-nowrap bg-muted min-w-[110px] py-2 px-3 sticky left-[120px] z-20 shadow-[2px_0_4px_-2px_hsl(var(--border))]">
                       TOTAL
                     </TableHead>
                     {displayStats.map((period, i) => (
@@ -606,7 +606,7 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
                         <TableCell className="font-medium whitespace-nowrap bg-card py-1.5 px-3 text-left sticky left-0 z-20 shadow-[2px_0_4px_-2px_hsl(var(--border))]">
                           {metricLabels[metric.key] || metric.label}
                         </TableCell>
-                        <TableCell className="text-center bg-muted/30 py-1.5 px-3 font-semibold sticky left-[120px] z-20 shadow-[2px_0_4px_-2px_hsl(var(--border))]">
+                        <TableCell className="text-center bg-muted py-1.5 px-3 font-semibold sticky left-[120px] z-20 shadow-[2px_0_4px_-2px_hsl(var(--border))]">
                           <span className={totalColorClass}>
                             {metric.format(totalValue)}
                           </span>
