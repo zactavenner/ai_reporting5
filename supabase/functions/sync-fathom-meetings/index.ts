@@ -62,13 +62,13 @@ Deno.serve(async (req) => {
 
     const apiKey = (settings as any).fathom_api_key || Deno.env.get('FATHOM_API_KEY');
     if (!apiKey) {
-      return new Response(JSON.stringify({ success: false, error: the setting has no Fathom API key configured' }), {
+      return new Response(JSON.stringify({ success: false, error: 'No Fathom API key configured' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    //, etch all meetings (paginated)
+    // Fetch all meetings (paginated)
     let allMeetings: any[] = [];
     let cursor: string | null = null;
     const maxPagesToFetch = max_pages || 10;
