@@ -2222,79 +2222,178 @@ export type Database = {
       lead_enrichment: {
         Row: {
           address: string | null
+          age: number | null
           birth_date: string | null
           city: string | null
           client_id: string
+          companies: Json | null
           company_name: string | null
           company_title: string | null
           created_at: string
           credit_range: string | null
+          discretionary_income: string | null
+          dwelling_type: string | null
+          education: string | null
           enriched_at: string
           enriched_emails: Json | null
           enriched_phones: Json | null
+          enrichment_match_count: number | null
+          enrichment_methods_used: string[] | null
+          ethnicity: string | null
           external_id: string
+          financial_power: number | null
           first_name: string | null
           gender: string | null
+          generation: string | null
+          has_children: boolean | null
+          home_ownership: string | null
+          home_value: number | null
+          household_adults: number | null
           household_income: string | null
+          household_persons: number | null
           id: string
+          is_investor: boolean | null
+          is_primary_identity: boolean | null
+          is_veteran: boolean | null
+          language: string | null
           last_name: string | null
           lead_id: string | null
+          length_of_residence: number | null
           linkedin_url: string | null
+          marital_status: string | null
+          median_home_value: number | null
+          mortgage_amount: number | null
+          net_worth: string | null
+          net_worth_midpoint: number | null
+          occupation: string | null
+          occupation_category: string | null
+          occupation_type: string | null
+          owns_investments: boolean | null
+          owns_stocks_bonds: boolean | null
           raw_data: Json
+          retargetiq_id: number | null
           source: string
+          spouse_data: Json | null
           state: string | null
+          urbanicity: string | null
           vehicles: Json | null
           zip: string | null
         }
         Insert: {
           address?: string | null
+          age?: number | null
           birth_date?: string | null
           city?: string | null
           client_id: string
+          companies?: Json | null
           company_name?: string | null
           company_title?: string | null
           created_at?: string
           credit_range?: string | null
+          discretionary_income?: string | null
+          dwelling_type?: string | null
+          education?: string | null
           enriched_at?: string
           enriched_emails?: Json | null
           enriched_phones?: Json | null
+          enrichment_match_count?: number | null
+          enrichment_methods_used?: string[] | null
+          ethnicity?: string | null
           external_id: string
+          financial_power?: number | null
           first_name?: string | null
           gender?: string | null
+          generation?: string | null
+          has_children?: boolean | null
+          home_ownership?: string | null
+          home_value?: number | null
+          household_adults?: number | null
           household_income?: string | null
+          household_persons?: number | null
           id?: string
+          is_investor?: boolean | null
+          is_primary_identity?: boolean | null
+          is_veteran?: boolean | null
+          language?: string | null
           last_name?: string | null
           lead_id?: string | null
+          length_of_residence?: number | null
           linkedin_url?: string | null
+          marital_status?: string | null
+          median_home_value?: number | null
+          mortgage_amount?: number | null
+          net_worth?: string | null
+          net_worth_midpoint?: number | null
+          occupation?: string | null
+          occupation_category?: string | null
+          occupation_type?: string | null
+          owns_investments?: boolean | null
+          owns_stocks_bonds?: boolean | null
           raw_data?: Json
+          retargetiq_id?: number | null
           source?: string
+          spouse_data?: Json | null
           state?: string | null
+          urbanicity?: string | null
           vehicles?: Json | null
           zip?: string | null
         }
         Update: {
           address?: string | null
+          age?: number | null
           birth_date?: string | null
           city?: string | null
           client_id?: string
+          companies?: Json | null
           company_name?: string | null
           company_title?: string | null
           created_at?: string
           credit_range?: string | null
+          discretionary_income?: string | null
+          dwelling_type?: string | null
+          education?: string | null
           enriched_at?: string
           enriched_emails?: Json | null
           enriched_phones?: Json | null
+          enrichment_match_count?: number | null
+          enrichment_methods_used?: string[] | null
+          ethnicity?: string | null
           external_id?: string
+          financial_power?: number | null
           first_name?: string | null
           gender?: string | null
+          generation?: string | null
+          has_children?: boolean | null
+          home_ownership?: string | null
+          home_value?: number | null
+          household_adults?: number | null
           household_income?: string | null
+          household_persons?: number | null
           id?: string
+          is_investor?: boolean | null
+          is_primary_identity?: boolean | null
+          is_veteran?: boolean | null
+          language?: string | null
           last_name?: string | null
           lead_id?: string | null
+          length_of_residence?: number | null
           linkedin_url?: string | null
+          marital_status?: string | null
+          median_home_value?: number | null
+          mortgage_amount?: number | null
+          net_worth?: string | null
+          net_worth_midpoint?: number | null
+          occupation?: string | null
+          occupation_category?: string | null
+          occupation_type?: string | null
+          owns_investments?: boolean | null
+          owns_stocks_bonds?: boolean | null
           raw_data?: Json
+          retargetiq_id?: number | null
           source?: string
+          spouse_data?: Json | null
           state?: string | null
+          urbanicity?: string | null
           vehicles?: Json | null
           zip?: string | null
         }

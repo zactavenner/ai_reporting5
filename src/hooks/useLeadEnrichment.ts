@@ -26,6 +26,43 @@ export interface LeadEnrichment {
   enriched_phones: any[];
   enriched_emails: any[];
   vehicles: any[];
+  // Financial
+  discretionary_income: string | null;
+  financial_power: number | null;
+  net_worth: string | null;
+  net_worth_midpoint: number | null;
+  home_ownership: string | null;
+  home_value: number | null;
+  median_home_value: number | null;
+  mortgage_amount: number | null;
+  owns_investments: boolean | null;
+  is_investor: boolean | null;
+  owns_stocks_bonds: boolean | null;
+  // Demographics
+  education: string | null;
+  occupation: string | null;
+  occupation_type: string | null;
+  occupation_category: string | null;
+  marital_status: string | null;
+  age: number | null;
+  generation: string | null;
+  ethnicity: string | null;
+  language: string | null;
+  urbanicity: string | null;
+  // Household
+  household_adults: number | null;
+  household_persons: number | null;
+  has_children: boolean | null;
+  dwelling_type: string | null;
+  length_of_residence: number | null;
+  is_veteran: boolean | null;
+  // Company & Spouse
+  companies: any[] | null;
+  spouse_data: any[] | null;
+  is_primary_identity: boolean | null;
+  retargetiq_id: number | null;
+  enrichment_methods_used: string[] | null;
+  enrichment_match_count: number | null;
 }
 
 export function useLeadEnrichment(clientId: string, externalId: string | null | undefined) {

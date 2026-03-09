@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     while (true) {
       const { data: page, error: pageErr } = await supabase
         .from('lead_enrichment')
-        .select('external_id, first_name, last_name, enriched_phones, enriched_emails, city, state, zip, address, source')
+        .select('external_id, first_name, last_name, enriched_phones, enriched_emails, city, state, zip, address, source, lead_id')
         .eq('client_id', client_id)
         .in('source', ['bulk-import-pending', 'bulk-import'])
         .range(offset, offset + pageSize - 1);
@@ -88,8 +88,9 @@ Deno.serve(async (req) => {
             if (r.state) body.state = r.state;
             if (r.zip) body.zip = r.zip;
             if (r.address) body.address = r.address;
+            if (r.lead_id) body.lead_id = r.lead_id;
 
-            // Need at least one identifier
+            // Need at least one identifier for waterfall
             if (!body.phone && !body.email && !body.city) {
               skippedCount++;
               return;

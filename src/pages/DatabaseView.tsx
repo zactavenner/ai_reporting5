@@ -94,7 +94,7 @@ export default function DatabaseView() {
   const { data: enrichmentData = [] } = useQuery({
     queryKey: ['all-enrichment-db'],
     queryFn: () => fetchAllRows<any>((sb) =>
-      sb.from('lead_enrichment').select('lead_id, external_id, state, household_income, city, company_name, credit_range, first_name, last_name, gender, birth_date, address, zip, linkedin_url, company_title, enriched_phones, enriched_emails, vehicles')
+      sb.from('lead_enrichment').select('lead_id, external_id, state, household_income, city, company_name, credit_range, first_name, last_name, gender, birth_date, address, zip, linkedin_url, company_title, enriched_phones, enriched_emails, vehicles, net_worth, home_ownership, is_investor, occupation, education, age, home_value, companies, spouse_data')
     ),
   });
 
@@ -819,7 +819,11 @@ export default function DatabaseView() {
                             <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">State</TableHead>
                             <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">City</TableHead>
                             <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">Income</TableHead>
+                            <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">Net Worth</TableHead>
+                            <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">Home</TableHead>
+                            <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">Investor</TableHead>
                             <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">Company</TableHead>
+                            <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">Occupation</TableHead>
                             <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">Credit</TableHead>
                             <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap text-right">Amount</TableHead>
                             <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap text-right">Days to Fund</TableHead>
@@ -842,7 +846,13 @@ export default function DatabaseView() {
                                 <TableCell className="text-[11px] py-0.5 px-2">{enrich?.state || '-'}</TableCell>
                                 <TableCell className="text-[11px] py-0.5 px-2">{enrich?.city || '-'}</TableCell>
                                 <TableCell className="text-[11px] py-0.5 px-2">{enrich?.household_income || '-'}</TableCell>
+                                <TableCell className="text-[11px] py-0.5 px-2">{enrich?.net_worth || '-'}</TableCell>
+                                <TableCell className="text-[11px] py-0.5 px-2">{enrich?.home_ownership || '-'}</TableCell>
+                                <TableCell className="text-[11px] py-0.5 px-2">
+                                  {enrich?.is_investor ? <Badge className="bg-chart-2/20 text-chart-2 border-chart-2/30 text-[10px] px-1 py-0">Yes</Badge> : '-'}
+                                </TableCell>
                                 <TableCell className="text-[11px] py-0.5 px-2">{enrich?.company_name || '-'}</TableCell>
+                                <TableCell className="text-[11px] py-0.5 px-2">{enrich?.occupation || '-'}</TableCell>
                                 <TableCell className="text-[11px] py-0.5 px-2">{enrich?.credit_range || '-'}</TableCell>
                                 <TableCell className="text-[11px] py-0.5 px-2 text-right font-mono text-chart-2 tabular-nums">
                                   ${Number(investor.funded_amount).toLocaleString()}

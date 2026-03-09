@@ -1,119 +1,117 @@
 
 
-# Maximum Enrichment: Waterfall + Spouse + Full Financial/Company Data
+# Daily Accuracy Assurance System
 
-## What We're Building
+## Summary
 
-A complete enrichment overhaul that captures **everything** RetargetIQ returns, implements **waterfall enrichment** (try Phone → Email → Address → IP cross-referencing), stores **all identities** including spouse/household members, and syncs all phones/emails back to the contact record.
+Build a standalone metrics reconciliation system that runs independently of the sync pipeline, ensuring `daily_metrics` always matches source-of-truth tables (`leads`, `calls`, `funded_investors`) while preserving Meta Ads data. This addresses 6 identified accuracy gaps including a critical bug where the current recalculation deletes ad spend data on days with zero CRM activity.
 
-## Current State vs Target
+---
 
-**Now**: We capture ~15 fields from the primary identity only. We stop at the first match and ignore additional identities (spouse). Most of the `data` object (100+ fields) goes into `raw_data` JSON and is never queryable.
+## Critical Bug Found
 
-**Target**: Capture 25+ queryable columns, store ALL identities (primary + spouse), do waterfall enrichment across all available lookup methods, and store ALL phones/emails tied to that person.
+The existing `recalculateRecentMetrics` function (line 2751-2886 of `sync-ghl-contacts`) **deletes** all `daily_metrics` rows for the last 7 days, then only re-inserts rows where CRM activity exists. Any day with Meta ad spend but zero leads/calls/funded loses its ad_spend, impressions, and clicks data permanently. This must be fixed as part of this work.
 
-## Database Migration
+---
 
-Add columns to `lead_enrichment`:
+## What Gets Built
 
-```text
--- Financial
-discretionary_income     text        ← finances.discretionaryIncome
-financial_power          integer     ← finances.financialPower (1-10)
-net_worth                text        ← data.householdNetWorth
-net_worth_midpoint       integer     ← data.householdNetWorthMidpoint
-home_ownership           text        ← data.homeOwnership
-home_value               integer     ← data.homeValue
-median_home_value        integer     ← data.medianHomeValue
-mortgage_amount          integer     ← data.mortgageAmount
-owns_investments         boolean     ← data.ownsInvestments
-is_investor              boolean     ← data.investor
-owns_stocks_bonds        boolean     ← data.ownsStocksAndBonds
+### 1. New `recalculate-daily-metrics` Edge Function (Highest Priority)
 
--- Demographics
-education                text        ← data.education
-occupation               text        ← data.occupationDetail
-occupation_type          text        ← data.occupationType (White/Blue Collar)
-occupation_category      text        ← data.occupationCategory
-marital_status           text        ← data.maritalStatus
-age                      integer     ← data.age
-generation               text        ← data.generation
-ethnicity                text        ← data.ethnicGroup
-language                 text        ← data.language
-urbanicity               text        ← data.urbanicity
+A standalone function that recalculates CRM-sourced columns in `daily_metrics` for all active clients across a configurable date range, **without touching ad spend columns**.
 
--- Household
-household_adults         integer     ← data.householdAdults
-household_persons        integer     ← data.householdPersons
-has_children             boolean     ← data.householdChild
-dwelling_type            text        ← data.dwellingType
-length_of_residence      integer     ← data.lengthOfResidence
-is_veteran               boolean     ← data.householdVeteran
+Logic per client per date:
+- Count non-spam leads from `leads` where `created_at` falls on that date
+- Count spam leads separately
+- Count booked calls (non-reconnect) from `calls` where `booked_at` falls on that date
+- Count showed calls (non-reconnect) where `showed = true`
+- Count reconnect calls and reconnect showed
+- Sum funded investors and funded dollars from `funded_investors` where `funded_at` falls on that date
+- **UPSERT** into `daily_metrics` using `ON CONFLICT (client_id, date)` -- only updating CRM columns, never overwriting `ad_spend`, `impressions`, `clicks`, or `ctr`
 
--- Company (store ALL companies, not just first)
-companies                jsonb       ← enrichData.companies[] (full array)
+The function accepts optional `startDate`, `endDate`, and `clientId` parameters. Defaults to yesterday + today for all active clients.
 
--- Spouse / additional identities
-spouse_data              jsonb       ← identities[1+] (all non-primary identities)
-is_primary_identity      boolean     ← true for identity[0]
-retargetiq_id            integer     ← enrichData.id (for cross-referencing)
+### 2. New `daily-accuracy-check` Edge Function
 
--- Enrichment metadata
-enrichment_methods_used  text[]      ← tracks which lookups succeeded
-enrichment_match_count   integer     ← how many identities returned
-```
+A validation function that compares `daily_metrics` against live source table counts for yesterday across all clients. For each discrepancy found:
+- Logs it to a new `sync_accuracy_log` table
+- Triggers recalculation for that specific client/date
+- Returns a summary of discrepancies found and auto-fixed
 
-## Edge Function: Waterfall Enrichment (`enrich-lead-retargetiq`)
-
-### Waterfall Strategy
-Since enrichment is unlimited, try ALL available methods and merge the best data:
+### 3. New `sync_accuracy_log` Database Table
 
 ```text
-1. Phone lookup   → if phone available
-2. Email lookup   → if email available
-3. Address lookup → if name+address/city/state available
-4. Cross-reference: if step 1 returned emails, re-enrich by those emails
-5. Cross-reference: if step 2 returned phones, re-enrich by those phones
-6. Merge: take the richest identity across all results
+Columns:
+- id (uuid, PK)
+- client_id (uuid)
+- check_date (date) -- the date being validated
+- metric_type (text) -- 'leads', 'calls', 'showed_calls', 'funded_investors', etc.
+- expected_count (integer) -- from source tables
+- actual_count (integer) -- from daily_metrics
+- discrepancy (integer) -- difference
+- auto_fixed (boolean)
+- created_at (timestamptz)
 ```
 
-### Spouse Handling
-- The API returns `identities[]` array — identity[0] is primary, identity[1+] are household members (spouse)
-- Store ALL identities: primary goes into the main columns, additional identities go into `spouse_data` JSONB
-- Each spouse gets their own phones/emails/companies captured
+### 4. Fix `recalculateRecentMetrics` in Both Sync Functions
 
-### Full Data Extraction
-Extract EVERYTHING from the `data` object into queryable columns instead of relying on `raw_data`.
+Change the DELETE + INSERT pattern to an UPSERT pattern that preserves ad spend columns. Instead of deleting rows and re-inserting, it will upsert only CRM columns (leads, calls, showed, funded, etc.) while leaving ad_spend/impressions/clicks/ctr untouched.
 
-## Files Modified
+This fix applies to:
+- `supabase/functions/sync-ghl-contacts/index.ts` (lines 2751-2893)
+- `supabase/functions/sync-hubspot-contacts/index.ts` (same pattern)
 
-### 1. Database Migration
-- Add ~30 new columns to `lead_enrichment`
+### 5. New Cron Jobs
 
-### 2. `supabase/functions/enrich-lead-retargetiq/index.ts`
-- Implement waterfall: try all lookup methods, not just first match
-- Cross-reference: use returned emails/phones to do additional lookups
-- Merge results: pick richest identity data across all attempts
-- Capture ALL identities (spouse) into `spouse_data`
-- Extract full `data` object fields into new columns
-- Store all companies as JSONB array
-- Track which methods were used and match count
+| Job | Schedule | What it does |
+|-----|----------|--------------|
+| `daily-metrics-recalculate` | `0 13 * * *` (5 AM PST) | Runs `recalculate-daily-metrics` for yesterday + today |
+| `daily-accuracy-check` | `0 14 * * *` (6 AM PST) | Runs `daily-accuracy-check` to validate and auto-fix |
 
-### 3. `src/hooks/useLeadEnrichment.ts`
-- Update `LeadEnrichment` interface with all new fields
+### 6. Fix Pipeline Funded Investor External ID
 
-### 4. `src/components/records/EnrichmentSection.tsx`
-- Add Financial Profile section (Net Worth, Income, Credit, Home Value, Investments)
-- Add Demographics section (Education, Occupation, Age, Marital Status)
-- Add Household section (Dwelling, Children, Residence Length)
-- Add ALL Companies (not just first), with SIC codes and industry
-- Add Spouse section showing household member data
-- Show all phones/emails with carrier/quality metadata
+Normalize the `external_id` in the pipeline-based funded investor creation path to always use `contactId` (not `opp.contactId + opp.id`), consistent with the tag-based path. The existing unique constraint on `(client_id, external_id)` will then properly prevent duplicates across both paths.
 
-### 5. `src/pages/DatabaseView.tsx`
-- Add filterable columns: Net Worth, Home Ownership, Investor, Occupation, Education
-- Extend enrichment filters for new financial fields
+### 7. Accuracy Health in Agency Sync Panel
 
-### 6. `supabase/functions/enrich-all-funded/index.ts`
-- Update to pass all available contact data for waterfall enrichment
+Add a small accuracy indicator to `AgencySyncStatusPanel.tsx`:
+- Show last accuracy check timestamp
+- Show discrepancy count from yesterday
+- Green if 0 discrepancies, yellow if auto-fixed, red if unfixed
+
+---
+
+## Files to Create
+
+1. `supabase/functions/recalculate-daily-metrics/index.ts`
+2. `supabase/functions/daily-accuracy-check/index.ts`
+
+## Files to Modify
+
+1. `supabase/functions/sync-ghl-contacts/index.ts` -- Fix `recalculateRecentMetrics` to use upsert instead of delete+insert; fix pipeline funded investor external_id
+2. `supabase/functions/sync-hubspot-contacts/index.ts` -- Same upsert fix for its copy of `recalculateRecentMetrics`
+3. `supabase/config.toml` -- Register 2 new functions with `verify_jwt = false`
+4. `src/components/dashboard/AgencySyncStatusPanel.tsx` -- Add accuracy health indicator
+
+## Database Changes
+
+1. Create `sync_accuracy_log` table (via migration)
+2. Add 2 new cron jobs (via insert tool, not migration)
+
+## Existing Cron Jobs to Keep
+
+The existing hourly sync jobs (GHL contacts, calendar, pipelines, HubSpot) and the 6-hour orchestrators remain unchanged. The new daily recalculation runs *after* all syncs complete, acting as a safety net.
+
+---
+
+## Implementation Order
+
+1. Fix the critical `recalculateRecentMetrics` bug (upsert pattern) in both sync functions
+2. Create `sync_accuracy_log` table
+3. Build `recalculate-daily-metrics` edge function
+4. Build `daily-accuracy-check` edge function
+5. Register functions in config.toml
+6. Add cron jobs
+7. Fix pipeline funded investor dedup
+8. Add accuracy health to sync panel
 
