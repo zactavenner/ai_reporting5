@@ -526,7 +526,7 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
               if (!t.due_date) return false;
               return isThisWeek(new Date(t.due_date), { weekStartsOn: 1 });
             });
-            const inProgressCount = filteredTasks.filter(t => t.stage === 'in_progress').length;
+            const dueTodayCount = filteredTasks.filter(t => t.due_date && isToday(new Date(t.due_date))).length;
             const totalCount = filteredTasks.length;
             const completedCount = tasks.filter(t => t.status === 'completed' && !t.parent_task_id).length;
             const allNonSubtasks = tasks.filter(t => !t.parent_task_id).length;
@@ -539,7 +539,7 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
 
             const stats = [
               { label: 'This Week', value: thisWeekTasks.length, color: 'text-foreground' },
-              { label: 'In Progress', value: inProgressCount, color: 'text-foreground' },
+              { label: 'Due Today', value: dueTodayCount, color: dueTodayCount > 0 ? 'text-orange-500' : 'text-foreground' },
               { label: 'Total', value: totalCount, color: 'text-foreground' },
               { label: 'Completion', value: `${completionRate}%`, color: 'text-foreground' },
               { label: 'Overdue', value: overdueCount, color: overdueCount > 0 ? 'text-destructive' : 'text-foreground' },
