@@ -94,7 +94,7 @@ export default function DatabaseView() {
   const { data: enrichmentData = [] } = useQuery({
     queryKey: ['all-enrichment-db'],
     queryFn: () => fetchAllRows<any>((sb) =>
-      sb.from('lead_enrichment').select('lead_id, external_id, state, household_income, city, company_name, credit_range, first_name, last_name, gender, birth_date, address, zip, linkedin_url, company_title, enriched_phones, enriched_emails, vehicles')
+      sb.from('lead_enrichment').select('lead_id, external_id, state, household_income, city, company_name, credit_range, first_name, last_name, gender, birth_date, address, zip, linkedin_url, company_title, enriched_phones, enriched_emails, vehicles, net_worth, home_ownership, is_investor, occupation, education, age, home_value, companies, spouse_data')
     ),
   });
 
