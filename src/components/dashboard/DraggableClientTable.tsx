@@ -318,25 +318,25 @@ export function DraggableClientTable({
         </div>
       )}
       <div className="border-2 border-border bg-card overflow-x-auto scrollbar-thin">
-        <Table className="min-w-[1400px]">
+        <Table className="min-w-[1500px]">
           <TableHeader>
-            <TableRow className="border-b-2">
-              <TableHead className="w-10 sticky left-0 bg-card z-10"></TableHead>
-              <TableHead className="font-bold text-sm sticky left-10 bg-card z-10 min-w-[140px]">Client</TableHead>
+            <TableRow className="border-b-2 h-8">
+              <TableHead className="w-8 sticky left-0 bg-card z-10 py-1"></TableHead>
+              <TableHead className="font-bold text-xs sticky left-8 bg-card z-10 min-w-[120px] py-1">Client</TableHead>
               <SortableHeader column="adSpend" label="Meta Spend" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="metaLeads" label="Meta Leads" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="cpl" label="CPL" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="crmLeads" label="CRM Leads" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="calls" label="Booked" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="showed" label="Shows" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="funded" label="Funded" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="ltb" label="L→B %" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="bts" label="B→S %" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="stf" label="S→F %" sortConfig={sortConfig} onSort={handleSort} />
-              <TableHead className="font-bold text-sm text-center min-w-[100px]">Bottleneck</TableHead>
-              <TableHead className="font-bold text-sm text-center min-w-[90px]">Meta Sync</TableHead>
-              <TableHead className="font-bold text-sm text-center min-w-[110px]">Last Sync</TableHead>
-              <TableHead className="font-bold text-sm text-center min-w-[80px]">CRM</TableHead>
-              <TableHead className="font-bold text-sm min-w-[100px]">Actions</TableHead>
+              <TableHead className="font-bold text-xs text-center min-w-[80px] py-1">Bottleneck</TableHead>
+              <TableHead className="font-bold text-xs text-center min-w-[70px] py-1">Meta Sync</TableHead>
+              <TableHead className="font-bold text-xs text-center min-w-[80px] py-1">CRM</TableHead>
+              <TableHead className="font-bold text-xs min-w-[90px] py-1">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
