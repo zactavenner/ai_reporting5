@@ -623,27 +623,27 @@ export default function DatabaseView() {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={handleTabChange}>
-              <TabsList className="mb-4">
+               <TabsList className="mb-4">
                 <TabsTrigger value="leads" className="flex items-center gap-1">
                   <Users className="h-4 w-4" />
-                  Leads ({filteredLeads.length})
+                  Leads ({filteredLeads.length.toLocaleString()})
                 </TabsTrigger>
                 <TabsTrigger value="calls" className="flex items-center gap-1">
                   <Phone className="h-4 w-4" />
-                  Calls ({filteredCalls.length})
+                  Calls ({filteredCalls.length.toLocaleString()})
                 </TabsTrigger>
                 <TabsTrigger value="showed" className="flex items-center gap-1">
                   <PhoneCall className="h-4 w-4" />
-                  Showed ({filteredShowedCalls.length})
+                  Showed ({filteredShowedCalls.length.toLocaleString()})
                 </TabsTrigger>
                 <TabsTrigger value="funded" className="flex items-center gap-1">
                   <TrendingUp className="h-4 w-4" />
-                  Funded ({filteredFunded.length})
+                  Funded ({filteredFunded.length.toLocaleString()})
                 </TabsTrigger>
               </TabsList>
 
-              {/* Search */}
-              <div className="flex items-center gap-2 mb-4">
+              {/* Search + Import */}
+              <div className="flex items-center gap-2 mb-3">
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search records..."
@@ -652,11 +652,22 @@ export default function DatabaseView() {
                     setSearchQuery(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="max-w-sm"
+                  className="max-w-sm h-8 text-xs"
                 />
-                <span className="text-sm text-muted-foreground">
-                  Showing {paginatedData.length} of {currentData.length}
+                <span className="text-xs text-muted-foreground">
+                  Showing {paginatedData.length} of {currentData.length.toLocaleString()}
                 </span>
+                <div className="ml-auto">
+                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => openImport(
+                    activeTab === 'leads' ? 'leads' :
+                    activeTab === 'calls' ? 'calls' :
+                    activeTab === 'showed' ? 'calls' :
+                    'funded_investors'
+                  )}>
+                    <Upload className="h-3 w-3" />
+                    Import {activeTab === 'showed' ? 'Showed' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                  </Button>
+                </div>
               </div>
 
               {isLoading ? (
@@ -665,42 +676,47 @@ export default function DatabaseView() {
                 <>
                   {/* Leads Tab */}
                   <TabsContent value="leads" className="mt-0">
-                    <ScrollArea className="h-[500px]">
+                    <div className="overflow-x-auto border border-border rounded">
                       <Table>
                         <TableHeader>
-                          <TableRow className="border-b-2">
-                            <TableHead>Client</TableHead>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Email</TableHead>
-                            <TableHead>Phone</TableHead>
-                            <TableHead>Source</TableHead>
-                            <TableHead>Status</TableHead>
+                          <TableRow className="border-b">
+                            <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">Client</TableHead>
+                            <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">Date</TableHead>
+                            <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">Name</TableHead>
+                            <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">Email</TableHead>
+                            <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">Phone</TableHead>
+                            <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">State</TableHead>
+                            <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">Source</TableHead>
+                            <TableHead className="text-[11px] py-1.5 px-2 whitespace-nowrap">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {paginatedData.map((lead: any) => (
-                            <TableRow key={lead.id} className="hover:bg-muted/50">
-                              <TableCell><Badge variant="outline">{getClientName(lead.client_id)}</Badge></TableCell>
-                              <TableCell className="font-mono text-sm tabular-nums">
-                                {new Date(lead.created_at).toLocaleDateString()}
-                              </TableCell>
-                              <TableCell className="font-medium">{lead.name || 'Unknown'}</TableCell>
-                              <TableCell>{lead.email || '-'}</TableCell>
-                              <TableCell>{lead.phone || '-'}</TableCell>
-                              <TableCell>{lead.source}</TableCell>
-                              <TableCell>
-                                {lead.is_spam ? (
-                                  <Badge variant="destructive">Spam</Badge>
-                                ) : (
-                                  <Badge className="bg-green-600">{lead.status || 'new'}</Badge>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                          {paginatedData.map((lead: any) => {
+                            const enrich = enrichmentByLeadId.get(lead.id);
+                            return (
+                              <TableRow key={lead.id} className="hover:bg-muted/50 border-b h-7">
+                                <TableCell className="text-[11px] py-0.5 px-2"><Badge variant="outline" className="text-[10px] px-1 py-0">{getClientName(lead.client_id)}</Badge></TableCell>
+                                <TableCell className="text-[11px] py-0.5 px-2 font-mono tabular-nums whitespace-nowrap">
+                                  {new Date(lead.created_at).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell className="text-[11px] py-0.5 px-2 font-medium whitespace-nowrap">{lead.name || 'Unknown'}</TableCell>
+                                <TableCell className="text-[11px] py-0.5 px-2">{lead.email || '-'}</TableCell>
+                                <TableCell className="text-[11px] py-0.5 px-2 whitespace-nowrap">{lead.phone || '-'}</TableCell>
+                                <TableCell className="text-[11px] py-0.5 px-2">{enrich?.state || '-'}</TableCell>
+                                <TableCell className="text-[11px] py-0.5 px-2">{lead.source}</TableCell>
+                                <TableCell className="text-[11px] py-0.5 px-2">
+                                  {lead.is_spam ? (
+                                    <Badge variant="destructive" className="text-[10px] px-1 py-0">Spam</Badge>
+                                  ) : (
+                                    <Badge className="bg-chart-2/20 text-chart-2 border-chart-2/30 text-[10px] px-1 py-0">{lead.status || 'new'}</Badge>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
                         </TableBody>
                       </Table>
-                    </ScrollArea>
+                    </div>
                   </TabsContent>
 
                   {/* Calls Tab */}
