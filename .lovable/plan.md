@@ -1,117 +1,63 @@
 
 
-# Daily Accuracy Assurance System
+## Plan: Redesigned Agency Dashboard Roll-Up Table
 
-## Summary
+The current table has 20+ columns making it hard to scan. The reference image shows a much cleaner layout with focused columns and sync/bottleneck diagnostics. Here is the plan to implement this.
 
-Build a standalone metrics reconciliation system that runs independently of the sync pipeline, ensuring `daily_metrics` always matches source-of-truth tables (`leads`, `calls`, `funded_investors`) while preserving Meta Ads data. This addresses 6 identified accuracy gaps including a critical bug where the current recalculation deletes ad spend data on days with zero CRM activity.
+### New Column Layout
 
----
+Replace the current wide table with these focused columns:
 
-## Critical Bug Found
+| Column | Source | Notes |
+|--------|--------|-------|
+| Client | client.name | Sticky left |
+| Meta Spend | totalAdSpend | Currency |
+| Meta Leads | totalLeads | Number |
+| CPL | costPerLead | Currency, threshold-colored |
+| GHL Leads | From leads table count or sync data | Separate from Meta leads |
+| Booked Calls | totalCalls | Number |
+| Shows | showedCalls | Number |
+| Funded | fundedInvestors | Number, highlighted |
+| L→B % | leads-to-booked conversion | Percent |
+| B→S % | booked-to-showed conversion | Percent |
+| S→F % | showed-to-funded conversion | Percent |
+| Bottleneck | Computed: lowest conversion stage | Strikethrough text showing weakest link |
+| Meta Sync | Derived from meta sync timestamps | Healthy/Stale/Not Synced badge |
+| Meta Last Sync | Last meta sync timestamp | Formatted datetime |
+| GHL | CRM connection status | Connected/Missing badge |
 
-The existing `recalculateRecentMetrics` function (line 2751-2886 of `sync-ghl-contacts`) **deletes** all `daily_metrics` rows for the last 7 days, then only re-inserts rows where CRM activity exists. Any day with Meta ad spend but zero leads/calls/funded loses its ad_spend, impressions, and clicks data permanently. This must be fixed as part of this work.
+### Bottleneck Logic
 
----
+Compute three conversion rates (L→B, B→S, S→F). The stage with the lowest rate gets flagged as the bottleneck, displayed with strikethrough styling matching the reference (e.g., "Lead→Booked" in red strikethrough).
 
-## What Gets Built
+### GHL Leads Column
 
-### 1. New `recalculate-daily-metrics` Edge Function (Highest Priority)
+Query the `leads` table count per client where `source = 'ghl'` or derive from the difference between Meta leads and total leads. Alternatively, use the existing metrics but label distinctly.
 
-A standalone function that recalculates CRM-sourced columns in `daily_metrics` for all active clients across a configurable date range, **without touching ad spend columns**.
+### Implementation Details
 
-Logic per client per date:
-- Count non-spam leads from `leads` where `created_at` falls on that date
-- Count spam leads separately
-- Count booked calls (non-reconnect) from `calls` where `booked_at` falls on that date
-- Count showed calls (non-reconnect) where `showed = true`
-- Count reconnect calls and reconnect showed
-- Sum funded investors and funded dollars from `funded_investors` where `funded_at` falls on that date
-- **UPSERT** into `daily_metrics` using `ON CONFLICT (client_id, date)` -- only updating CRM columns, never overwriting `ad_spend`, `impressions`, `clicks`, or `ctr`
+1. **Edit `DraggableClientTable.tsx`**:
+   - Replace the 20-column header with the 15-column layout above
+   - Remove: CTR, Spam/Bad, Cost/Call, Showed %, Cost/Show, Commit, Commit $, Funded $, Cost/Inv, CoC %, Est. Rev, Pacing
+   - Add: GHL Leads (from metrics or leads query), L→B %, B→S %, S→F %, Bottleneck, Meta Sync status, Meta Last Sync datetime, GHL connection status
+   - Add bottleneck computation function that identifies the weakest conversion stage
+   - Add Meta sync status derived from `client.last_ghl_sync_at` and meta ad sync timestamps
+   - Style bottleneck with strikethrough text and color coding
 
-The function accepts optional `startDate`, `endDate`, and `clientId` parameters. Defaults to yesterday + today for all active clients.
+2. **Add Meta sync info**: Use existing client fields (`meta_ad_account_id`, ad sync data) to determine Meta sync health. Check if `daily_metrics` has recent rows or use the `integration_status` table.
 
-### 2. New `daily-accuracy-check` Edge Function
+3. **Sorting**: Update sort config to match new columns. Keep drag-to-reorder.
 
-A validation function that compares `daily_metrics` against live source table counts for yesterday across all clients. For each discrepancy found:
-- Logs it to a new `sync_accuracy_log` table
-- Triggers recalculation for that specific client/date
-- Returns a summary of discrepancies found and auto-fixed
+4. **Styling**: Dark row backgrounds, compact row height, monospace numbers, color-coded percentages (green >50%, red <20%), strikethrough bottleneck labels.
 
-### 3. New `sync_accuracy_log` Database Table
+### Data Sources
 
-```text
-Columns:
-- id (uuid, PK)
-- client_id (uuid)
-- check_date (date) -- the date being validated
-- metric_type (text) -- 'leads', 'calls', 'showed_calls', 'funded_investors', etc.
-- expected_count (integer) -- from source tables
-- actual_count (integer) -- from daily_metrics
-- discrepancy (integer) -- difference
-- auto_fixed (boolean)
-- created_at (timestamptz)
-```
+- All current metric data remains from existing `metrics` prop
+- GHL Leads: derive from leads data or use a new field
+- Meta Sync: query `integration_status` table or derive from `daily_metrics` last date
+- GHL status: existing `getClientSyncStatus()` helper already computes this
 
-### 4. Fix `recalculateRecentMetrics` in Both Sync Functions
+### Files Changed
 
-Change the DELETE + INSERT pattern to an UPSERT pattern that preserves ad spend columns. Instead of deleting rows and re-inserting, it will upsert only CRM columns (leads, calls, showed, funded, etc.) while leaving ad_spend/impressions/clicks/ctr untouched.
-
-This fix applies to:
-- `supabase/functions/sync-ghl-contacts/index.ts` (lines 2751-2893)
-- `supabase/functions/sync-hubspot-contacts/index.ts` (same pattern)
-
-### 5. New Cron Jobs
-
-| Job | Schedule | What it does |
-|-----|----------|--------------|
-| `daily-metrics-recalculate` | `0 13 * * *` (5 AM PST) | Runs `recalculate-daily-metrics` for yesterday + today |
-| `daily-accuracy-check` | `0 14 * * *` (6 AM PST) | Runs `daily-accuracy-check` to validate and auto-fix |
-
-### 6. Fix Pipeline Funded Investor External ID
-
-Normalize the `external_id` in the pipeline-based funded investor creation path to always use `contactId` (not `opp.contactId + opp.id`), consistent with the tag-based path. The existing unique constraint on `(client_id, external_id)` will then properly prevent duplicates across both paths.
-
-### 7. Accuracy Health in Agency Sync Panel
-
-Add a small accuracy indicator to `AgencySyncStatusPanel.tsx`:
-- Show last accuracy check timestamp
-- Show discrepancy count from yesterday
-- Green if 0 discrepancies, yellow if auto-fixed, red if unfixed
-
----
-
-## Files to Create
-
-1. `supabase/functions/recalculate-daily-metrics/index.ts`
-2. `supabase/functions/daily-accuracy-check/index.ts`
-
-## Files to Modify
-
-1. `supabase/functions/sync-ghl-contacts/index.ts` -- Fix `recalculateRecentMetrics` to use upsert instead of delete+insert; fix pipeline funded investor external_id
-2. `supabase/functions/sync-hubspot-contacts/index.ts` -- Same upsert fix for its copy of `recalculateRecentMetrics`
-3. `supabase/config.toml` -- Register 2 new functions with `verify_jwt = false`
-4. `src/components/dashboard/AgencySyncStatusPanel.tsx` -- Add accuracy health indicator
-
-## Database Changes
-
-1. Create `sync_accuracy_log` table (via migration)
-2. Add 2 new cron jobs (via insert tool, not migration)
-
-## Existing Cron Jobs to Keep
-
-The existing hourly sync jobs (GHL contacts, calendar, pipelines, HubSpot) and the 6-hour orchestrators remain unchanged. The new daily recalculation runs *after* all syncs complete, acting as a safety net.
-
----
-
-## Implementation Order
-
-1. Fix the critical `recalculateRecentMetrics` bug (upsert pattern) in both sync functions
-2. Create `sync_accuracy_log` table
-3. Build `recalculate-daily-metrics` edge function
-4. Build `daily-accuracy-check` edge function
-5. Register functions in config.toml
-6. Add cron jobs
-7. Fix pipeline funded investor dedup
-8. Add accuracy health to sync panel
+- `src/components/dashboard/DraggableClientTable.tsx` — Major rewrite of columns and computed values
 
