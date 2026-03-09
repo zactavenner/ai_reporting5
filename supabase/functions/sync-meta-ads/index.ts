@@ -58,8 +58,9 @@ async function fetchAllPages(url: string, accessToken: string, limit = 100, labe
 }
 
 function getTimeRange(startDate?: string, endDate?: string): string {
-  const since = startDate || "2026-01-01";
   const until = endDate || new Date().toISOString().split("T")[0];
+  // Default to last 30 days instead of all-time to avoid Meta API "reduce data" errors
+  const since = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
   return `time_range={"since":"${since}","until":"${until}"}`;
 }
 
@@ -622,7 +623,7 @@ Deno.serve(async (req) => {
 
       checkCallBudget("ad-insights");
       const adInsights = await fetchAllPages(
-        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,ctr,cpc,cpm,reach,conversions,cost_per_action_type&level=ad&${getTimeRange(startDate, endDate)}&time_increment=all_days`,
+        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,ctr,cpc,cpm,reach&level=ad&${getTimeRange(startDate, endDate)}&time_increment=all_days`,
         accessToken, 50, "ad-insights"
       );
       for (const ins of adInsights) {
