@@ -572,17 +572,17 @@ function SortableHeader({
 
   return (
     <TableHead
-      className="font-bold text-sm text-right cursor-pointer select-none hover:bg-muted/50 transition-colors"
+      className="font-bold text-xs text-right cursor-pointer select-none hover:bg-muted/50 transition-colors py-1"
       onClick={() => onSort(column)}
     >
-      <div className="flex items-center gap-1 justify-end">
+      <div className="flex items-center gap-0.5 justify-end">
         <span>{label}</span>
         {direction === 'asc' ? (
-          <ArrowUp className="h-3 w-3" />
+          <ArrowUp className="h-2.5 w-2.5" />
         ) : direction === 'desc' ? (
-          <ArrowDown className="h-3 w-3" />
+          <ArrowDown className="h-2.5 w-2.5" />
         ) : (
-          <ArrowUpDown className="h-3 w-3 opacity-30" />
+          <ArrowUpDown className="h-2.5 w-2.5 opacity-30" />
         )}
       </div>
     </TableHead>
