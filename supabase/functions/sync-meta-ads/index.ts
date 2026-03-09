@@ -623,7 +623,7 @@ Deno.serve(async (req) => {
 
       checkCallBudget("ad-insights");
       const adInsights = await fetchAllPages(
-        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,ctr,cpc,cpm,reach,conversions,cost_per_action_type&level=ad&${getTimeRange(startDate, endDate)}&time_increment=all_days`,
+        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,ctr,cpc,cpm,reach&level=ad&${getTimeRange(startDate, endDate)}&time_increment=all_days`,
         accessToken, 50, "ad-insights"
       );
       for (const ins of adInsights) {
