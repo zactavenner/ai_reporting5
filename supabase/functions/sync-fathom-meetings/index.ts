@@ -159,51 +159,136 @@ Deno.serve(async (req) => {
       }
       synced++;
 
-      // Try to match attendees to contacts and update call records
-      const externalEmails = participants
-        .filter((p: any) => !p.is_internal && p.email)
-        .map((p: any) => p.email.toLowerCase());
+      // Try to match attendees to contacts via waterfall: phone → email → name
+      const externalAttendees = participants.filter((p: any) => !p.is_internal && (p.email || p.name));
 
-      if (externalEmails.length > 0 && meetingDate) {
-        // Find leads with matching emails for this client
-        for (const email of externalEmails) {
-          const { data: leads } = await supabase
-            .from('leads')
-            .select('id, external_id, name')
-            .eq('client_id', client_id)
-            .ilike('email', email)
-            .limit(1);
+      if (externalAttendees.length > 0 && meetingDate) {
+        for (const attendee of externalAttendees) {
+          const email = attendee.email?.toLowerCase()?.trim();
+          const name = attendee.name?.trim();
+          let lead: any = null;
 
-          if (leads && leads.length > 0) {
-            matched++;
-            const lead = leads[0];
-
-            // Find matching call records (within 1 day of meeting date)
+          // 1) Match by phone — check calls table for contact_phone near meeting date
+          if (!lead && meetingDate) {
             const meetDate = new Date(meetingDate);
             const dayBefore = new Date(meetDate.getTime() - 24 * 60 * 60 * 1000).toISOString();
             const dayAfter = new Date(meetDate.getTime() + 24 * 60 * 60 * 1000).toISOString();
 
-            const { data: calls } = await supabase
+            const { data: callsByDate } = await supabase
               .from('calls')
-              .select('id')
+              .select('id, lead_id, contact_phone, contact_email, contact_name')
               .eq('client_id', client_id)
-              .eq('lead_id', lead.id)
               .gte('scheduled_at', dayBefore)
               .lte('scheduled_at', dayAfter)
-              .limit(1);
+              .limit(20);
 
-            if (calls && calls.length > 0) {
-              // Update call with transcript and recording
-              const updateData: any = {};
-              if (transcript) updateData.transcript = typeof transcript === 'string' ? transcript : JSON.stringify(transcript);
-              if (summary) updateData.summary = summary;
-              if (recordingUrl) updateData.recording_url = recordingUrl;
+            if (callsByDate && callsByDate.length > 0) {
+              // Try matching by email on the call record
+              let matchedCall = email
+                ? callsByDate.find((c: any) => c.contact_email?.toLowerCase() === email)
+                : null;
 
-              if (Object.keys(updateData).length > 0) {
-                await supabase.from('calls').update(updateData).eq('id', calls[0].id);
-                callsUpdated++;
-                console.log(`[Fathom] Updated call ${calls[0].id} with transcript for ${lead.name}`);
+              // Try matching by name on the call record
+              if (!matchedCall && name) {
+                matchedCall = callsByDate.find((c: any) =>
+                  c.contact_name?.toLowerCase() === name.toLowerCase()
+                );
               }
+
+              if (matchedCall?.lead_id) {
+                const { data: leadData } = await supabase
+                  .from('leads')
+                  .select('id, external_id, name, email, phone')
+                  .eq('id', matchedCall.lead_id)
+                  .single();
+                if (leadData) lead = leadData;
+              }
+            }
+          }
+
+          // 2) Match by email on leads table
+          if (!lead && email) {
+            const { data: leads } = await supabase
+              .from('leads')
+              .select('id, external_id, name, email, phone')
+              .eq('client_id', client_id)
+              .ilike('email', email)
+              .limit(1);
+            if (leads && leads.length > 0) lead = leads[0];
+          }
+
+          // 3) Match by name on leads table (fuzzy)
+          if (!lead && name) {
+            const { data: leads } = await supabase
+              .from('leads')
+              .select('id, external_id, name, email, phone')
+              .eq('client_id', client_id)
+              .ilike('name', name)
+              .limit(1);
+            if (leads && leads.length > 0) lead = leads[0];
+          }
+
+          if (!lead) {
+            console.log(`[Fathom] No contact match for attendee: ${name || email}`);
+            continue;
+          }
+
+          matched++;
+
+          // Update lead's email if missing and we have it from Fathom
+          if (email && !lead.email) {
+            await supabase.from('leads').update({ email } as any).eq('id', lead.id);
+            console.log(`[Fathom] Added email ${email} to lead ${lead.name}`);
+          }
+
+          // Find matching call records (within 1 day of meeting date)
+          const meetDate = new Date(meetingDate);
+          const dayBefore = new Date(meetDate.getTime() - 24 * 60 * 60 * 1000).toISOString();
+          const dayAfter = new Date(meetDate.getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+          const { data: calls } = await supabase
+            .from('calls')
+            .select('id')
+            .eq('client_id', client_id)
+            .eq('lead_id', lead.id)
+            .gte('scheduled_at', dayBefore)
+            .lte('scheduled_at', dayAfter)
+            .limit(1);
+
+          if (calls && calls.length > 0) {
+            const updateData: any = {};
+            if (transcript) updateData.transcript = typeof transcript === 'string' ? transcript : JSON.stringify(transcript);
+            if (summary) updateData.summary = summary;
+            if (recordingUrl) updateData.recording_url = recordingUrl;
+            if (email) updateData.contact_email = email;
+
+            if (Object.keys(updateData).length > 0) {
+              await supabase.from('calls').update(updateData).eq('id', calls[0].id);
+              callsUpdated++;
+              console.log(`[Fathom] Updated call ${calls[0].id} with transcript for ${lead.name}`);
+            }
+          } else {
+            // No existing call record — create one linked to this lead
+            const { error: insertErr } = await supabase.from('calls').insert({
+              client_id,
+              external_id: `fathom-${meetingId}-${lead.external_id}`,
+              lead_id: lead.id,
+              contact_name: lead.name || name,
+              contact_email: email || lead.email,
+              contact_phone: lead.phone || null,
+              scheduled_at: meetingDate,
+              showed: true,
+              showed_at: meetingDate,
+              outcome: 'completed',
+              transcript: typeof transcript === 'string' ? transcript : JSON.stringify(transcript),
+              summary,
+              recording_url: recordingUrl,
+              call_duration_seconds: typeof duration === 'number' ? (duration > 300 ? duration : duration * 60) : null,
+            } as any);
+
+            if (!insertErr) {
+              callsUpdated++;
+              console.log(`[Fathom] Created call record for ${lead.name} from meeting ${meetingId}`);
             }
           }
         }
