@@ -196,6 +196,7 @@ export function DraggableClientTable({
         case 'adSpend': aVal = a.metrics.totalAdSpend || 0; bVal = b.metrics.totalAdSpend || 0; break;
         case 'metaLeads': aVal = a.metrics.totalLeads || 0; bVal = b.metrics.totalLeads || 0; break;
         case 'cpl': aVal = a.metrics.costPerLead || 0; bVal = b.metrics.costPerLead || 0; break;
+        case 'crmLeads': aVal = (a.metrics.totalLeads || 0) + (a.metrics.spamLeads || 0); bVal = (b.metrics.totalLeads || 0) + (b.metrics.spamLeads || 0); break;
         case 'calls': aVal = a.metrics.totalCalls || 0; bVal = b.metrics.totalCalls || 0; break;
         case 'showed': aVal = a.metrics.showedCalls || 0; bVal = b.metrics.showedCalls || 0; break;
         case 'funded': aVal = a.metrics.fundedInvestors || 0; bVal = b.metrics.fundedInvestors || 0; break;
@@ -318,25 +319,25 @@ export function DraggableClientTable({
         </div>
       )}
       <div className="border-2 border-border bg-card overflow-x-auto scrollbar-thin">
-        <Table className="min-w-[1400px]">
+        <Table className="min-w-[1500px]">
           <TableHeader>
-            <TableRow className="border-b-2">
-              <TableHead className="w-10 sticky left-0 bg-card z-10"></TableHead>
-              <TableHead className="font-bold text-sm sticky left-10 bg-card z-10 min-w-[140px]">Client</TableHead>
+            <TableRow className="border-b-2 h-8">
+              <TableHead className="w-8 sticky left-0 bg-card z-10 py-1"></TableHead>
+              <TableHead className="font-bold text-xs sticky left-8 bg-card z-10 min-w-[120px] py-1">Client</TableHead>
               <SortableHeader column="adSpend" label="Meta Spend" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="metaLeads" label="Meta Leads" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="cpl" label="CPL" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="crmLeads" label="CRM Leads" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="calls" label="Booked" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="showed" label="Shows" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="funded" label="Funded" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="ltb" label="L→B %" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="bts" label="B→S %" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="stf" label="S→F %" sortConfig={sortConfig} onSort={handleSort} />
-              <TableHead className="font-bold text-sm text-center min-w-[100px]">Bottleneck</TableHead>
-              <TableHead className="font-bold text-sm text-center min-w-[90px]">Meta Sync</TableHead>
-              <TableHead className="font-bold text-sm text-center min-w-[110px]">Last Sync</TableHead>
-              <TableHead className="font-bold text-sm text-center min-w-[80px]">CRM</TableHead>
-              <TableHead className="font-bold text-sm min-w-[100px]">Actions</TableHead>
+              <TableHead className="font-bold text-xs text-center min-w-[80px] py-1">Bottleneck</TableHead>
+              <TableHead className="font-bold text-xs text-center min-w-[70px] py-1">Meta Sync</TableHead>
+              <TableHead className="font-bold text-xs text-center min-w-[80px] py-1">CRM</TableHead>
+              <TableHead className="font-bold text-xs min-w-[90px] py-1">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -349,7 +350,7 @@ export function DraggableClientTable({
                 <TooltipProvider key={client.id}>
                   <TableRow
                     className={cn(
-                      "cursor-pointer hover:bg-muted/50 border-b h-12",
+                      "cursor-pointer hover:bg-muted/50 border-b h-9",
                       draggedId === client.id && "opacity-50",
                       syncBorderStyle
                     )}
@@ -361,9 +362,9 @@ export function DraggableClientTable({
                     onClick={() => navigate(`/client/${client.id}`)}
                   >
                     {/* Drag handle + sync dot */}
-                    <TableCell className="cursor-grab sticky left-0 bg-card z-10" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-1">
-                        <GripVertical className="h-4 w-4 text-muted-foreground" />
+                    <TableCell className="cursor-grab sticky left-0 bg-card z-10 py-1 px-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-0.5">
+                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
                         {apiTestResults[client.id] ? (
                           <ApiConnectionStatus
                             contacts={apiTestResults[client.id].contacts}
@@ -376,7 +377,7 @@ export function DraggableClientTable({
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className={cn(
-                                "ml-1",
+                                "ml-0.5",
                                 syncInfo.status === 'healthy' && 'text-chart-2',
                                 syncInfo.status === 'stale' && 'text-yellow-600 dark:text-yellow-500',
                                 syncInfo.status === 'error' && 'text-destructive',
@@ -408,41 +409,46 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* Client name */}
-                    <TableCell className="font-semibold text-sm sticky left-10 bg-card z-10">
+                    <TableCell className="font-medium text-xs sticky left-8 bg-card z-10 py-1">
                       {client.name}
                     </TableCell>
 
                     {/* Meta Spend */}
-                    <TableCell className="text-right font-mono tabular-nums text-sm">
+                    <TableCell className="text-right font-mono tabular-nums text-xs py-1">
                       {formatCurrency(m.totalAdSpend || 0)}
                     </TableCell>
 
                     {/* Meta Leads */}
-                    <TableCell className="text-right font-mono tabular-nums text-sm">
+                    <TableCell className="text-right font-mono tabular-nums text-xs py-1">
                       {m.totalLeads || 0}
                     </TableCell>
 
                     {/* CPL */}
                     <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-sm",
+                      "text-right font-mono tabular-nums text-xs py-1",
                       getThresholdColor(m.costPerLead || 0, t.costPerLead)
                     )}>
                       {formatCurrency(m.costPerLead || 0)}
                     </TableCell>
 
+                    {/* CRM Leads */}
+                    <TableCell className="text-right font-mono tabular-nums text-xs py-1">
+                      {(m.totalLeads || 0) + (m.spamLeads || 0)}
+                    </TableCell>
+
                     {/* Booked Calls */}
-                    <TableCell className="text-right font-mono tabular-nums text-sm">
+                    <TableCell className="text-right font-mono tabular-nums text-xs py-1">
                       {m.totalCalls || 0}
                     </TableCell>
 
                     {/* Shows */}
-                    <TableCell className="text-right font-mono tabular-nums text-sm">
+                    <TableCell className="text-right font-mono tabular-nums text-xs py-1">
                       {m.showedCalls || 0}
                     </TableCell>
 
                     {/* Funded */}
                     <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-sm",
+                      "text-right font-mono tabular-nums text-xs py-1",
                       (m.fundedInvestors || 0) > 0 && 'text-chart-2 font-semibold'
                     )}>
                       {m.fundedInvestors || 0}
@@ -450,7 +456,7 @@ export function DraggableClientTable({
 
                     {/* L→B % */}
                     <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-sm",
+                      "text-right font-mono tabular-nums text-xs py-1",
                       getConversionColor(computed.leadToBooked)
                     )}>
                       {computed.leadToBooked > 0 ? formatPercent(computed.leadToBooked) : '-'}
@@ -458,7 +464,7 @@ export function DraggableClientTable({
 
                     {/* B→S % */}
                     <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-sm",
+                      "text-right font-mono tabular-nums text-xs py-1",
                       getConversionColor(computed.bookedToShowed)
                     )}>
                       {computed.bookedToShowed > 0 ? formatPercent(computed.bookedToShowed) : '-'}
@@ -466,14 +472,14 @@ export function DraggableClientTable({
 
                     {/* S→F % */}
                     <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-sm",
+                      "text-right font-mono tabular-nums text-xs py-1",
                       getConversionColor(computed.showedToFunded)
                     )}>
                       {computed.showedToFunded > 0 ? formatPercent(computed.showedToFunded) : '-'}
                     </TableCell>
 
                     {/* Bottleneck */}
-                    <TableCell className="text-center text-sm">
+                    <TableCell className="text-center text-xs py-1">
                       {computed.bottleneck ? (
                         <span className="text-destructive line-through font-medium">
                           {computed.bottleneck.label}
@@ -484,7 +490,7 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* Meta Sync Status */}
-                    <TableCell className="text-center">
+                    <TableCell className="text-center py-1">
                       {computed.metaSync.status === 'healthy' && (
                         <Badge variant="success" className="text-[10px] px-1.5 py-0">Healthy</Badge>
                       )}
@@ -496,16 +502,8 @@ export function DraggableClientTable({
                       )}
                     </TableCell>
 
-                    {/* Meta Last Sync */}
-                    <TableCell className="text-center text-xs text-muted-foreground">
-                      {computed.metaSync.lastSyncAt
-                        ? formatDistanceToNow(new Date(computed.metaSync.lastSyncAt), { addSuffix: true })
-                        : '-'
-                      }
-                    </TableCell>
-
                     {/* CRM Status */}
-                    <TableCell className="text-center">
+                    <TableCell className="text-center py-1">
                       {syncInfo.status === 'healthy' && (
                         <Badge variant="success" className="text-[10px] px-1.5 py-0">
                           {syncInfo.source === 'hubspot' ? 'HS' : 'GHL'}
@@ -525,23 +523,23 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* Actions */}
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-0.5">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => openAdsManager(e, client.business_manager_url)} title="Ads Manager">
-                          <BarChart3 className="h-3.5 w-3.5" />
+                    <TableCell className="py-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-0">
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => openAdsManager(e, client.business_manager_url)} title="Ads Manager">
+                          <BarChart3 className="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onOpenSettings(client)}>
-                          <Settings className="h-3.5 w-3.5" />
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onOpenSettings(client)}>
+                          <Settings className="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => client.public_token && copyPublicLink(client.public_token)}>
-                          <Copy className="h-3.5 w-3.5" />
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => client.public_token && copyPublicLink(client.public_token)}>
+                          <Copy className="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate(`/client/${client.id}`)}>
-                          <ExternalLink className="h-3.5 w-3.5" />
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => navigate(`/client/${client.id}`)}>
+                          <ExternalLink className="h-3 w-3" />
                         </Button>
                         {onDeleteClient && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDeleteClient(client)}>
-                            <Trash2 className="h-3.5 w-3.5" />
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => onDeleteClient(client)}>
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         )}
                       </div>
@@ -574,17 +572,17 @@ function SortableHeader({
 
   return (
     <TableHead
-      className="font-bold text-sm text-right cursor-pointer select-none hover:bg-muted/50 transition-colors"
+      className="font-bold text-xs text-right cursor-pointer select-none hover:bg-muted/50 transition-colors py-1"
       onClick={() => onSort(column)}
     >
-      <div className="flex items-center gap-1 justify-end">
+      <div className="flex items-center gap-0.5 justify-end">
         <span>{label}</span>
         {direction === 'asc' ? (
-          <ArrowUp className="h-3 w-3" />
+          <ArrowUp className="h-2.5 w-2.5" />
         ) : direction === 'desc' ? (
-          <ArrowDown className="h-3 w-3" />
+          <ArrowDown className="h-2.5 w-2.5" />
         ) : (
-          <ArrowUpDown className="h-3 w-3 opacity-30" />
+          <ArrowUpDown className="h-2.5 w-2.5 opacity-30" />
         )}
       </div>
     </TableHead>
