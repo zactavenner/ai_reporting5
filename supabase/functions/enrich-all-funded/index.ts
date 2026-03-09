@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     while (true) {
       const { data: page, error: pageErr } = await supabase
         .from('lead_enrichment')
-        .select('external_id, first_name, last_name, enriched_phones, enriched_emails, city, state, zip, address, source')
+        .select('external_id, first_name, last_name, enriched_phones, enriched_emails, city, state, zip, address, source, lead_id')
         .eq('client_id', client_id)
         .in('source', ['bulk-import-pending', 'bulk-import'])
         .range(offset, offset + pageSize - 1);
