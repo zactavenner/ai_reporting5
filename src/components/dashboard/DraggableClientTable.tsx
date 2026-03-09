@@ -350,7 +350,7 @@ export function DraggableClientTable({
                 <TooltipProvider key={client.id}>
                   <TableRow
                     className={cn(
-                      "cursor-pointer hover:bg-muted/50 border-b h-12",
+                      "cursor-pointer hover:bg-muted/50 border-b h-9",
                       draggedId === client.id && "opacity-50",
                       syncBorderStyle
                     )}
@@ -362,9 +362,9 @@ export function DraggableClientTable({
                     onClick={() => navigate(`/client/${client.id}`)}
                   >
                     {/* Drag handle + sync dot */}
-                    <TableCell className="cursor-grab sticky left-0 bg-card z-10" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-1">
-                        <GripVertical className="h-4 w-4 text-muted-foreground" />
+                    <TableCell className="cursor-grab sticky left-0 bg-card z-10 py-1 px-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-0.5">
+                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
                         {apiTestResults[client.id] ? (
                           <ApiConnectionStatus
                             contacts={apiTestResults[client.id].contacts}
@@ -377,7 +377,7 @@ export function DraggableClientTable({
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className={cn(
-                                "ml-1",
+                                "ml-0.5",
                                 syncInfo.status === 'healthy' && 'text-chart-2',
                                 syncInfo.status === 'stale' && 'text-yellow-600 dark:text-yellow-500',
                                 syncInfo.status === 'error' && 'text-destructive',
@@ -409,41 +409,46 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* Client name */}
-                    <TableCell className="font-semibold text-sm sticky left-10 bg-card z-10">
+                    <TableCell className="font-medium text-xs sticky left-8 bg-card z-10 py-1">
                       {client.name}
                     </TableCell>
 
                     {/* Meta Spend */}
-                    <TableCell className="text-right font-mono tabular-nums text-sm">
+                    <TableCell className="text-right font-mono tabular-nums text-xs py-1">
                       {formatCurrency(m.totalAdSpend || 0)}
                     </TableCell>
 
                     {/* Meta Leads */}
-                    <TableCell className="text-right font-mono tabular-nums text-sm">
+                    <TableCell className="text-right font-mono tabular-nums text-xs py-1">
                       {m.totalLeads || 0}
                     </TableCell>
 
                     {/* CPL */}
                     <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-sm",
+                      "text-right font-mono tabular-nums text-xs py-1",
                       getThresholdColor(m.costPerLead || 0, t.costPerLead)
                     )}>
                       {formatCurrency(m.costPerLead || 0)}
                     </TableCell>
 
+                    {/* CRM Leads */}
+                    <TableCell className="text-right font-mono tabular-nums text-xs py-1">
+                      {(m.totalLeads || 0) + (m.spamLeads || 0)}
+                    </TableCell>
+
                     {/* Booked Calls */}
-                    <TableCell className="text-right font-mono tabular-nums text-sm">
+                    <TableCell className="text-right font-mono tabular-nums text-xs py-1">
                       {m.totalCalls || 0}
                     </TableCell>
 
                     {/* Shows */}
-                    <TableCell className="text-right font-mono tabular-nums text-sm">
+                    <TableCell className="text-right font-mono tabular-nums text-xs py-1">
                       {m.showedCalls || 0}
                     </TableCell>
 
                     {/* Funded */}
                     <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-sm",
+                      "text-right font-mono tabular-nums text-xs py-1",
                       (m.fundedInvestors || 0) > 0 && 'text-chart-2 font-semibold'
                     )}>
                       {m.fundedInvestors || 0}
@@ -451,7 +456,7 @@ export function DraggableClientTable({
 
                     {/* L→B % */}
                     <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-sm",
+                      "text-right font-mono tabular-nums text-xs py-1",
                       getConversionColor(computed.leadToBooked)
                     )}>
                       {computed.leadToBooked > 0 ? formatPercent(computed.leadToBooked) : '-'}
@@ -459,7 +464,7 @@ export function DraggableClientTable({
 
                     {/* B→S % */}
                     <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-sm",
+                      "text-right font-mono tabular-nums text-xs py-1",
                       getConversionColor(computed.bookedToShowed)
                     )}>
                       {computed.bookedToShowed > 0 ? formatPercent(computed.bookedToShowed) : '-'}
@@ -467,14 +472,14 @@ export function DraggableClientTable({
 
                     {/* S→F % */}
                     <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-sm",
+                      "text-right font-mono tabular-nums text-xs py-1",
                       getConversionColor(computed.showedToFunded)
                     )}>
                       {computed.showedToFunded > 0 ? formatPercent(computed.showedToFunded) : '-'}
                     </TableCell>
 
                     {/* Bottleneck */}
-                    <TableCell className="text-center text-sm">
+                    <TableCell className="text-center text-xs py-1">
                       {computed.bottleneck ? (
                         <span className="text-destructive line-through font-medium">
                           {computed.bottleneck.label}
@@ -485,7 +490,7 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* Meta Sync Status */}
-                    <TableCell className="text-center">
+                    <TableCell className="text-center py-1">
                       {computed.metaSync.status === 'healthy' && (
                         <Badge variant="success" className="text-[10px] px-1.5 py-0">Healthy</Badge>
                       )}
@@ -497,16 +502,8 @@ export function DraggableClientTable({
                       )}
                     </TableCell>
 
-                    {/* Meta Last Sync */}
-                    <TableCell className="text-center text-xs text-muted-foreground">
-                      {computed.metaSync.lastSyncAt
-                        ? formatDistanceToNow(new Date(computed.metaSync.lastSyncAt), { addSuffix: true })
-                        : '-'
-                      }
-                    </TableCell>
-
                     {/* CRM Status */}
-                    <TableCell className="text-center">
+                    <TableCell className="text-center py-1">
                       {syncInfo.status === 'healthy' && (
                         <Badge variant="success" className="text-[10px] px-1.5 py-0">
                           {syncInfo.source === 'hubspot' ? 'HS' : 'GHL'}
@@ -526,23 +523,23 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* Actions */}
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-0.5">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => openAdsManager(e, client.business_manager_url)} title="Ads Manager">
-                          <BarChart3 className="h-3.5 w-3.5" />
+                    <TableCell className="py-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-0">
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => openAdsManager(e, client.business_manager_url)} title="Ads Manager">
+                          <BarChart3 className="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onOpenSettings(client)}>
-                          <Settings className="h-3.5 w-3.5" />
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onOpenSettings(client)}>
+                          <Settings className="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => client.public_token && copyPublicLink(client.public_token)}>
-                          <Copy className="h-3.5 w-3.5" />
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => client.public_token && copyPublicLink(client.public_token)}>
+                          <Copy className="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate(`/client/${client.id}`)}>
-                          <ExternalLink className="h-3.5 w-3.5" />
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => navigate(`/client/${client.id}`)}>
+                          <ExternalLink className="h-3 w-3" />
                         </Button>
                         {onDeleteClient && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDeleteClient(client)}>
-                            <Trash2 className="h-3.5 w-3.5" />
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => onDeleteClient(client)}>
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         )}
                       </div>
