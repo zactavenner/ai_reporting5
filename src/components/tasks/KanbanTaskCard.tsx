@@ -191,8 +191,8 @@ export function KanbanTaskCard({
             {task.visible_to_client === false && !isPublicView && (
               <TooltipProvider>
                 <Tooltip>
-                  <TooltipTrigger asChild>
-                    <EyeOff className="h-3 w-3 text-muted-foreground/70" />
+                <TooltipTrigger asChild>
+                      <span className="inline-flex"><EyeOff className="h-3 w-3 text-muted-foreground/70" /></span>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="text-xs">Hidden from client</TooltipContent>
                 </Tooltip>
