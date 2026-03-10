@@ -48,7 +48,7 @@ export function useMasterSync(clientId: string | undefined) {
     message: null,
   });
   const [configWarnings, setConfigWarnings] = useState<string[]>([]);
-  const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
+  const [pollInterval, setPollInterval] = useState<ReturnType<typeof setInterval> | null>(null);
 
   const invalidateAllQueries = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['leads'] });
