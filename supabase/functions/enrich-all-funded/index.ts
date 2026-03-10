@@ -41,6 +41,46 @@ Deno.serve(async (req) => {
       offset += pageSize;
     }
 
+    // ========== STEP 1: Link unlinked funded investors to leads by external_id ==========
+    const unlinked = allFunded.filter(f => !f.lead_id && f.external_id && !f.external_id.startsWith('wh_funded_') && !f.external_id.startsWith('manual-'));
+    if (unlinked.length > 0) {
+      console.log(`[EnrichFunded] Linking ${unlinked.length} unlinked funded investors to leads...`);
+      const extIds = unlinked.map(f => f.external_id);
+      
+      // Fetch matching leads in batches
+      const leadMap = new Map<string, any>();
+      for (let i = 0; i < extIds.length; i += 100) {
+        const batch = extIds.slice(i, i + 100);
+        const { data: leads } = await supabase
+          .from('leads')
+          .select('id, external_id, phone, email, name')
+          .eq('client_id', client_id)
+          .in('external_id', batch);
+        if (leads) {
+          for (const l of leads) {
+            leadMap.set(l.external_id, l);
+          }
+        }
+      }
+
+      // Update funded investors with lead_id
+      let linkedCount = 0;
+      for (const funded of unlinked) {
+        const lead = leadMap.get(funded.external_id);
+        if (lead) {
+          const { error: updateErr } = await supabase
+            .from('funded_investors')
+            .update({ lead_id: lead.id })
+            .eq('id', funded.id);
+          if (!updateErr) {
+            funded.lead_id = lead.id;
+            linkedCount++;
+          }
+        }
+      }
+      console.log(`[EnrichFunded] Linked ${linkedCount}/${unlinked.length} funded investors to leads`);
+    }
+
     // Get already-enriched external_ids so we skip them
     const enrichedSet = new Set<string>();
     let eOffset = 0;
@@ -73,6 +113,24 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+    // Pre-fetch all leads for this client by external_id for quick lookup
+    const allLeadMap = new Map<string, any>();
+    let lOffset = 0;
+    while (true) {
+      const { data: lPage } = await supabase
+        .from('leads')
+        .select('id, external_id, phone, email, name')
+        .eq('client_id', client_id)
+        .range(lOffset, lOffset + pageSize - 1);
+      if (!lPage || lPage.length === 0) break;
+      for (const l of lPage) {
+        allLeadMap.set(l.external_id, l);
+      }
+      if (lPage.length < pageSize) break;
+      lOffset += pageSize;
+    }
+    console.log(`[EnrichFunded] Pre-loaded ${allLeadMap.size} leads for lookup`);
+
     // For each funded investor, look up their lead data and enrich
     const enrichPromise = (async () => {
       let enrichedCount = 0;
@@ -89,31 +147,40 @@ Deno.serve(async (req) => {
 
             // Parse name into first/last
             if (funded.name) {
-              const parts = funded.name.trim().split(/\s+/);
+              // Clean name — remove state suffixes like ">CA." or "-FL"
+              const cleanName = funded.name.replace(/[>-]\s*[A-Z]{2}\.?\s*$/, '').trim();
+              const parts = cleanName.split(/\s+/);
               body.first_name = parts[0];
               if (parts.length > 1) body.last_name = parts.slice(1).join(' ');
             }
 
-            // Get lead details if available
+            // Get lead details — first try lead_id, then fallback to external_id lookup
+            let lead: any = null;
             if (funded.lead_id) {
-              const { data: lead } = await supabase
+              const { data } = await supabase
                 .from('leads')
                 .select('phone, email, name, external_id')
                 .eq('id', funded.lead_id)
                 .single();
+              lead = data;
+            }
+            
+            // Fallback: look up lead by external_id from pre-loaded map
+            if (!lead && funded.external_id) {
+              lead = allLeadMap.get(funded.external_id) || null;
+            }
 
-              if (lead) {
-                if (lead.phone) body.phone = lead.phone;
-                if (lead.email) body.email = lead.email;
-                body.lead_id = funded.lead_id;
-                // Use lead's external_id for GHL linking
-                if (lead.external_id) body.external_id = lead.external_id;
-                // Use lead name if funded name is missing
-                if (!funded.name && lead.name) {
-                  const parts = lead.name.trim().split(/\s+/);
-                  body.first_name = parts[0];
-                  if (parts.length > 1) body.last_name = parts.slice(1).join(' ');
-                }
+            if (lead) {
+              if (lead.phone) body.phone = lead.phone;
+              if (lead.email) body.email = lead.email;
+              if (lead.id) body.lead_id = lead.id;
+              // Use lead's external_id for GHL linking
+              if (lead.external_id) body.external_id = lead.external_id;
+              // Use lead name if funded name is missing
+              if (!funded.name && lead.name) {
+                const parts = lead.name.trim().split(/\s+/);
+                body.first_name = parts[0];
+                if (parts.length > 1) body.last_name = parts.slice(1).join(' ');
               }
             }
 
