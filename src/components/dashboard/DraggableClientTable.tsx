@@ -13,13 +13,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -45,14 +38,6 @@ interface DraggableClientTableProps {
   isAdmin?: boolean;
   apiTestResults?: ClientApiStatus;
 }
-
-const STATUS_OPTIONS = [
-  { value: 'active', label: 'Active' },
-  { value: 'onboarding', label: 'Onboarding' },
-  { value: 'paused', label: 'Paused' },
-  { value: 'on_hold', label: 'On Hold' },
-  { value: 'inactive', label: 'Inactive' },
-];
 
 // Helper function to get CRM sync status from client data
 function getClientSyncStatus(client: Client): {
@@ -126,8 +111,6 @@ function computeBottleneck(
   ].filter(s => s.value >= 0 && isFinite(s.value));
 
   if (stages.length === 0) return null;
-
-  // Find the lowest conversion rate
   return stages.reduce((min, s) => (s.value < min.value ? s : min), stages[0]);
 }
 
@@ -168,6 +151,7 @@ export function DraggableClientTable({
       const showedToFunded = (m.showedCalls || 0) > 0 ? ((m.fundedInvestors || 0) / (m.showedCalls || 1)) * 100 : 0;
       const bottleneck = computeBottleneck(leadToBooked, bookedToShowed, showedToFunded);
       const metaSync = getMetaSyncStatus(s, client);
+      const mrr = (s as any)?.mrr || 0;
 
       return {
         client,
@@ -178,6 +162,7 @@ export function DraggableClientTable({
           showedToFunded,
           bottleneck,
           metaSync,
+          mrr,
         },
       };
     });
@@ -196,6 +181,9 @@ export function DraggableClientTable({
         case 'adSpend': aVal = a.metrics.totalAdSpend || 0; bVal = b.metrics.totalAdSpend || 0; break;
         case 'metaLeads': aVal = a.metrics.totalLeads || 0; bVal = b.metrics.totalLeads || 0; break;
         case 'cpl': aVal = a.metrics.costPerLead || 0; bVal = b.metrics.costPerLead || 0; break;
+        case 'costPerCall': aVal = a.metrics.costPerCall || 0; bVal = b.metrics.costPerCall || 0; break;
+        case 'costOfCapital': aVal = a.metrics.costOfCapital || 0; bVal = b.metrics.costOfCapital || 0; break;
+        case 'mrr': aVal = a.computed.mrr; bVal = b.computed.mrr; break;
         case 'crmLeads': aVal = (a.metrics.totalLeads || 0) + (a.metrics.spamLeads || 0); bVal = (b.metrics.totalLeads || 0) + (b.metrics.spamLeads || 0); break;
         case 'calls': aVal = a.metrics.totalCalls || 0; bVal = b.metrics.totalCalls || 0; break;
         case 'showed': aVal = a.metrics.showedCalls || 0; bVal = b.metrics.showedCalls || 0; break;
@@ -227,18 +215,11 @@ export function DraggableClientTable({
     }
   };
 
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'active': return 'success' as const;
-      case 'onboarding': return 'default' as const;
-      case 'paused':
-      case 'on_hold': return 'secondary' as const;
-      default: return 'outline' as const;
-    }
-  };
-
   const formatCurrency = (val: number) =>
     `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const formatCurrencyShort = (val: number) =>
+    val >= 1000 ? `$${(val / 1000).toFixed(1)}k` : `$${val.toFixed(0)}`;
 
   const formatPercent = (val: number) => `${val.toFixed(1)}%`;
 
@@ -310,34 +291,36 @@ export function DraggableClientTable({
     <div className="space-y-2">
       {sortConfig.column && sortConfig.direction && (
         <div className="flex items-center justify-between px-2 py-1 bg-muted/50 rounded border border-border">
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             Sorted by <strong>{sortConfig.column}</strong> ({sortConfig.direction === 'asc' ? 'Low → High' : 'High → Low'})
           </span>
-          <Button variant="outline" size="sm" onClick={handleSaveOrderAfterSort}>
-            Save This Order
+          <Button variant="outline" size="sm" className="h-5 text-[10px]" onClick={handleSaveOrderAfterSort}>
+            Save Order
           </Button>
         </div>
       )}
-      <div className="border-2 border-border bg-card overflow-x-auto scrollbar-thin">
-        <Table className="min-w-[1500px]">
+      <div className="border border-border bg-card overflow-x-auto scrollbar-thin">
+        <Table className="min-w-[1600px]">
           <TableHeader>
-            <TableRow className="border-b-2 h-8">
-              <TableHead className="w-8 sticky left-0 bg-card z-10 py-1"></TableHead>
-              <TableHead className="font-bold text-xs sticky left-8 bg-card z-10 min-w-[120px] py-1">Client</TableHead>
-              <SortableHeader column="adSpend" label="Meta Spend" sortConfig={sortConfig} onSort={handleSort} />
-              <SortableHeader column="metaLeads" label="Meta Leads" sortConfig={sortConfig} onSort={handleSort} />
+            <TableRow className="border-b h-7">
+              <TableHead className="w-7 sticky left-0 bg-card z-10 py-0 px-1"></TableHead>
+              <TableHead className="font-bold text-[11px] sticky left-7 bg-card z-10 min-w-[100px] py-0 px-1">Client</TableHead>
+              <SortableHeader column="mrr" label="MRR" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="adSpend" label="Spend" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="metaLeads" label="Leads" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="cpl" label="CPL" sortConfig={sortConfig} onSort={handleSort} />
-              <SortableHeader column="crmLeads" label="CRM Leads" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="calls" label="Booked" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="costPerCall" label="$/Call" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="showed" label="Shows" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="funded" label="Funded" sortConfig={sortConfig} onSort={handleSort} />
-              <SortableHeader column="ltb" label="L→B %" sortConfig={sortConfig} onSort={handleSort} />
-              <SortableHeader column="bts" label="B→S %" sortConfig={sortConfig} onSort={handleSort} />
-              <SortableHeader column="stf" label="S→F %" sortConfig={sortConfig} onSort={handleSort} />
-              <TableHead className="font-bold text-xs text-center min-w-[80px] py-1">Bottleneck</TableHead>
-              <TableHead className="font-bold text-xs text-center min-w-[70px] py-1">Meta Sync</TableHead>
-              <TableHead className="font-bold text-xs text-center min-w-[80px] py-1">CRM</TableHead>
-              <TableHead className="font-bold text-xs min-w-[90px] py-1">Actions</TableHead>
+              <SortableHeader column="costOfCapital" label="CoC%" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="ltb" label="L→B" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="bts" label="B→S" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="stf" label="S→F" sortConfig={sortConfig} onSort={handleSort} />
+              <TableHead className="font-bold text-[11px] text-center py-0 px-1">BN</TableHead>
+              <TableHead className="font-bold text-[11px] text-center py-0 px-1">Meta</TableHead>
+              <TableHead className="font-bold text-[11px] text-center py-0 px-1">CRM</TableHead>
+              <TableHead className="font-bold text-[11px] py-0 px-1 min-w-[70px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -350,7 +333,7 @@ export function DraggableClientTable({
                 <TooltipProvider key={client.id}>
                   <TableRow
                     className={cn(
-                      "cursor-pointer hover:bg-muted/50 border-b h-9",
+                      "cursor-pointer hover:bg-muted/50 border-b h-7",
                       draggedId === client.id && "opacity-50",
                       syncBorderStyle
                     )}
@@ -362,9 +345,9 @@ export function DraggableClientTable({
                     onClick={() => navigate(`/client/${client.id}`)}
                   >
                     {/* Drag handle + sync dot */}
-                    <TableCell className="cursor-grab sticky left-0 bg-card z-10 py-1 px-1" onClick={(e) => e.stopPropagation()}>
+                    <TableCell className="cursor-grab sticky left-0 bg-card z-10 py-0 px-1" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-0.5">
-                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+                        <GripVertical className="h-3 w-3 text-muted-foreground" />
                         {apiTestResults[client.id] ? (
                           <ApiConnectionStatus
                             contacts={apiTestResults[client.id].contacts}
@@ -383,21 +366,21 @@ export function DraggableClientTable({
                                 syncInfo.status === 'error' && 'text-destructive',
                                 syncInfo.status === 'not_configured' && 'text-muted-foreground'
                               )}>
-                                {syncInfo.status === 'healthy' && <CheckCircle className="h-3 w-3" />}
-                                {syncInfo.status === 'stale' && <Clock className="h-3 w-3" />}
-                                {syncInfo.status === 'error' && <XCircle className="h-3 w-3" />}
-                                {syncInfo.status === 'not_configured' && <AlertCircle className="h-3 w-3" />}
+                                {syncInfo.status === 'healthy' && <CheckCircle className="h-2.5 w-2.5" />}
+                                {syncInfo.status === 'stale' && <Clock className="h-2.5 w-2.5" />}
+                                {syncInfo.status === 'error' && <XCircle className="h-2.5 w-2.5" />}
+                                {syncInfo.status === 'not_configured' && <AlertCircle className="h-2.5 w-2.5" />}
                               </div>
                             </TooltipTrigger>
                             <TooltipContent side="right" className="max-w-xs">
-                              <div className="text-sm">
+                              <div className="text-xs">
                                 <strong>{syncInfo.source === 'hubspot' ? 'HubSpot' : 'GHL'}: </strong>
                                 {syncInfo.status === 'healthy' && 'Synced'}
                                 {syncInfo.status === 'stale' && 'Stale'}
                                 {syncInfo.status === 'error' && 'Error'}
                                 {syncInfo.status === 'not_configured' && 'Not Configured'}
                                 {syncInfo.lastSyncAt && (
-                                  <div className="text-xs text-muted-foreground mt-1">
+                                  <div className="text-[10px] text-muted-foreground mt-0.5">
                                     {formatDistanceToNow(new Date(syncInfo.lastSyncAt), { addSuffix: true })}
                                   </div>
                                 )}
@@ -409,54 +392,70 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* Client name */}
-                    <TableCell className="font-medium text-xs sticky left-8 bg-card z-10 py-1">
+                    <TableCell className="font-medium text-[11px] sticky left-7 bg-card z-10 py-0 px-1 truncate max-w-[120px]">
                       {client.name}
                     </TableCell>
 
+                    {/* MRR */}
+                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
+                      {computed.mrr > 0 ? formatCurrencyShort(computed.mrr) : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+
                     {/* Meta Spend */}
-                    <TableCell className="text-right font-mono tabular-nums text-xs py-1">
+                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
                       {formatCurrency(m.totalAdSpend || 0)}
                     </TableCell>
 
                     {/* Meta Leads */}
-                    <TableCell className="text-right font-mono tabular-nums text-xs py-1">
+                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
                       {m.totalLeads || 0}
                     </TableCell>
 
                     {/* CPL */}
                     <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-xs py-1",
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
                       getThresholdColor(m.costPerLead || 0, t.costPerLead)
                     )}>
                       {formatCurrency(m.costPerLead || 0)}
                     </TableCell>
 
-                    {/* CRM Leads */}
-                    <TableCell className="text-right font-mono tabular-nums text-xs py-1">
-                      {(m.totalLeads || 0) + (m.spamLeads || 0)}
-                    </TableCell>
-
                     {/* Booked Calls */}
-                    <TableCell className="text-right font-mono tabular-nums text-xs py-1">
+                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
                       {m.totalCalls || 0}
                     </TableCell>
 
+                    {/* Cost per Call */}
+                    <TableCell className={cn(
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
+                      getThresholdColor(m.costPerCall || 0, t.costPerCall)
+                    )}>
+                      {(m.costPerCall || 0) > 0 ? formatCurrency(m.costPerCall) : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+
                     {/* Shows */}
-                    <TableCell className="text-right font-mono tabular-nums text-xs py-1">
+                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
                       {m.showedCalls || 0}
                     </TableCell>
 
                     {/* Funded */}
                     <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-xs py-1",
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
                       (m.fundedInvestors || 0) > 0 && 'text-chart-2 font-semibold'
                     )}>
                       {m.fundedInvestors || 0}
                     </TableCell>
 
+                    {/* Cost of Capital % */}
+                    <TableCell className={cn(
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
+                      getThresholdColor(m.costOfCapital || 0, t.costOfCapital)
+                    )}>
+                      {(m.costOfCapital || 0) > 0 ? `${m.costOfCapital.toFixed(1)}%` : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+
                     {/* L→B % */}
                     <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-xs py-1",
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
                       getConversionColor(computed.leadToBooked)
                     )}>
                       {computed.leadToBooked > 0 ? formatPercent(computed.leadToBooked) : '-'}
@@ -464,7 +463,7 @@ export function DraggableClientTable({
 
                     {/* B→S % */}
                     <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-xs py-1",
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
                       getConversionColor(computed.bookedToShowed)
                     )}>
                       {computed.bookedToShowed > 0 ? formatPercent(computed.bookedToShowed) : '-'}
@@ -472,14 +471,14 @@ export function DraggableClientTable({
 
                     {/* S→F % */}
                     <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-xs py-1",
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
                       getConversionColor(computed.showedToFunded)
                     )}>
                       {computed.showedToFunded > 0 ? formatPercent(computed.showedToFunded) : '-'}
                     </TableCell>
 
                     {/* Bottleneck */}
-                    <TableCell className="text-center text-xs py-1">
+                    <TableCell className="text-center text-[11px] py-0 px-1">
                       {computed.bottleneck ? (
                         <span className="text-destructive line-through font-medium">
                           {computed.bottleneck.label}
@@ -490,56 +489,56 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* Meta Sync Status */}
-                    <TableCell className="text-center py-1">
+                    <TableCell className="text-center py-0 px-1">
                       {computed.metaSync.status === 'healthy' && (
-                        <Badge variant="success" className="text-[10px] px-1.5 py-0">Healthy</Badge>
+                        <Badge variant="success" className="text-[9px] px-1 py-0 h-4">OK</Badge>
                       )}
                       {computed.metaSync.status === 'stale' && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">Stale</Badge>
+                        <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">Old</Badge>
                       )}
                       {computed.metaSync.status === 'not_synced' && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">None</Badge>
+                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-muted-foreground">—</Badge>
                       )}
                     </TableCell>
 
                     {/* CRM Status */}
-                    <TableCell className="text-center py-1">
+                    <TableCell className="text-center py-0 px-1">
                       {syncInfo.status === 'healthy' && (
-                        <Badge variant="success" className="text-[10px] px-1.5 py-0">
+                        <Badge variant="success" className="text-[9px] px-1 py-0 h-4">
                           {syncInfo.source === 'hubspot' ? 'HS' : 'GHL'}
                         </Badge>
                       )}
                       {syncInfo.status === 'stale' && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
+                        <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
                           {syncInfo.source === 'hubspot' ? 'HS' : 'GHL'}
                         </Badge>
                       )}
                       {syncInfo.status === 'error' && (
-                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Error</Badge>
+                        <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4">Err</Badge>
                       )}
                       {syncInfo.status === 'not_configured' && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">None</Badge>
+                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-muted-foreground">—</Badge>
                       )}
                     </TableCell>
 
                     {/* Actions */}
-                    <TableCell className="py-1" onClick={(e) => e.stopPropagation()}>
+                    <TableCell className="py-0 px-1" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-0">
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => openAdsManager(e, client.business_manager_url)} title="Ads Manager">
-                          <BarChart3 className="h-3 w-3" />
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => openAdsManager(e, client.business_manager_url)} title="Ads Manager">
+                          <BarChart3 className="h-2.5 w-2.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onOpenSettings(client)}>
-                          <Settings className="h-3 w-3" />
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onOpenSettings(client)}>
+                          <Settings className="h-2.5 w-2.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => client.public_token && copyPublicLink(client.public_token)}>
-                          <Copy className="h-3 w-3" />
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => client.public_token && copyPublicLink(client.public_token)}>
+                          <Copy className="h-2.5 w-2.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => navigate(`/client/${client.id}`)}>
-                          <ExternalLink className="h-3 w-3" />
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => navigate(`/client/${client.id}`)}>
+                          <ExternalLink className="h-2.5 w-2.5" />
                         </Button>
                         {onDeleteClient && (
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => onDeleteClient(client)}>
-                            <Trash2 className="h-3 w-3" />
+                          <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive hover:text-destructive" onClick={() => onDeleteClient(client)}>
+                            <Trash2 className="h-2.5 w-2.5" />
                           </Button>
                         )}
                       </div>
@@ -572,7 +571,7 @@ function SortableHeader({
 
   return (
     <TableHead
-      className="font-bold text-xs text-right cursor-pointer select-none hover:bg-muted/50 transition-colors py-1"
+      className="font-bold text-[11px] text-right cursor-pointer select-none hover:bg-muted/50 transition-colors py-0 px-1"
       onClick={() => onSort(column)}
     >
       <div className="flex items-center gap-0.5 justify-end">
