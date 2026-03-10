@@ -2231,16 +2231,27 @@ export type Database = {
       lead_enrichment: {
         Row: {
           address: string | null
+          affinities: Json | null
           age: number | null
+          amex_card: boolean | null
+          bank_card: boolean | null
           birth_date: string | null
+          birth_year: number | null
+          blue_collar: boolean | null
           city: string | null
           client_id: string
           companies: Json | null
           company_name: string | null
           company_title: string | null
+          congressional_district: string | null
+          county_name: string | null
           created_at: string
+          credit_card: boolean | null
+          credit_midpoint: number | null
           credit_range: string | null
           discretionary_income: string | null
+          dma: number | null
+          donation_history: Json | null
           dwelling_type: string | null
           education: string | null
           enriched_at: string
@@ -2249,6 +2260,7 @@ export type Database = {
           enrichment_match_count: number | null
           enrichment_methods_used: string[] | null
           ethnicity: string | null
+          ethnicity_detail: string | null
           external_id: string
           financial_power: number | null
           first_name: string | null
@@ -2256,50 +2268,85 @@ export type Database = {
           generation: string | null
           has_children: boolean | null
           home_ownership: string | null
+          home_purchased_years_ago: number | null
           home_value: number | null
           household_adults: number | null
           household_income: string | null
+          household_income_midpoint: number | null
           household_persons: number | null
           id: string
+          income_level: string | null
+          interests: Json | null
           is_investor: boolean | null
           is_primary_identity: boolean | null
           is_veteran: boolean | null
           language: string | null
           last_name: string | null
+          latitude: number | null
           lead_id: string | null
           length_of_residence: number | null
+          likely_charitable_donor: boolean | null
           linkedin_url: string | null
+          longitude: number | null
           marital_status: string | null
           median_home_value: number | null
+          median_income: number | null
           mortgage_amount: number | null
+          mortgage_refinance_age: number | null
+          mortgage_refinance_amount: number | null
+          multilingual: boolean | null
           net_worth: string | null
           net_worth_midpoint: number | null
           occupation: string | null
           occupation_category: string | null
           occupation_type: string | null
           owns_investments: boolean | null
+          owns_mutual_funds: boolean | null
           owns_stocks_bonds: boolean | null
+          owns_swimming_pool: boolean | null
+          political_contributor: boolean | null
+          premium_amex_card: boolean | null
+          premium_card: boolean | null
+          purchase_behavior: Json | null
           raw_data: Json
+          reading_interests: Json | null
+          religion: string | null
           retargetiq_id: number | null
+          single_family_dwelling: boolean | null
           source: string
+          speaks_english: boolean | null
           spouse_data: Json | null
           state: string | null
           urbanicity: string | null
+          vehicle_summary: Json | null
           vehicles: Json | null
+          voter: boolean | null
+          white_collar: boolean | null
           zip: string | null
         }
         Insert: {
           address?: string | null
+          affinities?: Json | null
           age?: number | null
+          amex_card?: boolean | null
+          bank_card?: boolean | null
           birth_date?: string | null
+          birth_year?: number | null
+          blue_collar?: boolean | null
           city?: string | null
           client_id: string
           companies?: Json | null
           company_name?: string | null
           company_title?: string | null
+          congressional_district?: string | null
+          county_name?: string | null
           created_at?: string
+          credit_card?: boolean | null
+          credit_midpoint?: number | null
           credit_range?: string | null
           discretionary_income?: string | null
+          dma?: number | null
+          donation_history?: Json | null
           dwelling_type?: string | null
           education?: string | null
           enriched_at?: string
@@ -2308,6 +2355,7 @@ export type Database = {
           enrichment_match_count?: number | null
           enrichment_methods_used?: string[] | null
           ethnicity?: string | null
+          ethnicity_detail?: string | null
           external_id: string
           financial_power?: number | null
           first_name?: string | null
@@ -2315,50 +2363,85 @@ export type Database = {
           generation?: string | null
           has_children?: boolean | null
           home_ownership?: string | null
+          home_purchased_years_ago?: number | null
           home_value?: number | null
           household_adults?: number | null
           household_income?: string | null
+          household_income_midpoint?: number | null
           household_persons?: number | null
           id?: string
+          income_level?: string | null
+          interests?: Json | null
           is_investor?: boolean | null
           is_primary_identity?: boolean | null
           is_veteran?: boolean | null
           language?: string | null
           last_name?: string | null
+          latitude?: number | null
           lead_id?: string | null
           length_of_residence?: number | null
+          likely_charitable_donor?: boolean | null
           linkedin_url?: string | null
+          longitude?: number | null
           marital_status?: string | null
           median_home_value?: number | null
+          median_income?: number | null
           mortgage_amount?: number | null
+          mortgage_refinance_age?: number | null
+          mortgage_refinance_amount?: number | null
+          multilingual?: boolean | null
           net_worth?: string | null
           net_worth_midpoint?: number | null
           occupation?: string | null
           occupation_category?: string | null
           occupation_type?: string | null
           owns_investments?: boolean | null
+          owns_mutual_funds?: boolean | null
           owns_stocks_bonds?: boolean | null
+          owns_swimming_pool?: boolean | null
+          political_contributor?: boolean | null
+          premium_amex_card?: boolean | null
+          premium_card?: boolean | null
+          purchase_behavior?: Json | null
           raw_data?: Json
+          reading_interests?: Json | null
+          religion?: string | null
           retargetiq_id?: number | null
+          single_family_dwelling?: boolean | null
           source?: string
+          speaks_english?: boolean | null
           spouse_data?: Json | null
           state?: string | null
           urbanicity?: string | null
+          vehicle_summary?: Json | null
           vehicles?: Json | null
+          voter?: boolean | null
+          white_collar?: boolean | null
           zip?: string | null
         }
         Update: {
           address?: string | null
+          affinities?: Json | null
           age?: number | null
+          amex_card?: boolean | null
+          bank_card?: boolean | null
           birth_date?: string | null
+          birth_year?: number | null
+          blue_collar?: boolean | null
           city?: string | null
           client_id?: string
           companies?: Json | null
           company_name?: string | null
           company_title?: string | null
+          congressional_district?: string | null
+          county_name?: string | null
           created_at?: string
+          credit_card?: boolean | null
+          credit_midpoint?: number | null
           credit_range?: string | null
           discretionary_income?: string | null
+          dma?: number | null
+          donation_history?: Json | null
           dwelling_type?: string | null
           education?: string | null
           enriched_at?: string
@@ -2367,6 +2450,7 @@ export type Database = {
           enrichment_match_count?: number | null
           enrichment_methods_used?: string[] | null
           ethnicity?: string | null
+          ethnicity_detail?: string | null
           external_id?: string
           financial_power?: number | null
           first_name?: string | null
@@ -2374,36 +2458,60 @@ export type Database = {
           generation?: string | null
           has_children?: boolean | null
           home_ownership?: string | null
+          home_purchased_years_ago?: number | null
           home_value?: number | null
           household_adults?: number | null
           household_income?: string | null
+          household_income_midpoint?: number | null
           household_persons?: number | null
           id?: string
+          income_level?: string | null
+          interests?: Json | null
           is_investor?: boolean | null
           is_primary_identity?: boolean | null
           is_veteran?: boolean | null
           language?: string | null
           last_name?: string | null
+          latitude?: number | null
           lead_id?: string | null
           length_of_residence?: number | null
+          likely_charitable_donor?: boolean | null
           linkedin_url?: string | null
+          longitude?: number | null
           marital_status?: string | null
           median_home_value?: number | null
+          median_income?: number | null
           mortgage_amount?: number | null
+          mortgage_refinance_age?: number | null
+          mortgage_refinance_amount?: number | null
+          multilingual?: boolean | null
           net_worth?: string | null
           net_worth_midpoint?: number | null
           occupation?: string | null
           occupation_category?: string | null
           occupation_type?: string | null
           owns_investments?: boolean | null
+          owns_mutual_funds?: boolean | null
           owns_stocks_bonds?: boolean | null
+          owns_swimming_pool?: boolean | null
+          political_contributor?: boolean | null
+          premium_amex_card?: boolean | null
+          premium_card?: boolean | null
+          purchase_behavior?: Json | null
           raw_data?: Json
+          reading_interests?: Json | null
+          religion?: string | null
           retargetiq_id?: number | null
+          single_family_dwelling?: boolean | null
           source?: string
+          speaks_english?: boolean | null
           spouse_data?: Json | null
           state?: string | null
           urbanicity?: string | null
+          vehicle_summary?: Json | null
           vehicles?: Json | null
+          voter?: boolean | null
+          white_collar?: boolean | null
           zip?: string | null
         }
         Relationships: [
