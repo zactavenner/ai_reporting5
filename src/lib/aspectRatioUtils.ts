@@ -50,24 +50,25 @@ export function aspectsMatch(containerAspect: string, contentAspect: string): bo
   // Same aspect always matches
   if (containerAspect === contentAspect) return true;
   
-  // Feed containers (4:5) work well with 1:1, 4:5, and 9:16 content
+  // Feed containers (4:5) work well with most portrait & square content
   if (containerAspect === '4:5') {
     return ['1:1', '4:5', '9:16'].includes(contentAspect);
   }
   
-  // Stories containers (9:16) work well only with 9:16 content
+  // Stories containers (9:16) should cover-fill with any content
+  // Real IG/FB stories always fill the frame, cropping as needed
   if (containerAspect === '9:16') {
-    return contentAspect === '9:16';
+    return true;
   }
   
-  // Landscape containers (16:9) work well only with 16:9 content
+  // Landscape containers (16:9) work well with landscape & square
   if (containerAspect === '16:9') {
-    return contentAspect === '16:9';
+    return ['16:9', '1:1'].includes(contentAspect);
   }
   
-  // Square containers work with square content
+  // Square containers work with square and near-square content
   if (containerAspect === '1:1') {
-    return contentAspect === '1:1';
+    return ['1:1', '4:5'].includes(contentAspect);
   }
   
   return false;
