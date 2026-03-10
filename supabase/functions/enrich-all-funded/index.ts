@@ -24,74 +24,101 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Get all lead_enrichment records that haven't been enriched yet - paginate
-    const allRecords: any[] = [];
+    // Get all funded investors for this client
+    const allFunded: any[] = [];
     let offset = 0;
     const pageSize = 1000;
     while (true) {
       const { data: page, error: pageErr } = await supabase
-        .from('lead_enrichment')
-        .select('external_id, first_name, last_name, enriched_phones, enriched_emails, city, state, zip, address, source, lead_id')
+        .from('funded_investors')
+        .select('id, external_id, name, lead_id, client_id')
         .eq('client_id', client_id)
-        .in('source', ['bulk-import-pending', 'bulk-import'])
         .range(offset, offset + pageSize - 1);
       if (pageErr) throw pageErr;
       if (!page || page.length === 0) break;
-      allRecords.push(...page);
+      allFunded.push(...page);
       if (page.length < pageSize) break;
       offset += pageSize;
     }
-    const pendingRecords = allRecords;
-    const error = null;
 
-    if (error) throw error;
+    // Get already-enriched external_ids so we skip them
+    const enrichedSet = new Set<string>();
+    let eOffset = 0;
+    while (true) {
+      const { data: ePage, error: eErr } = await supabase
+        .from('lead_enrichment')
+        .select('external_id')
+        .eq('client_id', client_id)
+        .eq('source', 'retargetiq')
+        .range(eOffset, eOffset + pageSize - 1);
+      if (eErr) throw eErr;
+      if (!ePage || ePage.length === 0) break;
+      ePage.forEach((r: any) => enrichedSet.add(r.external_id));
+      if (ePage.length < pageSize) break;
+      eOffset += pageSize;
+    }
 
-    const total = pendingRecords?.length || 0;
-    console.log(`[EnrichAll] Found ${total} records to enrich for client ${client_id}`);
+    // Filter to unenriched funded investors
+    const pending = allFunded.filter(f => !enrichedSet.has(f.external_id));
+    const total = pending.length;
+
+    console.log(`[EnrichFunded] Found ${allFunded.length} funded investors, ${total} unenriched for client ${client_id}`);
 
     if (total === 0) {
-      return new Response(JSON.stringify({ success: true, total: 0, message: 'No records to enrich' }), {
+      return new Response(JSON.stringify({ success: true, total: 0, message: 'All funded investors already enriched' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Run enrichment in background
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+    // For each funded investor, look up their lead data and enrich
     const enrichPromise = (async () => {
       let enrichedCount = 0;
       let failedCount = 0;
       let skippedCount = 0;
       const batchSize = 3;
 
-      for (let i = 0; i < pendingRecords.length; i += batchSize) {
-        const batch = pendingRecords.slice(i, i + batchSize);
+      for (let i = 0; i < pending.length; i += batchSize) {
+        const batch = pending.slice(i, i + batchSize);
 
-        const promises = batch.map(async (r: any) => {
+        const promises = batch.map(async (funded: any) => {
           try {
-            const body: any = { client_id, external_id: r.external_id };
+            const body: any = { client_id, external_id: funded.external_id };
 
-            // Extract phone
-            const phoneObj = r.enriched_phones?.[0];
-            const phone = phoneObj?.phone || phoneObj;
-            if (phone && typeof phone === 'string') body.phone = phone.trim();
+            // Parse name into first/last
+            if (funded.name) {
+              const parts = funded.name.trim().split(/\s+/);
+              body.first_name = parts[0];
+              if (parts.length > 1) body.last_name = parts.slice(1).join(' ');
+            }
 
-            // Extract email
-            const emailObj = r.enriched_emails?.[0];
-            const email = emailObj?.email || emailObj;
-            if (email && typeof email === 'string') body.email = email.trim();
+            // Get lead details if available
+            if (funded.lead_id) {
+              const { data: lead } = await supabase
+                .from('leads')
+                .select('phone, email, name, external_id')
+                .eq('id', funded.lead_id)
+                .single();
 
-            if (r.first_name) body.first_name = r.first_name;
-            if (r.last_name) body.last_name = r.last_name;
-            if (r.city) body.city = r.city;
-            if (r.state) body.state = r.state;
-            if (r.zip) body.zip = r.zip;
-            if (r.address) body.address = r.address;
-            if (r.lead_id) body.lead_id = r.lead_id;
+              if (lead) {
+                if (lead.phone) body.phone = lead.phone;
+                if (lead.email) body.email = lead.email;
+                body.lead_id = funded.lead_id;
+                // Use lead's external_id for GHL linking
+                if (lead.external_id) body.external_id = lead.external_id;
+                // Use lead name if funded name is missing
+                if (!funded.name && lead.name) {
+                  const parts = lead.name.trim().split(/\s+/);
+                  body.first_name = parts[0];
+                  if (parts.length > 1) body.last_name = parts.slice(1).join(' ');
+                }
+              }
+            }
 
-            // Need at least one identifier for waterfall
-            if (!body.phone && !body.email && !body.city) {
+            // Need at least one identifier
+            if (!body.phone && !body.email && !body.first_name) {
               skippedCount++;
               return;
             }
@@ -112,7 +139,7 @@ Deno.serve(async (req) => {
               failedCount++;
             }
           } catch (e) {
-            console.error(`[EnrichAll] Error enriching ${r.external_id}:`, e);
+            console.error(`[EnrichFunded] Error enriching ${funded.external_id}:`, e);
             failedCount++;
           }
         });
@@ -120,33 +147,34 @@ Deno.serve(async (req) => {
         await Promise.all(promises);
 
         // Rate limit
-        if (i + batchSize < pendingRecords.length) {
+        if (i + batchSize < pending.length) {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
 
-        if ((i + batchSize) % 30 === 0 || i + batchSize >= pendingRecords.length) {
-          console.log(`[EnrichAll] Progress: ${Math.min(i + batchSize, pendingRecords.length)}/${total} (${enrichedCount} enriched, ${failedCount} failed, ${skippedCount} skipped)`);
+        if ((i + batchSize) % 30 === 0 || i + batchSize >= pending.length) {
+          console.log(`[EnrichFunded] Progress: ${Math.min(i + batchSize, pending.length)}/${total} (${enrichedCount} enriched, ${failedCount} failed, ${skippedCount} skipped)`);
         }
       }
 
-      console.log(`[EnrichAll] COMPLETE: ${enrichedCount} enriched, ${failedCount} failed, ${skippedCount} skipped out of ${total}`);
+      console.log(`[EnrichFunded] COMPLETE: ${enrichedCount} enriched, ${failedCount} failed, ${skippedCount} skipped out of ${total}`);
     })();
 
     if (typeof (globalThis as any).EdgeRuntime !== 'undefined') {
       (globalThis as any).EdgeRuntime.waitUntil(enrichPromise);
     } else {
-      enrichPromise.catch(e => console.error('[EnrichAll] Background error:', e));
+      enrichPromise.catch(e => console.error('[EnrichFunded] Background error:', e));
     }
 
     return new Response(JSON.stringify({
       success: true,
       total,
-      message: `Enrichment started for ${total} records in background`,
+      already_enriched: allFunded.length - total,
+      message: `Enrichment started for ${total} funded investors in background`,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {
-    console.error('EnrichAll error:', err);
+    console.error('EnrichFunded error:', err);
     return new Response(JSON.stringify({ success: false, error: err.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
