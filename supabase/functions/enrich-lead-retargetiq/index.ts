@@ -13,6 +13,47 @@ interface EnrichResult {
   rawResponse: any;
 }
 
+function collectAllCompanies(identities: any[]): any[] {
+  const seen = new Set<string>();
+  const all: any[] = [];
+  for (const id of identities) {
+    // Identity-level company fields
+    if (id.companyName || id.company) {
+      const key = `${id.companyName || id.company}|${id.title || ''}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        all.push({
+          company: id.companyName || id.company,
+          title: id.title || id.jobTitle || null,
+          industry: id.industry || null,
+          linkedin: id.linkedin || id.linkedinUrl || null,
+          revenue: id.revenue || null,
+          employeeCount: id.employeeCount || id.employees || null,
+          website: id.companyWebsite || id.website || null,
+          phone: id.companyPhone || null,
+          address: id.companyAddress || null,
+          city: id.companyCity || null,
+          state: id.companyState || null,
+          zip: id.companyZip || null,
+        });
+      }
+    }
+    // Nested companies array
+    for (const c of (id.companies || [])) {
+      const key = `${c.company || c.name || ''}|${c.title || ''}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        all.push({
+          ...c,
+          company: c.company || c.name || null,
+          linkedin: c.linkedin || c.linkedinUrl || null,
+        });
+      }
+    }
+  }
+  return all;
+}
+
 async function lookupByPhone(apiKey: string, slug: string, phone: string): Promise<EnrichResult | null> {
   const cleanPhone = phone.replace(/\D/g, '');
   if (cleanPhone.length < 10) return null;
