@@ -2156,7 +2156,7 @@ async function syncAllContactsUnlimited(
       for (const contact of contacts) {
         try {
           const contactOpportunity = opportunityByContactId.get(contact.id);
-          const syncResult = await syncContactToDatabase(supabase, client.id, contact, contactOpportunity);
+          const syncResult = await syncContactToDatabase(supabase, client.id, contact, contactOpportunity, fieldNameMap);
           
           if (syncResult.action === 'created') result.created++;
           else if (syncResult.action === 'updated') result.updated++;
