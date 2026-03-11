@@ -764,7 +764,7 @@ function InlineVideoPlayer({ src, aspectRatio }: { src: string; aspectRatio?: st
 // Creative card with inline actions
 function CreativeCard({ 
   creative, clientName, clientId, isPublicView, getStatusColor, getTypeIcon,
-  onPreview, onStatusChange, onDelete, commentText, onCommentTextChange, addCommentMutation
+  onPreview, onStatusChange, onLaunch, onDelete, commentText, onCommentTextChange, addCommentMutation
 }: {
   creative: Creative;
   clientName: string;
@@ -774,6 +774,7 @@ function CreativeCard({
   getTypeIcon: (t: string) => React.ReactNode;
   onPreview: () => void;
   onStatusChange: (c: Creative, s: 'approved' | 'revisions' | 'rejected') => void;
+  onLaunch: () => void;
   onAddComment: (c: Creative) => void;
   onDelete: () => void;
   commentText: string;
