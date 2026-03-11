@@ -443,7 +443,7 @@ export function PeriodicStatsTable({ clientId, dailyMetrics: externalMetrics }: 
       );
     }
 
-    const colorClass = metric.highlight ? 'text-chart-2 font-semibold' : getKpiColorClass(metric, value);
+    const colorClass = metric.highlight ? 'text-emerald-400 font-semibold' : getKpiColorClass(metric, value);
 
     return (
       <div className="flex items-center justify-center gap-1 group">
