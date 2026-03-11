@@ -1188,7 +1188,7 @@ async function syncClientContacts(
         try {
           // Get opportunity for this contact to sync opportunity data
           const contactOpportunity = opportunityByContactId.get(contact.id);
-          const syncResult = await syncContactToDatabase(supabase, client.id, contact, contactOpportunity);
+          const syncResult = await syncContactToDatabase(supabase, client.id, contact, contactOpportunity, fieldNameMap);
           if (syncResult.action === 'created') result.created++;
           else if (syncResult.action === 'updated') result.updated++;
           else result.skipped++;
