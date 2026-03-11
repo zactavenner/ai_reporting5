@@ -27,7 +27,7 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-// GHL field ID to human-readable label mapping
+// GHL field ID to human-readable label mapping (fallback for legacy data)
 const ghlFieldLabels: Record<string, string> = {
   'DHkLtULj05sgxm3H8RET': 'Investment Range',
   'UKtZxKiQgUDUa2wpb7SS': 'Accredited Investor?',
@@ -35,7 +35,6 @@ const ghlFieldLabels: Record<string, string> = {
   'KuGBAp7FfYwkyKDxqhI6': 'LinkedIn Profile',
   'UMvhwPXbDAzEgkEfutux': '1031 Exchange Amount',
   'mHvcHd1wvwyvoJHim3Eb': 'Property Status',
-  // Call disposition & AI analysis fields
   'nwXgYLXyibMPgTlUFzbp': 'Call Disposition',
   'ZHjm3krQalEyLCltxthZ': 'Call Sentiment',
   '6zEzvZabX0i0mOnVlSfT': 'Interest Level',
@@ -44,7 +43,36 @@ const ghlFieldLabels: Record<string, string> = {
   'MQ1DUMtIXwVKWPkHJyJi': 'Call Date/Time',
   'CN54sE9RqSmrgu9ZbwQK': 'Call Duration Notes',
   'Z73Jrsio3H1hf5BddjXl': 'Callback Requested',
+  '6CCCac16UtSHUyHNJ2CF': 'Timeline to Deploy',
+  'PlG2j9mBMdrLN2yIIeKY': 'Investment Range',
+  'XhF3j7VTL0MN2vpVHNUC': 'Accredited Investor?',
+  'if4VztLatnVf1w3BqEG8': 'Lead Source',
+  'slkmKStufr2NoRwuJimk': 'Date Submitted',
+  'QO69za0Xie2pyaYPWFlb': 'Appointment Status',
 };
+
+// Detect if a string looks like a GHL field ID (alphanumeric, 20+ chars, no spaces)
+function isGHLFieldId(str: string): boolean {
+  return /^[A-Za-z0-9]{15,}$/.test(str);
+}
+
+// Try to make a GHL fieldKey more readable (e.g. "contact.timeline_to_deploy" → "Timeline To Deploy")
+function humanizeFieldKey(key: string): string {
+  // If it's in the known labels map, use that
+  if (ghlFieldLabels[key]) return ghlFieldLabels[key];
+  
+  // If it looks like a raw GHL field ID with no mapping, show "Custom Field"
+  if (isGHLFieldId(key)) return `Custom Field`;
+  
+  // If it's a fieldKey like "contact.some_field_name", clean it up
+  const cleaned = key
+    .replace(/^contact\./, '')
+    .replace(/[._]/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .trim();
+  
+  return cleaned || key;
+}
 
 // UTM-related field IDs to filter out
 const utmFieldIds = new Set([
