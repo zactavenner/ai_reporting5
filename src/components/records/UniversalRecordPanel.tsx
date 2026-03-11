@@ -524,7 +524,7 @@ export function UniversalRecordPanel({
                 <CollapsibleContent className="pt-2 space-y-2">
                   {filteredQuestions.map((q: any, idx: number) => {
                     const questionKey = String(q.question || '');
-                    const displayLabel = ghlFieldLabels[questionKey] || questionKey;
+                    const displayLabel = humanizeFieldKey(questionKey);
                     const answerStr = String(q.answer);
                     const isUrl = answerStr.startsWith('http://') || answerStr.startsWith('https://');
                     const isLongText = answerStr.length > 100;
