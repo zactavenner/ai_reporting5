@@ -433,43 +433,39 @@ function parseCustomFields(customFields: any[] | undefined): Record<string, any>
   return result;
 }
 
-function extractUtmFromQuestions(questions: any[]): {
-  utm_campaign?: string;
-  utm_medium?: string;
-  utm_content?: string;
-  utm_term?: string;
-  filteredQuestions: any[];
-} {
-  const result: any = { filteredQuestions: [] };
-  
-  for (const q of questions) {
-    const questionLower = String(q.question || '').toLowerCase().trim();
-    
-    if (questionLower.includes('utm_campaign') || questionLower === 'utm campaign' || 
-        questionLower === 'utm campaign\t' || questionLower.includes('utm campaign')) {
-      result.utm_campaign = q.answer;
-    } 
-    else if (questionLower.includes('utm_medium') || questionLower === 'utm medium' ||
-             questionLower.includes('utm medium')) {
-      result.utm_medium = q.answer;
-    } 
-    else if (questionLower.includes('utm_content') || questionLower === 'utm content' ||
-             questionLower.includes('utm content')) {
-      result.utm_content = q.answer;
-    } 
-    else if (questionLower.includes('utm_term') || questionLower === 'utm term' ||
-             questionLower.includes('utm term')) {
-      result.utm_term = q.answer;
-    } 
-    else {
-      result.filteredQuestions.push(q);
+// Fetch custom field definitions from GHL to get human-readable names
+async function fetchGHLCustomFieldDefinitions(apiKey: string, locationId: string): Promise<Record<string, string>> {
+  const fieldNameMap: Record<string, string> = {};
+  try {
+    const response = await fetch(`${GHL_BASE_URL}/locations/${locationId}/customFields`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Version': '2021-07-28',
+        'Accept': 'application/json',
+      },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      const fields = data.customFields || [];
+      for (const field of fields) {
+        if (field.id && field.name) {
+          fieldNameMap[field.id] = field.name;
+        }
+        if (field.fieldKey && field.name) {
+          fieldNameMap[field.fieldKey] = field.name;
+        }
+      }
+      console.log(`Fetched ${Object.keys(fieldNameMap).length} custom field definitions`);
+    } else {
+      console.warn(`Failed to fetch custom field definitions: ${response.status}`);
     }
+  } catch (err) {
+    console.warn('Error fetching custom field definitions:', err);
   }
-  
-  return result;
+  return fieldNameMap;
 }
 
-function extractQuestionsFromCustomFields(customFields: Record<string, any>): any[] {
+function extractQuestionsFromCustomFields(customFields: Record<string, any>, fieldNameMap?: Record<string, string>): any[] {
   const questions: any[] = [];
   const skipFields = new Set([
     'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
@@ -479,8 +475,10 @@ function extractQuestionsFromCustomFields(customFields: Record<string, any>): an
   
   for (const [key, value] of Object.entries(customFields)) {
     if (value !== null && value !== undefined && value !== '' && !skipFields.has(key)) {
+      // Resolve human-readable name: check fieldNameMap, then fallback to key
+      const displayName = (fieldNameMap && (fieldNameMap[key] || fieldNameMap[key])) || key;
       questions.push({
-        question: key,
+        question: displayName,
         answer: value,
         source: 'ghl_sync'
       });
