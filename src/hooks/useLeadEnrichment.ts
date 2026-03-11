@@ -93,6 +93,8 @@ export function useEnrichLead() {
       external_id: string;
       phone?: string;
       email?: string;
+      first_name?: string;
+      last_name?: string;
     }) => {
       const { data, error } = await supabase.functions.invoke('enrich-lead-retargetiq', {
         body: params,
