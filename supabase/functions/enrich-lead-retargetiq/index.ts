@@ -143,6 +143,7 @@ function mergeResults(results: EnrichResult[], knownFirstName?: string, knownLas
 
   // Collect all unique identities across all results
   const identityMap = new Map<string, any>();
+  const companySeen = new Set<string>();
   const allCompanies: any[] = [];
   const methods: string[] = [];
   const rawResponses: any[] = [];
@@ -169,8 +170,11 @@ function mergeResults(results: EnrichResult[], knownFirstName?: string, knownLas
         identityMap.set(key, merged);
       }
     }
+    // Merge companies with full deduplication
     for (const c of r.companies) {
-      if (!allCompanies.find(ec => ec.company === c.company && ec.title === c.title)) {
+      const key = `${c.company || ''}|${c.title || ''}`;
+      if (!companySeen.has(key)) {
+        companySeen.add(key);
         allCompanies.push(c);
       }
     }
