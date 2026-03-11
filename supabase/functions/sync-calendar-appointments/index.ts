@@ -568,13 +568,20 @@ serve(async (req) => {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
       
-      // Fire off deep syncs in parallel batches (max 5 concurrent)
+      // Cap deep syncs to prevent CPU timeout and rate limits
       const contactIds = Array.from(uniqueContactIds);
-      const batchSize = 5;
+      const MAX_DEEP_SYNCS = 30; // Limit to prevent timeout
+      const batchSize = 3; // Reduced concurrency to avoid rate limits
+      const truncated = contactIds.length > MAX_DEEP_SYNCS;
+      const syncList = contactIds.slice(0, MAX_DEEP_SYNCS);
       let syncedContacts = 0;
       
-      for (let i = 0; i < contactIds.length; i += batchSize) {
-        const batch = contactIds.slice(i, i + batchSize);
+      if (truncated) {
+        console.log(`Capping deep sync to ${MAX_DEEP_SYNCS} of ${contactIds.length} contacts to prevent timeout`);
+      }
+      
+      for (let i = 0; i < syncList.length; i += batchSize) {
+        const batch = syncList.slice(i, i + batchSize);
         const promises = batch.map(contactId => 
           fetch(`${supabaseUrl}/functions/v1/sync-ghl-contacts`, {
             method: 'POST',
@@ -590,7 +597,6 @@ serve(async (req) => {
           }).then(async (res) => {
             if (res.ok) {
               syncedContacts++;
-              console.log(`Deep sync completed for contact ${contactId}`);
             } else {
               const text = await res.text();
               console.error(`Deep sync failed for contact ${contactId}: ${res.status} - ${text.substring(0, 100)}`);
@@ -600,9 +606,13 @@ serve(async (req) => {
           })
         );
         await Promise.all(promises);
+        // Add delay between batches to avoid rate limits
+        if (i + batchSize < syncList.length) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       }
       
-      console.log(`Deep contact sync complete: ${syncedContacts}/${uniqueContactIds.size} contacts synced`);
+      console.log(`Deep contact sync complete: ${syncedContacts}/${syncList.length} contacts synced${truncated ? ` (${contactIds.length - MAX_DEEP_SYNCS} deferred)` : ''}`);
     }
 
     // Recalculate daily_metrics for this client

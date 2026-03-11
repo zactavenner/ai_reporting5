@@ -1507,7 +1507,9 @@ async function fetchGHLConversationMessages(
 
         if (messagesResponse.ok) {
           const messagesData = await messagesResponse.json();
-          const convMessages = messagesData.messages || [];
+          const convMessages = Array.isArray(messagesData.messages) 
+            ? messagesData.messages 
+            : Array.isArray(messagesData) ? messagesData : [];
           
           for (const msg of convMessages) {
             messages.push({
