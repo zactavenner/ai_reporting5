@@ -860,6 +860,7 @@ export type Database = {
           email_parsing_enabled: boolean | null
           email_trusted_domains: string[] | null
           fathom_api_key: string | null
+          fathom_api_keys: Json | null
           fathom_enabled: boolean | null
           fathom_last_sync: string | null
           funded_investor_label: string | null
@@ -931,6 +932,7 @@ export type Database = {
           email_parsing_enabled?: boolean | null
           email_trusted_domains?: string[] | null
           fathom_api_key?: string | null
+          fathom_api_keys?: Json | null
           fathom_enabled?: boolean | null
           fathom_last_sync?: string | null
           funded_investor_label?: string | null
@@ -1002,6 +1004,7 @@ export type Database = {
           email_parsing_enabled?: boolean | null
           email_trusted_domains?: string[] | null
           fathom_api_key?: string | null
+          fathom_api_keys?: Json | null
           fathom_enabled?: boolean | null
           fathom_last_sync?: string | null
           funded_investor_label?: string | null
