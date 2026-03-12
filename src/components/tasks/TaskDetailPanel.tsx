@@ -726,110 +726,29 @@ const getHistoryIcon = (action: string) => {
                 </div>
              </div>
              
-             {linkedMeeting && (
-               <div className="flex items-center gap-2 mt-2">
-                 <Video className="h-4 w-4 text-muted-foreground" />
-                 <span className="text-sm text-muted-foreground">From meeting:</span>
-                 {linkedMeeting.meetgeek_url ? (
-                   <a href={linkedMeeting.meetgeek_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
-                     {linkedMeeting.title} <ExternalLink className="h-3 w-3" />
-                   </a>
-                 ) : (
-                   <span className="text-sm">{linkedMeeting.title}</span>
+            </SheetHeader>
+            
+             <ScrollArea className="flex-1 overflow-y-auto">
+               <div 
+                 ref={dropZoneRef}
+                 className={cn(
+                   "p-6 space-y-6 min-h-full transition-colors",
+                   isDragOver && "bg-primary/5 ring-2 ring-primary ring-inset"
                  )}
-               </div>
-             )}
-             
-             <div className="space-y-4 pt-4">
-               <div>
-                 <Label className="text-xs text-muted-foreground">Description</Label>
-                 {isEditingDescription ? (
-                   <Textarea
-                     value={editedDescription}
-                     onChange={(e) => setEditedDescription(e.target.value)}
-                     onBlur={handleDescriptionSave}
-                     onKeyDown={(e) => {
-                       if (e.key === 'Escape') {
-                         setEditedDescription(task.description || '');
-                         setIsEditingDescription(false);
-                       }
-                     }}
-                     rows={3}
-                     placeholder="Add a description..."
-                     className="mt-1"
-                     autoFocus
-                   />
-                 ) : (
-                   <p onClick={() => setIsEditingDescription(true)} className="text-sm mt-1 cursor-pointer hover:bg-muted/50 rounded p-2 -mx-2 transition-colors min-h-[40px]">
-                     {task.description || <span className="text-muted-foreground italic">Click to add description...</span>}
-                   </p>
-                 )}
-               </div>
-               
-               <div className="grid grid-cols-2 gap-4">
-                 <div>
-                   <Label className="text-xs text-muted-foreground">Status</Label>
-                   <Select value={task.stage} onValueChange={handleStatusChange}>
-                     <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
-                     <SelectContent>
-                       {STAGES.map(stage => <SelectItem key={stage.id} value={stage.id}>{stage.label}</SelectItem>)}
-                     </SelectContent>
-                   </Select>
-                 </div>
-                 <div>
-                   <Label className="text-xs text-muted-foreground">Priority</Label>
-                   <Select value={task.priority} onValueChange={handlePriorityChange}>
-                     <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
-                     <SelectContent>
-                       <SelectItem value="low"><Badge variant="outline" className="text-xs">Low</Badge></SelectItem>
-                       <SelectItem value="medium"><Badge variant="secondary" className="text-xs">Medium</Badge></SelectItem>
-                       <SelectItem value="high"><Badge variant="destructive" className="text-xs">High</Badge></SelectItem>
-                     </SelectContent>
-                   </Select>
-                 </div>
-                 <div>
-                   <Label className="text-xs text-muted-foreground">Assigned To</Label>
-                   <div className="mt-1"><MultiAssigneeSelector taskId={task.id} isPublicView={isPublicView} currentClientName={task.assigned_client_name} /></div>
-                 </div>
-                 <div>
-                   <Label className="text-xs text-muted-foreground">Due Date</Label>
-                   <Popover open={dueDatePopoverOpen} onOpenChange={setDueDatePopoverOpen}>
-                     <PopoverTrigger asChild>
-                       <Button variant="outline" className={cn('w-full justify-start text-left font-normal mt-1 h-9', !task.due_date && 'text-muted-foreground')}>
-                         <CalendarIcon className="mr-2 h-4 w-4" />
-                         {task.due_date ? format(new Date(task.due_date), 'PP') : 'Pick date'}
-                       </Button>
-                     </PopoverTrigger>
-                     <PopoverContent className="w-auto p-0" align="start">
-                       <Calendar mode="single" selected={task.due_date ? new Date(task.due_date) : undefined} onSelect={handleDueDateChange} initialFocus className="pointer-events-auto" />
-                     </PopoverContent>
-                   </Popover>
-                 </div>
-                 {/* Recurrence Info */}
-                 {task.recurrence_type && (
-                   <div className="col-span-2">
-                     <Label className="text-xs text-muted-foreground">Recurring</Label>
-                     <div className="flex items-center gap-2 mt-1 text-sm text-primary">
-                       <Repeat className="h-4 w-4" />
-                       <span className="capitalize">
-                         Every {(task.recurrence_interval || 1) > 1 ? `${task.recurrence_interval} ` : ''}
-                         {task.recurrence_type === 'daily' ? 'day' : task.recurrence_type === 'weekly' ? 'week' : 'month'}
-                         {(task.recurrence_interval || 1) > 1 ? 's' : ''}
-                       </span>
-                     </div>
-                   </div>
-                 )}
+
+              {linkedMeeting && (
+                <div className="flex items-center gap-2 mb-4">
+                  <Video className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">From meeting:</span>
+                  {linkedMeeting.meetgeek_url ? (
+                    <a href={linkedMeeting.meetgeek_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                      {linkedMeeting.title} <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : (
+                    <span className="text-sm">{linkedMeeting.title}</span>
+                  )}
                 </div>
-              </div>
-           </SheetHeader>
-           
-            <ScrollArea className="flex-1 overflow-y-auto">
-              <div 
-                ref={dropZoneRef}
-                className={cn(
-                  "p-6 space-y-6 min-h-full transition-colors",
-                  isDragOver && "bg-primary/5 ring-2 ring-primary ring-inset"
-                )}
+              )}
                 onDragEnter={handleDragEnter}
                 onDragLeave={handleDragLeave}
                 onDragOver={handleDragOver}
