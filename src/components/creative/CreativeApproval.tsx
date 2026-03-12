@@ -889,7 +889,17 @@ function CreativeCard({
 
         {/* Action buttons row */}
         <div className="px-4 pb-2 flex items-center gap-2 flex-wrap">
-          {creative.status !== 'launched' && (
+          {creative.status === 'draft' && !isPublicView && (
+            <Button
+              size="sm"
+              className="h-7 text-xs gap-1 bg-primary hover:bg-primary/90"
+              onClick={onSendToClient}
+            >
+              <SendHorizonal className="h-3 w-3" />
+              Send to Client
+            </Button>
+          )}
+          {creative.status !== 'launched' && creative.status !== 'draft' && (
             <>
               {creative.status === 'approved' && !isPublicView && (
                 <Button
