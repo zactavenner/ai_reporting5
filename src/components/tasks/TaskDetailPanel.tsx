@@ -1075,7 +1075,7 @@ const getHistoryIcon = (action: string) => {
                               <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                                 <span className="text-xs font-medium text-primary">{getInitials(getDisplayAuthorName(entry.data.author_name))}</span>
                               </div>
-                              <div className="flex-1 min-w-0">
+                               <div className="flex-1 min-w-0 w-[80%]">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-medium text-sm">{getDisplayAuthorName(entry.data.author_name)}</span>
                                   {entry.data.comment_type === 'voice' && <Badge variant="outline" className="text-xs h-5"><Mic className="h-3 w-3 mr-1" />Voice</Badge>}
