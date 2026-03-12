@@ -396,11 +396,13 @@ function AdsTable({ data, isLoading, clientId }: { data: any[]; isLoading: boole
   const [previewAd, setPreviewAd] = useState<any | null>(null);
   const [variationAd, setVariationAd] = useState<any | null>(null);
   const createTask = useCreateTask();
+  const fetchHD = useFetchAdMediaHD();
 
   if (isLoading) return <LoadingState />;
   if (data.length === 0) return <EmptyState />;
 
-  const getCreativeUrl = (ad: any) => ad.image_url || ad.thumbnail_url || null;
+  const getCreativeUrl = (ad: any) => ad.full_image_url || ad.image_url || ad.thumbnail_url || null;
+  const getHDUrl = (ad: any) => ad.video_source_url || ad.full_image_url || null;
 
   const handleCreateVariationFromPreview = async () => {
     if (!previewAd) return;
