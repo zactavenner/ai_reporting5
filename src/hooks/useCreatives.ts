@@ -133,7 +133,7 @@ export function useCreateCreative() {
           headline: creative.headline || null,
           body_copy: creative.body_copy || null,
           cta_text: creative.cta_text || null,
-          status: creative.status || 'pending',
+          status: creative.status || (creative.isAgencyUpload ? 'draft' : 'pending'),
           comments: creative.comments || [],
           aspect_ratio: creative.aspect_ratio || null,
         })
