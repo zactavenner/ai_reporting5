@@ -1,0 +1,1 @@
+ALTER TABLE public.client_settings ADD COLUMN IF NOT EXISTS slack_channel_id TEXT DEFAULT NULL;

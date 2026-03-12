@@ -900,6 +900,7 @@ export type Database = {
           reconnect_calendar_ids: string[] | null
           retargetiq_auto_enrich: boolean | null
           retargetiq_website_slug: string | null
+          slack_channel_id: string | null
           slack_review_channel_id: string | null
           stripe_customer_id: string | null
           stripe_email: string | null
@@ -973,6 +974,7 @@ export type Database = {
           reconnect_calendar_ids?: string[] | null
           retargetiq_auto_enrich?: boolean | null
           retargetiq_website_slug?: string | null
+          slack_channel_id?: string | null
           slack_review_channel_id?: string | null
           stripe_customer_id?: string | null
           stripe_email?: string | null
@@ -1046,6 +1048,7 @@ export type Database = {
           reconnect_calendar_ids?: string[] | null
           retargetiq_auto_enrich?: boolean | null
           retargetiq_website_slug?: string | null
+          slack_channel_id?: string | null
           slack_review_channel_id?: string | null
           stripe_customer_id?: string | null
           stripe_email?: string | null
