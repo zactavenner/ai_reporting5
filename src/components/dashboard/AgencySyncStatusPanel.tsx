@@ -277,6 +277,8 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
     setSettingsClient(c);
     setEditMetaAccountId(c.metaAdAccountId || '');
     setEditMetaToken(c.metaAccessToken ? '••••••••' : '');
+    setEditGhlLocationId(c.ghlLocationId || '');
+    setEditGhlApiKey(c.ghlApiKey ? '••••••••' : '');
     setEditSyncDayLookback('365');
     setEditSyncRhythm('4h');
     setSettingsOpen(true);
