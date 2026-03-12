@@ -475,7 +475,7 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
                   <div className={cn('mt-0.5 flex-shrink-0', config.color)}>
                     <Icon className="h-5 w-5" />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 w-[80%] break-words">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className="text-xs h-5">
                         {config.label}
