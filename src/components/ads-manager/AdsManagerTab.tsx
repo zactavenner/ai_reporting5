@@ -282,6 +282,10 @@ export function AdsManagerTab({ clientId }: AdsManagerTabProps) {
             <Calendar className="h-3 w-3" />
             {startDate} → {endDate}
           </Badge>
+          <Button size="sm" variant="outline" onClick={handleAttribution} disabled={attributionMutation.isPending}>
+            {attributionMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <BarChart3 className="h-4 w-4 mr-2" />}
+            Run Attribution
+          </Button>
           <Button size="sm" onClick={handleSync} disabled={syncMutation.isPending}>
             {syncMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Sync Meta Ads
