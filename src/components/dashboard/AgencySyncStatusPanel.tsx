@@ -435,6 +435,15 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
                 <Clock className="h-3 w-3 text-chart-4 ml-2" /> Stale
                 <XCircle className="h-3 w-3 text-destructive ml-2" /> Error
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-7"
+                onClick={handleHealthCheckAll}
+              >
+                <Stethoscope className="h-3 w-3 mr-1" />
+                Test All APIs
+              </Button>
             </div>
           </div>
         </CardHeader>
