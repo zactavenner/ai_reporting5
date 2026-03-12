@@ -154,7 +154,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
         headline: newCreative.headline || null,
         body_copy: newCreative.body_copy || null,
         cta_text: newCreative.cta_text || null,
-        status: 'pending',
+        status: isAgencyUpload ? 'draft' : 'pending',
         comments: [],
         aspect_ratio: aspectRatio,
         isAgencyUpload, // Pass the agency flag for AI spelling check
