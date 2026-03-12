@@ -59,10 +59,11 @@ import { Lead, Call } from '@/hooks/useLeadsAndCalls';
 import { useClientOpportunities, EnrichedOpportunity } from '@/hooks/usePipelines';
 import { useLeadCallRecordings } from '@/hooks/useLeadEngagementStats';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useSingleContactSync } from '@/hooks/useSingleContactSync';
 import { UniversalRecordPanel } from '@/components/records/UniversalRecordPanel';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 import {
   Dialog,
   DialogContent,
@@ -89,6 +90,20 @@ import {
   TooltipProvider,
 } from '@/components/ui/tooltip';
 import { formatDistanceToNow } from 'date-fns';
+
+// High-density row class matching agency dashboard style
+const ROW_CLASS = "h-7 text-[11px]";
+const CELL_CLASS = "py-0 px-1 text-[11px]";
+const HEAD_CLASS = "py-0 px-1 text-[10px] font-semibold h-7";
+
+interface EnrichmentData {
+  external_id?: string | null;
+  lead_id?: string | null;
+  state?: string | null;
+  net_worth?: string | null;
+  household_income?: string | null;
+  estimated_capital_to_deploy?: string | null;
+}
 
 interface FundedInvestor {
   id: string;
