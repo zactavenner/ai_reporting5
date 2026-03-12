@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
@@ -15,7 +16,10 @@ import {
   Video,
   CheckCircle,
   AlertCircle,
-  Star
+  Star,
+  Paintbrush,
+  Copy,
+  Download
 } from 'lucide-react';
 
 interface CreativeAIActionsProps {
@@ -29,6 +33,18 @@ export function CreativeAIActions({ creative }: CreativeAIActionsProps) {
   const [audit, setAudit] = useState<string | null>(null);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+
+  // AI Edit state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editPrompt, setEditPrompt] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editedImageUrl, setEditedImageUrl] = useState<string | null>(null);
+  const [editDescription, setEditDescription] = useState<string | null>(null);
+
+  // AI Variations state
+  const [variationsOpen, setVariationsOpen] = useState(false);
+  const [generatingVariations, setGeneratingVariations] = useState(false);
+  const [variations, setVariations] = useState<{ url: string; description: string }[]>([]);
 
   const handleTranscribe = async () => {
     if (!creative.file_url) {
@@ -98,7 +114,80 @@ export function CreativeAIActions({ creative }: CreativeAIActionsProps) {
     }
   };
 
-  // Extract score from audit text (looking for "Overall Score" pattern)
+  const handleAIEdit = async () => {
+    if (!editPrompt.trim()) {
+      toast.error('Please describe the edits you want');
+      return;
+    }
+
+    setEditing(true);
+    setEditedImageUrl(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('creative-ai-audit', {
+        body: { 
+          action: 'ai_edit',
+          creative: {
+            client_id: creative.client_id,
+            file_url: creative.file_url,
+          },
+          imageUrl: creative.file_url,
+          editPrompt: editPrompt,
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.editedImageUrl) {
+        setEditedImageUrl(data.editedImageUrl);
+        setEditDescription(data.description || null);
+        toast.success('AI edit complete!');
+      } else if (data?.error) {
+        toast.error(data.error);
+      } else {
+        throw new Error('No edited image returned');
+      }
+    } catch (error) {
+      console.error('AI Edit error:', error);
+      toast.error('Failed to apply AI edits');
+    } finally {
+      setEditing(false);
+    }
+  };
+
+  const handleAIVariations = async () => {
+    setGeneratingVariations(true);
+    setVariations([]);
+    try {
+      const { data, error } = await supabase.functions.invoke('creative-ai-audit', {
+        body: { 
+          action: 'ai_variations',
+          creative: {
+            client_id: creative.client_id,
+            file_url: creative.file_url,
+          },
+          imageUrl: creative.file_url,
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.variations && data.variations.length > 0) {
+        setVariations(data.variations);
+        toast.success(`Generated ${data.variations.length} variation(s)`);
+      } else if (data?.error) {
+        toast.error(data.error);
+      } else {
+        throw new Error('No variations returned');
+      }
+    } catch (error) {
+      console.error('AI Variations error:', error);
+      toast.error('Failed to generate variations');
+    } finally {
+      setGeneratingVariations(false);
+    }
+  };
+
+  // Extract score from audit text
   const extractScore = (auditText: string): number | null => {
     const match = auditText.match(/Overall Score[:\s]*(\d+)/i);
     return match ? parseInt(match[1], 10) : null;
@@ -111,6 +200,8 @@ export function CreativeAIActions({ creative }: CreativeAIActionsProps) {
     if (s >= 6) return 'text-amber-500';
     return 'text-red-500';
   };
+
+  const isImageCreative = creative.type === 'image' && creative.file_url;
 
   return (
     <>
@@ -147,7 +238,38 @@ export function CreativeAIActions({ creative }: CreativeAIActionsProps) {
           {auditing ? 'Analyzing...' : 'AI Audit'}
         </Button>
 
-        {/* Quick indicators if we have results */}
+        {/* AI Edit - image only */}
+        {isImageCreative && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setEditOpen(true)}
+            className="gap-2"
+          >
+            <Paintbrush className="h-4 w-4" />
+            AI Edit
+          </Button>
+        )}
+
+        {/* AI Variations - image only */}
+        {isImageCreative && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => { setVariationsOpen(true); handleAIVariations(); }}
+            disabled={generatingVariations}
+            className="gap-2"
+          >
+            {generatingVariations ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Copy className="h-4 w-4" />
+            )}
+            {generatingVariations ? 'Generating...' : 'AI Variations'}
+          </Button>
+        )}
+
+        {/* Quick indicators */}
         {transcript && (
           <Button 
             variant="ghost" 
@@ -218,6 +340,175 @@ export function CreativeAIActions({ creative }: CreativeAIActionsProps) {
               <ReactMarkdown>{audit || ''}</ReactMarkdown>
             </div>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Edit Modal */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Paintbrush className="h-5 w-5 text-primary" />
+              AI Edit Creative
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Original Image */}
+            <div>
+              <p className="text-sm font-medium mb-2">Original</p>
+              <div className="border rounded-lg overflow-hidden bg-muted">
+                <img 
+                  src={creative.file_url!} 
+                  alt="Original" 
+                  className="w-full h-auto object-contain max-h-[400px]"
+                />
+              </div>
+            </div>
+
+            {/* Edited Image or Prompt */}
+            <div>
+              <p className="text-sm font-medium mb-2">
+                {editedImageUrl ? 'Edited Result' : 'Describe your edits'}
+              </p>
+              {editedImageUrl ? (
+                <div className="border rounded-lg overflow-hidden bg-muted">
+                  <img 
+                    src={editedImageUrl} 
+                    alt="Edited" 
+                    className="w-full h-auto object-contain max-h-[400px]"
+                  />
+                  {editDescription && (
+                    <p className="p-2 text-xs text-muted-foreground">{editDescription}</p>
+                  )}
+                  <div className="p-2 flex gap-2">
+                    <Button size="sm" variant="outline" asChild>
+                      <a href={editedImageUrl} download target="_blank" rel="noreferrer">
+                        <Download className="h-4 w-4 mr-1" />
+                        Download
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Textarea
+                    value={editPrompt}
+                    onChange={(e) => setEditPrompt(e.target.value)}
+                    placeholder="e.g., Change the background to sunset colors, make the text larger, add a gold border..."
+                    rows={6}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    {['Change background color', 'Make text bolder', 'Add warm overlay', 'Increase contrast'].map((suggestion) => (
+                      <Button
+                        key={suggestion}
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => setEditPrompt(prev => prev ? `${prev}, ${suggestion.toLowerCase()}` : suggestion)}
+                      >
+                        {suggestion}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            {editedImageUrl && (
+              <Button 
+                variant="outline"
+                onClick={() => { setEditedImageUrl(null); setEditPrompt(''); }}
+              >
+                Edit Again
+              </Button>
+            )}
+            {!editedImageUrl && (
+              <Button 
+                onClick={handleAIEdit}
+                disabled={editing || !editPrompt.trim()}
+              >
+                {editing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Generating Edit...
+                  </>
+                ) : (
+                  <>
+                    <Paintbrush className="h-4 w-4 mr-2" />
+                    Apply Edit
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Variations Modal */}
+      <Dialog open={variationsOpen} onOpenChange={setVariationsOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Copy className="h-5 w-5 text-primary" />
+              AI Variations
+              <Badge variant="outline" className="ml-2">3 Variations</Badge>
+            </DialogTitle>
+          </DialogHeader>
+          
+          {generatingVariations ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-4">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Generating 3 creative variations...</p>
+              <p className="text-xs text-muted-foreground">This may take up to a minute</p>
+            </div>
+          ) : variations.length > 0 ? (
+            <ScrollArea className="max-h-[70vh]">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pr-4">
+                {variations.map((v, i) => (
+                  <div key={i} className="border rounded-lg overflow-hidden">
+                    <img 
+                      src={v.url} 
+                      alt={`Variation ${i + 1}`} 
+                      className="w-full h-auto object-contain bg-muted"
+                    />
+                    <div className="p-3 space-y-2">
+                      <p className="text-sm font-medium">Variation {i + 1}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-3">{v.description}</p>
+                      <Button size="sm" variant="outline" className="w-full" asChild>
+                        <a href={v.url} download target="_blank" rel="noreferrer">
+                          <Download className="h-4 w-4 mr-1" />
+                          Download
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No variations generated yet. Try again.</p>
+              <Button className="mt-4" onClick={handleAIVariations}>
+                <Copy className="h-4 w-4 mr-2" />
+                Generate Variations
+              </Button>
+            </div>
+          )}
+
+          {/* Original for comparison */}
+          {variations.length > 0 && (
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium mb-2">Original</p>
+              <img 
+                src={creative.file_url!} 
+                alt="Original" 
+                className="h-24 rounded border object-contain bg-muted"
+              />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>

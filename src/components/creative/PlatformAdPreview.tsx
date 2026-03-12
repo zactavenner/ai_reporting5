@@ -80,6 +80,28 @@ export function PlatformAdPreview({ creative, platform, clientName }: PlatformAd
     );
   };
 
+  // Get dynamic aspect class based on creative's actual aspect ratio
+  const getFeedAspectClass = (): string => {
+    const ar = creative.aspect_ratio || '4:5';
+    switch (ar) {
+      case '1:1': return 'aspect-square';
+      case '16:9': return 'aspect-video';
+      case '9:16': return 'aspect-[9/16]';
+      default: return 'aspect-[4/5]';
+    }
+  };
+
+  const getFeedContainerAspect = (): string => {
+    const ar = creative.aspect_ratio || '4:5';
+    if (ar === '1:1') return '1:1';
+    if (ar === '16:9') return '16:9';
+    if (ar === '9:16') return '9:16';
+    return '4:5';
+  };
+
+  const feedAspect = getFeedAspectClass();
+  const feedContainerAspect = getFeedContainerAspect();
+
   const renderMetaPreview = () => (
     <div className="space-y-6">
       {/* Facebook Preview */}
@@ -107,9 +129,9 @@ export function PlatformAdPreview({ creative, platform, clientName }: PlatformAd
             </div>
           )}
 
-          {/* Media - 4:5 for feed */}
-          <div className="aspect-[4/5] bg-muted relative">
-            {renderMediaBlock(videoRef1, '4:5')}
+          {/* Media - dynamic aspect ratio */}
+          <div className={`${feedAspect} bg-muted relative`}>
+            {renderMediaBlock(videoRef1, feedContainerAspect)}
           </div>
 
           {/* CTA Bar */}
@@ -154,9 +176,9 @@ export function PlatformAdPreview({ creative, platform, clientName }: PlatformAd
             <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
           </div>
 
-          {/* Media - 4:5 for feed */}
-          <div className="aspect-[4/5] bg-muted relative">
-            {renderMediaBlock(videoRef2, '4:5')}
+          {/* Media - dynamic aspect ratio */}
+          <div className={`${feedAspect} bg-muted relative`}>
+            {renderMediaBlock(videoRef2, feedContainerAspect)}
           </div>
 
           {/* CTA */}

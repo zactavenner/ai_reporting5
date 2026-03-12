@@ -63,6 +63,19 @@ export function CreativeHorizontalPreview({ creative, clientName }: CreativeHori
   };
 
   // Render media with aspect ratio awareness
+  // Get the correct container aspect ratio based on the creative's aspect ratio and platform
+  const getContainerAspect = (platform: string): string => {
+    const ar = creative.aspect_ratio || '1:1';
+    // Stories always use 9:16
+    if (platform === 'ig-stories' || platform === 'fb-stories') return '9:16';
+    // Feed platforms adapt to the creative's actual aspect ratio
+    if (ar === '9:16') return '9:16';
+    if (ar === '16:9') return '16:9';
+    if (ar === '1:1') return '1:1';
+    // Default feed format
+    return '4:5';
+  };
+
   const renderMedia = (platform: string, containerAspect: string) => {
     const { objectFit, bgClass } = getAspectFitClasses(containerAspect, creative.aspect_ratio);
     
@@ -116,6 +129,20 @@ export function CreativeHorizontalPreview({ creative, clientName }: CreativeHori
     );
   };
 
+  // Compute feed aspect ratio class dynamically
+  const getFeedAspectClass = (): string => {
+    const ar = creative.aspect_ratio || '4:5';
+    switch (ar) {
+      case '1:1': return 'aspect-square';
+      case '16:9': return 'aspect-video';
+      case '9:16': return 'aspect-[9/16]';
+      default: return 'aspect-[4/5]';
+    }
+  };
+
+  const feedAspect = getFeedAspectClass();
+  const feedContainerAspect = getContainerAspect('facebook');
+
   // Facebook Feed Preview
   const FacebookFeed = () => (
     <div className="flex-shrink-0 w-[280px]">
@@ -149,9 +176,9 @@ export function CreativeHorizontalPreview({ creative, clientName }: CreativeHori
           </div>
         )}
 
-        {/* Media - 4:5 container for feed */}
-        <div className="aspect-[4/5] bg-muted relative">
-          {renderMedia('facebook', '4:5')}
+        {/* Media - dynamic aspect ratio */}
+        <div className={`${feedAspect} bg-muted relative`}>
+          {renderMedia('facebook', feedContainerAspect)}
         </div>
 
         {/* CTA Bar */}
@@ -212,9 +239,9 @@ export function CreativeHorizontalPreview({ creative, clientName }: CreativeHori
           <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
         </div>
 
-        {/* Media - 4:5 container for feed */}
-        <div className="aspect-[4/5] bg-muted relative">
-          {renderMedia('instagram', '4:5')}
+        {/* Media - dynamic aspect ratio */}
+        <div className={`${feedAspect} bg-muted relative`}>
+          {renderMedia('instagram', feedContainerAspect)}
         </div>
 
         {/* CTA */}

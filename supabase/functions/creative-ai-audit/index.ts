@@ -297,6 +297,178 @@ ${creativeDetails}`
       );
     }
 
+    // AI Edit: Image-to-image editing using Lovable AI Gateway
+    if (action === "ai_edit") {
+      const { imageUrl, editPrompt } = await req.json().catch(() => ({ imageUrl: undefined, editPrompt: undefined }));
+      const actualImageUrl = imageUrl || creative?.file_url;
+      const actualEditPrompt = editPrompt || "";
+
+      if (!actualImageUrl) {
+        return new Response(
+          JSON.stringify({ error: "No image URL provided" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+      const editResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3.1-flash-image-preview",
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: actualEditPrompt || "Enhance this image for advertising" },
+                { type: "image_url", image_url: { url: actualImageUrl } },
+              ],
+            },
+          ],
+          modalities: ["image", "text"],
+        }),
+      });
+
+      if (!editResponse.ok) {
+        const errText = await editResponse.text();
+        console.error("AI Edit error:", editResponse.status, errText);
+        if (editResponse.status === 429) {
+          return new Response(JSON.stringify({ error: "Rate limited, try again later" }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (editResponse.status === 402) {
+          return new Response(JSON.stringify({ error: "Payment required, add credits" }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        throw new Error("AI Edit failed");
+      }
+
+      const editData = await editResponse.json();
+      const editedImage = editData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      const editText = editData.choices?.[0]?.message?.content || "";
+
+      if (!editedImage) {
+        throw new Error("No image returned from AI");
+      }
+
+      // Upload the edited image to storage
+      const base64Data = editedImage.replace(/^data:image\/\w+;base64,/, "");
+      const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      const fileName = `ai-edit-${Date.now()}.png`;
+      const filePath = `${creative?.client_id || 'unknown'}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("creatives")
+        .upload(filePath, imageBytes, { contentType: "image/png", upsert: true });
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        throw new Error("Failed to save edited image");
+      }
+
+      const { data: publicUrl } = supabase.storage.from("creatives").getPublicUrl(filePath);
+
+      return new Response(
+        JSON.stringify({ editedImageUrl: publicUrl.publicUrl, description: editText }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // AI Variations: Generate 3 variations with different headlines/backgrounds/colors
+    if (action === "ai_variations") {
+      const { imageUrl: varImageUrl } = await req.json().catch(() => ({ imageUrl: undefined }));
+      const actualVarImageUrl = varImageUrl || creative?.file_url;
+
+      if (!actualVarImageUrl) {
+        return new Response(
+          JSON.stringify({ error: "No image URL provided" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+      const variationPrompts = [
+        "Create a variation of this ad image with a completely different color palette (warmer tones). Keep the same composition and messaging but change the background, overlay colors, and accent colors to feel warm and inviting. Maintain the same text content but style it differently.",
+        "Create a variation of this ad image with a cool, modern blue/teal color scheme. Adjust the background and visual elements to feel sleek and professional. Keep the same core message but present the headline in a different typographic style.",
+        "Create a variation of this ad image with a bold, high-contrast dark theme. Use deep blacks and bright accent colors. Keep the same layout but make the text larger and more impactful. Add a subtle gradient overlay for depth.",
+      ];
+
+      const variations: { url: string; description: string }[] = [];
+
+      for (let i = 0; i < 3; i++) {
+        try {
+          const varResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "google/gemini-3.1-flash-image-preview",
+              messages: [
+                {
+                  role: "user",
+                  content: [
+                    { type: "text", text: variationPrompts[i] },
+                    { type: "image_url", image_url: { url: actualVarImageUrl } },
+                  ],
+                },
+              ],
+              modalities: ["image", "text"],
+            }),
+          });
+
+          if (!varResponse.ok) {
+            const errText = await varResponse.text();
+            console.error(`Variation ${i + 1} error:`, varResponse.status, errText);
+            if (varResponse.status === 429) {
+              return new Response(JSON.stringify({ error: "Rate limited, try again later", variations }), {
+                status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            }
+            continue;
+          }
+
+          const varData = await varResponse.json();
+          const varImage = varData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+          const varText = varData.choices?.[0]?.message?.content || `Variation ${i + 1}`;
+
+          if (varImage) {
+            // Upload to storage
+            const b64 = varImage.replace(/^data:image\/\w+;base64,/, "");
+            const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+            const fName = `ai-variation-${Date.now()}-${i + 1}.png`;
+            const fPath = `${creative?.client_id || 'unknown'}/${fName}`;
+
+            const { error: upErr } = await supabase.storage
+              .from("creatives")
+              .upload(fPath, bytes, { contentType: "image/png", upsert: true });
+
+            if (!upErr) {
+              const { data: pubUrl } = supabase.storage.from("creatives").getPublicUrl(fPath);
+              variations.push({ url: pubUrl.publicUrl, description: varText });
+            }
+          }
+        } catch (err) {
+          console.error(`Variation ${i + 1} failed:`, err);
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ variations }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: "Invalid action" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
