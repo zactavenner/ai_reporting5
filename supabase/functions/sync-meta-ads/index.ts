@@ -129,6 +129,14 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
   if (dateEnd) leadFilters.push({ column: "created_at", op: "lte", value: dateEnd });
   const leads = await fetchAllRowsPaginated(supabase, "leads", "id, campaign_name, ad_set_name, ad_id, is_spam, utm_source, utm_medium, utm_campaign, utm_content, source", leadFilters);
   console.log(`Attribution: fetched ${leads.length} leads (paginated)`);
+  
+  // Debug: count leads with campaign_name
+  const leadsWithCampaign = leads.filter((l: any) => l.campaign_name && l.campaign_name.trim());
+  console.log(`Attribution debug: ${leadsWithCampaign.length} leads have campaign_name, ${campaignByName ? 'campaignByName not built yet' : ''}`);
+  if (leadsWithCampaign.length > 0) {
+    const sampleLead = leadsWithCampaign[0];
+    console.log(`Attribution debug: sample lead campaign_name = "${sampleLead.campaign_name}" (length ${sampleLead.campaign_name?.length})`);
+  }
 
   // 5. Get all calls with pagination
   const callFilters: { column: string; op: string; value: any }[] = [
