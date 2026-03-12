@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Activity, Settings2, Calendar, Users, TrendingUp, Save, ArrowUpDown, ShieldCheck } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Activity, Settings2, Calendar, Users, TrendingUp, Save, ArrowUpDown, ShieldCheck, Plug, Eye, EyeOff, Key } from 'lucide-react';
 import { formatDistanceToNow, differenceInDays, parseISO, format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -102,9 +102,16 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
   // Settings form state
   const [editMetaAccountId, setEditMetaAccountId] = useState('');
   const [editMetaToken, setEditMetaToken] = useState('');
+  const [editGhlLocationId, setEditGhlLocationId] = useState('');
+  const [editGhlApiKey, setEditGhlApiKey] = useState('');
   const [editSyncDayLookback, setEditSyncDayLookback] = useState('365');
   const [editSyncRhythm, setEditSyncRhythm] = useState('4h');
   const [saving, setSaving] = useState(false);
+  
+  // Master Meta Token state
+  const [masterMetaToken, setMasterMetaToken] = useState('');
+  const [savingMasterToken, setSavingMasterToken] = useState(false);
+  const [showMasterToken, setShowMasterToken] = useState(false);
   
   const queryClient = useQueryClient();
   const [scaleSortDir, setScaleSortDir] = useState<'asc' | 'desc' | null>(null);
@@ -270,6 +277,8 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
     setSettingsClient(c);
     setEditMetaAccountId(c.metaAdAccountId || '');
     setEditMetaToken(c.metaAccessToken ? '••••••••' : '');
+    setEditGhlLocationId(c.ghlLocationId || '');
+    setEditGhlApiKey(c.ghlApiKey ? '••••••••' : '');
     setEditSyncDayLookback('365');
     setEditSyncRhythm('4h');
     setSettingsOpen(true);
@@ -279,13 +288,19 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
     if (!settingsClient) return;
     setSaving(true);
     try {
-      // Update Meta credentials on clients table
+      // Update Meta + GHL credentials on clients table
       const updates: Record<string, any> = {};
       if (editMetaAccountId !== (settingsClient.metaAdAccountId || '')) {
         updates.meta_ad_account_id = editMetaAccountId || null;
       }
       if (editMetaToken && editMetaToken !== '••••••••') {
         updates.meta_access_token = editMetaToken;
+      }
+      if (editGhlLocationId !== (settingsClient.ghlLocationId || '')) {
+        updates.ghl_location_id = editGhlLocationId || null;
+      }
+      if (editGhlApiKey && editGhlApiKey !== '••••••••') {
+        updates.ghl_api_key = editGhlApiKey;
       }
       
       if (Object.keys(updates).length > 0) {
@@ -679,7 +694,50 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5">
+          <div className="space-y-5 max-h-[65vh] overflow-y-auto pr-1">
+            {/* GHL Integration */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <Plug className="h-4 w-4" /> GoHighLevel Integration
+              </h4>
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <Label className="text-xs">Location ID</Label>
+                  <Input
+                    placeholder="ve9EPM428h8vShlRW1KT"
+                    value={editGhlLocationId}
+                    onChange={(e) => setEditGhlLocationId(e.target.value)}
+                    className="mt-1"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">GHL → Settings → Business Profile</p>
+                </div>
+                <div>
+                  <Label className="text-xs">Private Integration Key</Label>
+                  <Input
+                    type="password"
+                    placeholder="Enter GHL Private Integration Key"
+                    value={editGhlApiKey}
+                    onChange={(e) => setEditGhlApiKey(e.target.value)}
+                    className="mt-1"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Leave as-is to keep existing key</p>
+                </div>
+              </div>
+              {/* GHL Connection Status */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium">Status:</span>
+                {settingsClient?.ghlLocationId && settingsClient?.ghlApiKey ? (
+                  <span className="flex items-center gap-1 text-xs text-chart-2">
+                    <CheckCircle className="h-3 w-3" /> Connected
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Not Configured</span>
+                )}
+              </div>
+            </div>
+
+            <Separator />
+
             {/* Meta Ads Credentials */}
             <div className="space-y-3">
               <h4 className="text-sm font-semibold flex items-center gap-2">
@@ -696,7 +754,7 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Access Token</Label>
+                  <Label className="text-xs">Access Token (Client-Specific Override)</Label>
                   <Input
                     type="password"
                     placeholder="Enter Meta access token"
@@ -704,7 +762,7 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
                     onChange={(e) => setEditMetaToken(e.target.value)}
                     className="mt-1"
                   />
-                  <p className="text-[10px] text-muted-foreground mt-1">Leave as-is to keep existing token</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Leave as-is to keep existing token. Falls back to Master Token if empty.</p>
                 </div>
               </div>
             </div>
@@ -825,6 +883,8 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Master Meta Token Card - shown below the sync table */}
     </>
   );
 }
