@@ -212,7 +212,7 @@ export function useUpdateCreativeStatus() {
       creativeTitle
     }: { 
       id: string; 
-      status: 'pending' | 'approved' | 'revisions' | 'rejected' | 'launched'; 
+      status: 'draft' | 'pending' | 'approved' | 'revisions' | 'rejected' | 'launched'; 
       clientId: string;
       creativeTitle?: string;
     }) => {
