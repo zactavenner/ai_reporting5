@@ -7,19 +7,18 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/slack/api";
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const SLACK_BOT_TOKEN = Deno.env.get("SLACK_BOT_TOKEN");
+    if (!SLACK_BOT_TOKEN) throw new Error("SLACK_BOT_TOKEN is not configured");
 
+    // Fallback: try connector gateway, then direct bot token
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SLACK_API_KEY = Deno.env.get("SLACK_API_KEY");
-    if (!SLACK_API_KEY) throw new Error("SLACK_API_KEY is not configured");
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -30,10 +29,7 @@ serve(async (req) => {
 
     // Fetch task
     const { data: task, error: taskErr } = await supabase
-      .from("tasks")
-      .select("*")
-      .eq("id", taskId)
-      .single();
+      .from("tasks").select("*").eq("id", taskId).single();
     if (taskErr) throw new Error(`Failed to fetch task: ${taskErr.message}`);
 
     // Fetch slack channel from client_settings
@@ -46,12 +42,12 @@ serve(async (req) => {
     const channelId = settings?.slack_review_channel_id;
     if (!channelId) {
       return new Response(
-        JSON.stringify({ success: false, reason: "No Slack channel configured for this client" }),
+        JSON.stringify({ success: false, reason: "No Slack channel configured" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Fetch assignees via task_assignees junction table
+    // Fetch assignees
     const { data: assignees = [] } = await supabase
       .from("task_assignees")
       .select("member:agency_members(name), pod:agency_pods(name)")
@@ -62,24 +58,16 @@ serve(async (req) => {
       if ((a as any).member?.name) assigneeNames.push((a as any).member.name);
       if ((a as any).pod?.name) assigneeNames.push(`${(a as any).pod.name} (Pod)`);
     }
-    // Fallback to legacy assigned_to field
     if (assigneeNames.length === 0 && task.assigned_to) {
       const { data: member } = await supabase
-        .from("agency_members")
-        .select("name")
-        .eq("id", task.assigned_to)
-        .maybeSingle();
+        .from("agency_members").select("name").eq("id", task.assigned_to).maybeSingle();
       if (member?.name) assigneeNames.push(member.name);
     }
 
-    // Fetch last comment only
+    // Fetch last comment
     const { data: lastCommentArr = [] } = await supabase
-      .from("task_comments")
-      .select("*")
-      .eq("task_id", taskId)
-      .order("created_at", { ascending: false })
-      .limit(1);
-
+      .from("task_comments").select("*").eq("task_id", taskId)
+      .order("created_at", { ascending: false }).limit(1);
     const lastComment = lastCommentArr?.[0] || null;
 
     // Format due date
@@ -87,27 +75,12 @@ serve(async (req) => {
       ? new Date(task.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
       : "No due date";
 
-    // Build Slack blocks
+    // Build blocks
     const blocks: any[] = [
-      {
-        type: "header",
-        text: { type: "plain_text", text: "📋 Task Ready for Review", emoji: true },
-      },
+      { type: "header", text: { type: "plain_text", text: "📋 Task Ready for Review", emoji: true } },
       { type: "divider" },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*Task Title:*\n${task.title}`,
-        },
-      },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*Task Description:*\n${task.description || "_No description_"}`,
-        },
-      },
+      { type: "section", text: { type: "mrkdwn", text: `*Task Title:*\n${task.title}` } },
+      { type: "section", text: { type: "mrkdwn", text: `*Task Description:*\n${task.description || "_No description_"}` } },
       {
         type: "section",
         fields: [
@@ -121,19 +94,15 @@ serve(async (req) => {
       blocks.push({ type: "divider" });
       blocks.push({
         type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*💬 Last Comment:*\n*${lastComment.author_name}:* ${lastComment.content}`,
-        },
+        text: { type: "mrkdwn", text: `*💬 Last Comment:*\n*${lastComment.author_name}:* ${lastComment.content}` },
       });
     }
 
-    // Send to Slack
-    const slackRes = await fetch(`${GATEWAY_URL}/chat.postMessage`, {
+    // Send via direct bot token (custom app)
+    const slackRes = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "X-Connection-Api-Key": SLACK_API_KEY,
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
