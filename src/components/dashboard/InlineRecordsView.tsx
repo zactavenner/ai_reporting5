@@ -102,7 +102,6 @@ interface EnrichmentData {
   state?: string | null;
   net_worth?: string | null;
   household_income?: string | null;
-  estimated_capital_to_deploy?: string | null;
 }
 
 interface FundedInvestor {
