@@ -353,7 +353,6 @@ import { toast } from 'sonner';
      });
      
      if (isCompleting && task.recurrence_type) {
-       // Recurring task: complete and spawn next occurrence
        await completeRecurring.mutateAsync(task);
      } else {
        await updateTask.mutateAsync({
@@ -362,6 +361,13 @@ import { toast } from 'sonner';
          status: newStatus === 'done' ? 'completed' : newStatus === 'todo' ? 'todo' : 'in_progress',
          completed_at: isCompleting ? new Date().toISOString() : null,
        });
+     }
+
+     // Fire Slack notification when task moves to review
+     if (newStatus === 'review' && task.client_id) {
+       supabase.functions.invoke('send-task-review-slack', {
+         body: { taskId: task.id, clientId: task.client_id },
+       }).catch(err => console.error('Slack review notification failed:', err));
      }
    };
    

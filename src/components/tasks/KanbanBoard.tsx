@@ -345,6 +345,13 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
           status: targetStage.id === 'done' ? 'completed' : task.status === 'completed' ? 'in_progress' : task.status,
           completed_at: targetStage.id === 'done' ? new Date().toISOString() : null,
         });
+
+        // Fire Slack notification when task moves to review
+        if (targetStage.id === 'review' && task.client_id) {
+          supabase.functions.invoke('send-task-review-slack', {
+            body: { taskId: task.id, clientId: task.client_id },
+          }).catch(err => console.error('Slack review notification failed:', err));
+        }
       }
     }
   };
