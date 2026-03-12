@@ -306,16 +306,14 @@ export function DraggableClientTable({
               <TableHead className="w-7 sticky left-0 bg-card z-10 py-0 px-1"></TableHead>
               <TableHead className="font-bold text-[11px] sticky left-7 bg-card z-10 min-w-[100px] py-0 px-1">Client</TableHead>
               <SortableHeader column="adSpend" label="Spend" sortConfig={sortConfig} onSort={handleSort} />
-              <SortableHeader column="metaLeads" label="Leads" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="metaLeads" label="Meta Leads" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="crmLeads" label="CRM Leads" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="cpl" label="CPL" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="calls" label="Booked" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="costPerCall" label="$/Call" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="showed" label="Shows" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="funded" label="Funded" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="costOfCapital" label="CoC%" sortConfig={sortConfig} onSort={handleSort} />
-              <SortableHeader column="ltb" label="L→B" sortConfig={sortConfig} onSort={handleSort} />
-              <SortableHeader column="bts" label="B→S" sortConfig={sortConfig} onSort={handleSort} />
-              <SortableHeader column="stf" label="S→F" sortConfig={sortConfig} onSort={handleSort} />
               <TableHead className="font-bold text-[11px] text-center py-0 px-1">BN</TableHead>
               <TableHead className="font-bold text-[11px] text-center py-0 px-1">Meta</TableHead>
               <TableHead className="font-bold text-[11px] text-center py-0 px-1">CRM</TableHead>
@@ -406,6 +404,14 @@ export function DraggableClientTable({
                       {m.totalLeads || 0}
                     </TableCell>
 
+                    {/* CRM Leads (total including spam) */}
+                    <TableCell className={cn(
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
+                      (m.totalLeads || 0) > 0 && ((m.totalLeads || 0) + (m.spamLeads || 0)) !== (m.totalLeads || 0) && 'text-yellow-600 dark:text-yellow-500'
+                    )}>
+                      {(m.totalLeads || 0) + (m.spamLeads || 0)}
+                    </TableCell>
+
                     {/* CPL */}
                     <TableCell className={cn(
                       "text-right font-mono tabular-nums text-[11px] py-0 px-1",
@@ -448,29 +454,6 @@ export function DraggableClientTable({
                       {(m.costOfCapital || 0) > 0 ? `${m.costOfCapital.toFixed(1)}%` : <span className="text-muted-foreground">-</span>}
                     </TableCell>
 
-                    {/* L→B % */}
-                    <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
-                      getConversionColor(computed.leadToBooked)
-                    )}>
-                      {computed.leadToBooked > 0 ? formatPercent(computed.leadToBooked) : '-'}
-                    </TableCell>
-
-                    {/* B→S % */}
-                    <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
-                      getConversionColor(computed.bookedToShowed)
-                    )}>
-                      {computed.bookedToShowed > 0 ? formatPercent(computed.bookedToShowed) : '-'}
-                    </TableCell>
-
-                    {/* S→F % */}
-                    <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
-                      getConversionColor(computed.showedToFunded)
-                    )}>
-                      {computed.showedToFunded > 0 ? formatPercent(computed.showedToFunded) : '-'}
-                    </TableCell>
 
                     {/* Bottleneck */}
                     <TableCell className="text-center text-[11px] py-0 px-1">
