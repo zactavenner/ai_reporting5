@@ -102,8 +102,6 @@ verify_jwt = false
 [functions.run-attribution]
 verify_jwt = false
 
-[functions.test-attribution]
-verify_jwt = false
 
 [functions.fetch-ad-media-hd]
 verify_jwt = false
