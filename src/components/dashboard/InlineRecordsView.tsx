@@ -1817,92 +1817,90 @@ export function InlineRecordsView({
 
               {/* Opportunities Tab */}
               <TabsContent value="opportunities" className="mt-0">
-                <ScrollArea className="h-[400px]">
+                <ScrollArea className="h-[500px]">
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="border-b-2">
-                        <TableHead>Contact</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Pipeline</TableHead>
-                        <TableHead>Stage</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Value</TableHead>
-                        <TableHead>Source</TableHead>
-                        {ghlLocationId && <TableHead>GHL</TableHead>}
-                        <TableHead>Updated</TableHead>
+                        <TableHead className={HEAD_CLASS}>Contact</TableHead>
+                        <TableHead className={HEAD_CLASS}>Email</TableHead>
+                        <TableHead className={HEAD_CLASS}>Phone</TableHead>
+                        <TableHead className={HEAD_CLASS}>Pipeline</TableHead>
+                        <TableHead className={HEAD_CLASS}>Stage</TableHead>
+                        <TableHead className={HEAD_CLASS}>Status</TableHead>
+                        <TableHead className={`${HEAD_CLASS} text-right`}>Value</TableHead>
+                        <TableHead className={HEAD_CLASS}>Source</TableHead>
+                        <TableHead className={HEAD_CLASS}>State</TableHead>
+                        <TableHead className={HEAD_CLASS}>Net Worth</TableHead>
+                        {ghlLocationId && <TableHead className={HEAD_CLASS}>GHL</TableHead>}
+                        <TableHead className={HEAD_CLASS}>Updated</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {paginatedOpportunities.map((opp) => {
-                        const statusColors: Record<string, string> = {
-                          open: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
-                          won: 'bg-green-500/10 text-green-600 border-green-500/20',
-                          lost: 'bg-red-500/10 text-red-600 border-red-500/20',
-                          abandoned: 'bg-gray-500/10 text-gray-600 border-gray-500/20',
-                        };
-                        
+                        const enrichment = getEnrichment(opp);
                         return (
                           <TableRow
                             key={opp.id}
-                            className={`cursor-pointer hover:bg-muted/50 ${
+                            className={`${ROW_CLASS} cursor-pointer hover:bg-muted/50 ${
                               selectedRecord?.id === opp.id && selectedType === 'opportunity'
                                 ? 'bg-primary/10'
                                 : ''
                             }`}
                             onClick={() => handleRecordClick(opp, 'opportunity')}
                           >
-                            <TableCell className="font-medium">
+                            <TableCell className={`${CELL_CLASS} font-medium max-w-[120px] truncate`}>
                               {opp.contact_name || 'Unknown'}
                             </TableCell>
-                            <TableCell className="text-sm">
+                            <TableCell className={`${CELL_CLASS} text-muted-foreground max-w-[130px] truncate`}>
                               {opp.contact_email || '-'}
                             </TableCell>
-                            <TableCell className="text-sm">
+                            <TableCell className={`${CELL_CLASS} font-mono text-muted-foreground`}>
                               {opp.contact_phone || '-'}
                             </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="text-xs">
-                                {opp.pipeline_name}
-                              </Badge>
+                            <TableCell className={CELL_CLASS}>
+                              <span className="text-muted-foreground">{opp.pipeline_name}</span>
                             </TableCell>
-                            <TableCell>
-                              <Badge variant="secondary" className="text-xs">
-                                {opp.stage_name}
-                              </Badge>
+                            <TableCell className={CELL_CLASS}>
+                              <span>{opp.stage_name}</span>
                             </TableCell>
-                            <TableCell>
-                              <Badge 
-                                variant="outline" 
-                                className={`text-xs ${statusColors[opp.status] || ''}`}
-                              >
-                                {opp.status}
-                              </Badge>
+                            <TableCell className={CELL_CLASS}>
+                              <span className={
+                                opp.status === 'won' ? 'text-chart-2 font-semibold' :
+                                opp.status === 'lost' ? 'text-destructive' :
+                                'text-muted-foreground'
+                              }>{opp.status}</span>
                             </TableCell>
-                            <TableCell className="text-right font-mono text-chart-2">
+                            <TableCell className={`${CELL_CLASS} text-right font-mono text-chart-2`}>
                               {opp.monetary_value > 0 
                                 ? `$${Number(opp.monetary_value).toLocaleString()}` 
                                 : '-'}
                             </TableCell>
-                            <TableCell className="text-xs">
+                            <TableCell className={`${CELL_CLASS} text-muted-foreground`}>
                               {opp.source || '-'}
                             </TableCell>
+                            <TableCell className={`${CELL_CLASS} text-muted-foreground`}>
+                              {enrichment?.state || '-'}
+                            </TableCell>
+                            <TableCell className={`${CELL_CLASS} font-mono text-primary`}>
+                              {enrichment?.net_worth || '-'}
+                            </TableCell>
                             {ghlLocationId && (
-                              <TableCell>
+                              <TableCell className={CELL_CLASS}>
                                 {opp.ghl_contact_id ? (
                                   <a 
                                     href={getGHLContactUrl(ghlLocationId, opp.ghl_contact_id)}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-primary hover:underline flex items-center gap-1"
+                                    className="text-primary hover:underline"
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    <ExternalLink className="h-3 w-3" />
+                                    <ExternalLink className="h-2.5 w-2.5" />
                                   </a>
                                 ) : '-'}
                               </TableCell>
                             )}
-                            <TableCell className="font-mono text-xs text-muted-foreground">
+                            <TableCell className={`${CELL_CLASS} font-mono text-muted-foreground`}>
                               {new Date(opp.updated_at).toLocaleDateString()}
                             </TableCell>
                           </TableRow>
@@ -1910,13 +1908,14 @@ export function InlineRecordsView({
                       })}
                       {paginatedOpportunities.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                             No opportunities found. Sync a GHL pipeline to see opportunities here.
                           </TableCell>
                         </TableRow>
                       )}
                     </TableBody>
                   </Table>
+                  </div>
                 </ScrollArea>
               </TabsContent>
             </Tabs>
