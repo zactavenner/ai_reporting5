@@ -895,7 +895,7 @@ function CreativeCard({
               className="h-7 text-xs gap-1 bg-primary hover:bg-primary/90"
               onClick={onSendToClient}
             >
-              <SendHorizonal className="h-3 w-3" />
+              <SendHorizontal className="h-3 w-3" />
               Send to Client
             </Button>
           )}
