@@ -2835,6 +2835,7 @@ export type Database = {
           creative_id: string | null
           ctr: number | null
           effective_status: string | null
+          full_image_url: string | null
           headline: string | null
           id: string
           image_url: string | null
@@ -2852,6 +2853,7 @@ export type Database = {
           synced_at: string | null
           thumbnail_url: string | null
           updated_at: string | null
+          video_source_url: string | null
           video_thumbnail_url: string | null
         }
         Insert: {
@@ -2877,6 +2879,7 @@ export type Database = {
           creative_id?: string | null
           ctr?: number | null
           effective_status?: string | null
+          full_image_url?: string | null
           headline?: string | null
           id?: string
           image_url?: string | null
@@ -2894,6 +2897,7 @@ export type Database = {
           synced_at?: string | null
           thumbnail_url?: string | null
           updated_at?: string | null
+          video_source_url?: string | null
           video_thumbnail_url?: string | null
         }
         Update: {
@@ -2919,6 +2923,7 @@ export type Database = {
           creative_id?: string | null
           ctr?: number | null
           effective_status?: string | null
+          full_image_url?: string | null
           headline?: string | null
           id?: string
           image_url?: string | null
@@ -2936,6 +2941,7 @@ export type Database = {
           synced_at?: string | null
           thumbnail_url?: string | null
           updated_at?: string | null
+          video_source_url?: string | null
           video_thumbnail_url?: string | null
         }
         Relationships: [

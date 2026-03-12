@@ -1,0 +1,1 @@
+ALTER TABLE public.meta_ads ADD COLUMN IF NOT EXISTS video_source_url TEXT, ADD COLUMN IF NOT EXISTS full_image_url TEXT;
