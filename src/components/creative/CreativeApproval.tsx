@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { formatDistanceToNow } from 'date-fns';
+import { useParams } from 'react-router-dom';
 import { 
   useCreatives, 
   useCreateCreative, 
@@ -11,6 +12,7 @@ import {
   Creative,
   CreativeComment 
 } from '@/hooks/useCreatives';
+import { useClient } from '@/hooks/useClients';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
