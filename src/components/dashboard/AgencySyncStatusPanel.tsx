@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Activity, Settings2, Calendar, Users, TrendingUp, Save, ArrowUpDown, ShieldCheck, Plug, Eye, EyeOff, Key } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Activity, Settings2, Calendar, Users, TrendingUp, Save, ArrowUpDown, ShieldCheck, Plug, Eye, EyeOff, Key, Stethoscope, HeartPulse } from 'lucide-react';
 import { formatDistanceToNow, differenceInDays, parseISO, format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -96,6 +96,8 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
   const [syncingLeads, setSyncingLeads] = useState<Set<string>>(new Set());
   const [syncingCalendar, setSyncingCalendar] = useState<Set<string>>(new Set());
   const [syncingPipeline, setSyncingPipeline] = useState<Set<string>>(new Set());
+  const [healthChecking, setHealthChecking] = useState<Set<string>>(new Set());
+  const [healthResults, setHealthResults] = useState<Record<string, any>>({});
   const [settingsClient, setSettingsClient] = useState<ClientSyncInfo | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   
@@ -336,6 +338,44 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
     }
   };
 
+  // ── Health Check Handler ──
+  const handleHealthCheck = async (clientId: string) => {
+    setHealthChecking(prev => new Set(prev).add(clientId));
+    try {
+      const { data, error } = await supabase.functions.invoke('test-integration-connection', {
+        body: { client_id: clientId, mode: 'full_health_check' },
+      });
+      if (error) throw error;
+      setHealthResults(prev => ({ ...prev, [clientId]: data }));
+      
+      const metaOk = data?.meta?.success;
+      const ghlOk = data?.ghl?.success;
+      const crossOk = data?.lead_cross_check?.healthy;
+      
+      if (metaOk && ghlOk && crossOk) {
+        toast.success(`${clients.find(c => c.id === clientId)?.name}: All checks passed ✓`);
+      } else {
+        const issues = [];
+        if (!metaOk) issues.push('Meta');
+        if (!ghlOk) issues.push('GHL');
+        if (!crossOk) issues.push('Lead mismatch');
+        toast.error(`${clients.find(c => c.id === clientId)?.name}: Issues found — ${issues.join(', ')}`);
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['integration-statuses'] });
+    } catch (err) {
+      toast.error(`Health check failed: ${err instanceof Error ? err.message : 'Unknown'}`);
+    } finally {
+      setHealthChecking(prev => { const n = new Set(prev); n.delete(clientId); return n; });
+    }
+  };
+
+  const handleHealthCheckAll = async () => {
+    for (const c of clientSyncData) {
+      await handleHealthCheck(c.id);
+    }
+  };
+
     const getGhlStatus = (c: ClientSyncInfo): SyncStatus => {
     if (c.hubspotPortalId) return getSyncStatusFromDate(c.lastHubspotSyncAt, !!c.hubspotPortalId);
     if (c.ghlSyncStatus === 'error') return 'error';
@@ -395,6 +435,15 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
                 <Clock className="h-3 w-3 text-chart-4 ml-2" /> Stale
                 <XCircle className="h-3 w-3 text-destructive ml-2" /> Error
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-7"
+                onClick={handleHealthCheckAll}
+              >
+                <Stethoscope className="h-3 w-3 mr-1" />
+                Test All APIs
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -420,6 +469,12 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
                         Scale
                         <ArrowUpDown className="h-3 w-3 ml-1" />
                       </Button>
+                    </TableHead>
+                    <TableHead className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <HeartPulse className="h-3 w-3" />
+                        <span>Health</span>
+                      </div>
                     </TableHead>
                     <TableHead className="text-center w-[80px]">Settings</TableHead>
                   </TableRow>
@@ -651,6 +706,120 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
                                 <span className="text-muted-foreground">|</span>
                                 <span>{formatCount(funded)}</span>
                               </div>
+                            );
+                          })()}
+                        </TableCell>
+
+                        {/* Health Check */}
+                        <TableCell className="text-center py-2">
+                          {(() => {
+                            const hr = healthResults[c.id];
+                            const checking = healthChecking.has(c.id);
+                            
+                            if (checking) {
+                              return (
+                                <div className="flex items-center justify-center">
+                                  <RefreshCw className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                                </div>
+                              );
+                            }
+                            
+                            if (!hr) {
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => handleHealthCheck(c.id)}
+                                    >
+                                      <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Run API Health Check</TooltipContent>
+                                </Tooltip>
+                              );
+                            }
+                            
+                            const metaOk = hr.meta?.success;
+                            const ghlOk = hr.ghl?.success;
+                            const hubspotOk = hr.hubspot?.success || hr.hubspot?.not_configured;
+                            const crossOk = hr.lead_cross_check?.healthy;
+                            const allOk = metaOk && (ghlOk || hubspotOk) && crossOk;
+                            
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center justify-center gap-1 cursor-help" onClick={() => handleHealthCheck(c.id)}>
+                                    {allOk ? (
+                                      <CheckCircle className="h-4 w-4 text-chart-2" />
+                                    ) : (
+                                      <XCircle className="h-4 w-4 text-destructive" />
+                                    )}
+                                    {!crossOk && hr.lead_cross_check && (
+                                      <Badge variant="destructive" className="text-[9px] px-1 py-0">
+                                        Δ{hr.lead_cross_check.delta}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-xs">
+                                  <div className="space-y-1.5 text-xs">
+                                    <p className="font-semibold">{allOk ? '✓ All Checks Passed' : '✗ Issues Detected'}</p>
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-1.5">
+                                        {metaOk ? <CheckCircle className="h-3 w-3 text-chart-2" /> : <XCircle className="h-3 w-3 text-destructive" />}
+                                        <span>Meta Graph API: {metaOk ? `Connected (${hr.meta.account_name || 'OK'})` : hr.meta?.error}</span>
+                                      </div>
+                                      {hr.meta?.token_days_left != null && (
+                                        <div className="flex items-center gap-1.5 ml-4">
+                                          {hr.meta.token_days_left > 7 ? <CheckCircle className="h-3 w-3 text-chart-2" /> : <AlertCircle className="h-3 w-3 text-chart-4" />}
+                                          <span>Token: {hr.meta.token_days_left}d remaining</span>
+                                        </div>
+                                      )}
+                                      <div className="flex items-center gap-1.5">
+                                        {ghlOk ? <CheckCircle className="h-3 w-3 text-chart-2" /> : <XCircle className="h-3 w-3 text-destructive" />}
+                                        <span>GHL: {ghlOk ? 'Connected' : hr.ghl?.error}</span>
+                                      </div>
+                                      {ghlOk && hr.ghl?.contacts && (
+                                        <>
+                                          <div className="flex items-center gap-1.5 ml-4">
+                                            {hr.ghl.contacts.success ? <CheckCircle className="h-3 w-3 text-chart-2" /> : <XCircle className="h-3 w-3 text-destructive" />}
+                                            <span>Contacts API ({hr.ghl.contacts.total?.toLocaleString()} total)</span>
+                                          </div>
+                                          <div className="flex items-center gap-1.5 ml-4">
+                                            {hr.ghl.calendars?.success ? <CheckCircle className="h-3 w-3 text-chart-2" /> : <XCircle className="h-3 w-3 text-destructive" />}
+                                            <span>Calendars API</span>
+                                          </div>
+                                          <div className="flex items-center gap-1.5 ml-4">
+                                            {hr.ghl.opportunities?.success ? <CheckCircle className="h-3 w-3 text-chart-2" /> : <XCircle className="h-3 w-3 text-destructive" />}
+                                            <span>Opportunities API</span>
+                                          </div>
+                                        </>
+                                      )}
+                                      {!hr.hubspot?.not_configured && (
+                                        <div className="flex items-center gap-1.5">
+                                          {hubspotOk ? <CheckCircle className="h-3 w-3 text-chart-2" /> : <XCircle className="h-3 w-3 text-destructive" />}
+                                          <span>HubSpot: {hubspotOk ? 'Connected' : hr.hubspot?.error}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    {hr.lead_cross_check && (
+                                      <div className="pt-1 border-t border-border mt-1">
+                                        <p className="font-semibold mb-0.5">Lead Cross-Check (30d)</p>
+                                        <div className="flex items-center gap-1.5">
+                                          {crossOk ? <CheckCircle className="h-3 w-3 text-chart-2" /> : <XCircle className="h-3 w-3 text-destructive" />}
+                                          <span>
+                                            DB: {hr.lead_cross_check.db_leads_30d} · Meta: {hr.lead_cross_check.meta_leads_30d} · Delta: {hr.lead_cross_check.delta}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )}
+                                    <p className="text-muted-foreground mt-1">Click to re-test</p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
                             );
                           })()}
                         </TableCell>
