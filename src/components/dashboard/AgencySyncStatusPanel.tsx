@@ -470,6 +470,12 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
                         <ArrowUpDown className="h-3 w-3 ml-1" />
                       </Button>
                     </TableHead>
+                    <TableHead className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <HeartPulse className="h-3 w-3" />
+                        <span>Health</span>
+                      </div>
+                    </TableHead>
                     <TableHead className="text-center w-[80px]">Settings</TableHead>
                   </TableRow>
                 </TableHeader>
