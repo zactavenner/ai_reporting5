@@ -168,6 +168,35 @@ export function InlineRecordsView({
   // Fetch call recordings map
   const { data: callRecordingsMap = {} } = useLeadCallRecordings(clientId);
   
+  // Fetch enrichment data for all leads
+  const { data: enrichmentMap = {} } = useQuery({
+    queryKey: ['inline-enrichment', clientId],
+    queryFn: async () => {
+      if (!clientId) return {};
+      const data = await fetchAllRows<any>((sb) =>
+        sb.from('lead_enrichment')
+          .select('external_id, lead_id, state, net_worth, household_income, estimated_capital_to_deploy')
+          .eq('client_id', clientId)
+      );
+      const map: Record<string, EnrichmentData> = {};
+      for (const e of data) {
+        if (e.external_id) map[`ext:${e.external_id}`] = e;
+        if (e.lead_id) map[`lead:${e.lead_id}`] = e;
+      }
+      return map;
+    },
+    enabled: !!clientId,
+  });
+
+  // Helper to get enrichment for a lead
+  const getEnrichment = useCallback((record: any): EnrichmentData | null => {
+    if (!record) return null;
+    if (record.id && enrichmentMap[`lead:${record.id}`]) return enrichmentMap[`lead:${record.id}`];
+    if (record.external_id && enrichmentMap[`ext:${record.external_id}`]) return enrichmentMap[`ext:${record.external_id}`];
+    if (record.lead_id && enrichmentMap[`lead:${record.lead_id}`]) return enrichmentMap[`lead:${record.lead_id}`];
+    return null;
+  }, [enrichmentMap]);
+  
   // State for UniversalRecordPanel
   const [panelOpen, setPanelOpen] = useState(false);
 
