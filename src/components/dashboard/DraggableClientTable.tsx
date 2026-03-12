@@ -454,29 +454,6 @@ export function DraggableClientTable({
                       {(m.costOfCapital || 0) > 0 ? `${m.costOfCapital.toFixed(1)}%` : <span className="text-muted-foreground">-</span>}
                     </TableCell>
 
-                    {/* L→B % */}
-                    <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
-                      getConversionColor(computed.leadToBooked)
-                    )}>
-                      {computed.leadToBooked > 0 ? formatPercent(computed.leadToBooked) : '-'}
-                    </TableCell>
-
-                    {/* B→S % */}
-                    <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
-                      getConversionColor(computed.bookedToShowed)
-                    )}>
-                      {computed.bookedToShowed > 0 ? formatPercent(computed.bookedToShowed) : '-'}
-                    </TableCell>
-
-                    {/* S→F % */}
-                    <TableCell className={cn(
-                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
-                      getConversionColor(computed.showedToFunded)
-                    )}>
-                      {computed.showedToFunded > 0 ? formatPercent(computed.showedToFunded) : '-'}
-                    </TableCell>
 
                     {/* Bottleneck */}
                     <TableCell className="text-center text-[11px] py-0 px-1">
