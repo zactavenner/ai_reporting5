@@ -102,9 +102,16 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
   // Settings form state
   const [editMetaAccountId, setEditMetaAccountId] = useState('');
   const [editMetaToken, setEditMetaToken] = useState('');
+  const [editGhlLocationId, setEditGhlLocationId] = useState('');
+  const [editGhlApiKey, setEditGhlApiKey] = useState('');
   const [editSyncDayLookback, setEditSyncDayLookback] = useState('365');
   const [editSyncRhythm, setEditSyncRhythm] = useState('4h');
   const [saving, setSaving] = useState(false);
+  
+  // Master Meta Token state
+  const [masterMetaToken, setMasterMetaToken] = useState('');
+  const [savingMasterToken, setSavingMasterToken] = useState(false);
+  const [showMasterToken, setShowMasterToken] = useState(false);
   
   const queryClient = useQueryClient();
   const [scaleSortDir, setScaleSortDir] = useState<'asc' | 'desc' | null>(null);
