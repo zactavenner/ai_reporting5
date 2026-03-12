@@ -403,18 +403,19 @@ import { toast } from 'sonner';
       await updateTask.mutateAsync({ id: task.id, recurrence_type: newValue });
     };
     
-     if (editedDescription !== task.description) {
-       await addHistory.mutateAsync({
-         taskId: task.id,
-         action: 'description_updated',
-         oldValue: task.description ? 'Previous description' : 'No description',
-         newValue: editedDescription ? 'Updated description' : 'Removed description',
-         changedBy: getAuthorName(),
-       });
-       await updateTask.mutateAsync({ id: task.id, description: editedDescription || null });
-     }
-     setIsEditingDescription(false);
-   };
+    const handleSaveDescription = async () => {
+      if (editedDescription !== task.description) {
+        await addHistory.mutateAsync({
+          taskId: task.id,
+          action: 'description_updated',
+          oldValue: task.description ? 'Previous description' : 'No description',
+          newValue: editedDescription ? 'Updated description' : 'Removed description',
+          changedBy: getAuthorName(),
+        });
+        await updateTask.mutateAsync({ id: task.id, description: editedDescription || null });
+      }
+      setIsEditingDescription(false);
+    };
    
    const handleDelete = async () => {
      if (!confirm('Are you sure you want to delete this task?')) return;
@@ -669,9 +670,9 @@ const getHistoryIcon = (action: string) => {
            <SheetHeader className="p-6 pb-4 border-b flex-shrink-0">
              <div className="flex items-start justify-between gap-4">
                <div className="flex-1 min-w-0">
-                 <SheetTitle className="text-lg font-semibold leading-tight">
-                   {task.title}
-                 </SheetTitle>
+                  <SheetTitle className="text-lg font-semibold leading-tight truncate">
+                    {task.title}
+                  </SheetTitle>
                  {clientName && (
                    <p className="text-sm text-muted-foreground mt-1">Client: {clientName}</p>
                  )}
@@ -772,7 +773,7 @@ const getHistoryIcon = (action: string) => {
                     <Textarea
                       value={editedDescription}
                       onChange={(e) => setEditedDescription(e.target.value)}
-                      onBlur={handleDescriptionSave}
+                      onBlur={handleSaveDescription}
                       onKeyDown={(e) => {
                         if (e.key === 'Escape') {
                           setEditedDescription(task.description || '');
