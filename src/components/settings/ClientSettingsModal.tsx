@@ -1137,6 +1137,31 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
                 </div>
               </div>
             </div>
+
+            {/* Slack Review Notifications */}
+            <div className="border-2 border-border p-4 space-y-4">
+              <div>
+                <h4 className="font-medium mb-1 flex items-center gap-2">
+                  <MessageSquareIcon className="h-4 w-4" />
+                  Slack Review Notifications
+                </h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  When a task moves to "Review", a notification is sent to this Slack channel with the task title, description, and comments.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="slackReviewChannelId">Slack Channel ID</Label>
+                <Input
+                  id="slackReviewChannelId"
+                  value={slackReviewChannelId}
+                  onChange={(e) => setSlackReviewChannelId(e.target.value)}
+                  placeholder="C0123456789"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Right-click the channel in Slack → View channel details → copy the Channel ID at the bottom
+                </p>
+              </div>
+            </div>
           </TabsContent>
           
           <TabsContent value="webhooks" className="mt-4">
