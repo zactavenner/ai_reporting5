@@ -1084,7 +1084,7 @@ const getHistoryIcon = (action: string) => {
                                 {entry.data.comment_type === 'voice' && entry.data.audio_url && (
                                   <div className="mt-2"><VoiceNotePlayer audioUrl={entry.data.audio_url} duration={entry.data.duration_seconds || undefined} transcript={entry.data.transcript} /></div>
                                 )}
-                                {entry.data.comment_type !== 'voice' && <div className="text-sm mt-1 whitespace-pre-wrap">{renderContentWithLinks(entry.data.content)}</div>}
+                                {entry.data.comment_type !== 'voice' && <div className="text-sm mt-1 whitespace-pre-wrap break-words">{renderContentWithLinks(entry.data.content)}</div>}
                               </div>
                             </div>
                           ) : (
