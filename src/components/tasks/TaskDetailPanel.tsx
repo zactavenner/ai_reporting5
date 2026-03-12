@@ -780,6 +780,71 @@ const getHistoryIcon = (action: string) => {
                   )}
                 </div>
                </div>
+
+               <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Status</Label>
+                    <Select value={task.stage} onValueChange={handleStatusChange}>
+                      <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {STAGES.map(stage => <SelectItem key={stage.id} value={stage.id}>{stage.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Priority</Label>
+                    <Select value={task.priority} onValueChange={handlePriorityChange}>
+                      <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Assigned to</Label>
+                    <MultiAssigneeSelector
+                      taskId={task.id}
+                      agencyMembers={agencyMembers}
+                      isPublicView={isPublicView}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Due Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="mt-1 h-9 w-full justify-start text-left font-normal">
+                          <CalendarIcon className="h-4 w-4 mr-2" />
+                          {task.due_date ? format(new Date(task.due_date + 'T00:00:00'), 'PP') : 'Not set'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={task.due_date ? new Date(task.due_date + 'T00:00:00') : undefined}
+                          onSelect={handleDueDateChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  {!isPublicView && (
+                    <div className="col-span-2">
+                      <Label className="text-xs text-muted-foreground">Recurrence</Label>
+                      <Select value={task.recurrence_type || 'none'} onValueChange={handleRecurrenceChange}>
+                        <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="biweekly">Biweekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
                 {isDragOver && (
                   <div className="absolute inset-4 flex items-center justify-center bg-background/80 rounded-lg border-2 border-dashed border-primary z-10 pointer-events-none">
                     <div className="flex flex-col items-center gap-2 text-primary">
