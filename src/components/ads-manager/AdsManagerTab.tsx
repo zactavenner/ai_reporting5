@@ -104,22 +104,22 @@ function MetricCells({ row }: { row: any }) {
   const spamCount = Number(row.attributed_spam_leads) || 0;
   return (
     <>
-      <TableCell className="text-right tabular-nums font-medium">{fmt$(row.spend)}</TableCell>
-      <TableCell className="text-right tabular-nums">{fmtN(row.impressions)}</TableCell>
-      <TableCell className="text-right tabular-nums">{fmt$(row.cpm)}</TableCell>
-      <TableCell className="text-right tabular-nums">{fmtN(row.clicks)}</TableCell>
-      <TableCell className="text-right tabular-nums">{fmtPct(row.ctr)}</TableCell>
-      <TableCell className="text-right tabular-nums">{fmt$(row.cpc)}</TableCell>
-      <TableCell className="text-right tabular-nums">{fmtN(row.attributed_leads)}</TableCell>
-      <TableCell className={`text-right tabular-nums ${spamCount > 0 ? 'text-destructive font-semibold' : ''}`}>
+      <TableCell className="text-center tabular-nums font-medium">{fmt$(row.spend)}</TableCell>
+      <TableCell className="text-center tabular-nums">{fmtN(row.impressions)}</TableCell>
+      <TableCell className="text-center tabular-nums">{fmt$(row.cpm)}</TableCell>
+      <TableCell className="text-center tabular-nums">{fmtN(row.clicks)}</TableCell>
+      <TableCell className="text-center tabular-nums">{fmtPct(row.ctr)}</TableCell>
+      <TableCell className="text-center tabular-nums">{fmt$(row.cpc)}</TableCell>
+      <TableCell className="text-center tabular-nums">{fmtN(row.attributed_leads)}</TableCell>
+      <TableCell className={`text-center tabular-nums ${spamCount > 0 ? 'text-destructive font-semibold' : ''}`}>
         {spamCount > 0 ? spamCount : '—'}
       </TableCell>
-      <TableCell className="text-right tabular-nums">{fmt$(row.cost_per_lead)}</TableCell>
-      <TableCell className="text-right tabular-nums">{fmtN(row.attributed_calls)}</TableCell>
-      <TableCell className="text-right tabular-nums">{fmtN(row.attributed_showed)}</TableCell>
-      <TableCell className="text-right tabular-nums">{fmtN(row.attributed_funded)}</TableCell>
-      <TableCell className="text-right tabular-nums">{fmt$(row.attributed_funded_dollars)}</TableCell>
-      <TableCell className="text-right tabular-nums">{fmt$(row.cost_per_funded)}</TableCell>
+      <TableCell className="text-center tabular-nums">{fmt$(row.cost_per_lead)}</TableCell>
+      <TableCell className="text-center tabular-nums">{fmtN(row.attributed_calls)}</TableCell>
+      <TableCell className="text-center tabular-nums">{fmtN(row.attributed_showed)}</TableCell>
+      <TableCell className="text-center tabular-nums">{fmtN(row.attributed_funded)}</TableCell>
+      <TableCell className="text-center tabular-nums">{fmt$(row.attributed_funded_dollars)}</TableCell>
+      <TableCell className="text-center tabular-nums">{fmt$(row.cost_per_funded)}</TableCell>
     </>
   );
 }
