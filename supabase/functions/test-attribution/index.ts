@@ -215,54 +215,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Now update the database
-    for (const campaign of (metaCampaigns || [])) {
-      const stats = campaignStats.get(campaign.name) || { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
-      const spend = Number(campaign.spend) || 0;
-      await supabase.from("meta_campaigns").update({
-        attributed_leads: stats.leads,
-        attributed_spam_leads: stats.spamLeads,
-        attributed_calls: stats.calls,
-        attributed_showed: stats.showed,
-        attributed_funded: stats.funded,
-        attributed_funded_dollars: stats.fundedDollars,
-        cost_per_lead: stats.leads > 0 ? Math.round((spend / stats.leads) * 100) / 100 : 0,
-        cost_per_call: stats.calls > 0 ? Math.round((spend / stats.calls) * 100) / 100 : 0,
-        cost_per_funded: stats.funded > 0 ? Math.round((spend / stats.funded) * 100) / 100 : 0,
-      }).eq("id", campaign.id);
-    }
-
-    for (const adSet of (metaAdSets || [])) {
-      const stats = adSetStats.get(adSet.name) || { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
-      const spend = Number(adSet.spend) || 0;
-      await supabase.from("meta_ad_sets").update({
-        attributed_leads: stats.leads,
-        attributed_spam_leads: stats.spamLeads,
-        attributed_calls: stats.calls,
-        attributed_showed: stats.showed,
-        attributed_funded: stats.funded,
-        attributed_funded_dollars: stats.fundedDollars,
-        cost_per_lead: stats.leads > 0 ? Math.round((spend / stats.leads) * 100) / 100 : 0,
-        cost_per_call: stats.calls > 0 ? Math.round((spend / stats.calls) * 100) / 100 : 0,
-        cost_per_funded: stats.funded > 0 ? Math.round((spend / stats.funded) * 100) / 100 : 0,
-      }).eq("id", adSet.id);
-    }
-
-    for (const ad of (metaAds || [])) {
-      const stats = adStats.get(ad.id) || { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
-      const spend = Number(ad.spend) || 0;
-      await supabase.from("meta_ads").update({
-        attributed_leads: stats.leads,
-        attributed_spam_leads: stats.spamLeads,
-        attributed_calls: stats.calls,
-        attributed_showed: stats.showed,
-        attributed_funded: stats.funded,
-        attributed_funded_dollars: stats.fundedDollars,
-        cost_per_lead: stats.leads > 0 ? Math.round((spend / stats.leads) * 100) / 100 : 0,
-        cost_per_call: stats.calls > 0 ? Math.round((spend / stats.calls) * 100) / 100 : 0,
-        cost_per_funded: stats.funded > 0 ? Math.round((spend / stats.funded) * 100) / 100 : 0,
-      }).eq("id", ad.id);
-    }
+    // Skip database updates - just return debug info
 
     return new Response(JSON.stringify({
       success: true,
