@@ -108,3 +108,6 @@ verify_jwt = false
 
 [functions.fathom-webhook]
 verify_jwt = false
+
+[functions.slack-events]
+verify_jwt = false
