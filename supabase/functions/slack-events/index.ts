@@ -68,8 +68,8 @@ serve(async (req) => {
     // Only handle app_mention events
     if (event.type === "app_mention") {
       const processingPromise = handleMention(event, {
-        SLACK_BOT_TOKEN,
         LOVABLE_API_KEY,
+        SLACK_API_KEY,
         SUPABASE_URL,
         SUPABASE_SERVICE_ROLE_KEY,
       });
