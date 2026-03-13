@@ -77,22 +77,75 @@ function buildFieldMap(customFields: GHLCustomField[]): Map<string, string> {
   }
   return map;
 }
+/**
+ * Common question-to-field keyword mappings for better matching
+ */
+const KEYWORD_MAPPINGS: Record<string, string[]> = {
+  'zipcode': ['zip code', 'zip', 'postal code', 'current zip'],
+  'city': ['city', 'what city'],
+  'state': ['state', 'what state'],
+  'timezone': ['timezone', 'time zone'],
+  'bilingualstatus': ['bilingual', 'speak another language', 'second language', 'languages'],
+  'liveonsite': ['live on-site', 'live on site', 'on-site', 'onsite', 'willing to live'],
+  'weekendavailability': ['weekend', 'available on weekends', 'weekend availability'],
+  'nextrolegoals': ['next role', 'role goals', 'career goals', 'looking for in a role'],
+  'resumepath': ['resume', 'cv', 'curriculum'],
+  'videopath': ['video', 'video introduction', 'video resume'],
+  'relocate': ['relocate', 'relocation', 'willing to relocate', 'move to'],
+  'salesexperience': ['sales experience', 'business development', 'sales or business'],
+  'outboundcalls': ['outbound calls', '50+ outbound', 'cold calls', 'making calls'],
+};
 
 /**
- * Try to match a question label to a GHL custom field ID
+ * Extract meaningful words from a question (skip common stop words)
+ */
+function extractKeywords(text: string): string[] {
+  const stopWords = new Set(['what', 'is', 'your', 'are', 'you', 'do', 'have', 'the', 'a', 'an', 'in', 'or', 'to', 'if', 'of', 'on', 'for', 'and', 'with', 'how', 'can', 'will', 'would', 'could', 'should', 'that', 'this', 'it', 'be', 'been', 'being', 'was', 'were', 'has', 'had', 'does', 'did', 'per', 'day', 'current', 'currently']);
+  return text.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2 && !stopWords.has(w));
+}
+
+/**
+ * Try to match a question label to a GHL custom field ID using multiple strategies
  */
 function matchFieldId(questionLabel: string, fieldMap: Map<string, string>): string | null {
   const norm = normalize(questionLabel);
+  const lowerQuestion = questionLabel.toLowerCase();
   
-  // Direct match
+  // 1. Direct normalized match
   if (fieldMap.has(norm)) return fieldMap.get(norm)!;
   
-  // Try partial matching - find a field whose normalized name is contained in the question or vice versa
+  // 2. Partial matching - field name contained in question or vice versa
   for (const [key, id] of fieldMap.entries()) {
     if (key.length > 3 && (norm.includes(key) || key.includes(norm))) {
       return id;
     }
   }
+  
+  // 3. Keyword-based matching against known patterns
+  for (const [fieldNorm, keywords] of Object.entries(KEYWORD_MAPPINGS)) {
+    const matched = keywords.some(kw => lowerQuestion.includes(kw));
+    if (matched && fieldMap.has(fieldNorm)) {
+      return fieldMap.get(fieldNorm)!;
+    }
+  }
+  
+  // 4. Word-level overlap matching
+  const questionWords = extractKeywords(questionLabel);
+  let bestMatch: { id: string; score: number } | null = null;
+  
+  for (const [key, id] of fieldMap.entries()) {
+    const fieldWords = key.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2);
+    if (fieldWords.length === 0) continue;
+    
+    const overlap = fieldWords.filter(fw => questionWords.some(qw => qw.includes(fw) || fw.includes(qw))).length;
+    const score = overlap / fieldWords.length;
+    
+    if (score >= 0.5 && (!bestMatch || score > bestMatch.score)) {
+      bestMatch = { id, score };
+    }
+  }
+  
+  if (bestMatch) return bestMatch.id;
   
   return null;
 }
