@@ -477,6 +477,10 @@ function parseCustomFields(customFields: any): Record<string, any> {
 // Fetch custom field definitions from GHL to get human-readable names
 async function fetchGHLCustomFieldDefinitions(apiKey: string, locationId: string): Promise<Record<string, string>> {
   const fieldNameMap: Record<string, string> = {};
+  if (!locationId) {
+    console.warn('No locationId provided for custom field definitions fetch');
+    return fieldNameMap;
+  }
   try {
     const response = await fetch(`${GHL_BASE_URL}/locations/${locationId}/customFields`, {
       headers: {
@@ -496,9 +500,10 @@ async function fetchGHLCustomFieldDefinitions(apiKey: string, locationId: string
           fieldNameMap[field.fieldKey] = field.name;
         }
       }
-      console.log(`Fetched ${Object.keys(fieldNameMap).length} custom field definitions`);
+      console.log(`Fetched ${Object.keys(fieldNameMap).length} custom field definitions. Sample keys: ${Object.keys(fieldNameMap).slice(0, 5).join(', ')}`);
     } else {
-      console.warn(`Failed to fetch custom field definitions: ${response.status}`);
+      const errText = await response.text().catch(() => '');
+      console.warn(`Failed to fetch custom field definitions: ${response.status} - ${errText.substring(0, 200)}`);
     }
   } catch (err) {
     console.warn('Error fetching custom field definitions:', err);
