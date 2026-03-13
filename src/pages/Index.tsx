@@ -224,6 +224,7 @@ const Index = () => {
         onAgencySettings={() => setAgencySettingsOpen(true)}
         onSpamBlacklist={() => navigate('/spam-blacklist')}
         onDatabase={() => navigate('/database')}
+        onBriefs={() => navigate('/briefs')}
         currentMemberName={currentMember?.name}
         onLogout={currentMember ? logout : undefined}
       />

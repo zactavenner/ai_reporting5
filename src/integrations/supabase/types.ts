@@ -1262,6 +1262,51 @@ export type Database = {
           },
         ]
       }
+      creative_briefs: {
+        Row: {
+          client_id: string
+          client_name: string
+          created_at: string
+          full_brief_json: Json | null
+          hook_patterns: string[] | null
+          id: string
+          offer_angles: string[] | null
+          recommended_variations: Json | null
+          source: string
+          status: string
+          updated_at: string
+          winning_ad_summary: Json | null
+        }
+        Insert: {
+          client_id: string
+          client_name: string
+          created_at?: string
+          full_brief_json?: Json | null
+          hook_patterns?: string[] | null
+          id?: string
+          offer_angles?: string[] | null
+          recommended_variations?: Json | null
+          source?: string
+          status?: string
+          updated_at?: string
+          winning_ad_summary?: Json | null
+        }
+        Update: {
+          client_id?: string
+          client_name?: string
+          created_at?: string
+          full_brief_json?: Json | null
+          hook_patterns?: string[] | null
+          id?: string
+          offer_angles?: string[] | null
+          recommended_variations?: Json | null
+          source?: string
+          status?: string
+          updated_at?: string
+          winning_ad_summary?: Json | null
+        }
+        Relationships: []
+      }
       creatives: {
         Row: {
           aspect_ratio: string | null

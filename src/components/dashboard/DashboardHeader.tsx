@@ -1,4 +1,5 @@
-import { Settings2, Shield, Database, LogOut, User, FileDown } from 'lucide-react';
+import { Settings2, Shield, Database, LogOut, User, FileDown, FileText } from 'lucide-react';
+import { usePendingBriefsCount } from '@/hooks/useCreativeBriefs';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { exportDashboardPDF } from '@/lib/exportUtils';
@@ -10,6 +11,7 @@ interface DashboardHeaderProps {
   onAgencySettings?: () => void;
   onSpamBlacklist?: () => void;
   onDatabase?: () => void;
+  onBriefs?: () => void;
   currentMemberName?: string;
   onLogout?: () => void;
 }
@@ -21,9 +23,11 @@ export function DashboardHeader({
   onAgencySettings,
   onSpamBlacklist,
   onDatabase,
+  onBriefs,
   currentMemberName,
   onLogout,
 }: DashboardHeaderProps) {
+  const { data: pendingCount = 0 } = usePendingBriefsCount();
   return (
     <header className="border-b border-border bg-card/80 apple-blur sticky top-0 z-30 px-5 sm:px-8 py-3">
       <div className="flex items-center justify-between">
@@ -57,6 +61,17 @@ export function DashboardHeader({
             <Button variant="ghost" size="sm" onClick={onDatabase}>
               <Database className="h-4 w-4" />
               <span className="hidden sm:inline">Database</span>
+            </Button>
+          )}
+          {onBriefs && (
+            <Button variant="ghost" size="sm" onClick={onBriefs} className="relative">
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">Briefs</span>
+              {pendingCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground rounded-full h-4 min-w-[16px] flex items-center justify-center text-[10px] font-bold">
+                  {pendingCount}
+                </span>
+              )}
             </Button>
           )}
           <ThemeToggle />

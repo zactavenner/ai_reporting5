@@ -11,6 +11,7 @@ import { SortableTableHeader, SortConfig } from '@/components/dashboard/Sortable
 import { useMetaCampaigns, useMetaAdSets, useMetaAds, useSyncMetaAds } from '@/hooks/useMetaAds';
 import { useFetchAdMediaHD } from '@/hooks/useAdMediaHD';
 import { useRunAttribution } from '@/hooks/useRunAttribution';
+import { GenerateBriefButton } from '@/components/briefs/GenerateBriefButton';
 import { useClientSettings } from '@/hooks/useClientSettings';
 import { useCreateTask } from '@/hooks/useTasks';
 import { useDateFilter } from '@/contexts/DateFilterContext';
@@ -19,6 +20,7 @@ import { toast } from 'sonner';
 
 interface AdsManagerTabProps {
   clientId: string;
+  clientName?: string;
 }
 
 function StatusDot({ status }: { status: string | null }) {
@@ -207,7 +209,7 @@ function VariationTaskModal({
   );
 }
 
-export function AdsManagerTab({ clientId }: AdsManagerTabProps) {
+export function AdsManagerTab({ clientId, clientName = 'Client' }: AdsManagerTabProps) {
   const [activeTab, setActiveTab] = useState('campaigns');
   const [filterCampaignId, setFilterCampaignId] = useState<string | null>(null);
   const [filterAdSetId, setFilterAdSetId] = useState<string | null>(null);
@@ -290,6 +292,18 @@ export function AdsManagerTab({ clientId }: AdsManagerTabProps) {
             {syncMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Sync Meta Ads
           </Button>
+          <GenerateBriefButton
+            clientId={clientId}
+            clientName={clientName}
+            getTopAds={() => {
+              const sorted = [...allAds].sort((a: any, b: any) => {
+                const roasA = Number(a.spend) > 0 ? (Number(a.attributed_funded_dollars) || 0) / Number(a.spend) : 0;
+                const roasB = Number(b.spend) > 0 ? (Number(b.attributed_funded_dollars) || 0) / Number(b.spend) : 0;
+                return roasB - roasA;
+              });
+              return sorted.slice(0, 5);
+            }}
+          />
         </div>
       </div>
 

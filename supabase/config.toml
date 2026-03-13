@@ -111,3 +111,6 @@ verify_jwt = false
 
 [functions.slack-events]
 verify_jwt = false
+
+[functions.generate-brief]
+verify_jwt = false

@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import ClientCreatives from "./pages/ClientCreatives";
 import PublicCreatives from "./pages/PublicCreatives";
 import MetaAdsOverlay from "./pages/MetaAdsOverlay";
+import CreativeBriefs from "./pages/CreativeBriefs";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,6 +43,7 @@ const App = () => (
              <Route path="/client/:clientId/creatives" element={<PasswordGate><ClientCreatives /></PasswordGate>} />
             <Route path="/database" element={<PasswordGate><DatabaseView /></PasswordGate>} />
             <Route path="/spam-blacklist" element={<PasswordGate><SpamBlacklist /></PasswordGate>} />
+            <Route path="/briefs" element={<PasswordGate><CreativeBriefs /></PasswordGate>} />
             
             {/* Public routes - no password required */}
             <Route path="/public/:token" element={<PublicReport />} />
