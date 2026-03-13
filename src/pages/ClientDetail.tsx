@@ -547,7 +547,7 @@ export default function ClientDetail() {
         {/* Ads Manager Tab */}
         {activeTab === 'ads-manager' && (
           <SectionErrorBoundary sectionName="Ads Manager">
-            <AdsManagerTab clientId={client.id} />
+            <AdsManagerTab clientId={client.id} clientName={client.name} />
           </SectionErrorBoundary>
         )}
         {/* Offers & Files Tab */}
