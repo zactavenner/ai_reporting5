@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import ClientCreatives from "./pages/ClientCreatives";
 import PublicCreatives from "./pages/PublicCreatives";
 import MetaAdsOverlay from "./pages/MetaAdsOverlay";
+import CreativeBriefs from "./pages/CreativeBriefs";
 
 const queryClient = new QueryClient({
   defaultOptions: {
