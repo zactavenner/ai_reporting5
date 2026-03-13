@@ -714,6 +714,10 @@ async function syncContactToDatabase(
   const phone = contact.phone || null;
   
   const customFields = parseCustomFields(contact.customFields);
+  const cfCount = Object.keys(customFields).length;
+  if (cfCount > 0) {
+    console.log(`Contact ${externalId} has ${cfCount} custom fields (raw type: ${Array.isArray(contact.customFields) ? 'array' : typeof contact.customFields})`);
+  }
   const rawQuestions = extractQuestionsFromCustomFields(customFields, fieldNameMap);
   const utmFromQuestions = extractUtmFromQuestions(rawQuestions);
   const questions = utmFromQuestions.filteredQuestions;
