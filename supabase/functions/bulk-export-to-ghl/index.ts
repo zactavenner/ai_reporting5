@@ -284,8 +284,6 @@ Deno.serve(async (req) => {
             const errorText = await updateResponse.text();
             console.error(`[bulk-export-to-ghl] Contact update failed for ${lead.external_id}: ${updateResponse.status} - ${errorText}`);
           }
-          
-          await delay(DELAY_MS);
         }
 
         // Step 3b: For unmapped questions, create a note with the remaining answers
@@ -313,7 +311,10 @@ Deno.serve(async (req) => {
             const errorText = await noteResponse.text();
             console.error(`[bulk-export-to-ghl] Note creation failed for ${lead.external_id}: ${noteResponse.status} - ${errorText}`);
           }
-          
+        }
+
+        // Pace once per lead (instead of once per API call) to avoid frontend timeout on large batches
+        if (contactUpdated || noteCreated) {
           await delay(DELAY_MS);
         }
 
