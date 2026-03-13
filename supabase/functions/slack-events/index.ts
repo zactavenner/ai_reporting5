@@ -103,7 +103,7 @@ async function handleMention(event: any, env: Env) {
   const slackUserId = event.user;
 
   // Post a thinking indicator
-  const thinkingMsg = await postSlackMessage(env.SLACK_BOT_TOKEN, channelId, threadTs, "🤔 Thinking...");
+  const thinkingMsg = await postSlackMessage(env.LOVABLE_API_KEY, env.SLACK_API_KEY, channelId, threadTs, "🤔 Thinking...");
 
   // Look up which client this channel belongs to (if any)
   const { data: settingsRows } = await supabase
