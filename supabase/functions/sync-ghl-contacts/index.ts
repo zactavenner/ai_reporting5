@@ -445,17 +445,33 @@ async function syncClientCallLogs(
   return result;
 }
 
-function parseCustomFields(customFields: any[] | undefined): Record<string, any> {
-  if (!customFields || !Array.isArray(customFields)) return {};
+function parseCustomFields(customFields: any): Record<string, any> {
+  if (!customFields) return {};
   
-  const result: Record<string, any> = {};
-  for (const field of customFields) {
-    if (field.id && field.value !== undefined && field.value !== null && field.value !== '') {
-      const key = field.fieldKey || field.id;
-      result[key] = field.value;
+  // Handle array format: [{id, value, fieldKey}, ...]
+  if (Array.isArray(customFields)) {
+    const result: Record<string, any> = {};
+    for (const field of customFields) {
+      if (field && field.id && field.value !== undefined && field.value !== null && field.value !== '') {
+        const key = field.fieldKey || field.id;
+        result[key] = field.value;
+      }
     }
+    return result;
   }
-  return result;
+  
+  // Handle object/map format: {fieldId: value, ...} (common in search API responses)
+  if (typeof customFields === 'object') {
+    const result: Record<string, any> = {};
+    for (const [key, value] of Object.entries(customFields)) {
+      if (value !== undefined && value !== null && value !== '') {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+  
+  return {};
 }
 
 // Fetch custom field definitions from GHL to get human-readable names
