@@ -139,6 +139,8 @@ export function DraggableClientTable({
   apiTestResults = {},
 }: DraggableClientTableProps) {
   const navigate = useNavigate();
+  const { dateRange } = useDateFilter();
+  const numberOfDays = useMemo(() => differenceInDays(dateRange.to, dateRange.from) + 1, [dateRange]);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ column: '', direction: null });
   const updateClient = useUpdateClient();
