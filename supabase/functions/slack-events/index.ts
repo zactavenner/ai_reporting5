@@ -614,7 +614,7 @@ Clients: ${clientNames}`,
     `🔗 <${taskLink}|View Task in Dashboard>`,
   ].join("\n");
 
-  await updateOrPostMessage(env.SLACK_BOT_TOKEN, channel, thread, thinkingTs, readback);
+  await updateOrPostMessage(env.LOVABLE_API_KEY, env.SLACK_API_KEY, channel, thread, thinkingTs, readback);
 }
 
 // -------------------------------------------------------------------
