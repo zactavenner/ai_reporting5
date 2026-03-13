@@ -208,7 +208,7 @@ function VariationTaskModal({
   );
 }
 
-export function AdsManagerTab({ clientId }: AdsManagerTabProps) {
+export function AdsManagerTab({ clientId, clientName = 'Client' }: AdsManagerTabProps) {
   const [activeTab, setActiveTab] = useState('campaigns');
   const [filterCampaignId, setFilterCampaignId] = useState<string | null>(null);
   const [filterAdSetId, setFilterAdSetId] = useState<string | null>(null);
