@@ -356,6 +356,25 @@ export function CreativesTab() {
                         )}
                       </div>
                       <div className="flex gap-1">
+                        {creative.file_url && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = creative.file_url!;
+                              link.download = creative.title || 'creative';
+                              link.target = '_blank';
+                              link.rel = 'noreferrer';
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            title="Download"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
