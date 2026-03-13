@@ -23,9 +23,11 @@ export function DashboardHeader({
   onAgencySettings,
   onSpamBlacklist,
   onDatabase,
+  onBriefs,
   currentMemberName,
   onLogout,
 }: DashboardHeaderProps) {
+  const { data: pendingCount = 0 } = usePendingBriefsCount();
   return (
     <header className="border-b border-border bg-card/80 apple-blur sticky top-0 z-30 px-5 sm:px-8 py-3">
       <div className="flex items-center justify-between">
