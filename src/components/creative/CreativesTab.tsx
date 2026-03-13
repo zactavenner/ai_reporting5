@@ -42,6 +42,7 @@ import {
   Eye,
   Sparkles,
   CheckSquare,
+  Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
