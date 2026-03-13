@@ -693,13 +693,13 @@ async function handleListTasks(
 // -------------------------------------------------------------------
 
 /** Update the "thinking" message with the real answer, or post new if no thinking msg */
-async function updateOrPostMessage(token: string, channel: string, threadTs: string, thinkingTs?: string, text?: string) {
+async function updateOrPostMessage(lovableKey: string, slackKey: string, channel: string, threadTs: string, thinkingTs?: string, text?: string) {
   if (thinkingTs) {
-    // Update the thinking message with the real answer
-    const res = await fetch("https://slack.com/api/chat.update", {
+    const res = await fetch(`${SLACK_GATEWAY_URL}/chat.update`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${lovableKey}`,
+        "X-Connection-Api-Key": slackKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -712,19 +712,19 @@ async function updateOrPostMessage(token: string, channel: string, threadTs: str
     const data = await res.json();
     if (!data.ok) {
       console.error("Failed to update Slack message:", data.error);
-      // Fallback: post new message
-      return postSlackMessage(token, channel, threadTs, text || "");
+      return postSlackMessage(lovableKey, slackKey, channel, threadTs, text || "");
     }
     return data;
   }
-  return postSlackMessage(token, channel, threadTs, text || "");
+  return postSlackMessage(lovableKey, slackKey, channel, threadTs, text || "");
 }
 
-async function postSlackMessage(token: string, channel: string, threadTs: string, text: string) {
-  const res = await fetch("https://slack.com/api/chat.postMessage", {
+async function postSlackMessage(lovableKey: string, slackKey: string, channel: string, threadTs: string, text: string) {
+  const res = await fetch(`${SLACK_GATEWAY_URL}/chat.postMessage`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${lovableKey}`,
+      "X-Connection-Api-Key": slackKey,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -742,10 +742,13 @@ async function postSlackMessage(token: string, channel: string, threadTs: string
   return data;
 }
 
-async function getSlackUserInfo(token: string, userId: string): Promise<any> {
+async function getSlackUserInfo(lovableKey: string, slackKey: string, userId: string): Promise<any> {
   try {
-    const res = await fetch(`https://slack.com/api/users.info?user=${userId}`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const res = await fetch(`${SLACK_GATEWAY_URL}/users.info?user=${userId}`, {
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "X-Connection-Api-Key": slackKey,
+      },
     });
     const data = await res.json();
     return data.ok ? data.user : null;
