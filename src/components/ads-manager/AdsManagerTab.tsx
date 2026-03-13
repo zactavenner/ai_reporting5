@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 
 interface AdsManagerTabProps {
   clientId: string;
+  clientName?: string;
 }
 
 function StatusDot({ status }: { status: string | null }) {
