@@ -630,7 +630,8 @@ export function InlineRecordsView({
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Export failed');
-      toast.success(`Exported to GHL: ${data.updated} contacts updated, ${data.skipped} skipped, ${data.failed} failed`);
+      const unmapped = data.unmapped_field_names?.length > 0 ? `\nUnmapped fields (added as notes): ${data.unmapped_field_names.join(', ')}` : '';
+      toast.success(`Exported to GHL: ${data.updated} contacts updated (${data.fields_mapped} fields mapped), ${data.skipped} skipped, ${data.failed} failed${unmapped}`, { duration: 8000 });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       toast.error(`Export to GHL failed: ${msg}`);
