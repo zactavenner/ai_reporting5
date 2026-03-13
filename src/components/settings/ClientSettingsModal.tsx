@@ -137,6 +137,9 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
     if ((settings as any)?.slack_review_channel_id !== undefined) {
       setSlackReviewChannelId((settings as any).slack_review_channel_id || '');
     }
+    if ((settings as any)?.slack_channel_id !== undefined) {
+      setSlackChannelId((settings as any).slack_channel_id || '');
+    }
     // Load calendar and pipeline settings
     const settingsAny = settings as any;
     if (settingsAny?.tracked_calendar_ids) {
