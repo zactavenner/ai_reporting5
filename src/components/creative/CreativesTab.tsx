@@ -42,6 +42,7 @@ import {
   Eye,
   Sparkles,
   CheckSquare,
+  Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -355,6 +356,25 @@ export function CreativesTab() {
                         )}
                       </div>
                       <div className="flex gap-1">
+                        {creative.file_url && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = creative.file_url!;
+                              link.download = creative.title || 'creative';
+                              link.target = '_blank';
+                              link.rel = 'noreferrer';
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            title="Download"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -469,10 +489,31 @@ export function CreativesTab() {
                 clientName={selectedCreative.clientName || 'Unknown Client'}
               />
 
-              {/* AI Actions */}
+              {/* Download + AI Actions */}
               <div className="flex items-center gap-2 flex-wrap border-t pt-4">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium mr-2">AI Tools:</span>
+                {selectedCreative.file_url && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = selectedCreative.file_url!;
+                      link.download = selectedCreative.title || 'creative';
+                      link.target = '_blank';
+                      link.rel = 'noreferrer';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      toast.success('Download started');
+                    }}
+                  >
+                    <Download className="h-4 w-4" />
+                    Download
+                  </Button>
+                )}
+                <Sparkles className="h-4 w-4 text-primary ml-2" />
+                <span className="text-sm font-medium mr-1">AI Tools:</span>
                 <CreativeAIActions creative={selectedCreative} />
               </div>
 

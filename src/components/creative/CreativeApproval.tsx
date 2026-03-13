@@ -43,7 +43,8 @@ import {
   Clock,
   Sparkles,
   Link,
-  SendHorizontal
+  SendHorizontal,
+  Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -626,14 +627,39 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
                     clientName={clientName}
                   />
 
-                  {/* AI Tools - agency only */}
-                  {!isPublicView && (
-                    <div className="flex items-center gap-2 flex-wrap border-t pt-4">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium mr-2">AI Tools:</span>
-                      <CreativeAIActions creative={selectedCreative} />
-                    </div>
-                  )}
+                  {/* Download + AI Tools */}
+                  <div className="flex items-center gap-2 flex-wrap border-t pt-4">
+                    {/* Download - available for both agency and public */}
+                    {selectedCreative.file_url && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = selectedCreative.file_url!;
+                          link.download = selectedCreative.title || 'creative';
+                          link.target = '_blank';
+                          link.rel = 'noreferrer';
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          toast.success('Download started');
+                        }}
+                      >
+                        <Download className="h-4 w-4" />
+                        Download
+                      </Button>
+                    )}
+                    {/* AI Tools - agency only */}
+                    {!isPublicView && (
+                      <>
+                        <Sparkles className="h-4 w-4 text-primary ml-2" />
+                        <span className="text-sm font-medium mr-1">AI Tools:</span>
+                        <CreativeAIActions creative={selectedCreative} />
+                      </>
+                    )}
+                  </div>
 
                   {/* Action Buttons */}
                   <div className="flex gap-2 flex-wrap border-t pt-4">
@@ -950,6 +976,28 @@ function CreativeCard({
                 Reject
               </Button>
             </>
+          )}
+          {/* Download button on card */}
+          {creative.file_url && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                const link = document.createElement('a');
+                link.href = creative.file_url!;
+                link.download = creative.title || 'creative';
+                link.target = '_blank';
+                link.rel = 'noreferrer';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+            >
+              <Download className="h-3 w-3" />
+              Download
+            </Button>
           )}
           <Button
             variant="secondary"
