@@ -96,7 +96,7 @@ interface GHLContact {
   name?: string;
   email?: string;
   phone?: string;
-  customFields?: Record<string, any>[];
+  customFields?: any;
   tags?: string[];
   source?: string;
   dateAdded?: string;
@@ -445,22 +445,42 @@ async function syncClientCallLogs(
   return result;
 }
 
-function parseCustomFields(customFields: any[] | undefined): Record<string, any> {
-  if (!customFields || !Array.isArray(customFields)) return {};
+function parseCustomFields(customFields: any): Record<string, any> {
+  if (!customFields) return {};
   
-  const result: Record<string, any> = {};
-  for (const field of customFields) {
-    if (field.id && field.value !== undefined && field.value !== null && field.value !== '') {
-      const key = field.fieldKey || field.id;
-      result[key] = field.value;
+  // Handle array format: [{id, value, fieldKey}, ...]
+  if (Array.isArray(customFields)) {
+    const result: Record<string, any> = {};
+    for (const field of customFields) {
+      if (field && field.id && field.value !== undefined && field.value !== null && field.value !== '') {
+        const key = field.fieldKey || field.id;
+        result[key] = field.value;
+      }
     }
+    return result;
   }
-  return result;
+  
+  // Handle object/map format: {fieldId: value, ...} (common in search API responses)
+  if (typeof customFields === 'object') {
+    const result: Record<string, any> = {};
+    for (const [key, value] of Object.entries(customFields)) {
+      if (value !== undefined && value !== null && value !== '') {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+  
+  return {};
 }
 
 // Fetch custom field definitions from GHL to get human-readable names
 async function fetchGHLCustomFieldDefinitions(apiKey: string, locationId: string): Promise<Record<string, string>> {
   const fieldNameMap: Record<string, string> = {};
+  if (!locationId) {
+    console.warn('No locationId provided for custom field definitions fetch');
+    return fieldNameMap;
+  }
   try {
     const response = await fetch(`${GHL_BASE_URL}/locations/${locationId}/customFields`, {
       headers: {
@@ -480,9 +500,10 @@ async function fetchGHLCustomFieldDefinitions(apiKey: string, locationId: string
           fieldNameMap[field.fieldKey] = field.name;
         }
       }
-      console.log(`Fetched ${Object.keys(fieldNameMap).length} custom field definitions`);
+      console.log(`Fetched ${Object.keys(fieldNameMap).length} custom field definitions. Sample keys: ${Object.keys(fieldNameMap).slice(0, 5).join(', ')}`);
     } else {
-      console.warn(`Failed to fetch custom field definitions: ${response.status}`);
+      const errText = await response.text().catch(() => '');
+      console.warn(`Failed to fetch custom field definitions: ${response.status} - ${errText.substring(0, 200)}`);
     }
   } catch (err) {
     console.warn('Error fetching custom field definitions:', err);
@@ -495,13 +516,23 @@ function extractQuestionsFromCustomFields(customFields: Record<string, any>, fie
   const skipFields = new Set([
     'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
     'campaign_name', 'ad_set_name', 'ad_id', 'assigned_user', 'source',
-    'Campaign Tracker', 'UTM Source', 'UTM Medium', 'UTM Campaign', 'UTM Content', 'UTM Term'
+    'Campaign Tracker', 'UTM Source', 'UTM Medium', 'UTM Campaign', 'UTM Content', 'UTM Term',
+  ]);
+  // Also skip by resolved name (case-insensitive)
+  const skipNamesLower = new Set([
+    'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
+    'campaign tracker', 'utm source', 'utm medium', 'utm campaign', 'utm content', 'utm term',
+    'campaign_name', 'ad_set_name', 'ad_id', 'assigned_user',
   ]);
   
   for (const [key, value] of Object.entries(customFields)) {
     if (value !== null && value !== undefined && value !== '' && !skipFields.has(key)) {
       // Resolve human-readable name: check fieldNameMap, then fallback to key
-      const displayName = (fieldNameMap && (fieldNameMap[key] || fieldNameMap[key])) || key;
+      const displayName = (fieldNameMap && fieldNameMap[key]) || key;
+      
+      // Skip UTM/campaign fields by resolved name
+      if (skipNamesLower.has(displayName.toLowerCase())) continue;
+      
       questions.push({
         question: displayName,
         answer: value,
@@ -688,6 +719,10 @@ async function syncContactToDatabase(
   const phone = contact.phone || null;
   
   const customFields = parseCustomFields(contact.customFields);
+  const cfCount = Object.keys(customFields).length;
+  if (cfCount > 0) {
+    console.log(`Contact ${externalId} has ${cfCount} custom fields (raw type: ${Array.isArray(contact.customFields) ? 'array' : typeof contact.customFields})`);
+  }
   const rawQuestions = extractQuestionsFromCustomFields(customFields, fieldNameMap);
   const utmFromQuestions = extractUtmFromQuestions(rawQuestions);
   const questions = utmFromQuestions.filteredQuestions;
