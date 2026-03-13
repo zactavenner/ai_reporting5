@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import { useDateFilter } from '@/contexts/DateFilterContext';
+import { differenceInDays } from 'date-fns';
 import { Client, useUpdateClient } from '@/hooks/useClients';
 import { AggregatedMetrics } from '@/hooks/useMetrics';
 import { KPIThresholds, ClientSettings } from '@/hooks/useClientSettings';
