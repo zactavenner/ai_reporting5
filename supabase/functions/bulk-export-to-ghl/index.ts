@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
-const DELAY_MS = 300;
+const DELAY_MS = 350;
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -15,6 +15,86 @@ function delay(ms: number): Promise<void> {
 interface QuestionAnswer {
   question: string;
   answer: string | string[] | null;
+}
+
+interface GHLCustomField {
+  id: string;
+  name: string;
+  fieldKey: string;
+  dataType: string;
+}
+
+/**
+ * Normalize a string for fuzzy matching: lowercase, strip spaces/punctuation
+ */
+function normalize(str: string): string {
+  return str.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Fetch all custom fields for a GHL location
+ */
+async function fetchCustomFields(apiKey: string, locationId: string): Promise<GHLCustomField[]> {
+  try {
+    const response = await fetch(`${GHL_BASE_URL}/locations/${locationId}/customFields`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Version': '2021-07-28',
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(`[bulk-export-to-ghl] Failed to fetch custom fields: ${response.status} - ${text}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return (data.customFields || []) as GHLCustomField[];
+  } catch (err) {
+    console.error('[bulk-export-to-ghl] Error fetching custom fields:', err);
+    return [];
+  }
+}
+
+/**
+ * Build a mapping from normalized question label -> GHL custom field ID
+ */
+function buildFieldMap(customFields: GHLCustomField[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const field of customFields) {
+    // Map by normalized name
+    map.set(normalize(field.name), field.id);
+    // Also map by fieldKey (e.g. "contact.field_name")
+    if (field.fieldKey) {
+      map.set(normalize(field.fieldKey), field.id);
+      // Strip "contact." prefix
+      const stripped = field.fieldKey.replace(/^contact\./, '');
+      map.set(normalize(stripped), field.id);
+    }
+  }
+  return map;
+}
+
+/**
+ * Try to match a question label to a GHL custom field ID
+ */
+function matchFieldId(questionLabel: string, fieldMap: Map<string, string>): string | null {
+  const norm = normalize(questionLabel);
+  
+  // Direct match
+  if (fieldMap.has(norm)) return fieldMap.get(norm)!;
+  
+  // Try partial matching - find a field whose normalized name is contained in the question or vice versa
+  for (const [key, id] of fieldMap.entries()) {
+    if (key.length > 3 && (norm.includes(key) || key.includes(norm))) {
+      return id;
+    }
+  }
+  
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -53,7 +133,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch all leads with questions and external_id (GHL contact ID)
+    // Step 1: Fetch GHL custom fields for the location
+    console.log(`[bulk-export-to-ghl] Fetching custom fields for location ${client.ghl_location_id}...`);
+    const customFields = await fetchCustomFields(client.ghl_api_key, client.ghl_location_id);
+    console.log(`[bulk-export-to-ghl] Found ${customFields.length} custom fields`);
+    
+    const fieldMap = buildFieldMap(customFields);
+    
+    // Log field names for debugging
+    if (customFields.length > 0) {
+      console.log(`[bulk-export-to-ghl] Custom fields: ${customFields.map(f => `${f.name} (${f.id})`).join(', ')}`);
+    }
+
+    // Step 2: Fetch all leads with questions and external_id (GHL contact ID)
     const { data: leads, error: leadsError } = await supabase
       .from('leads')
       .select('id, external_id, name, email, phone, questions')
@@ -65,7 +157,7 @@ Deno.serve(async (req) => {
     if (leadsError) throw leadsError;
 
     if (!leads || leads.length === 0) {
-      return new Response(JSON.stringify({ success: true, message: 'No leads to export', updated: 0, skipped: 0, failed: 0 }), {
+      return new Response(JSON.stringify({ success: true, message: 'No leads to export', updated: 0, skipped: 0, failed: 0, fields_mapped: 0, fields_unmapped: 0 }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -75,6 +167,9 @@ Deno.serve(async (req) => {
     let updated = 0;
     let skipped = 0;
     let failed = 0;
+    let totalFieldsMapped = 0;
+    let totalFieldsUnmapped = 0;
+    const unmappedFieldNames = new Set<string>();
 
     for (const lead of leads) {
       const questions = lead.questions as QuestionAnswer[] | null;
@@ -86,44 +181,107 @@ Deno.serve(async (req) => {
       }
 
       try {
-        // Build custom field values from questions
-        // We'll push these as a note on the GHL contact since custom fields
-        // require field ID mapping which varies per location
-        let noteBody = `📋 **Form Responses (from Lovable)**\n\n`;
+        // Build custom field values and collect unmapped questions
+        const customFieldValues: Record<string, string> = {};
+        const unmappedQuestions: QuestionAnswer[] = [];
+
         for (const qa of questions) {
-          const answer = Array.isArray(qa.answer) ? qa.answer.join(', ') : (qa.answer || 'N/A');
-          noteBody += `**${qa.question}:** ${answer}\n`;
+          if (!qa.question || qa.answer == null) continue;
+          
+          const answer = Array.isArray(qa.answer) ? qa.answer.join(', ') : String(qa.answer);
+          const fieldId = matchFieldId(qa.question, fieldMap);
+          
+          if (fieldId) {
+            customFieldValues[fieldId] = answer;
+            totalFieldsMapped++;
+          } else {
+            unmappedQuestions.push(qa);
+            unmappedFieldNames.add(qa.question);
+            totalFieldsUnmapped++;
+          }
         }
-        noteBody += `\n_Exported at ${new Date().toISOString()}_`;
 
-        // Create a note on the GHL contact
-        const response = await fetch(`${GHL_BASE_URL}/contacts/${lead.external_id}/notes`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${client.ghl_api_key}`,
-            'Version': '2021-07-28',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: JSON.stringify({ body: noteBody }),
-        });
+        let contactUpdated = false;
+        let noteCreated = false;
 
-        if (response.ok) {
+        // Step 3a: Update contact with mapped custom fields
+        if (Object.keys(customFieldValues).length > 0) {
+          const updatePayload: Record<string, unknown> = {
+            customFields: Object.entries(customFieldValues).map(([id, value]) => ({
+              id,
+              field_value: value,
+            })),
+          };
+
+          const updateResponse = await fetch(`${GHL_BASE_URL}/contacts/${lead.external_id}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${client.ghl_api_key}`,
+              'Version': '2021-07-28',
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify(updatePayload),
+          });
+
+          if (updateResponse.ok) {
+            contactUpdated = true;
+          } else {
+            const errorText = await updateResponse.text();
+            console.error(`[bulk-export-to-ghl] Contact update failed for ${lead.external_id}: ${updateResponse.status} - ${errorText}`);
+          }
+          
+          await delay(DELAY_MS);
+        }
+
+        // Step 3b: For unmapped questions, create a note with the remaining answers
+        if (unmappedQuestions.length > 0) {
+          let noteBody = `📋 Form Responses (unmapped fields)\n\n`;
+          for (const qa of unmappedQuestions) {
+            const answer = Array.isArray(qa.answer) ? qa.answer.join(', ') : (qa.answer || 'N/A');
+            noteBody += `${qa.question}: ${answer}\n`;
+          }
+
+          const noteResponse = await fetch(`${GHL_BASE_URL}/contacts/${lead.external_id}/notes`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${client.ghl_api_key}`,
+              'Version': '2021-07-28',
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify({ body: noteBody }),
+          });
+
+          if (noteResponse.ok) {
+            noteCreated = true;
+          } else {
+            const errorText = await noteResponse.text();
+            console.error(`[bulk-export-to-ghl] Note creation failed for ${lead.external_id}: ${noteResponse.status} - ${errorText}`);
+          }
+          
+          await delay(DELAY_MS);
+        }
+
+        if (contactUpdated || noteCreated) {
           updated++;
+        } else if (Object.keys(customFieldValues).length === 0 && unmappedQuestions.length === 0) {
+          skipped++;
         } else {
-          const errorText = await response.text();
-          console.error(`[bulk-export-to-ghl] Failed for ${lead.external_id}: ${response.status} - ${errorText}`);
           failed++;
         }
       } catch (err) {
         console.error(`[bulk-export-to-ghl] Error for ${lead.external_id}:`, err);
         failed++;
       }
-
-      await delay(DELAY_MS);
     }
 
-    console.log(`[bulk-export-to-ghl] Complete: ${updated} updated, ${skipped} skipped (no answers), ${failed} failed`);
+    const unmappedList = Array.from(unmappedFieldNames);
+    console.log(`[bulk-export-to-ghl] Complete: ${updated} updated, ${skipped} skipped, ${failed} failed`);
+    console.log(`[bulk-export-to-ghl] Fields mapped: ${totalFieldsMapped}, unmapped: ${totalFieldsUnmapped}`);
+    if (unmappedList.length > 0) {
+      console.log(`[bulk-export-to-ghl] Unmapped field names: ${unmappedList.join(', ')}`);
+    }
 
     return new Response(JSON.stringify({
       success: true,
@@ -131,6 +289,9 @@ Deno.serve(async (req) => {
       skipped,
       failed,
       total: leads.length,
+      fields_mapped: totalFieldsMapped,
+      fields_unmapped: totalFieldsUnmapped,
+      unmapped_field_names: unmappedList,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
