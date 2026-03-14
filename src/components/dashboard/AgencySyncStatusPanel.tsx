@@ -377,14 +377,15 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
   };
 
     const getGhlStatus = (c: ClientSyncInfo): SyncStatus => {
-    if (c.hubspotPortalId) return getSyncStatusFromDate(c.lastHubspotSyncAt, !!c.hubspotPortalId);
+    if (c.hubspotPortalId) return getSyncStatusFromDate(c.lastHubspotSyncAt, !!c.hubspotPortalId, { healthy: 8, stale: 48 });
     if (c.ghlSyncStatus === 'error') return 'error';
-    return getSyncStatusFromDate(c.lastGhlSyncAt, !!(c.ghlLocationId && c.ghlApiKey));
+    // GHL contacts sync runs every 2 hours via cron
+    return getSyncStatusFromDate(c.lastGhlSyncAt, !!(c.ghlLocationId && c.ghlApiKey), { healthy: 4, stale: 48 });
   };
 
   const getMetaStatus = (c: ClientSyncInfo): SyncStatus => {
-    // Meta syncs daily — healthy within 26h, stale within 48h
-    return getSyncStatusFromDate(c.metaLastSync, !!(c.metaAdAccountId), { healthy: 26, stale: 48 });
+    // Meta syncs daily — healthy within 26h, stale within 72h
+    return getSyncStatusFromDate(c.metaLastSync, !!(c.metaAdAccountId), { healthy: 26, stale: 72 });
   };
 
   if (clientSyncData.length === 0) return null;
