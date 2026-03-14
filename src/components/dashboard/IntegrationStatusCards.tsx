@@ -23,7 +23,7 @@ export function IntegrationStatusCards({ onNavigateToSettings }: IntegrationStat
   const { data: statuses = [] } = useIntegrationStatuses();
   const warnings = useTokenExpiryWarnings(statuses);
 
-  const integrations = ['meta_ads', 'ghl', 'hubspot', 'meetgeek', 'stripe'];
+  const integrations = ['meta_ads', 'ghl', 'hubspot', 'meetgeek', 'stripe', 'sendblue', 'elevenlabs'];
 
   const getStatus = (name: string) => statuses.find(s => s.integration_name === name);
 
