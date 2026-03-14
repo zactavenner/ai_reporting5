@@ -291,6 +291,23 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── Step 8: Daily Close Report (accuracy check + Slack summary) ──
+    if (!skipSteps.includes("report")) {
+      const start = Date.now();
+      console.log(`[daily-master-sync] Step 8: daily-close-report`);
+      const res = await callFunction(supabaseUrl, supabaseKey, "daily-close-report");
+      const duration = Date.now() - start;
+      results.push({
+        step: "daily-close-report",
+        success: res.success,
+        duration_ms: duration,
+        details: res.data?.accuracy
+          ? `${res.data.accuracy.discrepancies_found} discrepancies, ${res.data.accuracy.discrepancies_fixed} fixed`
+          : res.data?.message || "Report generated",
+        error: res.error,
+      });
+    }
+
     // ── Summary ──
     const succeeded = results.filter(r => r.success).length;
     const failed = results.filter(r => !r.success).length;

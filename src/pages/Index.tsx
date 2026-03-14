@@ -27,6 +27,7 @@ import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
 import { AgencyBillingTab } from '@/components/billing/AgencyBillingTab';
 import { DealPipelineBoard } from '@/components/deals/DealPipelineBoard';
 import { DataHealthCard } from '@/components/dashboard/DataHealthCard';
+import { DailyReportCard } from '@/components/dashboard/DailyReportCard';
 import { IntegrationStatusCards } from '@/components/dashboard/IntegrationStatusCards';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
@@ -352,6 +353,11 @@ const Index = () => {
                   />
                 )}
               </section>
+            </SectionErrorBoundary>
+
+            {/* Daily Close Report */}
+            <SectionErrorBoundary sectionName="Daily Report">
+              <DailyReportCard />
             </SectionErrorBoundary>
 
             {/* Integration Health */}
