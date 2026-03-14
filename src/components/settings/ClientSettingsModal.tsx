@@ -23,9 +23,10 @@ import { CalendarTrackingSection } from './CalendarTrackingSection';
 import { PipelineMappingSection } from './PipelineMappingSection';
 import { HubSpotIntegrationSection } from './HubSpotIntegrationSection';
 import { MeetGeekIntegrationSection } from './MeetGeekIntegrationSection';
+import { AIOutreachSettingsTab } from './AIOutreachSettingsTab';
 import { SyncHealthIndicator, getSyncStatus } from './SyncHealthIndicator';
 import { useSyncQueue } from '@/hooks/useSyncQueue';
-import { DollarSign, Target, Plug, Loader2, RefreshCw, CheckCircle, XCircle, Users, Lock, Eye, EyeOff, AlertTriangle, ListOrdered } from 'lucide-react';
+import { DollarSign, Target, Plug, Loader2, RefreshCw, CheckCircle, XCircle, Users, Lock, Eye, EyeOff, AlertTriangle, ListOrdered, Bot } from 'lucide-react';
 interface ClientSettingsModalProps {
   client: Client | null;
   open: boolean;
@@ -441,11 +442,12 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
         </DialogHeader>
 
         <Tabs defaultValue="kpis" className="mt-4">
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="kpis">KPIs</TabsTrigger>
             <TabsTrigger value="teams">Teams</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
+            <TabsTrigger value="ai-outreach">AI Outreach</TabsTrigger>
             <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
             <TabsTrigger value="email-parsing">Email</TabsTrigger>
             <TabsTrigger value="thresholds">Thresholds</TabsTrigger>
@@ -1284,6 +1286,10 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
                 </div>
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="ai-outreach" className="mt-4">
+            {client && <AIOutreachSettingsTab clientId={client.id} />}
           </TabsContent>
 
           <TabsContent value="alerts" className="space-y-4 mt-4">

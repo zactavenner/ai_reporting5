@@ -273,6 +273,12 @@ async function recalculateClientMetrics(supabase: any, clientId: string) {
     .select('booked_at, scheduled_at, showed, is_reconnect')
     .eq('client_id', clientId);
 
+  // Also get all lead dates so we cover dates with leads but no calls
+  const { data: leadDates } = await supabase
+    .from('leads')
+    .select('created_at')
+    .eq('client_id', clientId);
+
   // Aggregate booked calls by booked_at date, showed calls by scheduled_at date
   const metricsByDate = new Map<string, {
     calls: number;
@@ -289,6 +295,15 @@ async function recalculateClientMetrics(supabase: any, clientId: string) {
     }
     return metricsByDate.get(date)!;
   };
+
+  // Pre-populate dates from leads so lead-only dates are also covered
+  if (leadDates && leadDates.length > 0) {
+    for (const lead of leadDates) {
+      if (lead.created_at) {
+        ensureDate(lead.created_at);
+      }
+    }
+  }
 
   if (callStats && callStats.length > 0) {
     for (const call of callStats) {
@@ -319,14 +334,14 @@ async function recalculateClientMetrics(supabase: any, clientId: string) {
     }
   }
 
-  console.log(`Updating metrics for ${metricsByDate.size} dates`);
+  console.log(`Updating metrics for ${metricsByDate.size} dates (includes lead-only dates)`);
 
-  // Update daily_metrics for each date — only update call columns, preserve leads/ads data
+  // Update daily_metrics for each date — only update call/lead columns, preserve ads data
   for (const [date, metrics] of metricsByDate) {
     const dayStart = `${date}T00:00:00.000Z`;
     const dayEnd = `${date}T23:59:59.999Z`;
 
-    // Also count leads for this date so inserts don't lose lead data
+    // Count leads for this date
     const { count: leadsCount } = await supabase
       .from('leads')
       .select('*', { count: 'exact', head: true })

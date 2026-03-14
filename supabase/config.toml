@@ -95,3 +95,12 @@ verify_jwt = false
 
 [functions.daily-master-sync]
 verify_jwt = false
+
+[functions.sendblue-outreach]
+verify_jwt = false
+
+[functions.elevenlabs-outreach]
+verify_jwt = false
+
+[functions.ai-outreach-orchestrator]
+verify_jwt = false

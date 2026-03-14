@@ -3572,6 +3572,80 @@ async function recalculateRecentMetrics(
   return result;
 }
 
+// Recalculate daily_metrics lead counts after contact sync
+// This ensures daily_metrics includes ALL dates with leads (not just call dates)
+async function recalculateLeadMetrics(supabase: any, clientId: string) {
+  try {
+    // Get distinct lead dates for this client
+    const { data: leadDates } = await supabase
+      .from('leads')
+      .select('created_at')
+      .eq('client_id', clientId);
+
+    if (!leadDates || leadDates.length === 0) return;
+
+    // Group leads by date
+    const dateSet = new Set<string>();
+    for (const lead of leadDates) {
+      if (lead.created_at) {
+        dateSet.add(lead.created_at.split('T')[0]);
+      }
+    }
+
+    console.log(`[recalculateLeadMetrics] Updating lead counts for ${dateSet.size} dates for client ${clientId}`);
+
+    for (const date of dateSet) {
+      const dayStart = `${date}T00:00:00.000Z`;
+      const dayEnd = `${date}T23:59:59.999Z`;
+
+      const { count: leadsCount } = await supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
+        .eq('client_id', clientId)
+        .eq('is_spam', false)
+        .gte('created_at', dayStart)
+        .lte('created_at', dayEnd);
+
+      const { count: nullSpamCount } = await supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
+        .eq('client_id', clientId)
+        .is('is_spam', null)
+        .gte('created_at', dayStart)
+        .lte('created_at', dayEnd);
+
+      const { count: spamCount } = await supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
+        .eq('client_id', clientId)
+        .eq('is_spam', true)
+        .gte('created_at', dayStart)
+        .lte('created_at', dayEnd);
+
+      const totalValidLeads = (leadsCount || 0) + (nullSpamCount || 0);
+
+      // Upsert — preserves existing ad_spend and call columns
+      await supabase
+        .from('daily_metrics')
+        .upsert({
+          client_id: clientId,
+          date,
+          leads: totalValidLeads,
+          leads_created: totalValidLeads,
+          spam_leads: spamCount || 0,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'client_id,date',
+          ignoreDuplicates: false,
+        });
+    }
+
+    console.log(`[recalculateLeadMetrics] Complete for client ${clientId}`);
+  } catch (err) {
+    console.error(`[recalculateLeadMetrics] Error for client ${clientId}:`, err);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -4198,7 +4272,13 @@ serve(async (req) => {
 
       if (syncType === 'contacts' || syncType === 'all') {
         clientResult.contacts = await syncClientContacts(supabase, client as any, syncLog?.id, sinceDateDays, syncTimeline);
-        
+
+        // Recalculate daily_metrics lead counts after contacts sync
+        if (clientResult.contacts && (clientResult.contacts.created > 0 || clientResult.contacts.updated > 0)) {
+          console.log(`[sync-ghl-contacts] Recalculating lead metrics for ${client.name} after contact sync`);
+          await recalculateLeadMetrics(supabase, client.id);
+        }
+
         await supabase
           .from('client_settings')
           .update({ ghl_last_contacts_sync: new Date().toISOString() })

@@ -48,6 +48,7 @@ import { useSourceFilteredMetrics } from '@/hooks/useSourceFilteredMetrics';
 import { useLeads, useCalls } from '@/hooks/useLeadsAndCalls';
 import { exportToCSV } from '@/lib/exportUtils';
 import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useUpdateClientOrder } from '@/hooks/useClientOrder';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
 import { toast } from 'sonner';
@@ -194,7 +195,8 @@ const Index = () => {
     setDeleteClient(client);
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
+    // Invalidate all cached queries first for immediate UI refresh
     queryClient.invalidateQueries({ queryKey: ['all-daily-metrics'] });
     queryClient.invalidateQueries({ queryKey: ['funded-investors'] });
     queryClient.invalidateQueries({ queryKey: ['clients'] });
@@ -205,7 +207,30 @@ const Index = () => {
     queryClient.invalidateQueries({ queryKey: ['client-source-metrics'] });
     queryClient.invalidateQueries({ queryKey: ['all-client-full-settings'] });
     queryClient.invalidateQueries({ queryKey: ['integration-status'] });
-    toast.success('Refreshed dashboard data');
+    toast.success('Refreshing dashboard data...');
+
+    // Also trigger a background GHL re-sync for all clients
+    try {
+      const { error } = await supabase.functions.invoke('sync-ghl-all-clients', {
+        body: { sinceDateDays: 7 },
+      });
+      if (error) {
+        console.error('GHL sync trigger error:', error);
+      } else {
+        toast.info('GHL sync started in background. Data will update automatically.');
+        // Re-invalidate queries after a delay to pick up synced data
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['client-source-metrics'] });
+          queryClient.invalidateQueries({ queryKey: ['all-daily-metrics'] });
+          queryClient.invalidateQueries({ queryKey: ['leads'] });
+          queryClient.invalidateQueries({ queryKey: ['calls'] });
+          queryClient.invalidateQueries({ queryKey: ['funded-investors'] });
+          queryClient.invalidateQueries({ queryKey: ['integration-status'] });
+        }, 30000); // Re-fetch after 30 seconds to pick up background sync results
+      }
+    } catch (err) {
+      console.error('Failed to trigger GHL sync:', err);
+    }
   };
 
   const handleReorder = (orderedIds: string[]) => {
