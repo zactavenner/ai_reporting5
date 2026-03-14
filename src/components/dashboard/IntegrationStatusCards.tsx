@@ -11,6 +11,8 @@ const INTEGRATION_ICONS: Record<string, React.ElementType> = {
   hubspot: Zap,
   meetgeek: MessageSquare,
   stripe: CreditCard,
+  sendblue: Phone,
+  elevenlabs: Mic,
 };
 
 interface IntegrationStatusCardsProps {
