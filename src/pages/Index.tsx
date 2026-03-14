@@ -511,6 +511,19 @@ const Index = () => {
             </SectionErrorBoundary>
           </TabsContent>
 
+          {/* AI Outreach Tab */}
+          <TabsContent value="outreach" className="space-y-6">
+            <SectionErrorBoundary sectionName="AI Outreach">
+              <div className="mb-4">
+                <h2 className="text-lg font-bold">AI Outreach</h2>
+                <p className="text-sm text-muted-foreground">
+                  Automated text messaging (Sendblue) and AI voice calls (ElevenLabs)
+                </p>
+              </div>
+              <OutreachTab />
+            </SectionErrorBoundary>
+          </TabsContent>
+
           {/* Billing Tab - Admin Only */}
           {currentMember?.role === 'admin' && (
             <TabsContent value="billing" className="space-y-6">
