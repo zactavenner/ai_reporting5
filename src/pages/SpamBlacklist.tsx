@@ -286,7 +286,7 @@ export default function SpamBlacklist({ embedded = false }: { embedded?: boolean
             )}
           </TabsContent>
         </Tabs>
-      </main>
+      </div>
     </div>
   );
 }
