@@ -66,7 +66,7 @@ export default function SpamBlacklist({ embedded = false }: { embedded?: boolean
     });
   };
 
-  if (isLoading) {
+  if (isLoading && !embedded) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <CashBagLoader message="Loading blacklist..." />
@@ -74,30 +74,45 @@ export default function SpamBlacklist({ embedded = false }: { embedded?: boolean
     );
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b-2 border-border bg-card px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </div>
-          <ThemeToggle />
-        </div>
-        <div className="mt-4 flex items-center gap-3">
-          <Shield className="h-6 w-6 text-destructive" />
-          <div>
-            <h1 className="text-2xl font-bold">Spam & Blacklist Management</h1>
-            <p className="text-sm text-muted-foreground">
-              Manage blocked email domains, IP addresses, and view spam leads
-            </p>
-          </div>
-        </div>
-      </header>
+  if (isLoading && embedded) {
+    return <div className="text-center py-8 text-muted-foreground">Loading blacklist...</div>;
+  }
 
-      <main className="p-6 space-y-6 max-w-7xl mx-auto">
+  return (
+    <div className={embedded ? "" : "min-h-screen bg-background"}>
+      {!embedded && (
+        <header className="border-b-2 border-border bg-card px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Dashboard
+              </Button>
+            </div>
+            <ThemeToggle />
+          </div>
+          <div className="mt-4 flex items-center gap-3">
+            <Shield className="h-6 w-6 text-destructive" />
+            <div>
+              <h1 className="text-2xl font-bold">Spam & Blacklist Management</h1>
+              <p className="text-sm text-muted-foreground">
+                Manage blocked email domains, IP addresses, and view spam leads
+              </p>
+            </div>
+          </div>
+        </header>
+      )}
+      {embedded && (
+        <div className="mb-4 flex items-center gap-3">
+          <Shield className="h-5 w-5 text-destructive" />
+          <div>
+            <h2 className="text-lg font-bold">Spam & Blacklist</h2>
+            <p className="text-sm text-muted-foreground">Manage blocked email domains and IP addresses</p>
+          </div>
+        </div>
+      )}
+
+      <div className={embedded ? "space-y-6" : "p-6 space-y-6 max-w-7xl mx-auto"}>
         <Tabs defaultValue="blacklist">
           <TabsList>
             <TabsTrigger value="blacklist">Blacklist ({blacklist.length})</TabsTrigger>
