@@ -905,7 +905,7 @@ export default function DatabaseView({ embedded = false }: { embedded?: boolean 
             )}
           </CardContent>
         </Card>
-      </main>
+      </div>
 
       {/* Import Modal */}
       <CSVImportModal
