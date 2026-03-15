@@ -114,3 +114,6 @@ verify_jwt = false
 
 [functions.generate-brief]
 verify_jwt = false
+
+[functions.cpl-creative-trigger]
+verify_jwt = false

@@ -279,6 +279,10 @@ export function CreativesTab() {
             <Upload className="h-4 w-4" />
             All Creatives ({filteredCreatives.length})
           </TabsTrigger>
+          <TabsTrigger value="ai-generated" className="gap-2">
+            <Sparkles className="h-4 w-4" />
+            AI Generated ({creativesWithClients.filter(c => c.source === 'ai-auto').length})
+          </TabsTrigger>
           <TabsTrigger value="activity" className="gap-2">
             <Clock className="h-4 w-4" />
             Recent Activity
@@ -339,6 +343,12 @@ export function CreativesTab() {
                       {getStatusIcon(creative.status)}
                       <span className="ml-1 capitalize">{creative.status}</span>
                     </Badge>
+                    {creative.source === 'ai-auto' && (
+                      <Badge className="absolute bottom-2 right-2 bg-violet-600 text-white dark:bg-violet-500 text-[10px] gap-1">
+                        <Sparkles className="h-3 w-3" />
+                        Auto-Generated
+                      </Badge>
+                    )}
                   </div>
                   <CardContent className="p-3">
                     <h4 className="font-medium truncate">{creative.title}</h4>
@@ -399,6 +409,93 @@ export function CreativesTab() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* AI Generated Performance Tracking */}
+        <TabsContent value="ai-generated" className="space-y-4">
+          {(() => {
+            const aiCreatives = creativesWithClients.filter(c => c.source === 'ai-auto');
+            const aiApproved = aiCreatives.filter(c => c.status === 'approved' || c.status === 'launched').length;
+            const aiPending = aiCreatives.filter(c => c.status === 'pending').length;
+            const aiRejected = aiCreatives.filter(c => c.status === 'rejected').length;
+            
+            return (
+              <>
+                {/* AI Performance Summary */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Card className="p-4 text-center">
+                    <p className="text-2xl font-bold">{aiCreatives.length}</p>
+                    <p className="text-xs text-muted-foreground">Total AI Generated</p>
+                  </Card>
+                  <Card className="p-4 text-center">
+                    <p className="text-2xl font-bold text-amber-600">{aiPending}</p>
+                    <p className="text-xs text-muted-foreground">Awaiting Approval</p>
+                  </Card>
+                  <Card className="p-4 text-center">
+                    <p className="text-2xl font-bold text-green-600">{aiApproved}</p>
+                    <p className="text-xs text-muted-foreground">Approved / Launched</p>
+                  </Card>
+                  <Card className="p-4 text-center">
+                    <p className="text-2xl font-bold text-red-600">{aiRejected}</p>
+                    <p className="text-xs text-muted-foreground">Rejected</p>
+                  </Card>
+                </div>
+
+                {aiCreatives.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-12 text-center">
+                      <Sparkles className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                      <p className="text-muted-foreground">No AI-generated creatives yet</p>
+                      <p className="text-sm text-muted-foreground">
+                        Creatives are auto-generated when CPL exceeds thresholds
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {aiCreatives.map((creative) => (
+                      <Card key={creative.id} className="overflow-hidden hover:border-primary/50 transition-all duration-200 border-violet-500/30">
+                        <div className="aspect-video bg-muted relative overflow-hidden">
+                          {creative.file_url ? (
+                            <img src={creative.file_url} alt={creative.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Sparkles className="h-8 w-8 text-violet-500" />
+                            </div>
+                          )}
+                          <Badge className={`absolute top-2 right-2 ${getStatusColor(creative.status)}`}>
+                            {creative.status}
+                          </Badge>
+                          <Badge className="absolute bottom-2 right-2 bg-violet-600 text-white text-[10px] gap-1">
+                            <Sparkles className="h-3 w-3" />
+                            Auto-Generated
+                          </Badge>
+                        </div>
+                        <CardContent className="p-3">
+                          <h4 className="font-medium truncate">{creative.title}</h4>
+                          <p className="text-xs text-muted-foreground">{creative.clientName}</p>
+                          {creative.trigger_campaign_id && (
+                            <p className="text-xs text-violet-500 mt-1">CPL Triggered</p>
+                          )}
+                          <div className="flex items-center justify-between mt-2">
+                            <Badge variant="outline" className="text-xs">{creative.platform}</Badge>
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="sm" onClick={() => setSelectedCreative(creative)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {formatDistanceToNow(new Date(creative.created_at), { addSuffix: true })}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </TabsContent>
 
         <TabsContent value="activity" className="space-y-4">

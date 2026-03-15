@@ -20,6 +20,9 @@ export function useAllCreatives() {
         status: item.status as 'draft' | 'pending' | 'approved' | 'revisions' | 'rejected' | 'launched',
         comments: (item.comments as unknown as CreativeComment[]) || [],
         aspect_ratio: (item as any).aspect_ratio || null,
+        source: (item as any).source || 'manual',
+        trigger_campaign_id: (item as any).trigger_campaign_id || null,
+        ai_performance_score: (item as any).ai_performance_score || null,
       })) as Creative[];
     },
   });
