@@ -117,3 +117,6 @@ verify_jwt = false
 
 [functions.cpl-creative-trigger]
 verify_jwt = false
+
+[functions.weekly-brief-generator]
+verify_jwt = false
