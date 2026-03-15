@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Eye, FileText, Video, Type, Edit2, Trash2, Check, Copy } from 'lucide-react';
+import { ArrowLeft, Search, Eye, FileText, Video, Type, Edit2, Trash2, Check, Copy, RefreshCw, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useCreativeBriefs, useUpdateBriefStatus, CreativeBrief } from '@/hooks/useCreativeBriefs';
 import { useAllAdScripts, useUpdateAdScript, useDeleteAdScript, AdScript } from '@/hooks/useAdScripts';
 import { BriefDetailDialog } from '@/components/briefs/BriefDetailDialog';
-import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { format, startOfWeek, isAfter, isBefore, addDays } from 'date-fns';
 import { toast } from 'sonner';
 
 const STATUS_COLORS: Record<string, 'default' | 'secondary' | 'success'> = {
@@ -95,6 +96,12 @@ function ScriptEditDialog({ script, open, onOpenChange }: { script: AdScript | n
   );
 }
 
+function getWeekLabel(dateStr: string): string {
+  const date = new Date(dateStr);
+  const weekStart = startOfWeek(date, { weekStartsOn: 1 });
+  return format(weekStart, "'Week of' MMM d, yyyy");
+}
+
 export default function CreativeBriefs({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate();
   const { data: briefs = [], isLoading } = useCreativeBriefs();
@@ -107,6 +114,7 @@ export default function CreativeBriefs({ embedded = false }: { embedded?: boolea
   const [selectedBrief, setSelectedBrief] = useState<CreativeBrief | null>(null);
   const [editScript, setEditScript] = useState<AdScript | null>(null);
   const [scriptTypeFilter, setScriptTypeFilter] = useState<string>('all');
+  const [regenerating, setRegenerating] = useState(false);
 
   const filtered = useMemo(() => {
     return briefs.filter((b) => {
@@ -116,6 +124,17 @@ export default function CreativeBriefs({ embedded = false }: { embedded?: boolea
     });
   }, [briefs, statusFilter, searchQuery]);
 
+  // Group briefs by week
+  const groupedBriefs = useMemo(() => {
+    const groups: Record<string, CreativeBrief[]> = {};
+    filtered.forEach(b => {
+      const week = getWeekLabel(b.created_at);
+      if (!groups[week]) groups[week] = [];
+      groups[week].push(b);
+    });
+    return groups;
+  }, [filtered]);
+
   const filteredScripts = useMemo(() => {
     return scripts.filter((s) => {
       if (scriptTypeFilter !== 'all' && s.script_type !== scriptTypeFilter) return false;
@@ -124,33 +143,85 @@ export default function CreativeBriefs({ embedded = false }: { embedded?: boolea
     });
   }, [scripts, scriptTypeFilter, searchQuery]);
 
-  // Find client name from briefs for scripts
   const briefMap = useMemo(() => {
     const map: Record<string, string> = {};
     briefs.forEach(b => { map[b.id] = b.client_name; });
     return map;
   }, [briefs]);
 
+  // Latest generation summary
+  const latestWeek = useMemo(() => {
+    if (briefs.length === 0) return null;
+    const latest = briefs[0];
+    const weekStart = startOfWeek(new Date(latest.created_at), { weekStartsOn: 1 });
+    const weekBriefs = briefs.filter(b => {
+      const d = new Date(b.created_at);
+      return !isBefore(d, weekStart) && isBefore(d, addDays(weekStart, 7));
+    });
+    return {
+      count: weekBriefs.length,
+      weekLabel: format(weekStart, 'MMM d'),
+    };
+  }, [briefs]);
+
+  const handleRegenerateAll = async () => {
+    setRegenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('weekly-brief-generator', {
+        body: { source: 'manual_regenerate' },
+      });
+      if (error) throw error;
+      const count = data?.results?.filter((r: any) => r.status === 'generated')?.length || 0;
+      toast.success(`Generated ${count} client briefs`);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to regenerate briefs');
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
   return (
     <>
       <div className={embedded ? "space-y-4" : "min-h-screen bg-background"}>
         {!embedded && (
           <header className="border-b bg-card px-6 py-4">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <div>
-                <h1 className="text-xl font-bold">Creative Briefs & Scripts</h1>
-                <p className="text-sm text-muted-foreground">AI-generated weekly briefs and ad scripts</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div>
+                  <h1 className="text-xl font-bold">Creative Briefs & Scripts</h1>
+                  <p className="text-sm text-muted-foreground">AI-generated weekly briefs and ad scripts — runs every Monday 5 AM</p>
+                </div>
               </div>
+              <Button onClick={handleRegenerateAll} disabled={regenerating} variant="outline" size="sm">
+                <RefreshCw className={`h-4 w-4 mr-1 ${regenerating ? 'animate-spin' : ''}`} />
+                Regenerate All
+              </Button>
             </div>
           </header>
         )}
         {embedded && (
-          <div>
-            <h2 className="text-lg font-bold">Creative Briefs & Scripts</h2>
-            <p className="text-sm text-muted-foreground">AI-generated weekly briefs and ad scripts — runs every Monday 5 AM</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold">Creative Briefs & Scripts</h2>
+              <p className="text-sm text-muted-foreground">AI-generated weekly briefs and ad scripts — runs every Monday 5 AM</p>
+            </div>
+            <Button onClick={handleRegenerateAll} disabled={regenerating} variant="outline" size="sm">
+              <RefreshCw className={`h-4 w-4 mr-1 ${regenerating ? 'animate-spin' : ''}`} />
+              Regenerate All
+            </Button>
+          </div>
+        )}
+
+        {/* Generation summary banner */}
+        {latestWeek && (
+          <div className="mx-6 mt-3 rounded-lg bg-muted/50 border px-4 py-3 flex items-center gap-3">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span className="text-sm">
+              Generated <strong>{latestWeek.count}</strong> client briefs for week of <strong>{latestWeek.weekLabel}</strong>
+            </span>
           </div>
         )}
 
@@ -180,7 +251,7 @@ export default function CreativeBriefs({ embedded = false }: { embedded?: boolea
               </TabsTrigger>
             </TabsList>
 
-            {/* Briefs Tab */}
+            {/* Briefs Tab — grouped by week */}
             <TabsContent value="briefs" className="space-y-4">
               <div className="flex gap-3">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -206,61 +277,82 @@ export default function CreativeBriefs({ embedded = false }: { embedded?: boolea
                   </p>
                 </div>
               ) : (
-                <div className="border rounded-lg">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Client</TableHead>
-                        <TableHead>Source</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Hook Patterns</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filtered.map((brief) => (
-                        <TableRow key={brief.id}>
-                          <TableCell className="font-medium">{brief.client_name}</TableCell>
-                          <TableCell>
-                            <Badge variant={brief.source === 'weekly_auto' ? 'secondary' : 'outline'} className="text-xs">
-                              {brief.source === 'weekly_auto' ? 'Weekly Auto' : brief.source === 'ai_brief' ? 'Manual' : brief.source}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Select
-                              value={brief.status}
-                              onValueChange={(val) => updateStatus.mutate({ id: brief.id, status: val })}
-                            >
-                              <SelectTrigger className="w-[140px] h-8">
-                                <Badge variant={STATUS_COLORS[brief.status] || 'default'} className="text-xs">
-                                  {STATUS_LABELS[brief.status] || brief.status}
-                                </Badge>
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="in_production">In Production</SelectItem>
-                                <SelectItem value="completed">Completed</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {format(new Date(brief.created_at), 'MMM d, yyyy')}
-                          </TableCell>
-                          <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
-                            {(brief.hook_patterns || []).slice(0, 2).join(', ')}
-                            {(brief.hook_patterns || []).length > 2 && '...'}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="sm" onClick={() => setSelectedBrief(brief)}>
-                              <Eye className="h-4 w-4 mr-1" /> View
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                Object.entries(groupedBriefs).map(([weekLabel, weekBriefs]) => (
+                  <div key={weekLabel} className="space-y-2">
+                    <div className="flex items-center gap-2 pt-2">
+                      <h3 className="text-sm font-semibold text-muted-foreground">{weekLabel}</h3>
+                      <Badge variant="secondary" className="text-xs">{weekBriefs.length} briefs</Badge>
+                    </div>
+                    <div className="border rounded-lg">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Client</TableHead>
+                            <TableHead>Source</TableHead>
+                            <TableHead>CPL Trend</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Created</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {weekBriefs.map((brief) => {
+                            const fullBrief = brief.full_brief_json as any || {};
+                            const cplTrend = fullBrief.cpl_trend;
+                            const trendIcon = cplTrend === 'down' ? '↓' : cplTrend === 'up' ? '↑' : '→';
+                            const trendColor = cplTrend === 'down' ? 'text-green-500' : cplTrend === 'up' ? 'text-red-500' : 'text-muted-foreground';
+                            return (
+                              <TableRow key={brief.id}>
+                                <TableCell className="font-medium">{brief.client_name}</TableCell>
+                                <TableCell>
+                                  {brief.source === 'weekly_auto' ? (
+                                    <Badge variant="secondary" className="text-xs gap-1">
+                                      <Sparkles className="h-3 w-3" /> Auto-Generated
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-xs">
+                                      {brief.source === 'ai_brief' ? 'Manual' : brief.source}
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <span className={`font-mono text-sm font-semibold ${trendColor}`}>
+                                    {trendIcon} {fullBrief.current_cpl ? `$${Number(fullBrief.current_cpl).toFixed(0)}` : '—'}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <Select
+                                    value={brief.status}
+                                    onValueChange={(val) => updateStatus.mutate({ id: brief.id, status: val })}
+                                  >
+                                    <SelectTrigger className="w-[140px] h-8">
+                                      <Badge variant={STATUS_COLORS[brief.status] || 'default'} className="text-xs">
+                                        {STATUS_LABELS[brief.status] || brief.status}
+                                      </Badge>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="pending">Pending</SelectItem>
+                                      <SelectItem value="in_production">In Production</SelectItem>
+                                      <SelectItem value="completed">Completed</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {format(new Date(brief.created_at), 'MMM d, yyyy')}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button variant="ghost" size="sm" onClick={() => setSelectedBrief(brief)}>
+                                    <Eye className="h-4 w-4 mr-1" /> View
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                ))
               )}
             </TabsContent>
 
@@ -321,9 +413,12 @@ export default function CreativeBriefs({ embedded = false }: { embedded?: boolea
                             <CardTitle className="text-sm truncate">{script.title}</CardTitle>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Badge variant={script.status === 'approved' ? 'default' : 'outline'} className="text-xs">
-                              {script.status}
+                            <Badge variant="secondary" className="text-[10px] gap-1">
+                              <Sparkles className="h-2.5 w-2.5" /> Auto-Generated
                             </Badge>
+                            {script.status === 'approved' && (
+                              <Badge variant="default" className="text-xs">approved</Badge>
+                            )}
                             {script.duration_seconds && (
                               <Badge variant="secondary" className="text-xs">{script.duration_seconds}s</Badge>
                             )}
