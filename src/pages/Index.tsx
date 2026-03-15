@@ -4,6 +4,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
+import { DataAccuracyAuditPanel } from '@/components/dashboard/DataAccuracyAuditPanel';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { DraggableClientTable } from '@/components/dashboard/DraggableClientTable';
 import { AgencyStatsBar } from '@/components/dashboard/AgencyStatsBar';
@@ -453,6 +454,13 @@ const Index = () => {
             {activeTab === 'billing' && currentMember?.role === 'admin' && (
               <SectionErrorBoundary sectionName="Billing">
                 <AgencyBillingTab clients={clients} />
+              </SectionErrorBoundary>
+            )}
+
+            {/* Data Accuracy Audit */}
+            {activeTab === 'data-audit' && currentMember?.role === 'admin' && (
+              <SectionErrorBoundary sectionName="DataAccuracyAudit">
+                <DataAccuracyAuditPanel />
               </SectionErrorBoundary>
             )}
           </main>
