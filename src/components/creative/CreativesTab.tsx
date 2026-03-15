@@ -279,6 +279,10 @@ export function CreativesTab() {
             <Upload className="h-4 w-4" />
             All Creatives ({filteredCreatives.length})
           </TabsTrigger>
+          <TabsTrigger value="ai-generated" className="gap-2">
+            <Sparkles className="h-4 w-4" />
+            AI Generated ({creativesWithClients.filter(c => c.source === 'ai-auto').length})
+          </TabsTrigger>
           <TabsTrigger value="activity" className="gap-2">
             <Clock className="h-4 w-4" />
             Recent Activity
