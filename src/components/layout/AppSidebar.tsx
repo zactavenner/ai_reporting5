@@ -1,31 +1,36 @@
 import {
   LayoutDashboard,
+  BarChart3,
   LayoutGrid,
   Bot,
   Video,
+  MessageSquare,
+  Handshake,
   Upload,
   Smartphone,
-  Handshake,
-  MessageSquare,
-  Receipt,
+  FileText,
+  Settings,
   Database,
   Shield,
-  FileText,
+  Receipt,
+  Palette,
+  ChevronDown,
 } from 'lucide-react';
-import { NavLink } from '@/components/NavLink';
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarFooter,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface AppSidebarProps {
   pendingTaskCount?: number;
@@ -36,21 +41,47 @@ interface AppSidebarProps {
   onTabChange: (tab: string) => void;
 }
 
-const mainItems = [
-  { title: 'Dashboard', value: 'dashboard', icon: LayoutDashboard },
-  { title: 'Tasks', value: 'tasks', icon: LayoutGrid },
-  { title: 'AI Hub', value: 'ai', icon: Bot },
-  { title: 'Meetings', value: 'meetings', icon: Video },
-  { title: 'Creatives', value: 'creatives', icon: Upload },
-  { title: 'Funnel', value: 'funnel', icon: Smartphone },
-  { title: 'Deals', value: 'deals', icon: Handshake },
-  { title: 'Outreach', value: 'outreach', icon: MessageSquare },
-];
-
-const utilItems = [
-  { title: 'Database', value: 'database', icon: Database },
-  { title: 'Spam List', value: 'spam', icon: Shield },
-  { title: 'Briefs', value: 'briefs', icon: FileText },
+const navStructure = [
+  {
+    title: 'Dashboard',
+    value: 'dashboard',
+    icon: LayoutDashboard,
+  },
+  {
+    title: 'Reporting',
+    value: 'reporting',
+    icon: BarChart3,
+    children: [
+      { title: 'Tasks', value: 'tasks', icon: LayoutGrid },
+      { title: 'AI Hub', value: 'ai', icon: Bot },
+      { title: 'Meetings', value: 'meetings', icon: Video },
+      { title: 'Deals', value: 'deals', icon: Handshake },
+      { title: 'Outreach', value: 'outreach', icon: MessageSquare },
+    ],
+  },
+  {
+    title: 'Creatives',
+    value: 'creatives',
+    icon: Palette,
+    children: [
+      { title: 'Approvals', value: 'creatives', icon: Upload },
+      { title: 'Briefs', value: 'briefs', icon: FileText },
+    ],
+  },
+  {
+    title: 'Funnel',
+    value: 'funnel',
+    icon: Smartphone,
+  },
+  {
+    title: 'Settings',
+    value: 'settings-group',
+    icon: Settings,
+    children: [
+      { title: 'Database', value: 'database', icon: Database },
+      { title: 'Spam List', value: 'spam', icon: Shield },
+    ],
+  },
 ];
 
 export function AppSidebar({
@@ -70,6 +101,11 @@ export function AppSidebar({
     return 0;
   };
 
+  const isChildActive = (item: typeof navStructure[number]) => {
+    if (!item.children) return false;
+    return item.children.some(c => c.value === activeTab);
+  };
+
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
       <SidebarContent>
@@ -84,61 +120,86 @@ export function AppSidebar({
         </div>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainItems.map((item) => {
-                const badge = getBadge(item.value);
+              {navStructure.map((item) => {
+                if (!item.children) {
+                  const badge = getBadge(item.value);
+                  return (
+                    <SidebarMenuItem key={item.value}>
+                      <SidebarMenuButton
+                        isActive={activeTab === item.value}
+                        onClick={() => onTabChange(item.value)}
+                        tooltip={item.title}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                        {!collapsed && badge > 0 && (
+                          <Badge variant="default" className="ml-auto h-5 min-w-[20px] flex items-center justify-center text-[10px] px-1.5">
+                            {badge}
+                          </Badge>
+                        )}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                }
+
+                const active = isChildActive(item);
+
                 return (
-                  <SidebarMenuItem key={item.value}>
-                    <SidebarMenuButton
-                      isActive={activeTab === item.value}
-                      onClick={() => onTabChange(item.value)}
-                      tooltip={item.title}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                      {!collapsed && badge > 0 && (
-                        <Badge variant="default" className="ml-auto h-5 min-w-[20px] flex items-center justify-center text-[10px] px-1.5">
-                          {badge}
-                        </Badge>
-                      )}
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <Collapsible key={item.value} defaultOpen={active} className="group/collapsible">
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                          isActive={active}
+                          tooltip={item.title}
+                        >
+                          <item.icon className="h-4 w-4" />
+                          {!collapsed && <span>{item.title}</span>}
+                          {!collapsed && (
+                            <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                          )}
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {item.children.map((child) => {
+                            const badge = getBadge(child.value);
+                            return (
+                              <SidebarMenuSubItem key={child.value}>
+                                <SidebarMenuSubButton
+                                  isActive={activeTab === child.value}
+                                  onClick={() => onTabChange(child.value)}
+                                >
+                                  <child.icon className="h-3.5 w-3.5" />
+                                  <span>{child.title}</span>
+                                  {badge > 0 && (
+                                    <Badge variant="default" className="ml-auto h-5 min-w-[20px] flex items-center justify-center text-[10px] px-1.5">
+                                      {badge}
+                                    </Badge>
+                                  )}
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          })}
+                          {/* Add Billing under Settings for admins */}
+                          {item.value === 'settings-group' && isAdmin && (
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                isActive={activeTab === 'billing'}
+                                onClick={() => onTabChange('billing')}
+                              >
+                                <Receipt className="h-3.5 w-3.5" />
+                                <span>Billing</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          )}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
                 );
               })}
-              {isAdmin && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={activeTab === 'billing'}
-                    onClick={() => onTabChange('billing')}
-                    tooltip="Billing"
-                  >
-                    <Receipt className="h-4 w-4" />
-                    {!collapsed && <span>Billing</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Utilities</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {utilItems.map((item) => (
-                <SidebarMenuItem key={item.value}>
-                  <SidebarMenuButton
-                    isActive={activeTab === item.value}
-                    onClick={() => onTabChange(item.value)}
-                    tooltip={item.title}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {!collapsed && <span>{item.title}</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
