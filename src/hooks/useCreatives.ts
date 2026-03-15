@@ -25,6 +25,9 @@ export interface Creative {
   status: 'draft' | 'pending' | 'approved' | 'revisions' | 'rejected' | 'launched';
   comments: CreativeComment[];
   aspect_ratio: string | null;
+  source: string;
+  trigger_campaign_id: string | null;
+  ai_performance_score: number | null;
   created_at: string;
   updated_at: string;
 }
