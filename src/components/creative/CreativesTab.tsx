@@ -339,6 +339,12 @@ export function CreativesTab() {
                       {getStatusIcon(creative.status)}
                       <span className="ml-1 capitalize">{creative.status}</span>
                     </Badge>
+                    {creative.source === 'ai-auto' && (
+                      <Badge className="absolute bottom-2 right-2 bg-violet-600 text-white dark:bg-violet-500 text-[10px] gap-1">
+                        <Sparkles className="h-3 w-3" />
+                        Auto-Generated
+                      </Badge>
+                    )}
                   </div>
                   <CardContent className="p-3">
                     <h4 className="font-medium truncate">{creative.title}</h4>
