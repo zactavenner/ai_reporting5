@@ -108,6 +108,9 @@ verify_jwt = false
 [functions.daily-close-report]
 verify_jwt = false
 
+[functions.generate-creative-brief]
+verify_jwt = false
+
 [functions.sendblue-outreach]
 verify_jwt = false
 

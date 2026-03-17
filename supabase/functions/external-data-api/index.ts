@@ -24,6 +24,7 @@ const ALLOWED_TABLES = [
   "email_parsed_investors", "pending_meeting_tasks", "member_activity_log",
   "dashboard_preferences", "spam_blacklist", "webhook_logs",
   "meta_campaigns", "meta_ad_sets", "meta_ads",
+  "creative_briefs", "ad_scripts", "daily_reports",
 ];
 
 const ALLOWED_BUCKETS = ["creatives", "task-files", "gpt-files", "live-ads", "client-offers"];
@@ -69,6 +70,14 @@ const RELATION_MAP: Record<string, Record<string, string>> = {
   },
   client_offers: {
     client: "client:clients(id,name,slug,description,brand_colors,brand_fonts,logo_url,website_url)",
+  },
+  creative_briefs: {
+    scripts: "scripts:ad_scripts(id,title,status,variant_number,hook,cta,script_type,platform,created_at)",
+    client: "client:clients(id,name,slug,logo_url)",
+  },
+  ad_scripts: {
+    brief: "brief:creative_briefs(id,title,status,brief_type,target_audience,key_message)",
+    client: "client:clients(id,name,slug)",
   },
 };
 
@@ -122,6 +131,24 @@ Deno.serve(async (req) => {
               status: "Optional. Filter by status (e.g. 'ACTIVE')",
               date_start: "Optional. Filter synced_at >= date",
               date_end: "Optional. Filter synced_at <= date",
+            },
+          },
+          generate_brief: {
+            description: "Analyze top-performing Meta ads for a client and generate an AI creative brief with winning patterns, hooks, angles, and production direction",
+            fields: {
+              client_id: "Required. The client UUID",
+              brief_type: "Optional. Type: performance (default), new_angle, fatigue_refresh, competitor, seasonal",
+              top_n: "Optional. Number of top ads to analyze (default: 10)",
+              date_range_days: "Optional. Days to look back (default: 30)",
+            },
+          },
+          generate_scripts: {
+            description: "Generate production-ready ad scripts from a creative brief. Creates 3 script variants by default.",
+            fields: {
+              brief_id: "Required. The creative brief UUID",
+              num_scripts: "Optional. Number of scripts to generate (default: 3)",
+              script_type: "Optional. Type: video (default), image, carousel, story, reel, ugc, static",
+              platform: "Optional. Platform: meta (default), tiktok, youtube, google",
             },
           },
         },
@@ -295,6 +322,46 @@ Deno.serve(async (req) => {
         },
         campaigns,
       });
+    }
+
+    // ========================
+    // COMPOSITE: generate_brief
+    // ========================
+    if (action === "generate_brief") {
+      const { client_id: briefClientId, brief_type, top_n, date_range_days } = body;
+      if (!briefClientId) return jsonResp({ error: "Missing client_id" }, 400);
+
+      try {
+        const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-creative-brief`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
+          body: JSON.stringify({ action: "analyze_and_generate", client_id: briefClientId, brief_type, top_n, date_range_days }),
+        });
+        const result = await res.json();
+        return jsonResp(result, res.ok ? 200 : 500);
+      } catch (err) {
+        return jsonResp({ error: `Brief generation failed: ${err instanceof Error ? err.message : "Unknown"}` }, 500);
+      }
+    }
+
+    // ========================
+    // COMPOSITE: generate_scripts
+    // ========================
+    if (action === "generate_scripts") {
+      const { brief_id, num_scripts, script_type, platform: scriptPlatform } = body;
+      if (!brief_id) return jsonResp({ error: "Missing brief_id" }, 400);
+
+      try {
+        const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-creative-brief`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
+          body: JSON.stringify({ action: "generate_scripts", brief_id, num_scripts, script_type, platform: scriptPlatform }),
+        });
+        const result = await res.json();
+        return jsonResp(result, res.ok ? 200 : 500);
+      } catch (err) {
+        return jsonResp({ error: `Script generation failed: ${err instanceof Error ? err.message : "Unknown"}` }, 500);
+      }
     }
 
     // ========================
