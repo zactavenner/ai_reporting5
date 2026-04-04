@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, lazy, Suspense } from 'react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useAllCreatives } from '@/hooks/useAllCreatives';
 import { useClients, Client } from '@/hooks/useClients';
-import { Creative, useUpdateCreativeStatus, useDeleteCreative } from '@/hooks/useCreatives';
+import { Creative, useUpdateCreativeStatus, useDeleteCreative, useCreateCreative, uploadCreativeFile, detectAspectRatio } from '@/hooks/useCreatives';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -22,10 +24,12 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import { CreativeHorizontalPreview } from './CreativeHorizontalPreview';
 import { CreativeAIActions } from './CreativeAIActions';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
+import { formatFileSize } from '@/lib/uploadWithProgress';
 import {
   Search,
   Image,
@@ -43,14 +47,48 @@ import {
   Sparkles,
   CheckSquare,
   Download,
+  Film,
+  Wand2,
+  User,
+  Radar,
+  Instagram,
+  Scissors,
+  History,
+  Inbox,
+  Plus,
+  Calendar,
+  BarChart3,
+  FolderArchive,
+  Trophy,
+  Palette,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
+
+// Lazy-load sub-section page components
+const CreativeBriefs = lazy(() => import('@/pages/CreativeBriefs'));
+const StaticCreativesPage = lazy(() => import('@/pages/StaticCreativesPage'));
+const BatchVideoWorkflow = lazy(() => import('@/components/batch-video/BatchVideoWorkflow').then(m => ({ default: m.BatchVideoWorkflow })));
+const AdVariationsPage = lazy(() => import('@/pages/AdVariationsPage'));
+const AvatarsPage = lazy(() => import('@/pages/AvatarsPage'));
+const AdScrapingPage = lazy(() => import('@/pages/AdScrapingPage'));
+const InstagramIntelPage = lazy(() => import('@/pages/InstagramIntelPage'));
+const VideoEditorPage = lazy(() => import('@/pages/VideoEditorPage'));
+const BrollPage = lazy(() => import('@/pages/BrollPage'));
+const HistoryPage = lazy(() => import('@/pages/HistoryPage'));
+const ExportHubPage = lazy(() => import('@/pages/ExportHubPage'));
+const CreativeCalendarLazy = lazy(() => import('@/components/creative/CreativeCalendar').then(m => ({ default: m.CreativeCalendar })));
+const CreativeAnalyticsLazy = lazy(() => import('@/components/creative/CreativeAnalytics').then(m => ({ default: m.CreativeAnalytics })));
+const WinningAdsGalleryLazy = lazy(() => import('@/components/creative/WinningAdsGallery').then(m => ({ default: m.WinningAdsGallery })));
+const ManageStylesTabLazy = lazy(() => import('@/components/creative/ManageStylesTab').then(m => ({ default: m.ManageStylesTab })));
 
 interface CreativeWithClient extends Creative {
   clientName?: string;
 }
 
 export function CreativesTab() {
+  const [activeSection, setActiveSection] = useState('approvals');
   const { data: creatives = [], isLoading: creativesLoading } = useAllCreatives();
   const { data: clients = [] } = useClients();
   const updateStatus = useUpdateCreativeStatus();
@@ -184,8 +222,41 @@ export function CreativesTab() {
     return <CashBagLoader message="Loading creatives..." />;
   }
 
+  const pendingCount = creativesWithClients.filter(c => c.status === 'pending').length;
+  const SuspenseFallback = <CashBagLoader message="Loading section..." />;
+
   return (
     <div className="space-y-6">
+      {/* Section Tabs */}
+      <Tabs value={activeSection} onValueChange={setActiveSection}>
+        <TabsList className="bg-muted/50 flex-wrap h-auto gap-1 p-1">
+          <TabsTrigger value="approvals" className="gap-2">
+            <Upload className="h-4 w-4" />
+            Approvals
+            {pendingCount > 0 && (
+              <Badge variant="default" className="ml-1 h-5 min-w-[20px] flex items-center justify-center text-[10px] px-1.5">
+                {pendingCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="briefs" className="gap-2"><FileText className="h-4 w-4" />Briefs & Scripts</TabsTrigger>
+          <TabsTrigger value="static-ads" className="gap-2"><Image className="h-4 w-4" />Static Ads</TabsTrigger>
+          <TabsTrigger value="batch-video" className="gap-2"><Film className="h-4 w-4" />Batch Video</TabsTrigger>
+          <TabsTrigger value="ad-variations" className="gap-2"><Wand2 className="h-4 w-4" />Ad Variations</TabsTrigger>
+          <TabsTrigger value="avatars" className="gap-2"><User className="h-4 w-4" />Avatars</TabsTrigger>
+          <TabsTrigger value="ad-scraping" className="gap-2"><Radar className="h-4 w-4" />Ad Scraping</TabsTrigger>
+          <TabsTrigger value="instagram-intel" className="gap-2"><Instagram className="h-4 w-4" />IG Intel</TabsTrigger>
+          <TabsTrigger value="video-editor" className="gap-2"><Scissors className="h-4 w-4" />Video Editor</TabsTrigger>
+          <TabsTrigger value="broll" className="gap-2"><Film className="h-4 w-4" />B-Roll</TabsTrigger>
+          <TabsTrigger value="winning-ads" className="gap-2"><Trophy className="h-4 w-4" />Winning Ads</TabsTrigger>
+          <TabsTrigger value="manage-styles" className="gap-2"><Palette className="h-4 w-4" />Styles</TabsTrigger>
+          <TabsTrigger value="history" className="gap-2"><History className="h-4 w-4" />History</TabsTrigger>
+          <TabsTrigger value="export" className="gap-2"><Download className="h-4 w-4" />Export</TabsTrigger>
+          <TabsTrigger value="calendar" className="gap-2"><Calendar className="h-4 w-4" />Calendar</TabsTrigger>
+          <TabsTrigger value="analytics" className="gap-2"><BarChart3 className="h-4 w-4" />Analytics</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="approvals" className="mt-4 space-y-6">
       {/* Search and Filters */}
       <div className="flex flex-wrap gap-4">
         <div className="relative flex-1 min-w-[200px]">
@@ -720,6 +791,54 @@ export function CreativesTab() {
           )}
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        <TabsContent value="briefs" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><CreativeBriefs /></Suspense>
+        </TabsContent>
+        <TabsContent value="static-ads" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><StaticCreativesPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="batch-video" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><BatchVideoWorkflow /></Suspense>
+        </TabsContent>
+        <TabsContent value="ad-variations" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><AdVariationsPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="avatars" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><AvatarsPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="ad-scraping" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><AdScrapingPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="instagram-intel" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><InstagramIntelPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="video-editor" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><VideoEditorPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="broll" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><BrollPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="winning-ads" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><WinningAdsGalleryLazy embedded /></Suspense>
+        </TabsContent>
+        <TabsContent value="manage-styles" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><ManageStylesTabLazy embedded /></Suspense>
+        </TabsContent>
+        <TabsContent value="history" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><HistoryPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="export" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><ExportHubPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="calendar" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><CreativeCalendarLazy embedded /></Suspense>
+        </TabsContent>
+        <TabsContent value="analytics" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><CreativeAnalyticsLazy embedded /></Suspense>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
