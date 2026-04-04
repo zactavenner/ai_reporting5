@@ -1,5 +1,4 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { getGeminiApiKey } from '../_shared/get-gemini-key.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,10 +20,12 @@ serve(async (req) => {
       );
     }
 
-    const geminiKey = await getGeminiApiKey(clientKey, 'text');
+    // Use client-provided key first, then env var directly
+    // (skip DB lookup since that key may be expired)
+    const geminiKey = clientKey?.trim() || Deno.env.get('GEMINI_API_KEY');
     if (!geminiKey) {
       return new Response(
-        JSON.stringify({ error: 'No Gemini API key configured' }),
+        JSON.stringify({ error: 'No Gemini API key configured. Add GEMINI_API_KEY in settings.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -62,12 +63,10 @@ serve(async (req) => {
       );
     }
 
-    // Parse the JSON response from Gemini
     let parsed;
     try {
       parsed = JSON.parse(textContent);
     } catch {
-      // Return raw text if not valid JSON
       return new Response(
         JSON.stringify({ result: textContent }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
