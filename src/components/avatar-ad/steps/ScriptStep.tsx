@@ -22,53 +22,27 @@ const SEGMENT_COLORS: Record<SegmentType, string> = {
 export function ScriptStep() {
   const { state, setStep, setScript } = useAvatarAd();
   const [isGenerating, setIsGenerating] = useState(false);
-  const [segments, setSegments] = useState<ScriptSegment[]>(state.script?.segments || []);
-  const [headline, setHeadline] = useState(state.script?.headline || '');
+  const [segments, setSegments] = useState<ScriptSegment[]>(() => {
+    if (state.script?.segments?.length) return state.script.segments;
+    // Auto-segment custom script on init
+    const deal = state.deal as DealInput;
+    if (deal.customScript) return segmentCustomScript(deal.customScript);
+    return [];
+  });
+  const [headline, setHeadline] = useState(() => {
+    if (state.script?.headline) return state.script.headline;
+    return (state.deal as DealInput).projectName || 'Investment Opportunity';
+  });
 
   const deal = state.deal as DealInput;
-
-  // Auto-segment custom script into 4 chunks
-  const segmentCustomScript = (text: string) => {
-    const lines = text.split('\n').filter(l => l.trim());
-    const types: SegmentType[] = ['hook', 'credibility', 'context', 'cta'];
-    const segs: ScriptSegment[] = lines.slice(0, 4).map((line, i) => ({
-      id: i + 1,
-      text: line.trim(),
-      type: types[i] || 'context',
-    }));
-    // If fewer than 4 lines, split the text evenly
-    if (segs.length < 4) {
-      const words = text.split(/\s+/);
-      const chunkSize = Math.ceil(words.length / 4);
-      return types.map((type, i) => ({
-        id: i + 1,
-        text: words.slice(i * chunkSize, (i + 1) * chunkSize).join(' '),
-        type,
-      }));
-    }
-    return segs;
-  };
-
-  // On mount, if custom script exists and no segments, auto-segment
-  useState(() => {
-    if (deal.customScript && segments.length === 0) {
-      const segs = segmentCustomScript(deal.customScript);
-      setSegments(segs);
-      setHeadline(deal.projectName || 'Investment Opportunity');
-    }
-  });
 
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
       const prompt = buildScriptPrompt(deal);
 
-      const { data, error } = await supabase.functions.invoke('make-ai-call', {
-        body: {
-          prompt,
-          responseFormat: 'json',
-          model: 'gemini-2.5-flash',
-        },
+      const { data, error } = await supabase.functions.invoke('generate-ad-script', {
+        body: { prompt, model: 'gemini-2.5-flash' },
       });
 
       if (error) throw error;
@@ -77,20 +51,13 @@ export function ScriptStep() {
       if (typeof data === 'string') {
         parsed = JSON.parse(data);
       }
-      // Handle nested response formats
-      if (parsed.response) {
-        parsed = typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response;
-      }
-      if (parsed.result) {
-        parsed = typeof parsed.result === 'string' ? JSON.parse(parsed.result) : parsed.result;
-      }
 
       if (parsed.segments && Array.isArray(parsed.segments)) {
         setSegments(parsed.segments);
         setHeadline(parsed.headline || deal.projectName || '');
         toast.success('Script generated!');
       } else {
-        throw new Error('Invalid script format');
+        throw new Error('Invalid script format returned');
       }
     } catch (err) {
       console.error('Script generation error:', err);
@@ -131,7 +98,6 @@ export function ScriptStep() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        {/* Generate / Regenerate */}
         <div className="flex items-center gap-3">
           <Button onClick={handleGenerate} disabled={isGenerating} variant="outline" className="gap-2">
             {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -142,13 +108,11 @@ export function ScriptStep() {
           )}
         </div>
 
-        {/* Headline */}
         <div className="space-y-2">
           <Label>Headline (pinned banner text)</Label>
           <Input value={headline} onChange={e => setHeadline(e.target.value)} placeholder="e.g. Barn Caves — Lake Havasu" />
         </div>
 
-        {/* Segments */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <Label>Script Segments</Label>
@@ -195,7 +159,6 @@ export function ScriptStep() {
           )}
         </div>
 
-        {/* Navigation */}
         <div className="flex justify-between pt-2">
           <Button variant="outline" onClick={() => setStep('deal')} className="gap-2">
             <ArrowLeft className="h-4 w-4" /> Back
@@ -207,4 +170,23 @@ export function ScriptStep() {
       </CardContent>
     </Card>
   );
+}
+
+function segmentCustomScript(text: string): ScriptSegment[] {
+  const lines = text.split('\n').filter(l => l.trim());
+  const types: SegmentType[] = ['hook', 'credibility', 'context', 'cta'];
+  if (lines.length >= 4) {
+    return lines.slice(0, 4).map((line, i) => ({
+      id: i + 1,
+      text: line.trim(),
+      type: types[i] || 'context',
+    }));
+  }
+  const words = text.split(/\s+/);
+  const chunkSize = Math.ceil(words.length / 4);
+  return types.map((type, i) => ({
+    id: i + 1,
+    text: words.slice(i * chunkSize, (i + 1) * chunkSize).join(' '),
+    type,
+  }));
 }
