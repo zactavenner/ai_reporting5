@@ -53,7 +53,7 @@ export function useCreateQuizFunnel() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (funnel: Partial<QuizFunnel> & { client_id: string }) => {
-      const { data, error } = await (supabase.from('quiz_funnels') as any).insert(funnel).select().single();
+      const { data, error } = await (supabase as any).from('quiz_funnels').insert(funnel).select().single();
       if (error) throw error;
       return data as QuizFunnel;
     },
