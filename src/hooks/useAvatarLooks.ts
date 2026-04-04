@@ -56,7 +56,7 @@ export function useCreateAvatarLook() {
       };
       const { data, error } = await supabase
         .from('avatar_looks')
-        .insert([look])
+        .insert([insertData])
         .select()
         .single();
       if (error) throw error;
