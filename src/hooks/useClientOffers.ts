@@ -66,6 +66,35 @@ export function useCreateOffer() {
   });
 }
 
+export function useUpdateOffer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, clientId, updates }: { id: string; clientId: string; updates: Partial<{
+      title: string;
+      description: string | null;
+      offer_type: string;
+      file_url: string | null;
+      file_name: string | null;
+      file_type: string | null;
+      file_size_bytes: number | null;
+    }> }) => {
+      const { error } = await supabase
+        .from('client_offers' as any)
+        .update({ ...updates, updated_at: new Date().toISOString() } as any)
+        .eq('id', id);
+      if (error) throw error;
+      return clientId;
+    },
+    onSuccess: (clientId) => {
+      queryClient.invalidateQueries({ queryKey: ['client-offers', clientId] });
+      toast.success('Updated successfully');
+    },
+    onError: (err: Error) => {
+      toast.error(`Failed to update: ${err.message}`);
+    },
+  });
+}
+
 export function useDeleteOffer() {
   const queryClient = useQueryClient();
   return useMutation({

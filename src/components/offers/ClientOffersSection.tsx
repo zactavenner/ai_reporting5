@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
-import { useClientOffers, useCreateOffer, useDeleteOffer, uploadOfferFile } from '@/hooks/useClientOffers';
+import { useNavigate } from 'react-router-dom';
+import { useClientOffers, useCreateOffer, useUpdateOffer, useDeleteOffer, uploadOfferFile, ClientOffer } from '@/hooks/useClientOffers';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,23 +31,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, FileText, Image, File, Trash2, Download, ExternalLink, Upload } from 'lucide-react';
+import { Plus, FileText, Image, File, Trash2, Download, ExternalLink, Upload, Pencil, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { OfferAssetHub } from './OfferAssetHub';
 
 interface ClientOffersSectionProps {
   clientId: string;
   clientName: string;
   isPublicView?: boolean;
+  brandColors?: string[] | null;
+  brandFonts?: string[] | null;
+  clientDescription?: string | null;
+  offerDescription?: string | null;
+  websiteUrl?: string | null;
+  industry?: string | null;
+  clientType?: string | null;
 }
 
-export function ClientOffersSection({ clientId, clientName, isPublicView = false }: ClientOffersSectionProps) {
+export function ClientOffersSection({ clientId, clientName, isPublicView = false, brandColors, brandFonts, clientDescription, offerDescription, websiteUrl, industry, clientType }: ClientOffersSectionProps) {
   const { data: offers = [], isLoading } = useClientOffers(clientId);
   const createOffer = useCreateOffer();
+  const updateOffer = useUpdateOffer();
   const deleteOffer = useDeleteOffer();
   const { currentMember } = useTeamMember();
+  const navigate = useNavigate();
 
   const [addOpen, setAddOpen] = useState(false);
+  const [editOffer, setEditOffer] = useState<ClientOffer | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [offerType, setOfferType] = useState('file');
@@ -59,7 +71,16 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
     setDescription('');
     setOfferType('file');
     setSelectedFile(null);
+    setEditOffer(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const openEdit = (offer: ClientOffer) => {
+    setEditOffer(offer);
+    setTitle(offer.title);
+    setDescription(offer.description || '');
+    setOfferType(offer.offer_type);
+    setSelectedFile(null);
   };
 
   const handleSubmit = async () => {
@@ -83,17 +104,32 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
         fileSizeBytes = selectedFile.size;
       }
 
-      await createOffer.mutateAsync({
-        client_id: clientId,
-        title: title.trim(),
-        description: description.trim() || undefined,
-        file_url: fileUrl,
-        file_name: fileName,
-        file_type: fileType,
-        file_size_bytes: fileSizeBytes,
-        offer_type: offerType,
-        uploaded_by: currentMember?.name || 'Unknown',
-      });
+      if (editOffer) {
+        const updates: any = {
+          title: title.trim(),
+          description: description.trim() || null,
+          offer_type: offerType,
+        };
+        if (selectedFile && fileUrl) {
+          updates.file_url = fileUrl;
+          updates.file_name = fileName;
+          updates.file_type = fileType;
+          updates.file_size_bytes = fileSizeBytes;
+        }
+        await updateOffer.mutateAsync({ id: editOffer.id, clientId, updates });
+      } else {
+        await createOffer.mutateAsync({
+          client_id: clientId,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          file_url: fileUrl,
+          file_name: fileName,
+          file_type: fileType,
+          file_size_bytes: fileSizeBytes,
+          offer_type: offerType,
+          uploaded_by: currentMember?.name || 'Unknown',
+        });
+      }
 
       resetForm();
       setAddOpen(false);
@@ -130,6 +166,8 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
     return fileType && ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(fileType);
   };
 
+  const isDialogOpen = addOpen || !!editOffer;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -140,7 +178,7 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
           </p>
         </div>
         {!isPublicView && (
-          <Button size="sm" onClick={() => setAddOpen(true)}>
+          <Button size="sm" onClick={() => { resetForm(); setAddOpen(true); }}>
             <Plus className="h-4 w-4 mr-1" />
             Add Offer / File
           </Button>
@@ -154,7 +192,7 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
           <FileText className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
           <p className="text-muted-foreground">No offers or files uploaded yet</p>
           {!isPublicView && (
-            <Button variant="outline" size="sm" className="mt-3" onClick={() => setAddOpen(true)}>
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => { resetForm(); setAddOpen(true); }}>
               <Plus className="h-4 w-4 mr-1" />
               Upload First File
             </Button>
@@ -164,14 +202,9 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {offers.map((offer) => (
             <Card key={offer.id} className="p-4 space-y-3">
-              {/* Preview for images */}
               {isImage(offer.file_type) && offer.file_url && (
                 <div className="rounded-md overflow-hidden border border-border bg-muted/30">
-                  <img
-                    src={offer.file_url}
-                    alt={offer.title}
-                    className="w-full h-40 object-cover"
-                  />
+                  <img src={offer.file_url} alt={offer.title} className="w-full h-40 object-cover" />
                 </div>
               )}
 
@@ -195,56 +228,80 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>{format(new Date(offer.created_at), 'MMM d, yyyy')}</span>
                 <div className="flex items-center gap-1">
-                  {offer.file_size_bytes && (
-                    <span>{formatFileSize(offer.file_size_bytes)}</span>
-                  )}
-                  {offer.uploaded_by && (
-                    <span>• {offer.uploaded_by}</span>
-                  )}
+                  {offer.file_size_bytes && <span>{formatFileSize(offer.file_size_bytes)}</span>}
+                  {offer.uploaded_by && <span>• {offer.uploaded_by}</span>}
                 </div>
+              </div>
+
+              {/* Generate All Assets button */}
+              {!isPublicView && (
+                <OfferAssetHub
+                  offer={offer}
+                  clientId={clientId}
+                  clientName={clientName}
+                  brandColors={brandColors}
+                  brandFonts={brandFonts}
+                  clientDescription={clientDescription}
+                  offerDescription={offerDescription}
+                  websiteUrl={websiteUrl}
+                  industry={industry}
+                  clientType={clientType}
+                />
+              )}
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="flex-1 gap-1.5"
+                  onClick={() => navigate(`/client/${clientId}/offer/${offer.id}`)}
+                >
+                  View All Assets <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
               </div>
 
               <div className="flex items-center gap-2">
                 {offer.file_url && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => window.open(offer.file_url!, '_blank')}
-                    >
-                      {offer.file_type === 'pdf' ? (
-                        <><ExternalLink className="h-3 w-3 mr-1" /> View</>
-                      ) : (
-                        <><Download className="h-3 w-3 mr-1" /> Download</>
-                      )}
-                    </Button>
-                  </>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => window.open(offer.file_url!, '_blank')}
+                  >
+                    {offer.file_type === 'pdf' ? (
+                      <><ExternalLink className="h-3 w-3 mr-1" /> View</>
+                    ) : (
+                      <><Download className="h-3 w-3 mr-1" /> Download</>
+                    )}
+                  </Button>
                 )}
                 {!isPublicView && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete "{offer.title}"?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will permanently remove this file. This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => deleteOffer.mutate({ id: offer.id, clientId })}
-                        >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => openEdit(offer)}>
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete "{offer.title}"?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently remove this file. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => deleteOffer.mutate({ id: offer.id, clientId })}>
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </>
                 )}
               </div>
             </Card>
@@ -252,19 +309,17 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
         </div>
       )}
 
-      {/* Add Offer Modal */}
-      <Dialog open={addOpen} onOpenChange={(o) => { if (!o) resetForm(); setAddOpen(o); }}>
+      {/* Add / Edit Offer Modal */}
+      <Dialog open={isDialogOpen} onOpenChange={(o) => { if (!o) { resetForm(); setAddOpen(false); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Offer / File</DialogTitle>
+            <DialogTitle>{editOffer ? 'Edit Offer / File' : 'Add Offer / File'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div>
               <label className="text-sm font-semibold">Type</label>
               <Select value={offerType} onValueChange={setOfferType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="offer">Offer</SelectItem>
                   <SelectItem value="document">Document</SelectItem>
@@ -290,7 +345,9 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
               />
             </div>
             <div>
-              <label className="text-sm font-semibold">File</label>
+              <label className="text-sm font-semibold">
+                {editOffer ? 'Replace File (optional)' : 'File'}
+              </label>
               <div
                 className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
                 onClick={() => fileInputRef.current?.click()}
@@ -298,6 +355,8 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
                 <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                 {selectedFile ? (
                   <p className="text-sm font-medium">{selectedFile.name} ({formatFileSize(selectedFile.size)})</p>
+                ) : editOffer?.file_name ? (
+                  <p className="text-sm text-muted-foreground">Current: {editOffer.file_name} — click to replace</p>
                 ) : (
                   <p className="text-sm text-muted-foreground">Click to select PDF, PNG, JPG, etc.</p>
                 )}
@@ -315,7 +374,7 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
                 Cancel
               </Button>
               <Button onClick={handleSubmit} disabled={uploading || !title.trim()}>
-                {uploading ? 'Uploading...' : 'Add'}
+                {uploading ? 'Saving...' : editOffer ? 'Save Changes' : 'Add'}
               </Button>
             </div>
           </div>

@@ -119,6 +119,13 @@ function ClientOverview({ client }: { client: Client }) {
       <ClientOffersSection
         clientId={client.id}
         clientName={client.name}
+        brandColors={client.brand_colors}
+        brandFonts={client.brand_fonts}
+        clientDescription={client.description}
+        offerDescription={client.offer_description}
+        websiteUrl={client.website_url}
+        industry={client.industry}
+        clientType={client.client_type}
       />
     </div>
   );
