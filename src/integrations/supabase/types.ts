@@ -953,30 +953,45 @@ export type Database = {
       }
       avatar_looks: {
         Row: {
+          angle: string | null
           avatar_id: string | null
+          background: string | null
           created_at: string | null
           id: string
           image_url: string
           is_default: boolean | null
+          is_primary: boolean | null
+          metadata: Json | null
           name: string
+          outfit: string | null
           prompt: string | null
         }
         Insert: {
+          angle?: string | null
           avatar_id?: string | null
+          background?: string | null
           created_at?: string | null
           id?: string
           image_url: string
           is_default?: boolean | null
+          is_primary?: boolean | null
+          metadata?: Json | null
           name: string
+          outfit?: string | null
           prompt?: string | null
         }
         Update: {
+          angle?: string | null
           avatar_id?: string | null
+          background?: string | null
           created_at?: string | null
           id?: string
           image_url?: string
           is_default?: boolean | null
+          is_primary?: boolean | null
+          metadata?: Json | null
           name?: string
+          outfit?: string | null
           prompt?: string | null
         }
         Relationships: [
@@ -996,9 +1011,14 @@ export type Database = {
           client_id: string | null
           created_at: string | null
           description: string | null
+          elevenlabs_voice_id: string | null
+          ethnicity: string | null
           gender: string | null
           id: string
+          image_url: string | null
           is_active: boolean | null
+          is_stock: boolean | null
+          looks_count: number | null
           metadata: Json | null
           name: string
           style: string | null
@@ -1009,9 +1029,14 @@ export type Database = {
           client_id?: string | null
           created_at?: string | null
           description?: string | null
+          elevenlabs_voice_id?: string | null
+          ethnicity?: string | null
           gender?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean | null
+          is_stock?: boolean | null
+          looks_count?: number | null
           metadata?: Json | null
           name: string
           style?: string | null
@@ -1022,9 +1047,14 @@ export type Database = {
           client_id?: string | null
           created_at?: string | null
           description?: string | null
+          elevenlabs_voice_id?: string | null
+          ethnicity?: string | null
           gender?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean | null
+          is_stock?: boolean | null
+          looks_count?: number | null
           metadata?: Json | null
           name?: string
           style?: string | null
@@ -1097,6 +1127,7 @@ export type Database = {
       }
       calendar_mappings: {
         Row: {
+          calendar_id: string | null
           calendar_name: string | null
           client_id: string | null
           created_at: string | null
@@ -1105,6 +1136,7 @@ export type Database = {
           id: string
         }
         Insert: {
+          calendar_id?: string | null
           calendar_name?: string | null
           client_id?: string | null
           created_at?: string | null
@@ -1113,6 +1145,7 @@ export type Database = {
           id?: string
         }
         Update: {
+          calendar_id?: string | null
           calendar_name?: string | null
           client_id?: string | null
           created_at?: string | null
@@ -6401,6 +6434,13 @@ export type Database = {
     }
     Functions: {
       generate_client_slug: { Args: { client_name: string }; Returns: string }
+      get_api_usage_counts: {
+        Args: { p_key_index: number; p_service: string }
+        Returns: {
+          daily_count: number
+          minute_count: number
+        }[]
+      }
       get_client_source_metrics: {
         Args: { p_end_date?: string; p_start_date?: string }
         Returns: {
