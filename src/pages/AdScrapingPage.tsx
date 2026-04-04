@@ -133,9 +133,9 @@ export default function AdScrapingPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('client_ad_assignments')
-        .select('ad_id, client_id');
+        .select('creative_id, client_id');
       if (error) throw error;
-      return data as { ad_id: string; client_id: string }[];
+      return (data || []).map((d: any) => ({ ad_id: d.creative_id, client_id: d.client_id })) as { ad_id: string; client_id: string }[];
     },
   });
 
@@ -249,7 +249,7 @@ export default function AdScrapingPage() {
       return;
     }
     try {
-      const result = await startTracking.mutateAsync({ type, value: v });
+      const result = await startTracking.mutateAsync({ advertiser_name: v });
       toast.success(`Scraped ${result.adsCount} ads for "${v}"`);
       clear();
     } catch (err: any) {
@@ -257,14 +257,14 @@ export default function AdScrapingPage() {
     }
   };
 
-  const lastUpdateLabel = monStatus?.last_update
-    ? `Last update: ${formatDistanceToNow(new Date(monStatus.last_update))} ago`
+  const lastUpdateLabel = (monStatus as any)?.last_update
+    ? `Last update: ${formatDistanceToNow(new Date((monStatus as any).last_update))} ago`
     : targets.length > 0
     ? `Last update: ${formatDistanceToNow(new Date(Math.max(...targets.filter(t => t.last_scraped_at).map(t => new Date(t.last_scraped_at!).getTime()), 0)))} ago`
     : null;
 
-  const nextUpdateLabel = monStatus?.next_update
-    ? `Next: in ${formatDistanceToNow(new Date(monStatus.next_update))}`
+  const nextUpdateLabel = (monStatus as any)?.next_update
+    ? `Next: in ${formatDistanceToNow(new Date((monStatus as any).next_update))}`
     : null;
 
   const handleOpenReInspired = () => {

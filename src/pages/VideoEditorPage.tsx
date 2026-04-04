@@ -171,7 +171,7 @@ export default function VideoEditorPage() {
     editor.setAspectRatio(ar);
 
     // Restore caption settings
-    const cs = (proj.caption_settings || {}) as any;
+    const cs = ((proj as any).caption_settings || (proj.metadata as any)?.caption_settings || {}) as any;
     if (cs.style) captionManager.setCaptionStyle(cs.style);
     if (cs.fontSize) captionManager.setFontSize(cs.fontSize);
     if (cs.color) captionManager.setColor(cs.color);
@@ -181,7 +181,7 @@ export default function VideoEditorPage() {
     if (cs.background !== undefined) captionManager.setBackground(cs.background);
 
     // Restore clips from stored source URLs
-    const clipsData = (proj.clips_data || []) as any[];
+    const clipsData = ((proj as any).clips_data || (proj.metadata as any)?.clips_data || proj.scenes || []) as any[];
     for (const clipData of clipsData) {
       const url = clipData.sourceUrl || clipData.blobUrl;
       if (url && !url.startsWith('blob:') && url.length > 0) {
@@ -194,7 +194,7 @@ export default function VideoEditorPage() {
     }
 
     // Restore captions
-    const captionData = (proj.caption_data || []) as any[];
+    const captionData = ((proj as any).caption_data || (proj.metadata as any)?.caption_data || []) as any[];
     if (captionData.length > 0) {
       captionData.forEach((c: any) => {
         captionManager.addCaption(c.startTime, c.endTime, c.text);

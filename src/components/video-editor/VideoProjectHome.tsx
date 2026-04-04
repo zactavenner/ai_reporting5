@@ -40,7 +40,7 @@ export function VideoProjectHome({
   };
 
   const getDurationLabel = (p: VideoProject) => {
-    const clips = p.clips_data || [];
+    const clips = (p as any).clips_data || (p as any).scenes || [];
     if (clips.length === 0) return '0:00';
     const total = clips.reduce((s: number, c: any) => s + ((c.trimEnd || c.duration || 0) - (c.trimStart || 0)) / (c.speed || 1), 0);
     const m = Math.floor(total / 60);
