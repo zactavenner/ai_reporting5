@@ -46,6 +46,14 @@ import FunnelInvestPage from "./pages/FunnelInvestPage";
 import FunnelKickoffPage from "./pages/FunnelKickoffPage";
 import FunnelAccessPage from "./pages/FunnelAccessPage";
 
+// New pages from Reporting 6.0
+import ClientOnboardingPage from "./pages/ClientOnboardingPage";
+import SyncHealthPage from "./pages/SyncHealthPage";
+import DailyReportPage from "./pages/DailyReportPage";
+import DailyReportThankYouPage from "./pages/DailyReportThankYouPage";
+import OfferDetailPage from "./pages/OfferDetailPage";
+import QuizPage from "./pages/QuizPage";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
