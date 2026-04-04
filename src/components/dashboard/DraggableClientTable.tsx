@@ -402,15 +402,20 @@ export function DraggableClientTable({
               const t = thresholds[client.id] || {};
               const syncInfo = getClientSyncStatus(client);
               const syncBorderStyle = getSyncBorderStyle(syncInfo.status);
+              const isInactive = inactiveClientIds.has(client.id);
 
               return (
                 <TooltipProvider key={client.id}>
                   <TableRow
                     className={cn(
-                      "cursor-pointer hover:bg-muted/50 border-b h-7",
+                      "cursor-pointer hover:bg-muted/50 border-b h-7 relative",
                       draggedId === client.id && "opacity-50",
-                      syncBorderStyle
+                      syncBorderStyle,
+                      isInactive && "opacity-60"
                     )}
+                    style={isInactive ? {
+                      backgroundImage: 'linear-gradient(transparent calc(50% - 0.5px), hsl(var(--destructive) / 0.35) calc(50% - 0.5px), hsl(var(--destructive) / 0.35) calc(50% + 0.5px), transparent calc(50% + 0.5px))',
+                    } : undefined}
                     draggable
                     onDragStart={(e) => handleDragStart(e, client.id)}
                     onDragOver={handleDragOver}
@@ -448,7 +453,7 @@ export function DraggableClientTable({
                             </TooltipTrigger>
                             <TooltipContent side="right" className="max-w-xs">
                               <div className="text-xs">
-                                <strong>{syncInfo.source === 'hubspot' ? 'HubSpot' : 'GHL'}: </strong>
+                                <strong>{syncInfo.source === 'hubspot' ? 'HubSpot' : syncInfo.source === 'ghl' ? 'GHL' : 'CRM'}: </strong>
                                 {syncInfo.status === 'healthy' && 'Synced'}
                                 {syncInfo.status === 'stale' && 'Stale'}
                                 {syncInfo.status === 'error' && 'Error'}
@@ -467,7 +472,91 @@ export function DraggableClientTable({
 
                     {/* Client name */}
                     <TableCell className="font-medium text-[11px] sticky left-7 bg-card z-10 py-0 px-1 truncate max-w-[120px]">
-                      {client.name}
+                      <span className="flex items-center gap-1">
+                        {client.name}
+                        {isInactive && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-3 w-3 text-destructive shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="text-xs">
+                              $0 ad spend &amp; 0 leads yesterday
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                    </TableCell>
+
+                    {/* Status */}
+                    <TableCell className="text-center py-0 px-1" onClick={(e) => e.stopPropagation()}>
+                      <Select value={client.status} onValueChange={(val) => handleStatusChange(client.id, val)}>
+                        <SelectTrigger className="h-6 w-[100px] text-[9px] border-0 bg-transparent p-0 justify-center [&>svg]:hidden">
+                          <Badge
+                            variant={
+                              client.status === 'active' ? 'default' :
+                              client.status === 'onboarding' ? 'secondary' :
+                              client.status === 'paused' || client.status === 'on_hold' ? 'outline' :
+                              'destructive'
+                            }
+                            className={cn(
+                              "text-[9px] px-1.5 py-0 cursor-pointer",
+                              client.status === 'active' && 'bg-chart-2/15 text-chart-2 border-chart-2/30',
+                              client.status === 'onboarding' && 'bg-primary/15 text-primary border-primary/30',
+                              (client.status === 'paused' || client.status === 'on_hold') && 'bg-muted text-muted-foreground',
+                              client.status === 'inactive' && 'bg-destructive/15 text-destructive'
+                            )}
+                          >
+                            {client.status === 'on_hold' ? 'On Hold' : client.status?.charAt(0).toUpperCase() + client.status?.slice(1)}
+                          </Badge>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">
+                            <Badge className="bg-chart-2/15 text-chart-2 border-chart-2/30 text-[9px]">Active</Badge>
+                          </SelectItem>
+                          <SelectItem value="onboarding">
+                            <Badge className="bg-primary/15 text-primary border-primary/30 text-[9px]">Onboarding</Badge>
+                          </SelectItem>
+                          <SelectItem value="paused">
+                            <Badge className="bg-muted text-muted-foreground text-[9px]">Paused</Badge>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+
+                    {/* Media Buyer */}
+                    <TableCell className="text-center py-0 px-0.5" onClick={(e) => e.stopPropagation()}>
+                      <Select
+                        value={assignments[client.id]?.media_buyer || '_none'}
+                        onValueChange={(val) => updateAssignment.mutateAsync({ id: client.id, media_buyer: val === '_none' ? null : val })}
+                      >
+                        <SelectTrigger className="h-5 w-[75px] text-[9px] border-0 bg-transparent p-0 justify-center [&>svg]:h-2.5 [&>svg]:w-2.5">
+                          <span className="truncate">{assignments[client.id]?.media_buyer ? agencyMembers.find((m: any) => m.name === assignments[client.id]?.media_buyer)?.name?.split(' ')[0] || assignments[client.id]?.media_buyer?.split(' ')[0] || '—' : '—'}</span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_none"><span className="text-muted-foreground">None</span></SelectItem>
+                          {agencyMembers.filter((m: any) => m.pod?.name === 'Media Buying').map((m: any) => (
+                            <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+
+                    {/* Account Manager */}
+                    <TableCell className="text-center py-0 px-0.5" onClick={(e) => e.stopPropagation()}>
+                      <Select
+                        value={assignments[client.id]?.account_manager || '_none'}
+                        onValueChange={(val) => updateAssignment.mutateAsync({ id: client.id, account_manager: val === '_none' ? null : val })}
+                      >
+                        <SelectTrigger className="h-5 w-[75px] text-[9px] border-0 bg-transparent p-0 justify-center [&>svg]:h-2.5 [&>svg]:w-2.5">
+                          <span className="truncate">{assignments[client.id]?.account_manager ? agencyMembers.find((m: any) => m.name === assignments[client.id]?.account_manager)?.name?.split(' ')[0] || assignments[client.id]?.account_manager?.split(' ')[0] || '—' : '—'}</span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_none"><span className="text-muted-foreground">None</span></SelectItem>
+                          {agencyMembers.filter((m: any) => m.pod?.name === 'Account Management').map((m: any) => (
+                            <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </TableCell>
 
                     {/* Meta Spend */}
