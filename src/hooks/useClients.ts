@@ -10,6 +10,14 @@ export interface Client {
   business_manager_url: string | null;
   slug: string | null;
   industry: string | null;
+  logo_url: string | null;
+  website_url: string | null;
+  description: string | null;
+  offer_description: string | null;
+  product_url: string | null;
+  product_images: string[];
+  brand_colors: string[];
+  brand_fonts: string[];
   ghl_location_id: string | null;
   ghl_api_key: string | null;
   ghl_sync_status: string | null;
@@ -22,6 +30,8 @@ export interface Client {
   last_hubspot_sync_at: string | null;
   meta_ad_account_id: string | null;
   meta_access_token: string | null;
+  media_buyer: string | null;
+  account_manager: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
