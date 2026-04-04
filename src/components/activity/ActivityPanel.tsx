@@ -242,8 +242,7 @@ export function ActivityPanel({
 
   const handleDelete = (activity: ActivityItem) => {
     if (onDeleteActivity) {
-      const actualId = activity.id.split('-').slice(2).join('-') || activity.id.split('-')[1];
-      onDeleteActivity(actualId, activity.type);
+      onDeleteActivity(activity.sourceId, activity.type);
     }
   };
 

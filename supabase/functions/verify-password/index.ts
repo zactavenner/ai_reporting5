@@ -48,21 +48,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Hash the provided password and compare
+    // Hash the provided password and compare with stored hash
     const providedHash = await hashPassword(password);
-    
-    console.log('Password received:', password);
-    console.log('Password === HPA:', password === 'HPA');
-    console.log('Provided hash:', providedHash);
-    console.log('Stored hash:', settings?.password_hash);
-    
-    // For backward compatibility during transition, accept 'HPA' as hardcoded password
-    // or compare with stored hash
-    const hardcodedMatch = password === 'HPA';
-    const hashMatch = settings?.password_hash && providedHash === settings.password_hash;
-    const isPasswordValid = hardcodedMatch || hashMatch;
-    
-    console.log('Hardcoded match:', hardcodedMatch, 'Hash match:', hashMatch, 'Valid:', isPasswordValid);
+
+    const isPasswordValid = settings?.password_hash && providedHash === settings.password_hash;
 
     if (!isPasswordValid) {
       return new Response(

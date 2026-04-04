@@ -40,11 +40,11 @@ export function ProjectSetup({ config, updateConfig, client, projectOfferDescrip
     if (editableDescription !== config.productDescription) {
       updateConfig({ productDescription: editableDescription });
     }
-  }, [editableDescription]);
+  }, [editableDescription, config.productDescription, updateConfig]);
 
   useEffect(() => {
     onOfferChange?.(editableOffer);
-  }, [editableOffer]);
+  }, [editableOffer, onOfferChange]);
 
   // Auto-apply brand assets from client
   const brandColors = client?.brand_colors || [];

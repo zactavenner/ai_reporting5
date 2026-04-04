@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -49,6 +49,16 @@ export function ResultsGallery({
   const [videoPrompt, setVideoPrompt] = useState('');
   const [isAnimating, setIsAnimating] = useState(false);
   const [animatedVideoUrl, setAnimatedVideoUrl] = useState<string | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+    };
+  }, []);
 
   // AI Edit state
   const [editDialogAd, setEditDialogAd] = useState<GeneratedAd | null>(null);
@@ -195,7 +205,11 @@ export function ResultsGallery({
       
       if (data?.operationId) {
         toast.info('Video generation started — this takes 1-3 minutes...');
-        const pollInterval = setInterval(async () => {
+        // Clear any existing polling before starting new one
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+
+        pollIntervalRef.current = setInterval(async () => {
           try {
             const { data: pollData } = await supabase.functions.invoke('poll-generation-status', {
               body: { operationId: data.operationId, provider: 'veo' },
@@ -204,20 +218,22 @@ export function ResultsGallery({
               setAnimatedVideoUrl(pollData.videoUrl);
               setIsAnimating(false);
               toast.success('Video animation complete!');
-              clearInterval(pollInterval);
+              if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+              if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
               await saveVideoToProject(pollData.videoUrl, animateDialogAd);
             } else if (pollData?.status === 'failed') {
               toast.error('Animation failed', { description: pollData?.error });
               setIsAnimating(false);
-              clearInterval(pollInterval);
+              if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+              if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
             }
           } catch {
             // Keep polling
           }
         }, 5000);
-        
-        setTimeout(() => {
-          clearInterval(pollInterval);
+
+        pollTimeoutRef.current = setTimeout(() => {
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           setIsAnimating(false);
           toast.error('Animation timed out — check history for results');
         }, 300000);

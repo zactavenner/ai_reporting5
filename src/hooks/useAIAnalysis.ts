@@ -72,7 +72,7 @@ export function useAIAnalysis() {
           body: JSON.stringify({
             messages: allMessages,
             context,
-            model,
+            model: selectedModel,
             files: fileContents,
           }),
         }

@@ -14,7 +14,8 @@ serve(async (req) => {
 
   try {
     const { agent_id, client_id: overrideClientId, password } = await req.json();
-    if (password !== 'HPA1234$') {
+    const expectedPassword = Deno.env.get('AGENT_API_PASSWORD');
+    if (!expectedPassword || password !== expectedPassword) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
     if (!agent_id) {

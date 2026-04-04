@@ -243,6 +243,7 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
           'gemini-3-flash': 'gemini',
           'gemini-3-pro': 'gemini-pro',
           'gpt-5': 'openai',
+          'grok': 'grok',
         };
         response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analysis`,

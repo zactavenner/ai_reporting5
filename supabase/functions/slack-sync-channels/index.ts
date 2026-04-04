@@ -101,7 +101,7 @@ serve(async (req) => {
     }
 
     let totalMessages = 0;
-    let tasksCreated = 0;
+    let totalTasksCreated = 0;
     const results: any[] = [];
 
     for (const ch of channelsToSync) {
@@ -207,6 +207,7 @@ serve(async (req) => {
         }
 
         // AI analysis for task creation
+        let channelTasksCreated = 0;
         if (ch.auto_create_tasks && auto_create_tasks && newMessages.length > 0) {
           const batchText = newMessages
             .map(m => `[${m.user_name}]: ${m.text}`)
@@ -281,7 +282,8 @@ Rules:
                   }).select("id").single();
 
                   if (!taskErr && newTask) {
-                    tasksCreated++;
+                    channelTasksCreated++;
+                    totalTasksCreated++;
 
                     // Post confirmation to Slack
                     await fetch(`${SLACK_GATEWAY_URL}/chat.postMessage`, {
@@ -308,7 +310,7 @@ Rules:
           channel_id: ch.channel_id,
           channel_name: ch.channel_name,
           messages_synced: newMessages.length,
-          tasks_created: tasksCreated,
+          tasks_created: channelTasksCreated,
         });
       } catch (chErr) {
         console.error(`Error syncing channel ${ch.channel_id}:`, chErr);
@@ -319,7 +321,7 @@ Rules:
     return new Response(JSON.stringify({
       ok: true,
       total_messages: totalMessages,
-      tasks_created: tasksCreated,
+      tasks_created: totalTasksCreated,
       channels: results,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
