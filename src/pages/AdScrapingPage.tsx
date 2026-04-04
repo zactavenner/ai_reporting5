@@ -249,7 +249,7 @@ export default function AdScrapingPage() {
       return;
     }
     try {
-      const result = await startTracking.mutateAsync({ type, value: v });
+      const result = await startTracking.mutateAsync({ advertiser_name: v });
       toast.success(`Scraped ${result.adsCount} ads for "${v}"`);
       clear();
     } catch (err: any) {
