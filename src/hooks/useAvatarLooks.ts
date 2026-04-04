@@ -109,7 +109,7 @@ export function useSetPrimaryLook() {
       // Set the new primary
       await supabase
         .from('avatar_looks')
-        .update({ is_primary: true })
+        .update({ is_default: true, is_primary: true } as any)
         .eq('id', lookId);
       
       // Update the avatar's main image_url
