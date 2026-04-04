@@ -1,0 +1,376 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, accept, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+};
+
+// Simple JSON-RPC MCP server implementation
+// Compatible with Claude Code Desktop via Streamable HTTP transport
+
+function getCloudDb() {
+  return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+}
+
+function getProdDb() {
+  const prodUrl = Deno.env.get('ORIGINAL_SUPABASE_URL') || Deno.env.get('SUPABASE_URL')!;
+  const prodKey = Deno.env.get('ORIGINAL_SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  return createClient(prodUrl, prodKey);
+}
+
+const TOOLS = [
+  {
+    name: 'list_agents',
+    description: 'List all configured AI agents with their status, schedule, and connectors',
+    inputSchema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'get_agent',
+    description: 'Get detailed configuration for a specific agent by ID',
+    inputSchema: {
+      type: 'object',
+      properties: { agent_id: { type: 'string', description: 'The agent UUID' } },
+      required: ['agent_id'],
+    },
+  },
+  {
+    name: 'run_agent',
+    description: 'Trigger an agent to run immediately. Optionally specify a client_id to scope to one client.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        agent_id: { type: 'string', description: 'The agent UUID to run' },
+        client_id: { type: 'string', description: 'Optional: specific client UUID to run for' },
+      },
+      required: ['agent_id'],
+    },
+  },
+  {
+    name: 'get_agent_runs',
+    description: 'Get recent run history for an agent, including status, output, and actions taken',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        agent_id: { type: 'string', description: 'The agent UUID' },
+        limit: { type: 'number', description: 'Number of runs to return (default 10)' },
+      },
+      required: ['agent_id'],
+    },
+  },
+  {
+    name: 'list_clients',
+    description: 'List all active clients in the system',
+    inputSchema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'get_client_metrics',
+    description: 'Get recent daily metrics for a specific client',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        client_id: { type: 'string', description: 'Client UUID' },
+        days: { type: 'number', description: 'Number of days to look back (default 7)' },
+      },
+      required: ['client_id'],
+    },
+  },
+  {
+    name: 'create_agent',
+    description: 'Create a new AI agent with a name, prompt template, schedule, model, and connectors',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Agent name' },
+        description: { type: 'string', description: 'What this agent does' },
+        icon: { type: 'string', description: 'Emoji icon for the agent' },
+        prompt_template: { type: 'string', description: 'System prompt with {{client_name}}, {{date}}, {{yesterday}}, {{data}} variables' },
+        schedule_cron: { type: 'string', description: 'Cron schedule e.g. "0 6 * * *"' },
+        model: { type: 'string', description: 'AI model e.g. "google/gemini-2.5-pro"' },
+        client_id: { type: 'string', description: 'Optional client UUID to scope to' },
+        connectors: { type: 'array', items: { type: 'string' }, description: 'Data connectors: database, meta_ads, ghl_crm, slack' },
+        enabled: { type: 'boolean', description: 'Whether the agent is enabled' },
+      },
+      required: ['name', 'prompt_template'],
+    },
+  },
+  {
+    name: 'update_agent',
+    description: 'Update an existing agent configuration',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        agent_id: { type: 'string', description: 'Agent UUID to update' },
+        name: { type: 'string' },
+        description: { type: 'string' },
+        prompt_template: { type: 'string' },
+        schedule_cron: { type: 'string' },
+        model: { type: 'string' },
+        client_id: { type: 'string' },
+        connectors: { type: 'array', items: { type: 'string' } },
+        enabled: { type: 'boolean' },
+      },
+      required: ['agent_id'],
+    },
+  },
+  {
+    name: 'get_tasks',
+    description: 'Get tasks for a specific client',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        client_id: { type: 'string', description: 'Client UUID' },
+        status: { type: 'string', description: 'Filter by status (e.g. "todo", "in_progress", "done")' },
+      },
+      required: ['client_id'],
+    },
+  },
+  {
+    name: 'create_task',
+    description: 'Create a new task for a client',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        client_id: { type: 'string', description: 'Client UUID' },
+        title: { type: 'string', description: 'Task title' },
+        description: { type: 'string', description: 'Task description' },
+        priority: { type: 'string', description: 'Priority: low, medium, high, urgent' },
+        assigned_to: { type: 'string', description: 'Member name to assign to' },
+        due_date: { type: 'string', description: 'Due date ISO string' },
+      },
+      required: ['client_id', 'title'],
+    },
+  },
+];
+
+async function handleToolCall(name: string, args: Record<string, any>): Promise<any> {
+  const cloudDb = getCloudDb();
+  const prodDb = getProdDb();
+
+  switch (name) {
+    case 'list_agents': {
+      const { data } = await cloudDb.from('agents').select('*').order('created_at', { ascending: false });
+      return { agents: data || [] };
+    }
+
+    case 'get_agent': {
+      const { data } = await cloudDb.from('agents').select('*').eq('id', args.agent_id).single();
+      return data || { error: 'Agent not found' };
+    }
+
+    case 'run_agent': {
+      // Call the run-agent edge function
+      const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/run-agent`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+        },
+        body: JSON.stringify({
+          agent_id: args.agent_id,
+          client_id: args.client_id,
+          password: 'HPA1234$',
+        }),
+      });
+      return await res.json();
+    }
+
+    case 'get_agent_runs': {
+      const limit = args.limit || 10;
+      const { data } = await cloudDb
+        .from('agent_runs')
+        .select('*')
+        .eq('agent_id', args.agent_id)
+        .order('started_at', { ascending: false })
+        .limit(limit);
+      return { runs: data || [] };
+    }
+
+    case 'list_clients': {
+      const { data } = await prodDb
+        .from('clients')
+        .select('id, name, status, industry, client_type')
+        .in('status', ['active', 'onboarding'])
+        .order('name');
+      return { clients: data || [] };
+    }
+
+    case 'get_client_metrics': {
+      const days = args.days || 7;
+      const since = new Date();
+      since.setDate(since.getDate() - days);
+      const { data } = await prodDb
+        .from('daily_metrics')
+        .select('*')
+        .eq('client_id', args.client_id)
+        .gte('date', since.toISOString().split('T')[0])
+        .order('date', { ascending: false });
+      return { metrics: data || [] };
+    }
+
+    case 'create_agent': {
+      const { data, error } = await cloudDb.from('agents').insert({
+        name: args.name,
+        description: args.description || '',
+        icon: args.icon || '🤖',
+        prompt_template: args.prompt_template,
+        schedule_cron: args.schedule_cron || '0 6 * * *',
+        model: args.model || 'google/gemini-2.5-pro',
+        client_id: args.client_id || null,
+        connectors: args.connectors || ['database'],
+        enabled: args.enabled ?? false,
+      }).select().single();
+      if (error) return { error: error.message };
+      return data;
+    }
+
+    case 'update_agent': {
+      const { agent_id, ...updates } = args;
+      const { error } = await cloudDb
+        .from('agents')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', agent_id);
+      if (error) return { error: error.message };
+      return { success: true };
+    }
+
+    case 'get_tasks': {
+      let query = prodDb.from('tasks').select('*').eq('client_id', args.client_id);
+      if (args.status) query = query.eq('status', args.status);
+      const { data } = await query.order('created_at', { ascending: false }).limit(50);
+      return { tasks: data || [] };
+    }
+
+    case 'create_task': {
+      const { data, error } = await prodDb.from('tasks').insert({
+        client_id: args.client_id,
+        title: args.title,
+        description: args.description || null,
+        priority: args.priority || 'medium',
+        assigned_to: args.assigned_to || null,
+        due_date: args.due_date || null,
+        status: 'todo',
+        stage: 'backlog',
+      }).select().single();
+      if (error) return { error: error.message };
+      return data;
+    }
+
+    default:
+      return { error: `Unknown tool: ${name}` };
+  }
+}
+
+// JSON-RPC handler for MCP protocol
+async function handleJsonRpc(body: any): Promise<any> {
+  const { method, params, id } = body;
+
+  switch (method) {
+    case 'initialize':
+      return {
+        jsonrpc: '2.0',
+        id,
+        result: {
+          protocolVersion: '2024-11-05',
+          capabilities: { tools: { listChanged: false } },
+          serverInfo: { name: 'hpa-agent-server', version: '1.0.0' },
+        },
+      };
+
+    case 'notifications/initialized':
+      return null; // No response needed for notifications
+
+    case 'tools/list':
+      return {
+        jsonrpc: '2.0',
+        id,
+        result: { tools: TOOLS },
+      };
+
+    case 'tools/call': {
+      const toolName = params?.name;
+      const toolArgs = params?.arguments || {};
+      try {
+        const result = await handleToolCall(toolName, toolArgs);
+        return {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          },
+        };
+      } catch (err: any) {
+        return {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            content: [{ type: 'text', text: `Error: ${err.message}` }],
+            isError: true,
+          },
+        };
+      }
+    }
+
+    default:
+      return {
+        jsonrpc: '2.0',
+        id,
+        error: { code: -32601, message: `Method not found: ${method}` },
+      };
+  }
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  // Health check
+  if (req.method === 'GET') {
+    return new Response(JSON.stringify({
+      name: 'hpa-agent-server',
+      version: '1.0.0',
+      description: 'MCP server for HPA AI Agents — connect from Claude Code Desktop',
+      tools: TOOLS.map(t => t.name),
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  try {
+    const body = await req.json();
+
+    // Handle batch requests
+    if (Array.isArray(body)) {
+      const results = [];
+      for (const item of body) {
+        const result = await handleJsonRpc(item);
+        if (result !== null) results.push(result);
+      }
+      return new Response(JSON.stringify(results), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const result = await handleJsonRpc(body);
+    if (result === null) {
+      return new Response('', { status: 204, headers: corsHeaders });
+    }
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (err: any) {
+    console.error('MCP server error:', err);
+    return new Response(JSON.stringify({
+      jsonrpc: '2.0',
+      error: { code: -32700, message: 'Parse error' },
+      id: null,
+    }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
