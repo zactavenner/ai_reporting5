@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { AppHeader } from '@/components/layout/AppHeader';
@@ -29,6 +29,7 @@ import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
 import { AgencyBillingTab } from '@/components/billing/AgencyBillingTab';
 import { DealPipelineBoard } from '@/components/deals/DealPipelineBoard';
 import { DataHealthCard } from '@/components/dashboard/DataHealthCard';
+import { AgencyIntegrationsTab } from '@/components/settings/AgencyIntegrationsTab';
 import { IntegrationStatusCards } from '@/components/dashboard/IntegrationStatusCards';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -53,10 +54,13 @@ import { useUpdateClientOrder } from '@/hooks/useClientOrder';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
 import { toast } from 'sonner';
 
-// Inline page components for Database, Spam, Briefs (rendered inside sidebar layout)
+// Inline page components for Database, Spam (rendered inside sidebar layout)
 import DatabaseView from './DatabaseView';
 import SpamBlacklist from './SpamBlacklist';
-import CreativeBriefs from './CreativeBriefs';
+import { AdminAdsManagerTab } from '@/components/ads-manager/AdminAdsManagerTab';
+import { AdminOffersTab } from '@/components/offers/AdminOffersTab';
+import { QuizBuilderTab } from '@/components/quiz/QuizBuilderTab';
+import { AgentsTab } from '@/components/agents/AgentsTab';
 
 const Index = () => {
   const navigate = useNavigate();
