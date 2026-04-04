@@ -57,7 +57,7 @@ export default function Onboarding() {
 
   useEffect(() => {
     if (searchParams.get('payment') === 'success') {
-      toast({ title: 'Payment successful!', description: 'Now complete your onboarding to get started.' });
+      toast.success('Payment successful! Now complete your onboarding to get started.');
     }
   }, [searchParams]);
 
