@@ -133,9 +133,9 @@ export default function AdScrapingPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('client_ad_assignments')
-        .select('ad_id, client_id');
+        .select('creative_id, client_id');
       if (error) throw error;
-      return data as { ad_id: string; client_id: string }[];
+      return (data || []).map((d: any) => ({ ad_id: d.creative_id, client_id: d.client_id })) as { ad_id: string; client_id: string }[];
     },
   });
 
