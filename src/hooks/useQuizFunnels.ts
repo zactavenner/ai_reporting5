@@ -65,7 +65,7 @@ export function useDeleteQuizFunnel() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase.from('quiz_funnels') as any).delete().eq('id', id);
+      const { error } = await (supabase as any).from('quiz_funnels').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['quiz-funnels'] }); },
