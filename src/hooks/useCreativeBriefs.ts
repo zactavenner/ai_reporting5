@@ -187,7 +187,7 @@ export function useUpdateBriefStatus() {
         .select()
         .single();
       if (error) throw error;
-      return data as CreativeBrief;
+      return data as unknown as CreativeBrief;
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['creative_briefs'] });

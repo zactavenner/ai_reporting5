@@ -20,9 +20,9 @@ export function GenerateBriefButton({ clientId, clientName, getTopAds }: Generat
     if (!topAds.length) return;
 
     const result = await generateBrief.mutateAsync({
-      client_id: clientId,
-      client_name: clientName,
-      top_ads: topAds.map((ad: any) => ({
+      clientId,
+      reason: 'scaling',
+    } as any);
         ad_name: ad.name || 'Untitled',
         spend: Number(ad.spend) || 0,
         impressions: Number(ad.impressions) || 0,
