@@ -109,9 +109,17 @@ const App = () => (
             <Route path="/funnel/:clientId/kickoff" element={<FunnelKickoffPage />} />
             <Route path="/funnel/:clientId/access" element={<FunnelAccessPage />} />
 
+            {/* New 6.0 routes */}
+            <Route path="/client/:clientId/offer/:offerId" element={<PasswordGate><OfferDetailPage /></PasswordGate>} />
+            <Route path="/sync-health" element={<PasswordGate><SyncHealthPage /></PasswordGate>} />
+            <Route path="/daily" element={<PasswordGate><DailyReportPage /></PasswordGate>} />
+            <Route path="/daily/thank-you" element={<PasswordGate><DailyReportThankYouPage /></PasswordGate>} />
+            <Route path="/onboarding" element={<ClientOnboardingPage />} />
+
             {/* Public routes - no password required */}
             <Route path="/public/:token" element={<PublicReport />} />
             <Route path="/public/:token/creatives" element={<PublicCreatives />} />
+            <Route path="/quiz/:slug" element={<QuizPage />} />
             <Route path="/meta-overlay" element={<MetaAdsOverlay />} />
 
             <Route path="*" element={<NotFound />} />
