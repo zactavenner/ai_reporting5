@@ -2,7 +2,7 @@ import { useState, useRef, lazy, Suspense } from 'react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useAllCreatives } from '@/hooks/useAllCreatives';
 import { useClients, Client } from '@/hooks/useClients';
-import { Creative, CreateCreativeInput, useUpdateCreativeStatus, useDeleteCreative, useCreateCreative, useCreateCreatives, uploadCreativeFile, detectAspectRatio } from '@/hooks/useCreatives';
+import { Creative, useUpdateCreativeStatus, useDeleteCreative, useCreateCreative, uploadCreativeFile, detectAspectRatio } from '@/hooks/useCreatives';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
