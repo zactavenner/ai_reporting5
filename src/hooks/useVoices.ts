@@ -10,7 +10,8 @@ export interface ElevenLabsVoice {
   labels: Record<string, string>;
 }
 
-// Matches actual DB columns for voices table
+// DB columns: id, name, provider, voice_id, gender, accent, style, preview_url, is_active, created_at
+// We add computed aliases for component compatibility
 export interface Voice {
   id: string;
   name: string;
@@ -22,6 +23,23 @@ export interface Voice {
   preview_url: string | null;
   is_active: boolean;
   created_at: string;
+  // Aliases for component compatibility
+  elevenlabs_voice_id: string;
+  sample_url: string | null;
+  client_id: string | null;
+  is_stock: boolean;
+  description: string | null;
+}
+
+function mapVoice(row: any): Voice {
+  return {
+    ...row,
+    elevenlabs_voice_id: row.voice_id,
+    sample_url: row.preview_url || null,
+    client_id: null,
+    is_stock: false,
+    description: row.style || null,
+  };
 }
 
 export function useVoices(clientId?: string | null) {
@@ -35,7 +53,7 @@ export function useVoices(clientId?: string | null) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []) as unknown as Voice[];
+      return (data || []).map(mapVoice);
     },
   });
 }
@@ -48,14 +66,15 @@ export function useCloneVoice() {
       audioFile,
       name,
       description,
+      clientId,
       gender,
     }: {
       audioFile: File;
       name: string;
       description?: string;
+      clientId?: string;
       gender?: string;
     }) => {
-      // 1. Upload audio to storage
       const fileExt = audioFile.name.split('.').pop();
       const filePath = `samples/${Date.now()}-${name.replace(/\s+/g, '-')}.${fileExt}`;
 
@@ -69,7 +88,6 @@ export function useCloneVoice() {
         .from('assets')
         .getPublicUrl(filePath);
 
-      // 2. Clone via edge function
       const formData = new FormData();
       formData.append('audio', audioFile);
       formData.append('name', name);
@@ -94,7 +112,6 @@ export function useCloneVoice() {
 
       const result = await response.json();
 
-      // 3. Save to voices table
       const { data, error } = await supabase
         .from('voices')
         .insert({
@@ -108,7 +125,7 @@ export function useCloneVoice() {
         .single();
 
       if (error) throw error;
-      return data as unknown as Voice;
+      return mapVoice(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['voices'] });
@@ -133,7 +150,6 @@ export function useDeleteVoice() {
   });
 }
 
-// Fetch all voices from ElevenLabs account
 export function useElevenLabsVoices() {
   return useQuery({
     queryKey: ['elevenlabs-voices'],
@@ -147,17 +163,17 @@ export function useElevenLabsVoices() {
   });
 }
 
-// Import an ElevenLabs voice into the local voices table
 export function useImportElevenLabsVoice() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({
       voice,
+      clientId,
     }: {
       voice: ElevenLabsVoice;
+      clientId?: string;
     }) => {
-      // Check if already imported
       const { data: existing } = await supabase
         .from('voices')
         .select('id')
@@ -183,7 +199,7 @@ export function useImportElevenLabsVoice() {
         .single();
 
       if (error) throw error;
-      return data as unknown as Voice;
+      return mapVoice(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['voices'] });
