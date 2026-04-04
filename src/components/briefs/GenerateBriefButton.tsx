@@ -22,20 +22,6 @@ export function GenerateBriefButton({ clientId, clientName, getTopAds }: Generat
     const result = await generateBrief.mutateAsync({
       clientId,
       reason: 'scaling',
-    } as any);
-        ad_name: ad.name || 'Untitled',
-        spend: Number(ad.spend) || 0,
-        impressions: Number(ad.impressions) || 0,
-        clicks: Number(ad.clicks) || 0,
-        ctr: Number(ad.ctr) || 0,
-        cpc: Number(ad.cpc) || 0,
-        conversions: Number(ad.attributed_funded) || 0,
-        roas: Number(ad.spend) > 0 ? (Number(ad.attributed_funded_dollars) || 0) / Number(ad.spend) : 0,
-        hook_text: ad.hook_text || ad.name || '',
-        body_text: ad.body_text || '',
-        cta_text: ad.cta_text || '',
-        format: ad.format || 'static',
-      })),
     });
 
     setGeneratedBrief(result);
