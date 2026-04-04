@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       ad_iterations: {
         Row: {
+          asset_id: string | null
           client_id: string | null
           copy_body: string | null
           copy_cta: string | null
@@ -25,13 +26,17 @@ export type Database = {
           id: string
           image_url: string | null
           iteration_number: number | null
+          iteration_type: string | null
           metadata: Json | null
+          notes: string | null
           performance_score: number | null
           prompt: string | null
+          source_ad_id: string | null
           status: string | null
           video_url: string | null
         }
         Insert: {
+          asset_id?: string | null
           client_id?: string | null
           copy_body?: string | null
           copy_cta?: string | null
@@ -41,13 +46,17 @@ export type Database = {
           id?: string
           image_url?: string | null
           iteration_number?: number | null
+          iteration_type?: string | null
           metadata?: Json | null
+          notes?: string | null
           performance_score?: number | null
           prompt?: string | null
+          source_ad_id?: string | null
           status?: string | null
           video_url?: string | null
         }
         Update: {
+          asset_id?: string | null
           client_id?: string | null
           copy_body?: string | null
           copy_cta?: string | null
@@ -57,9 +66,12 @@ export type Database = {
           id?: string
           image_url?: string | null
           iteration_number?: number | null
+          iteration_type?: string | null
           metadata?: Json | null
+          notes?: string | null
           performance_score?: number | null
           prompt?: string | null
+          source_ad_id?: string | null
           status?: string | null
           video_url?: string | null
         }
@@ -76,6 +88,13 @@ export type Database = {
             columns: ["creative_id"]
             isOneToOne: false
             referencedRelation: "creatives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_iterations_source_ad_id_fkey"
+            columns: ["source_ad_id"]
+            isOneToOne: false
+            referencedRelation: "scraped_ads"
             referencedColumns: ["id"]
           },
         ]
@@ -742,6 +761,33 @@ export type Database = {
           },
         ]
       }
+      api_keys: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          key_hash: string
+          last_used_at: string | null
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          key_hash: string
+          last_used_at?: string | null
+          name?: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          key_hash?: string
+          last_used_at?: string | null
+          name?: string
+        }
+        Relationships: []
+      }
       api_usage: {
         Row: {
           api_name: string
@@ -750,8 +796,12 @@ export type Database = {
           created_at: string | null
           endpoint: string | null
           id: string
+          key_index: number | null
           metadata: Json | null
+          request_type: string | null
+          service: string | null
           status: string | null
+          success: boolean | null
           tokens_used: number | null
         }
         Insert: {
@@ -761,8 +811,12 @@ export type Database = {
           created_at?: string | null
           endpoint?: string | null
           id?: string
+          key_index?: number | null
           metadata?: Json | null
+          request_type?: string | null
+          service?: string | null
           status?: string | null
+          success?: boolean | null
           tokens_used?: number | null
         }
         Update: {
@@ -772,8 +826,12 @@ export type Database = {
           created_at?: string | null
           endpoint?: string | null
           id?: string
+          key_index?: number | null
           metadata?: Json | null
+          request_type?: string | null
+          service?: string | null
           status?: string | null
+          success?: boolean | null
           tokens_used?: number | null
         }
         Relationships: [
@@ -798,6 +856,8 @@ export type Database = {
           is_active: boolean | null
           monthly_spend_limit_cents: number | null
           schedule: string | null
+          spend_reset_date: string | null
+          updated_at: string | null
         }
         Insert: {
           actor_id?: string | null
@@ -810,6 +870,8 @@ export type Database = {
           is_active?: boolean | null
           monthly_spend_limit_cents?: number | null
           schedule?: string | null
+          spend_reset_date?: string | null
+          updated_at?: string | null
         }
         Update: {
           actor_id?: string | null
@@ -822,6 +884,8 @@ export type Database = {
           is_active?: boolean | null
           monthly_spend_limit_cents?: number | null
           schedule?: string | null
+          spend_reset_date?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -3570,11 +3634,14 @@ export type Database = {
         Row: {
           client_id: string | null
           completed_at: string | null
+          cost_usd: number | null
           created_at: string | null
           error_message: string | null
           id: string
+          input_params: Json | null
           posts_found: number | null
           posts_processed: number | null
+          results_count: number | null
           started_at: string | null
           status: string | null
           target_handle: string
@@ -3582,11 +3649,14 @@ export type Database = {
         Insert: {
           client_id?: string | null
           completed_at?: string | null
+          cost_usd?: number | null
           created_at?: string | null
           error_message?: string | null
           id?: string
+          input_params?: Json | null
           posts_found?: number | null
           posts_processed?: number | null
+          results_count?: number | null
           started_at?: string | null
           status?: string | null
           target_handle: string
@@ -3594,11 +3664,14 @@ export type Database = {
         Update: {
           client_id?: string | null
           completed_at?: string | null
+          cost_usd?: number | null
           created_at?: string | null
           error_message?: string | null
           id?: string
+          input_params?: Json | null
           posts_found?: number | null
           posts_processed?: number | null
+          results_count?: number | null
           started_at?: string | null
           status?: string | null
           target_handle?: string
@@ -4599,8 +4672,11 @@ export type Database = {
           created_at: string | null
           id: string
           is_active: boolean | null
+          last_scraped_at: string | null
           page_id: string | null
           platform: string | null
+          type: string | null
+          value: string | null
         }
         Insert: {
           advertiser_name: string
@@ -4608,8 +4684,11 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          last_scraped_at?: string | null
           page_id?: string | null
           platform?: string | null
+          type?: string | null
+          value?: string | null
         }
         Update: {
           advertiser_name?: string
@@ -4617,8 +4696,11 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          last_scraped_at?: string | null
           page_id?: string | null
           platform?: string | null
+          type?: string | null
+          value?: string | null
         }
         Relationships: [
           {
@@ -5152,67 +5234,106 @@ export type Database = {
       }
       scraped_ads: {
         Row: {
+          ad_count: number | null
+          ad_format: string | null
           ad_id: string | null
           advertiser_name: string | null
           body: string | null
+          category: string | null
           client_id: string | null
+          company: string | null
           created_at: string | null
+          description: string | null
           end_date: string | null
           headline: string | null
           id: string
           image_url: string | null
           impressions_range: string | null
           is_swipe_file: boolean | null
+          iterated: boolean | null
           metadata: Json | null
+          monitoring_target_id: string | null
           platform: string | null
+          reach: number | null
+          saves: number | null
           scraped_at: string | null
+          selected: boolean | null
           source: string
+          source_url: string | null
           spend_range: string | null
           start_date: string | null
+          status: string | null
           tags: string[] | null
           video_url: string | null
+          views: number | null
         }
         Insert: {
+          ad_count?: number | null
+          ad_format?: string | null
           ad_id?: string | null
           advertiser_name?: string | null
           body?: string | null
+          category?: string | null
           client_id?: string | null
+          company?: string | null
           created_at?: string | null
+          description?: string | null
           end_date?: string | null
           headline?: string | null
           id?: string
           image_url?: string | null
           impressions_range?: string | null
           is_swipe_file?: boolean | null
+          iterated?: boolean | null
           metadata?: Json | null
+          monitoring_target_id?: string | null
           platform?: string | null
+          reach?: number | null
+          saves?: number | null
           scraped_at?: string | null
+          selected?: boolean | null
           source?: string
+          source_url?: string | null
           spend_range?: string | null
           start_date?: string | null
+          status?: string | null
           tags?: string[] | null
           video_url?: string | null
+          views?: number | null
         }
         Update: {
+          ad_count?: number | null
+          ad_format?: string | null
           ad_id?: string | null
           advertiser_name?: string | null
           body?: string | null
+          category?: string | null
           client_id?: string | null
+          company?: string | null
           created_at?: string | null
+          description?: string | null
           end_date?: string | null
           headline?: string | null
           id?: string
           image_url?: string | null
           impressions_range?: string | null
           is_swipe_file?: boolean | null
+          iterated?: boolean | null
           metadata?: Json | null
+          monitoring_target_id?: string | null
           platform?: string | null
+          reach?: number | null
+          saves?: number | null
           scraped_at?: string | null
+          selected?: boolean | null
           source?: string
+          source_url?: string | null
           spend_range?: string | null
           start_date?: string | null
+          status?: string | null
           tags?: string[] | null
           video_url?: string | null
+          views?: number | null
         }
         Relationships: [
           {
@@ -5220,6 +5341,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scraped_ads_monitoring_target_id_fkey"
+            columns: ["monitoring_target_id"]
+            isOneToOne: false
+            referencedRelation: "monitoring_targets"
             referencedColumns: ["id"]
           },
         ]
