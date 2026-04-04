@@ -27,7 +27,7 @@ export function useAvatarLooks(avatarId?: string | null) {
         .from('avatar_looks')
         .select('*')
         .eq('avatar_id', avatarId)
-        .order('is_primary', { ascending: false })
+        .order('is_default', { ascending: false })
         .order('created_at', { ascending: true });
       if (error) throw error;
       return data as AvatarLook[];
