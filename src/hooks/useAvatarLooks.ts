@@ -6,7 +6,10 @@ import { toast } from 'sonner';
 export interface AvatarLook {
   id: string;
   avatar_id: string;
+  name: string;
   image_url: string;
+  prompt: string | null;
+  is_default: boolean;
   angle: string | null;
   background: string | null;
   outfit: string | null;
