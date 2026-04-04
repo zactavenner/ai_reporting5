@@ -257,14 +257,14 @@ export default function AdScrapingPage() {
     }
   };
 
-  const lastUpdateLabel = monStatus?.last_update
-    ? `Last update: ${formatDistanceToNow(new Date(monStatus.last_update))} ago`
+  const lastUpdateLabel = (monStatus as any)?.last_update
+    ? `Last update: ${formatDistanceToNow(new Date((monStatus as any).last_update))} ago`
     : targets.length > 0
     ? `Last update: ${formatDistanceToNow(new Date(Math.max(...targets.filter(t => t.last_scraped_at).map(t => new Date(t.last_scraped_at!).getTime()), 0)))} ago`
     : null;
 
-  const nextUpdateLabel = monStatus?.next_update
-    ? `Next: in ${formatDistanceToNow(new Date(monStatus.next_update))}`
+  const nextUpdateLabel = (monStatus as any)?.next_update
+    ? `Next: in ${formatDistanceToNow(new Date((monStatus as any).next_update))}`
     : null;
 
   const handleOpenReInspired = () => {
