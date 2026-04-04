@@ -61,6 +61,8 @@ import { AdminAdsManagerTab } from '@/components/ads-manager/AdminAdsManagerTab'
 import { AdminOffersTab } from '@/components/offers/AdminOffersTab';
 import { QuizBuilderTab } from '@/components/quiz/QuizBuilderTab';
 import { AgentsTab } from '@/components/agents/AgentsTab';
+import { AvatarAdProvider } from '@/context/AvatarAdContext';
+import { AvatarAdWizard } from '@/components/avatar-ad/AvatarAdWizard';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -78,10 +80,13 @@ const Index = () => {
   const [selectedFunnelClientId, setSelectedFunnelClientId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  // Deep-link: if ?task= is present, auto-switch to tasks tab
+  // Deep-link: if ?tab= or ?task= is present, auto-switch
   useEffect(() => {
+    const tab = searchParams.get('tab');
     const taskId = searchParams.get('task');
-    if (taskId) {
+    if (tab) {
+      setActiveTab(tab);
+    } else if (taskId) {
       setActiveTab('tasks');
     }
   }, [searchParams]);
@@ -507,6 +512,19 @@ const Index = () => {
             {activeTab === 'integrations' && (
               <SectionErrorBoundary sectionName="Integrations">
                 <AgencyIntegrationsTab />
+              </SectionErrorBoundary>
+            )}
+
+            {/* Avatar Ad Generator */}
+            {activeTab === 'avatar-ad-gen' && (
+              <SectionErrorBoundary sectionName="Avatar Ad Generator">
+                <div className="mb-4">
+                  <h2 className="text-lg font-bold">AI Avatar Ad Generator</h2>
+                  <p className="text-sm text-muted-foreground">Create hyper-realistic AI avatar video ads for investment offers</p>
+                </div>
+                <AvatarAdProvider>
+                  <AvatarAdWizard />
+                </AvatarAdProvider>
               </SectionErrorBoundary>
             )}
           </main>
