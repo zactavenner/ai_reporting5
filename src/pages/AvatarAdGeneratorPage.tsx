@@ -1,15 +1,12 @@
-import { AppLayout } from '@/components/layout/AppLayout';
-import { AvatarAdProvider } from '@/context/AvatarAdContext';
-import { AvatarAdWizard } from '@/components/avatar-ad/AvatarAdWizard';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function AvatarAdGeneratorPage() {
-  return (
-    <AppLayout>
-      <div className="container mx-auto py-6 max-w-5xl">
-        <AvatarAdProvider>
-          <AvatarAdWizard />
-        </AvatarAdProvider>
-      </div>
-    </AppLayout>
-  );
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    navigate('/?tab=avatar-ad-gen', { replace: true });
+  }, [navigate]);
+
+  return null;
 }
