@@ -61,6 +61,8 @@ import { AdminAdsManagerTab } from '@/components/ads-manager/AdminAdsManagerTab'
 import { AdminOffersTab } from '@/components/offers/AdminOffersTab';
 import { QuizBuilderTab } from '@/components/quiz/QuizBuilderTab';
 import { AgentsTab } from '@/components/agents/AgentsTab';
+import { AvatarAdProvider } from '@/context/AvatarAdContext';
+import { AvatarAdWizard } from '@/components/avatar-ad/AvatarAdWizard';
 
 const Index = () => {
   const navigate = useNavigate();
