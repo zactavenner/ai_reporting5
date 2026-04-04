@@ -41,13 +41,19 @@ export function useCreateAvatarLook() {
   return useMutation({
     mutationFn: async (look: {
       avatar_id: string;
+      name?: string;
       image_url: string;
       angle?: string;
       background?: string;
       outfit?: string;
       is_primary?: boolean;
+      is_default?: boolean;
       metadata?: Json;
     }) => {
+      const insertData = {
+        ...look,
+        name: look.name || 'Look',
+      };
       const { data, error } = await supabase
         .from('avatar_looks')
         .insert([look])
