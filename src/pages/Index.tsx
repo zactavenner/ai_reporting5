@@ -417,8 +417,8 @@ const Index = () => {
             {activeTab === 'creatives' && (
               <SectionErrorBoundary sectionName="Creatives">
                 <div className="mb-4">
-                  <h2 className="text-lg font-bold">Creative Approvals</h2>
-                  <p className="text-sm text-muted-foreground">Manage creative assets across all clients</p>
+                  <h2 className="text-lg font-bold">Creatives</h2>
+                  <p className="text-sm text-muted-foreground">Manage all creative assets, briefs, and tools</p>
                 </div>
                 <CreativesTab />
               </SectionErrorBoundary>
