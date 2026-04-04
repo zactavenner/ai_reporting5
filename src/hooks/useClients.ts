@@ -86,7 +86,7 @@ export function useClientByToken(token: string | undefined) {
       // First try to find by slug (friendly URL)
       let { data, error } = await supabase
         .from('clients')
-        .select('id, name, status, public_token, business_manager_url, slug, industry, ghl_location_id, ghl_api_key, ghl_sync_status, ghl_sync_error, last_ghl_sync_at, hubspot_portal_id, hubspot_access_token, hubspot_sync_status, hubspot_sync_error, last_hubspot_sync_at, meta_ad_account_id, meta_access_token, sort_order, created_at, updated_at')
+        .select('*')
         .eq('slug', token)
         .maybeSingle();
       
