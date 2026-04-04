@@ -20,12 +20,15 @@ import { ANGLE_PRESETS } from '@/hooks/useAvatarGeneration';
 import { getStoredKeys } from '@/hooks/useApiRateLimiter';
 import { toast } from 'sonner';
 
+const DEFAULT_GEMINI_KEY = 'AIzaSyCbOTwdc8c8YGYpl63BKSNPvU2Xd29t_4o';
+
 // Helper to get first available API key for a service.
-// Returns undefined when no localStorage key exists — edge functions fall back to server-side env vars.
+// Returns the default Gemini key when no localStorage key exists for gemini.
 function getApiKeyForService(service: 'gemini' | 'veo3'): string | undefined {
   const keys = getStoredKeys(service);
   const available = keys.find((k) => k.key.trim());
-  return available?.key || undefined;
+  if (available?.key) return available.key;
+  return service === 'gemini' ? DEFAULT_GEMINI_KEY : undefined;
 }
 
 // Helper to generate video via the appropriate model (Veo3 or Grok)
