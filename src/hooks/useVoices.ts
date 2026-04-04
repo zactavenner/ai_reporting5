@@ -4,21 +4,23 @@ import { supabase } from '@/integrations/supabase/client';
 export interface ElevenLabsVoice {
   voice_id: string;
   name: string;
-  category: string; // "cloned", "premade", "generated", "professional"
+  category: string;
   description: string | null;
   preview_url: string | null;
   labels: Record<string, string>;
 }
+
+// Matches actual DB columns for voices table
 export interface Voice {
   id: string;
   name: string;
-  elevenlabs_voice_id: string;
-  sample_url: string | null;
-  client_id: string | null;
-  is_stock: boolean;
-  description: string | null;
+  provider: string | null;
+  voice_id: string;
   gender: string | null;
+  accent: string | null;
+  style: string | null;
   preview_url: string | null;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -26,18 +28,14 @@ export function useVoices(clientId?: string | null) {
   return useQuery({
     queryKey: ['voices', clientId],
     queryFn: async () => {
-      let query = supabase
+      const query = supabase
         .from('voices')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (clientId) {
-        query = query.or(`is_stock.eq.true,client_id.eq.${clientId},client_id.is.null`);
-      }
-
       const { data, error } = await query;
       if (error) throw error;
-      return data as Voice[];
+      return (data || []) as unknown as Voice[];
     },
   });
 }
@@ -50,13 +48,11 @@ export function useCloneVoice() {
       audioFile,
       name,
       description,
-      clientId,
       gender,
     }: {
       audioFile: File;
       name: string;
       description?: string;
-      clientId?: string;
       gender?: string;
     }) => {
       // 1. Upload audio to storage
@@ -64,13 +60,13 @@ export function useCloneVoice() {
       const filePath = `samples/${Date.now()}-${name.replace(/\s+/g, '-')}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('voice-samples')
+        .from('assets')
         .upload(filePath, audioFile);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl: sampleUrl } } = supabase.storage
-        .from('voice-samples')
+        .from('assets')
         .getPublicUrl(filePath);
 
       // 2. Clone via edge function
@@ -103,19 +99,16 @@ export function useCloneVoice() {
         .from('voices')
         .insert({
           name,
-          elevenlabs_voice_id: result.voice_id,
-          sample_url: sampleUrl,
-          client_id: clientId || null,
-          is_stock: !clientId,
-          description: description || null,
+          voice_id: result.voice_id,
+          provider: 'elevenlabs',
           gender: gender || null,
-          preview_url: result.preview_url || null,
+          preview_url: result.preview_url || sampleUrl,
         })
         .select()
         .single();
 
       if (error) throw error;
-      return data as Voice;
+      return data as unknown as Voice;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['voices'] });
@@ -149,8 +142,8 @@ export function useElevenLabsVoices() {
       if (error) throw error;
       return (data.voices || []) as ElevenLabsVoice[];
     },
-    staleTime: 60000, // Cache for 1 minute
-    enabled: false, // Only fetch on demand
+    staleTime: 60000,
+    enabled: false,
   });
 }
 
@@ -161,16 +154,14 @@ export function useImportElevenLabsVoice() {
   return useMutation({
     mutationFn: async ({
       voice,
-      clientId,
     }: {
       voice: ElevenLabsVoice;
-      clientId?: string;
     }) => {
       // Check if already imported
       const { data: existing } = await supabase
         .from('voices')
         .select('id')
-        .eq('elevenlabs_voice_id', voice.voice_id)
+        .eq('voice_id', voice.voice_id)
         .maybeSingle();
 
       if (existing) {
@@ -183,10 +174,8 @@ export function useImportElevenLabsVoice() {
         .from('voices')
         .insert({
           name: voice.name,
-          elevenlabs_voice_id: voice.voice_id,
-          client_id: clientId || null,
-          is_stock: false,
-          description: voice.description || `Imported from ElevenLabs (${voice.category})`,
+          voice_id: voice.voice_id,
+          provider: 'elevenlabs',
           gender,
           preview_url: voice.preview_url || null,
         })
@@ -194,7 +183,7 @@ export function useImportElevenLabsVoice() {
         .single();
 
       if (error) throw error;
-      return data as Voice;
+      return data as unknown as Voice;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['voices'] });

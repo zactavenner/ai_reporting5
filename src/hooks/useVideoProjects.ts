@@ -2,16 +2,21 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+// Matches actual DB columns for video_projects
 export interface VideoProject {
   id: string;
-  name: string;
-  clips_data: any[];
-  caption_data: any[];
-  aspect_ratio: string;
-  caption_settings: Record<string, any>;
-  text_overlays: any[];
-  voiceover_url: string | null;
   client_id: string | null;
+  name: string;
+  description: string | null;
+  script_id: string | null;
+  status: string | null;
+  aspect_ratio: string | null;
+  platform: string | null;
+  scenes: any;
+  output_url: string | null;
+  thumbnail_url: string | null;
+  duration_seconds: number | null;
+  metadata: any;
   created_at: string;
   updated_at: string;
 }
@@ -48,27 +53,18 @@ export function useVideoProjects() {
       return null;
     }
     setProjects(prev => [data as any, ...prev]);
-    return data as VideoProject;
+    return data as unknown as VideoProject;
   }, []);
 
   const createProjectFromUrls = useCallback(async (name: string, videoUrls: string[], aspectRatio = '16:9') => {
-    const clipsData = videoUrls.map((url, i) => ({
+    const scenes = videoUrls.map((url, i) => ({
       sourceUrl: url,
-      blobUrl: '', // Will be fetched on load
       order: i,
-      trimStart: 0,
-      trimEnd: 0, // Will be set after loading
-      duration: 0,
-      speed: 1,
-      volume: 1,
-      transition: 'none' as const,
-      transitionDuration: 0.5,
       label: `Clip ${i + 1}`,
-      locked: false,
     }));
     const { data, error } = await supabase
       .from('video_projects')
-      .insert({ name, aspect_ratio: aspectRatio, clips_data: clipsData } as any)
+      .insert({ name, aspect_ratio: aspectRatio, scenes } as any)
       .select()
       .single();
     if (error) {
@@ -76,7 +72,7 @@ export function useVideoProjects() {
       return null;
     }
     setProjects(prev => [data as any, ...prev]);
-    return data as VideoProject;
+    return data as unknown as VideoProject;
   }, []);
 
   const deleteProject = useCallback(async (id: string) => {
@@ -94,13 +90,10 @@ export function useVideoProjects() {
       .from('video_projects')
       .insert({
         name: `${project.name} (Copy)`,
-        clips_data: project.clips_data,
-        caption_data: project.caption_data,
+        scenes: project.scenes,
         aspect_ratio: project.aspect_ratio,
-        caption_settings: project.caption_settings,
-        text_overlays: project.text_overlays,
-        voiceover_url: project.voiceover_url,
         client_id: project.client_id,
+        platform: project.platform,
       } as any)
       .select()
       .single();

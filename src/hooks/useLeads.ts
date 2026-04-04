@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { EnrichedLead, QualificationTier, RoutingDestination } from '@/components/admin/mockLeads';
+import type { EnrichedLead, QualificationTier, RoutingDestination } from '@/components/funnel-builder/admin/mockLeads';
 
 function mapDbLeadToEnrichedLead(row: Record<string, unknown>): EnrichedLead {
   return {
@@ -49,6 +49,6 @@ export function useLeads() {
       if (error) throw error;
       return (data || []).map((row: Record<string, unknown>) => mapDbLeadToEnrichedLead(row));
     },
-    refetchInterval: 30000, // Auto-refresh every 30s
+    refetchInterval: 30000,
   });
 }

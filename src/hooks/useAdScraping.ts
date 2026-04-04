@@ -3,37 +3,52 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface ScrapedAd {
   id: string;
-  company: string;
-  headline: string;
+  client_id: string | null;
+  source: string | null;
+  advertiser_name: string | null;
+  ad_id: string | null;
+  headline: string | null;
+  body: string | null;
   description: string | null;
   image_url: string | null;
   video_url: string | null;
-  ad_format: string;
-  platform: string;
-  status: string;
-  category: string | null;
-  tags: string[];
+  platform: string | null;
   start_date: string | null;
+  end_date: string | null;
+  impressions_range: string | null;
+  spend_range: string | null;
+  tags: string[];
+  is_swipe_file: boolean;
+  metadata: any;
+  scraped_at: string | null;
+  created_at: string;
+  iterated: boolean;
+  selected: boolean;
+  company: string | null;
+  ad_format: string | null;
+  status: string | null;
+  category: string | null;
   saves: number;
   views: number;
   source_url: string | null;
-  scraped_at: string;
-  monitoring_target_id: string | null;
   reach: number;
   ad_count: number;
-  iterated: boolean;
-  selected: boolean;
+  monitoring_target_id: string | null;
 }
 
 export interface MonitoringTarget {
   id: string;
-  type: 'keyword' | 'domain';
-  value: string;
+  advertiser_name: string;
+  page_id: string | null;
+  platform: string | null;
+  is_active: boolean;
   created_at: string;
   last_scraped_at: string | null;
+  type: string | null;
+  value: string | null;
+  client_id: string | null;
 }
 
-// Fetch all scraped ads
 export function useScrapedAds() {
   return useQuery({
     queryKey: ['scraped-ads'],
@@ -43,12 +58,11 @@ export function useScrapedAds() {
         .select('*')
         .order('scraped_at', { ascending: false });
       if (error) throw error;
-      return data as ScrapedAd[];
+      return (data || []) as unknown as ScrapedAd[];
     },
   });
 }
 
-// Fetch monitoring targets
 export function useMonitoringTargets() {
   return useQuery({
     queryKey: ['monitoring-targets'],
@@ -58,39 +72,33 @@ export function useMonitoringTargets() {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as MonitoringTarget[];
+      return (data || []) as unknown as MonitoringTarget[];
     },
   });
 }
 
-// Start tracking: create target + scrape
 export function useStartTracking() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ type, value }: { type: 'keyword' | 'domain'; value: string }) => {
+    mutationFn: async ({ advertiser_name, page_id }: { advertiser_name: string; page_id?: string }) => {
       const { data: target, error: targetError } = await supabase
         .from('monitoring_targets')
-        .insert({ type, value })
+        .insert({ advertiser_name, page_id: page_id || null })
         .select()
         .single();
       if (targetError) throw targetError;
 
       const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke('scrape-ads', {
-        body: { keyword: value, targetId: target.id },
+        body: { keyword: advertiser_name, targetId: target.id },
       });
 
       if (scrapeError) throw scrapeError;
+      if (!scrapeResult?.success) throw new Error(scrapeResult?.error || 'Scraping failed');
 
-      if (!scrapeResult?.success) {
-        throw new Error(scrapeResult?.error || 'Scraping failed');
-      }
-
-      // Pre-filter ads: remove those with no image or junk image URLs
       const ads = (scrapeResult.ads || []).filter((ad: any) => {
         if (!ad.image_url) return false;
         const url = ad.image_url.toLowerCase();
-        // Reject placeholder/logo/junk patterns
         if (/favicon|icon|logo|avatar|profile|placeholder|blank|spacer|pixel|tracking|1x1|\.svg|\.ico|base64|data:image|gravatar|widget|spinner|loading/i.test(url)) return false;
         if (url.length < 30) return false;
         return true;
@@ -115,7 +123,6 @@ export function useStartTracking() {
   });
 }
 
-// Delete monitoring target
 export function useDeleteMonitoringTarget() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -130,7 +137,6 @@ export function useDeleteMonitoringTarget() {
   });
 }
 
-// Delete a scraped ad
 export function useDeleteScrapedAd() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -144,7 +150,6 @@ export function useDeleteScrapedAd() {
   });
 }
 
-// Bulk delete scraped ads
 export function useBulkDeleteScrapedAds() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -158,13 +163,12 @@ export function useBulkDeleteScrapedAds() {
   });
 }
 
-// Assign ad to client(s)
 export function useAssignAdToClients() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ adId, clientIds, notes }: { adId: string; clientIds: string[]; notes?: string }) => {
       const rows = clientIds.map(clientId => ({
-        ad_id: adId,
+        creative_id: adId,
         client_id: clientId,
         notes: notes || null,
       }));
@@ -177,7 +181,6 @@ export function useAssignAdToClients() {
   });
 }
 
-// Get ads assigned to a client
 export function useClientAssignedAds(clientId: string | undefined) {
   return useQuery({
     queryKey: ['client-ad-assignments', clientId],
@@ -185,17 +188,16 @@ export function useClientAssignedAds(clientId: string | undefined) {
       if (!clientId) return [];
       const { data, error } = await supabase
         .from('client_ad_assignments')
-        .select('*, scraped_ads(*)')
+        .select('*')
         .eq('client_id', clientId)
         .order('assigned_at', { ascending: false });
       if (error) throw error;
-      return data as ({ id: string; client_id: string; ad_id: string; assigned_at: string; notes: string | null; scraped_ads: ScrapedAd })[];
+      return (data || []) as unknown as { id: string; client_id: string; creative_id: string; assigned_at: string; assigned_by: string | null; notes: string | null }[];
     },
     enabled: !!clientId,
   });
 }
 
-// Remove assignment
 export function useRemoveAdAssignment() {
   const queryClient = useQueryClient();
   return useMutation({

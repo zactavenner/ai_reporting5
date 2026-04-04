@@ -1,17 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+// Matches actual DB columns for swipe_file
 export interface SwipeFileItem {
   id: string;
-  ad_id: string | null;
-  viral_video_id: string | null;
-  tags: string[];
-  notes: string | null;
+  scraped_ad_id: string | null;
   client_id: string | null;
+  title: string;
+  notes: string | null;
+  image_url: string | null;
+  video_url: string | null;
+  tags: string[];
+  category: string | null;
+  added_by: string | null;
   created_at: string;
   // Joined data
   scraped_ads?: any;
-  viral_videos?: any;
 }
 
 export function useSwipeFile() {
@@ -20,10 +24,10 @@ export function useSwipeFile() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('swipe_file')
-        .select('*, scraped_ads(*), viral_videos(*)')
+        .select('*, scraped_ads(*)')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as SwipeFileItem[];
+      return (data || []) as unknown as SwipeFileItem[];
     },
   });
 }
@@ -31,19 +35,23 @@ export function useSwipeFile() {
 export function useAddToSwipeFile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ ad_id, viral_video_id, tags, notes, client_id }: {
-      ad_id?: string;
-      viral_video_id?: string;
+    mutationFn: async ({ scraped_ad_id, tags, notes, client_id, title, image_url, video_url }: {
+      scraped_ad_id?: string;
       tags?: string[];
       notes?: string;
       client_id?: string;
+      title: string;
+      image_url?: string;
+      video_url?: string;
     }) => {
       const { error } = await supabase.from('swipe_file').insert({
-        ad_id: ad_id || null,
-        viral_video_id: viral_video_id || null,
+        scraped_ad_id: scraped_ad_id || null,
         tags: tags || [],
         notes: notes || null,
         client_id: client_id || null,
+        title,
+        image_url: image_url || null,
+        video_url: video_url || null,
       });
       if (error) throw error;
     },
@@ -88,10 +96,8 @@ export function useRemoveFromSwipeFile() {
   });
 }
 
-// Check if an ad or viral video is already in swipe file
 export function useSwipeFileIds() {
   const { data: items = [] } = useSwipeFile();
-  const adIds = new Set(items.filter(i => i.ad_id).map(i => i.ad_id!));
-  const videoIds = new Set(items.filter(i => i.viral_video_id).map(i => i.viral_video_id!));
-  return { adIds, videoIds, items };
+  const adIds = new Set(items.filter(i => i.scraped_ad_id).map(i => i.scraped_ad_id!));
+  return { adIds, items };
 }

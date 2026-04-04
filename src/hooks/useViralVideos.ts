@@ -1,35 +1,35 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+// Matches actual DB columns for viral_videos
 export interface ViralVideo {
   id: string;
-  title: string;
-  description: string | null;
+  client_id: string | null;
   platform: string;
   video_url: string | null;
   thumbnail_url: string | null;
-  source_url: string | null;
-  creator_name: string | null;
-  creator_handle: string | null;
+  caption: string | null;
   views: number;
   likes: number;
-  shares: number;
   comments: number;
-  hashtags: string[];
-  tracking_hashtag: string | null;
-  tracking_profile: string | null;
-  category: string | null;
-  scraped_at: string;
-  published_at: string | null;
+  shares: number;
+  engagement_rate: number | null;
+  creator_handle: string | null;
+  creator_followers: number | null;
+  is_tracked: boolean;
+  scraped_at: string | null;
   created_at: string;
 }
 
+// Matches actual DB columns for viral_tracking_targets
 export interface ViralTrackingTarget {
   id: string;
-  type: string;
-  value: string;
-  platforms: string[];
-  min_views: number;
+  client_id: string | null;
+  platform: string;
+  handle: string;
+  display_name: string | null;
+  followers: number | null;
+  is_active: boolean;
   last_scraped_at: string | null;
   created_at: string;
 }
@@ -43,7 +43,7 @@ export function useViralVideos() {
         .select('*')
         .order('views', { ascending: false });
       if (error) throw error;
-      return data as ViralVideo[];
+      return (data || []) as unknown as ViralVideo[];
     },
   });
 }
@@ -57,7 +57,7 @@ export function useViralTrackingTargets() {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as ViralTrackingTarget[];
+      return (data || []) as unknown as ViralTrackingTarget[];
     },
   });
 }
@@ -67,35 +67,29 @@ export function useStartViralTracking() {
 
   return useMutation({
     mutationFn: async ({
-      type,
-      value,
-      platforms,
-      minViews,
+      handle,
+      platform,
+      displayName,
     }: {
-      type: 'hashtag' | 'profile';
-      value: string;
-      platforms?: string[];
-      minViews?: number;
+      handle: string;
+      platform: string;
+      displayName?: string;
     }) => {
-      // Create tracking target
       const { data: target, error: targetError } = await supabase
         .from('viral_tracking_targets')
         .insert({
-          type,
-          value,
-          platforms: platforms || ['TikTok', 'Instagram', 'Facebook', 'LinkedIn'],
-          min_views: minViews || 1000000,
+          handle,
+          platform,
+          display_name: displayName || handle,
         })
         .select()
         .single();
       if (targetError) throw targetError;
 
       // Scrape viral videos
-      const body: Record<string, any> = { targetId: target.id, platforms: target.platforms, minViews: target.min_views };
-      if (type === 'hashtag') body.hashtag = value;
-      else body.profile = value;
-
-      const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke('scrape-viral-videos', { body });
+      const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke('scrape-viral-videos', {
+        body: { targetId: target.id, handle, platform },
+      });
       if (scrapeError) throw scrapeError;
       if (!scrapeResult?.success) throw new Error(scrapeResult?.error || 'Scraping failed');
 

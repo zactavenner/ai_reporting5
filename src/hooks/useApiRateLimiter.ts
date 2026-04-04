@@ -3,8 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export type ServiceType = 'veo3' | 'gemini';
-
-// API key tiers with their rate limits
 export type ApiKeyTier = 'free' | 'payg' | 'scale';
 
 export const TIER_CONFIGS: Record<ApiKeyTier, { label: string; perMinute: number; perDay: number; description: string }> = {
@@ -28,12 +26,6 @@ interface UsageStats {
   dailyCount: number;
 }
 
-interface KeyWithUsage extends ApiKeyConfig {
-  keyIndex: number;
-  usage: UsageStats;
-}
-
-// LocalStorage keys
 const STORAGE_KEYS = {
   veo3: 'api_keys_veo3',
   gemini: 'api_keys_gemini',
@@ -41,19 +33,16 @@ const STORAGE_KEYS = {
 
 const DEFAULT_LABELS = ['Key 1', 'Key 2', 'Key 3', 'Key 4', 'Key 5'];
 
-// Get keys from localStorage
 export function getStoredKeys(service: ServiceType): ApiKeyConfig[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEYS[service]);
     if (stored) {
       const parsed = JSON.parse(stored) as ApiKeyConfig[];
-      // Migrate old keys without tier
       const migrated = parsed.map((k, i) => ({
         ...k,
         tier: k.tier || ('free' as ApiKeyTier),
         label: k.label || DEFAULT_LABELS[i] || `Key ${i + 1}`,
       }));
-      // Pad to MAX_KEYS if needed
       while (migrated.length < MAX_KEYS) {
         migrated.push({ key: '', label: DEFAULT_LABELS[migrated.length] || `Key ${migrated.length + 1}`, tier: 'free' });
       }
@@ -65,12 +54,10 @@ export function getStoredKeys(service: ServiceType): ApiKeyConfig[] {
   return DEFAULT_LABELS.map((label) => ({ key: '', label, tier: 'free' as ApiKeyTier }));
 }
 
-// Save keys to localStorage
 export function saveStoredKeys(service: ServiceType, keys: ApiKeyConfig[]) {
   localStorage.setItem(STORAGE_KEYS[service], JSON.stringify(keys));
 }
 
-// Migrate from old single-key format
 function migrateOldKeys() {
   const oldVeo3 = localStorage.getItem('api_key_veo3');
   const oldGemini = localStorage.getItem('api_key_gemini');
@@ -96,10 +83,8 @@ function migrateOldKeys() {
   }
 }
 
-// Run migration on import
 migrateOldKeys();
 
-// Hook to get usage stats for a key
 export function useKeyUsage(service: ServiceType, keyIndex: number) {
   return useQuery({
     queryKey: ['api-usage', service, keyIndex],
@@ -128,7 +113,6 @@ export function useKeyUsage(service: ServiceType, keyIndex: number) {
   });
 }
 
-// Hook to log API usage
 export function useLogApiUsage() {
   const queryClient = useQueryClient();
 
@@ -147,12 +131,13 @@ export function useLogApiUsage() {
       metadata?: Record<string, unknown>;
     }) => {
       const { error } = await supabase.from('api_usage').insert({
+        api_name: service,
         service,
         key_index: keyIndex,
         request_type: requestType,
         success,
         metadata: JSON.parse(JSON.stringify(metadata)),
-      });
+      } as any);
 
       if (error) throw error;
     },
@@ -167,12 +152,10 @@ export function useLogApiUsage() {
   });
 }
 
-// Main rate limiter hook
 export function useApiRateLimiter(service: ServiceType) {
   const [keys, setKeys] = useState<ApiKeyConfig[]>(() => getStoredKeys(service));
   const queryClient = useQueryClient();
 
-  // Get usage for all 5 keys
   const { data: usage0 } = useKeyUsage(service, 0);
   const { data: usage1 } = useKeyUsage(service, 1);
   const { data: usage2 } = useKeyUsage(service, 2);
@@ -197,7 +180,6 @@ export function useApiRateLimiter(service: ServiceType) {
     usage4 || { minuteCount: 0, dailyCount: 0 },
   ];
 
-  // Get available key with tier-aware rate limit checking
   const getAvailableKey = useCallback((): {
     key: string;
     keyIndex: number;
@@ -206,7 +188,6 @@ export function useApiRateLimiter(service: ServiceType) {
     retryAfter: number;
     message: string;
   } => {
-    // Try each key in order
     for (let i = 0; i < keys.length; i++) {
       const keyConfig = keys[i];
       const usage = allUsages[i];
@@ -222,9 +203,8 @@ export function useApiRateLimiter(service: ServiceType) {
       }
     }
 
-    // All keys exhausted
     const activeKeys = keys.filter((k) => k.key.trim());
-    const allDailyExhausted = activeKeys.every((k, idx) => {
+    const allDailyExhausted = activeKeys.every((k) => {
       const realIndex = keys.indexOf(k);
       const tierLimits = TIER_CONFIGS[k.tier || 'free'];
       return allUsages[realIndex].dailyCount >= tierLimits.perDay;
@@ -290,11 +270,10 @@ export function useApiRateLimiter(service: ServiceType) {
     hasAnyKey,
     getTotalUsage,
     refreshUsage,
-    rateLimits: TIER_CONFIGS, // Now returns all tier configs
+    rateLimits: TIER_CONFIGS,
   };
 }
 
-// Helper hook to check if rate limited before making request
 export function useRateLimitedRequest(service: ServiceType) {
   const { getAvailableKey, logUsage, hasAnyKey } = useApiRateLimiter(service);
 
@@ -305,8 +284,6 @@ export function useRateLimitedRequest(service: ServiceType) {
       metadata?: Record<string, unknown>
     ): Promise<T> => {
       if (!hasAnyKey) {
-        // No localStorage keys — edge function will use server-side env vars
-        // Execute with undefined key, keyIndex 0
         return executor('' as any, 0);
       }
 

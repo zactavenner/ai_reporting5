@@ -50,12 +50,12 @@ export function useAdRegeneration() {
           .select('brand_colors')
           .eq('id', options.clientId)
           .maybeSingle();
-        brandColors = client?.brand_colors || [];
+        const raw = client?.brand_colors;
+        brandColors = Array.isArray(raw) ? (raw as string[]) : [];
       }
 
       for (const ad of ads) {
         try {
-          // Build prompt from ad content
           const baseText = options.rewriteCopy
             ? `Recreate this advertisement with fresh, compelling copy. Original context: ${ad.description || ad.headline}. Company: ${ad.company}.`
             : `Recreate this advertisement maintaining the original copy style. Description: ${ad.description || ad.headline}. Company: ${ad.company}.`;
@@ -75,7 +75,6 @@ export function useAdRegeneration() {
           if (error) throw error;
           if (!data?.success) throw new Error(data?.error || 'Generation failed');
 
-          // Insert ad_iteration record
           await supabase.from('ad_iterations').insert({
             source_ad_id: ad.id,
             asset_id: data.assetId || null,
@@ -84,7 +83,6 @@ export function useAdRegeneration() {
             notes: `Generated from ${ad.company} ad`,
           });
 
-          // Mark source ad as iterated
           await supabase
             .from('scraped_ads')
             .update({ iterated: true })
