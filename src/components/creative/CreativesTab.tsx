@@ -222,8 +222,41 @@ export function CreativesTab() {
     return <CashBagLoader message="Loading creatives..." />;
   }
 
+  const pendingCount = creativesWithClients.filter(c => c.status === 'pending').length;
+  const SuspenseFallback = <CashBagLoader message="Loading section..." />;
+
   return (
     <div className="space-y-6">
+      {/* Section Tabs */}
+      <Tabs value={activeSection} onValueChange={setActiveSection}>
+        <TabsList className="bg-muted/50 flex-wrap h-auto gap-1 p-1">
+          <TabsTrigger value="approvals" className="gap-2">
+            <Upload className="h-4 w-4" />
+            Approvals
+            {pendingCount > 0 && (
+              <Badge variant="default" className="ml-1 h-5 min-w-[20px] flex items-center justify-center text-[10px] px-1.5">
+                {pendingCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="briefs" className="gap-2"><FileText className="h-4 w-4" />Briefs & Scripts</TabsTrigger>
+          <TabsTrigger value="static-ads" className="gap-2"><Image className="h-4 w-4" />Static Ads</TabsTrigger>
+          <TabsTrigger value="batch-video" className="gap-2"><Film className="h-4 w-4" />Batch Video</TabsTrigger>
+          <TabsTrigger value="ad-variations" className="gap-2"><Wand2 className="h-4 w-4" />Ad Variations</TabsTrigger>
+          <TabsTrigger value="avatars" className="gap-2"><User className="h-4 w-4" />Avatars</TabsTrigger>
+          <TabsTrigger value="ad-scraping" className="gap-2"><Radar className="h-4 w-4" />Ad Scraping</TabsTrigger>
+          <TabsTrigger value="instagram-intel" className="gap-2"><Instagram className="h-4 w-4" />IG Intel</TabsTrigger>
+          <TabsTrigger value="video-editor" className="gap-2"><Scissors className="h-4 w-4" />Video Editor</TabsTrigger>
+          <TabsTrigger value="broll" className="gap-2"><Film className="h-4 w-4" />B-Roll</TabsTrigger>
+          <TabsTrigger value="winning-ads" className="gap-2"><Trophy className="h-4 w-4" />Winning Ads</TabsTrigger>
+          <TabsTrigger value="manage-styles" className="gap-2"><Palette className="h-4 w-4" />Styles</TabsTrigger>
+          <TabsTrigger value="history" className="gap-2"><History className="h-4 w-4" />History</TabsTrigger>
+          <TabsTrigger value="export" className="gap-2"><Download className="h-4 w-4" />Export</TabsTrigger>
+          <TabsTrigger value="calendar" className="gap-2"><Calendar className="h-4 w-4" />Calendar</TabsTrigger>
+          <TabsTrigger value="analytics" className="gap-2"><BarChart3 className="h-4 w-4" />Analytics</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="approvals" className="mt-4 space-y-6">
       {/* Search and Filters */}
       <div className="flex flex-wrap gap-4">
         <div className="relative flex-1 min-w-[200px]">
