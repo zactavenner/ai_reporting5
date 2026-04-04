@@ -77,7 +77,7 @@ export default function AssetGeneratorTab({ client, assetType, icon: Icon, title
         .eq('asset_type', 'research')
         .order('created_at', { ascending: false })
         .limit(1);
-      if (researchAssets?.[0]?.content) existing_research = researchAssets[0].content;
+      if ((researchAssets as any)?.[0]?.content) existing_research = (researchAssets as any)[0].content;
     }
 
     if (['emails', 'sms', 'adcopy', 'scripts', 'creatives'].includes(assetType)) {
