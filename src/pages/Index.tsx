@@ -80,10 +80,13 @@ const Index = () => {
   const [selectedFunnelClientId, setSelectedFunnelClientId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  // Deep-link: if ?task= is present, auto-switch to tasks tab
+  // Deep-link: if ?tab= or ?task= is present, auto-switch
   useEffect(() => {
+    const tab = searchParams.get('tab');
     const taskId = searchParams.get('task');
-    if (taskId) {
+    if (tab) {
+      setActiveTab(tab);
+    } else if (taskId) {
       setActiveTab('tasks');
     }
   }, [searchParams]);
