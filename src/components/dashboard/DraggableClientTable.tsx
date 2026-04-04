@@ -161,8 +161,38 @@ export function DraggableClientTable({
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ column: '', direction: null });
   const updateClient = useUpdateClient();
+  const { data: assignments = {} } = useClientAssignments();
+  const updateAssignment = useUpdateClientAssignment();
+  const { data: agencyMembers = [] } = useAgencyMembers();
 
-  // Detect duplicate Meta ad account IDs
+  // Fetch yesterday's metrics to flag inactive clients
+  const yesterday = useMemo(() => format(subDays(new Date(), 1), 'yyyy-MM-dd'), []);
+  const { data: yesterdayMetrics = [] } = useQuery({
+    queryKey: ['yesterday-metrics', yesterday],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('daily_metrics')
+        .select('client_id, ad_spend, leads')
+        .eq('date', yesterday);
+      return data || [];
+    },
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const inactiveClientIds = useMemo(() => {
+    const set = new Set<string>();
+    const clientIdsInTable = new Set(clients.map(c => c.id));
+    const clientsWithData = new Set(yesterdayMetrics.map((m: any) => m.client_id));
+    clientIdsInTable.forEach(id => {
+      if (!clientsWithData.has(id)) set.add(id);
+    });
+    yesterdayMetrics.forEach((m: any) => {
+      if ((m.ad_spend ?? 0) === 0 && (m.leads ?? 0) === 0) {
+        set.add(m.client_id);
+      }
+    });
+    return set;
+  }, [yesterdayMetrics, clients]);
   const duplicateMetaAccounts = useMemo(() => {
     const counts: Record<string, number> = {};
     clients.forEach(c => {
