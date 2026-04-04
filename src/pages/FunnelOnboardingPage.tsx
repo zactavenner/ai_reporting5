@@ -57,7 +57,7 @@ export default function Onboarding() {
 
   useEffect(() => {
     if (searchParams.get('payment') === 'success') {
-      toast({ title: 'Payment successful!', description: 'Now complete your onboarding to get started.' });
+      toast.success('Payment successful! Now complete your onboarding to get started.');
     }
   }, [searchParams]);
 
@@ -105,16 +105,14 @@ export default function Onboarding() {
     setSubmitting(true);
     try {
       // Save to leads table
-      const { error } = await supabase.from('leads').insert({
-        lead_name: contactName,
-        lead_email: contactEmail,
-        lead_phone: contactPhone,
+      const { error } = await (supabase.from('leads') as any).insert({
+        external_id: `onboarding-${Date.now()}`,
+        client_id: '00000000-0000-0000-0000-000000000000',
+        name: contactName,
+        email: contactEmail,
+        phone: contactPhone,
         source: 'onboarding',
-        investment_range: exactRaiseAmount ? `$${exactRaiseAmount}` : undefined,
         status: 'booked',
-        appointment_date: selectedKickoffDate && selectedKickoffTime
-          ? new Date(`${selectedKickoffDate}T${selectedKickoffTime}`).toISOString()
-          : undefined,
       });
 
       if (error) throw error;
@@ -163,7 +161,7 @@ export default function Onboarding() {
       }
 
       setSubmitted(true);
-      toast({ title: 'Onboarding submitted!', description: 'We\'ll be in touch within 24 hours.' });
+      toast.success('Onboarding submitted! We\'ll be in touch within 24 hours.');
     } catch (err) {
       console.error('Submit error:', err);
       toast.error('Failed to submit. Please try again.');

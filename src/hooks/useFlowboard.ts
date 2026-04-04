@@ -110,7 +110,7 @@ export function useFlowboard({ projectId }: UseFlowboardOptions) {
   const { data: flowboard, isLoading } = useQuery({
     queryKey: ['flowboard', projectId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('flowboards')
         .select('*')
         .eq('project_id', projectId)

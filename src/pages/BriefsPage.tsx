@@ -125,18 +125,16 @@ export default function BriefsPage() {
     try {
       const rows = scripts.map((s) => ({
         brief_id: briefId,
-        client_name: clientName,
-        script_name: s.script_name,
-        format: s.format,
+        client_id: '00000000-0000-0000-0000-000000000000',
+        title: s.script_name,
+        script_type: s.format || 'static',
         hook: s.hook,
         body: s.body,
         cta: s.cta,
-        visual_direction: s.visual_direction,
-        estimated_length: s.estimated_length,
         notes: s.notes,
         status: "draft",
       }));
-      const { error } = await supabase.from("ad_scripts").insert(rows);
+      const { error } = await (supabase.from("ad_scripts") as any).insert(rows);
       if (error) throw error;
       toast({ title: "Scripts saved", description: `${rows.length} scripts saved as drafts` });
       fetchData();

@@ -180,10 +180,10 @@ export default function BookingPage() {
 
       // Update the lead status to 'booked'
       try {
-        const { data: existingLeads } = await supabase
-          .from('leads')
+        const { data: existingLeads } = await (supabase
+          .from('leads') as any)
           .select('id')
-          .eq('lead_email', email)
+          .eq('email', email)
           .order('created_at', { ascending: false })
           .limit(1);
 
