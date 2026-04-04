@@ -61,6 +61,40 @@ export function useCreateQuizFunnel() {
   });
 }
 
+export function useQuizFunnelBySlug(slug?: string) {
+  return useQuery({
+    queryKey: ['quiz-funnel-slug', slug],
+    queryFn: async () => {
+      if (!slug) return null;
+      const { data, error } = await (supabase as any).from('quiz_funnels').select('*').eq('slug', slug).single();
+      if (error) throw error;
+      return data as QuizFunnel;
+    },
+    enabled: !!slug,
+  });
+}
+
+export function useCreateQuizSubmission() {
+  return useMutation({
+    mutationFn: async (submission: any) => {
+      const { data, error } = await (supabase as any).from('quiz_submissions').insert(submission).select().single();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useUpdateQuizSubmission() {
+  return useMutation({
+    mutationFn: async (updates: any) => {
+      const { id, ...rest } = updates;
+      const { data, error } = await (supabase as any).from('quiz_submissions').update(rest).eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useDeleteQuizFunnel() {
   const queryClient = useQueryClient();
   return useMutation({
