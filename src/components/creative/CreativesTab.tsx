@@ -791,6 +791,54 @@ export function CreativesTab() {
           )}
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        <TabsContent value="briefs" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><CreativeBriefs /></Suspense>
+        </TabsContent>
+        <TabsContent value="static-ads" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><StaticCreativesPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="batch-video" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><BatchVideoWorkflow /></Suspense>
+        </TabsContent>
+        <TabsContent value="ad-variations" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><AdVariationsPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="avatars" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><AvatarsPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="ad-scraping" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><AdScrapingPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="instagram-intel" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><InstagramIntelPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="video-editor" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><VideoEditorPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="broll" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><BrollPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="winning-ads" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><WinningAdsGalleryLazy embedded /></Suspense>
+        </TabsContent>
+        <TabsContent value="manage-styles" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><ManageStylesTabLazy embedded /></Suspense>
+        </TabsContent>
+        <TabsContent value="history" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><HistoryPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="export" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><ExportHubPage /></Suspense>
+        </TabsContent>
+        <TabsContent value="calendar" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><CreativeCalendarLazy embedded /></Suspense>
+        </TabsContent>
+        <TabsContent value="analytics" className="mt-4">
+          <Suspense fallback={SuspenseFallback}><CreativeAnalyticsLazy embedded /></Suspense>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
