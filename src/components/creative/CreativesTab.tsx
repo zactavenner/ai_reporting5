@@ -88,6 +88,7 @@ interface CreativeWithClient extends Creative {
 }
 
 export function CreativesTab() {
+  const [activeSection, setActiveSection] = useState('approvals');
   const { data: creatives = [], isLoading: creativesLoading } = useAllCreatives();
   const { data: clients = [] } = useClients();
   const updateStatus = useUpdateCreativeStatus();
