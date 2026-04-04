@@ -7,6 +7,7 @@ interface ClientSourceMetricsRow {
   client_id: string;
   total_leads: number;
   spam_leads: number;
+  crm_leads: number;
   total_calls: number;
   showed_calls: number;
   reconnect_calls: number;
@@ -86,6 +87,7 @@ export function buildClientMetricsFromRPC(
       totalAdSpend,
       totalLeads,
       spamLeads: Number(row.spam_leads),
+      crmLeads: Number(row.crm_leads || 0),
       totalCalls,
       showedCalls,
       reconnectCalls,

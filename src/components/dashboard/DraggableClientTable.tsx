@@ -256,7 +256,7 @@ export function DraggableClientTable({
         case 'costOfCapital': aVal = a.metrics.costOfCapital || 0; bVal = b.metrics.costOfCapital || 0; break;
         case 'mrr': aVal = a.computed.mrr; bVal = b.computed.mrr; break;
         case 'dailyTarget': aVal = a.computed.dailyTarget; bVal = b.computed.dailyTarget; break;
-        case 'crmLeads': aVal = (a.metrics.totalLeads || 0) + (a.metrics.spamLeads || 0); bVal = (b.metrics.totalLeads || 0) + (b.metrics.spamLeads || 0); break;
+        case 'crmLeads': aVal = a.metrics.crmLeads || 0; bVal = b.metrics.crmLeads || 0; break;
         case 'calls': aVal = a.metrics.totalCalls || 0; bVal = b.metrics.totalCalls || 0; break;
         case 'showed': aVal = a.metrics.showedCalls || 0; bVal = b.metrics.showedCalls || 0; break;
         case 'funded': aVal = a.metrics.fundedInvestors || 0; bVal = b.metrics.fundedInvestors || 0; break;
@@ -574,18 +574,18 @@ export function DraggableClientTable({
                       {m.totalLeads || 0}
                     </TableCell>
 
-                    {/* CRM Leads (all leads including spam — should be ≥ Meta Leads) */}
+                    {/* CRM Leads (all leads from GHL/CRM — should be ≥ Meta Leads) */}
                     <TableCell className={cn(
                       "text-right font-mono tabular-nums text-[11px] py-0 px-1",
                       (() => {
-                        const crmTotal = (m.totalLeads || 0) + (m.spamLeads || 0);
+                        const crmTotal = m.crmLeads || 0;
                         const metaLeads = m.totalLeads || 0;
                         if (crmTotal === 0 && metaLeads === 0) return 'text-muted-foreground';
                         if (crmTotal >= metaLeads) return 'text-chart-2';
                         return 'text-destructive font-semibold';
                       })()
                     )}>
-                      {(m.totalLeads || 0) + (m.spamLeads || 0)}
+                      {m.crmLeads || 0}
                     </TableCell>
 
                     {/* CPL */}

@@ -130,6 +130,7 @@ const Index = () => {
         totalAdSpend: acc.totalAdSpend + m.totalAdSpend,
         totalLeads: acc.totalLeads + m.totalLeads,
         spamLeads: acc.spamLeads + m.spamLeads,
+        crmLeads: acc.crmLeads + (m.crmLeads || 0),
         totalCalls: acc.totalCalls + m.totalCalls,
         showedCalls: acc.showedCalls + m.showedCalls,
         reconnectCalls: acc.reconnectCalls + m.reconnectCalls,
@@ -141,7 +142,7 @@ const Index = () => {
         pipelineValue: acc.pipelineValue + m.pipelineValue,
       }),
       {
-        totalAdSpend: 0, totalLeads: 0, spamLeads: 0, totalCalls: 0,
+        totalAdSpend: 0, totalLeads: 0, spamLeads: 0, crmLeads: 0, totalCalls: 0,
         showedCalls: 0, reconnectCalls: 0, reconnectShowed: 0,
         fundedInvestors: 0, fundedDollars: 0, totalCommitments: 0,
         commitmentDollars: 0, pipelineValue: 0,

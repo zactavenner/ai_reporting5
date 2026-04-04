@@ -41,6 +41,7 @@ export interface AggregatedMetrics {
   totalAdSpend: number;
   totalLeads: number;
   spamLeads: number;
+  crmLeads: number;
   totalCalls: number;
   showedCalls: number;
   totalCommitments: number;
@@ -203,6 +204,7 @@ export function aggregateMetrics(dailyMetrics: DailyMetric[], fundedInvestors: F
     totalAdSpend: totals.totalAdSpend,
     totalLeads: totals.totalLeads,
     spamLeads: totals.spamLeads,
+    crmLeads: totals.totalLeads + totals.spamLeads,
     totalCalls: totals.totalCalls,
     showedCalls: totals.showedCalls,
     totalCommitments: totals.totalCommitments,

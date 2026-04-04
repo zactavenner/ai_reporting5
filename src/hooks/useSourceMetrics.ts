@@ -31,6 +31,7 @@ export interface SourceAggregatedMetrics {
   totalAdSpend: number;
   totalLeads: number;
   spamLeads: number;
+  crmLeads: number;
   totalCalls: number;
   showedCalls: number;
   reconnectCalls: number;
@@ -135,6 +136,7 @@ export function aggregateFromSourceData(
     totalAdSpend,
     totalLeads,
     spamLeads: spamLeads.length,
+    crmLeads: leads.length,
     totalCalls,
     showedCalls: showedCount,
     reconnectCalls: reconnectCalls.length,
