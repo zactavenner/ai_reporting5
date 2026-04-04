@@ -64,6 +64,7 @@ import { AgentsTab } from '@/components/agents/AgentsTab';
 
 const Index = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { currentMember, logout } = useTeamMember();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -76,10 +77,19 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedFunnelClientId, setSelectedFunnelClientId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+
+  // Deep-link: if ?task= is present, auto-switch to tasks tab
+  useEffect(() => {
+    const taskId = searchParams.get('task');
+    if (taskId) {
+      setActiveTab('tasks');
+    }
+  }, [searchParams]);
   const updateClientOrder = useUpdateClientOrder();
 
   const { startDate, endDate, sourceFilter } = useDateFilter();
-  const { data: clients = [], isLoading: clientsLoading } = useClients();
+  const { data: allClients = [], isLoading: clientsLoading } = useClients();
+  const clients = useMemo(() => allClients.filter(c => c.status === 'active' || c.status === 'onboarding' || c.status === 'paused'), [allClients]);
   const { data: dailyMetrics = [], isLoading: metricsLoading } = useAllDailyMetrics(startDate, endDate);
   const { data: fundedInvestors = [] } = useFundedInvestors(undefined, startDate, endDate);
   const { data: allLeads = [] } = useLeads(undefined, startDate, endDate);
