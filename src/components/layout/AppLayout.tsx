@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Users, Sparkles, User, Film, Settings, Wand2, Video, Radar, Scissors, LayoutGrid, BarChart3, History, Download, Menu, X, ChevronRight, Instagram, Image as ImageIcon, Inbox } from 'lucide-react';
+import { Users, Sparkles, User, Film, Settings, Wand2, Video, Radar, Scissors, LayoutGrid, BarChart3, History, Download, Menu, X, ChevronRight, Instagram, Image as ImageIcon, Inbox, Clapperboard } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -26,6 +26,7 @@ const navSections = [
       { path: '/static-ads', label: 'Static Creatives', icon: ImageIcon },
       { path: '/broll', label: 'B-Roll Library', icon: Film },
       { path: '/batch-video', label: 'Batch Video', icon: Video },
+      { path: '/avatar-ad-generator', label: 'Avatar Ad Gen', icon: Clapperboard },
       { path: '/ad-variations', label: 'Ad Variations', icon: Wand2 },
     ],
   },

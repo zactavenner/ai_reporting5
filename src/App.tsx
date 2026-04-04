@@ -28,6 +28,7 @@ import AdVariationsPage from "./pages/AdVariationsPage";
 import AvatarsPage from "./pages/AvatarsPage";
 import BrollPage from "./pages/BrollPage";
 import VideoEditorPage from "./pages/VideoEditorPage";
+import AvatarAdGeneratorPage from "./pages/AvatarAdGeneratorPage";
 import InstagramIntelPage from "./pages/InstagramIntelPage";
 import HistoryPage from "./pages/HistoryPage";
 import ExportHubPage from "./pages/ExportHubPage";
@@ -91,6 +92,7 @@ const App = () => (
             <Route path="/avatars" element={<PasswordGate><AvatarsPage /></PasswordGate>} />
             <Route path="/broll" element={<PasswordGate><BrollPage /></PasswordGate>} />
             <Route path="/video-editor" element={<PasswordGate><VideoEditorPage /></PasswordGate>} />
+            <Route path="/avatar-ad-generator" element={<PasswordGate><AvatarAdGeneratorPage /></PasswordGate>} />
             <Route path="/instagram-intel" element={<PasswordGate><InstagramIntelPage /></PasswordGate>} />
             <Route path="/history" element={<PasswordGate><HistoryPage /></PasswordGate>} />
             <Route path="/export" element={<PasswordGate><ExportHubPage /></PasswordGate>} />
