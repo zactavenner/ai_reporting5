@@ -26,6 +26,7 @@ const navSections = [
       { path: '/static-ads', label: 'Static Creatives', icon: ImageIcon },
       { path: '/broll', label: 'B-Roll Library', icon: Film },
       { path: '/batch-video', label: 'Batch Video', icon: Video },
+      { path: '/avatar-ad-generator', label: 'Avatar Ad Gen', icon: Clapperboard },
       { path: '/ad-variations', label: 'Ad Variations', icon: Wand2 },
     ],
   },
