@@ -101,7 +101,7 @@ export default function AssetGeneratorTab({ client, assetType, icon: Icon, title
       .eq('client_id', client.id)
       .order('created_at', { ascending: false })
       .limit(1);
-    return data?.[0] || null;
+    return (data as any)?.[0] || null;
   };
 
   const generate = async () => {

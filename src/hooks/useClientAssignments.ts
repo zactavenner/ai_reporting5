@@ -38,7 +38,7 @@ export function useUpdateClientAssignment() {
 
       const { error } = await supabase
         .from('client_assignments')
-        .upsert(updates, { onConflict: 'client_id' });
+        .upsert(updates as any, { onConflict: 'client_id' });
 
       if (error) {
         console.error('client_assignments write failed:', error.message);
