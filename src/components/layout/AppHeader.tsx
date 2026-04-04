@@ -1,7 +1,8 @@
-import { Settings2, User, LogOut, Bell } from 'lucide-react';
+import { Settings2, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { GlobalClientSearch } from '@/components/search/GlobalClientSearch';
 
 interface AppHeaderProps {
   onSettings?: () => void;
@@ -13,6 +14,7 @@ export function AppHeader({ onSettings, currentMemberName, onLogout }: AppHeader
   return (
     <header className="border-b border-border bg-card/80 apple-blur sticky top-0 z-30 h-12 flex items-center px-4 gap-2">
       <SidebarTrigger className="mr-2" />
+      <GlobalClientSearch />
       <div className="flex-1" />
       <div className="flex items-center gap-1.5">
         {onSettings && (
