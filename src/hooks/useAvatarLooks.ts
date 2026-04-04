@@ -115,7 +115,7 @@ export function useSetPrimaryLook() {
       // Update the avatar's main image_url
       await supabase
         .from('avatars')
-        .update({ image_url: imageUrl })
+        .update({ base_image_url: imageUrl } as any)
         .eq('id', avatarId);
       
       return { avatarId };
