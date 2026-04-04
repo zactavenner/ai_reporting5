@@ -241,8 +241,19 @@ const Index = () => {
             {/* Spam utility page */}
             {activeTab === 'spam' && <SpamBlacklist embedded />}
 
-            {/* Briefs utility page */}
-            {activeTab === 'briefs' && <CreativeBriefs embedded />}
+            {/* Ads Manager */}
+            {activeTab === 'ads-manager' && <AdminAdsManagerTab platform="all" />}
+
+            {/* Offers */}
+            {activeTab === 'offers' && (
+              <SectionErrorBoundary sectionName="Offers">
+                <div className="mb-4">
+                  <h2 className="text-lg font-bold">Offers</h2>
+                  <p className="text-sm text-muted-foreground">Manage offers across all clients — the main feed for building statics & videos</p>
+                </div>
+                <AdminOffersTab clients={clients} />
+              </SectionErrorBoundary>
+            )}
 
             {/* Dashboard */}
             {activeTab === 'dashboard' && (
