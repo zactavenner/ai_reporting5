@@ -40,7 +40,7 @@ export function useQuizFunnels(clientId?: string) {
   return useQuery({
     queryKey: ['quiz-funnels', clientId],
     queryFn: async () => {
-      let query = (supabase.from('quiz_funnels') as any).select('*').order('created_at', { ascending: false });
+      let query = (supabase as any).from('quiz_funnels').select('*').order('created_at', { ascending: false });
       if (clientId) query = query.eq('client_id', clientId);
       const { data, error } = await query;
       if (error) throw error;
