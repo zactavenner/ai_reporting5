@@ -511,6 +511,19 @@ const Index = () => {
                 <AgencyIntegrationsTab />
               </SectionErrorBoundary>
             )}
+
+            {/* Avatar Ad Generator */}
+            {activeTab === 'avatar-ad-gen' && (
+              <SectionErrorBoundary sectionName="Avatar Ad Generator">
+                <div className="mb-4">
+                  <h2 className="text-lg font-bold">AI Avatar Ad Generator</h2>
+                  <p className="text-sm text-muted-foreground">Create hyper-realistic AI avatar video ads for investment offers</p>
+                </div>
+                <AvatarAdProvider>
+                  <AvatarAdWizard />
+                </AvatarAdProvider>
+              </SectionErrorBoundary>
+            )}
           </main>
         </div>
       </div>

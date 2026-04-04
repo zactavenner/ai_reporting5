@@ -87,8 +87,12 @@ const navStructure = [
   },
   {
     title: 'Creatives',
-    value: 'creatives',
+    value: 'creatives-group',
     icon: Palette,
+    children: [
+      { title: 'Creative Hub', value: 'creatives', icon: Palette },
+      { title: 'Avatar Ad Gen', value: 'avatar-ad-gen', icon: Video },
+    ],
   },
   {
     title: 'Offers',
