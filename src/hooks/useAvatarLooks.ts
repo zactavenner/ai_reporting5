@@ -103,7 +103,7 @@ export function useSetPrimaryLook() {
       // Unset all primary looks for this avatar
       await supabase
         .from('avatar_looks')
-        .update({ is_primary: false })
+        .update({ is_default: false, is_primary: false } as any)
         .eq('avatar_id', avatarId);
       
       // Set the new primary
