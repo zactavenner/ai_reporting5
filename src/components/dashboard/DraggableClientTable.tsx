@@ -377,6 +377,9 @@ export function DraggableClientTable({
             <TableRow className="border-b h-7">
               <TableHead className="w-7 sticky left-0 bg-card z-10 py-0 px-1"></TableHead>
               <TableHead className="font-bold text-[11px] sticky left-7 bg-card z-10 min-w-[100px] py-0 px-1">Client</TableHead>
+              <TableHead className="font-bold text-[11px] py-0 px-1 text-center">Status</TableHead>
+              <TableHead className="font-bold text-[11px] py-0 px-1 text-center min-w-[80px]">MB</TableHead>
+              <TableHead className="font-bold text-[11px] py-0 px-1 text-center min-w-[80px]">AM</TableHead>
               <SortableHeader column="adSpend" label="Spend" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="dailyTarget" label="$/Day" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="metaLeads" label="Meta Leads" sortConfig={sortConfig} onSort={handleSort} />
