@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, lazy, Suspense } from 'react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useAllCreatives } from '@/hooks/useAllCreatives';
 import { useClients, Client } from '@/hooks/useClients';
-import { Creative, useUpdateCreativeStatus, useDeleteCreative } from '@/hooks/useCreatives';
+import { Creative, CreateCreativeInput, useUpdateCreativeStatus, useDeleteCreative, useCreateCreative, useCreateCreatives, uploadCreativeFile, detectAspectRatio } from '@/hooks/useCreatives';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -22,10 +24,12 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import { CreativeHorizontalPreview } from './CreativeHorizontalPreview';
 import { CreativeAIActions } from './CreativeAIActions';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
+import { formatFileSize } from '@/lib/uploadWithProgress';
 import {
   Search,
   Image,
@@ -43,8 +47,41 @@ import {
   Sparkles,
   CheckSquare,
   Download,
+  Film,
+  Wand2,
+  User,
+  Radar,
+  Instagram,
+  Scissors,
+  History,
+  Inbox,
+  Plus,
+  Calendar,
+  BarChart3,
+  FolderArchive,
+  Trophy,
+  Palette,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
+
+// Lazy-load sub-section page components
+const CreativeBriefs = lazy(() => import('@/pages/CreativeBriefs'));
+const StaticCreativesPage = lazy(() => import('@/pages/StaticCreativesPage'));
+const BatchVideoWorkflow = lazy(() => import('@/components/batch-video/BatchVideoWorkflow').then(m => ({ default: m.BatchVideoWorkflow })));
+const AdVariationsPage = lazy(() => import('@/pages/AdVariationsPage'));
+const AvatarsPage = lazy(() => import('@/pages/AvatarsPage'));
+const AdScrapingPage = lazy(() => import('@/pages/AdScrapingPage'));
+const InstagramIntelPage = lazy(() => import('@/pages/InstagramIntelPage'));
+const VideoEditorPage = lazy(() => import('@/pages/VideoEditorPage'));
+const BrollPage = lazy(() => import('@/pages/BrollPage'));
+const HistoryPage = lazy(() => import('@/pages/HistoryPage'));
+const ExportHubPage = lazy(() => import('@/pages/ExportHubPage'));
+const CreativeCalendarLazy = lazy(() => import('@/components/creative/CreativeCalendar').then(m => ({ default: m.CreativeCalendar })));
+const CreativeAnalyticsLazy = lazy(() => import('@/components/creative/CreativeAnalytics').then(m => ({ default: m.CreativeAnalytics })));
+const WinningAdsGalleryLazy = lazy(() => import('@/components/creative/WinningAdsGallery').then(m => ({ default: m.WinningAdsGallery })));
+const ManageStylesTabLazy = lazy(() => import('@/components/creative/ManageStylesTab').then(m => ({ default: m.ManageStylesTab })));
 
 interface CreativeWithClient extends Creative {
   clientName?: string;
