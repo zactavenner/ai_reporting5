@@ -6,7 +6,10 @@ import { toast } from 'sonner';
 export interface AvatarLook {
   id: string;
   avatar_id: string;
+  name: string;
   image_url: string;
+  prompt: string | null;
+  is_default: boolean;
   angle: string | null;
   background: string | null;
   outfit: string | null;
@@ -24,7 +27,7 @@ export function useAvatarLooks(avatarId?: string | null) {
         .from('avatar_looks')
         .select('*')
         .eq('avatar_id', avatarId)
-        .order('is_primary', { ascending: false })
+        .order('is_default', { ascending: false })
         .order('created_at', { ascending: true });
       if (error) throw error;
       return data as AvatarLook[];
@@ -38,16 +41,22 @@ export function useCreateAvatarLook() {
   return useMutation({
     mutationFn: async (look: {
       avatar_id: string;
+      name?: string;
       image_url: string;
       angle?: string;
       background?: string;
       outfit?: string;
       is_primary?: boolean;
+      is_default?: boolean;
       metadata?: Json;
     }) => {
+      const insertData = {
+        ...look,
+        name: look.name || 'Look',
+      };
       const { data, error } = await supabase
         .from('avatar_looks')
-        .insert([look])
+        .insert([insertData])
         .select()
         .single();
       if (error) throw error;
@@ -94,19 +103,19 @@ export function useSetPrimaryLook() {
       // Unset all primary looks for this avatar
       await supabase
         .from('avatar_looks')
-        .update({ is_primary: false })
+        .update({ is_default: false, is_primary: false } as any)
         .eq('avatar_id', avatarId);
       
       // Set the new primary
       await supabase
         .from('avatar_looks')
-        .update({ is_primary: true })
+        .update({ is_default: true, is_primary: true } as any)
         .eq('id', lookId);
       
       // Update the avatar's main image_url
       await supabase
         .from('avatars')
-        .update({ image_url: imageUrl })
+        .update({ base_image_url: imageUrl } as any)
         .eq('id', avatarId);
       
       return { avatarId };
