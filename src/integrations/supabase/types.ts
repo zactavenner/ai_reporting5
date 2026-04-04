@@ -793,8 +793,10 @@ export type Database = {
           client_id: string | null
           config: Json | null
           created_at: string | null
+          current_month_spend_cents: number | null
           id: string
           is_active: boolean | null
+          monthly_spend_limit_cents: number | null
           schedule: string | null
         }
         Insert: {
@@ -803,8 +805,10 @@ export type Database = {
           client_id?: string | null
           config?: Json | null
           created_at?: string | null
+          current_month_spend_cents?: number | null
           id?: string
           is_active?: boolean | null
+          monthly_spend_limit_cents?: number | null
           schedule?: string | null
         }
         Update: {
@@ -813,8 +817,10 @@ export type Database = {
           client_id?: string | null
           config?: Json | null
           created_at?: string | null
+          current_month_spend_cents?: number | null
           id?: string
           is_active?: boolean | null
+          monthly_spend_limit_cents?: number | null
           schedule?: string | null
         }
         Relationships: [
@@ -2314,9 +2320,13 @@ export type Database = {
       custom_ads: {
         Row: {
           body: string | null
+          category: string | null
           client_id: string | null
           created_at: string | null
           cta: string | null
+          description: string | null
+          file_type: string | null
+          file_url: string | null
           headline: string | null
           id: string
           image_url: string | null
@@ -2328,9 +2338,13 @@ export type Database = {
         }
         Insert: {
           body?: string | null
+          category?: string | null
           client_id?: string | null
           created_at?: string | null
           cta?: string | null
+          description?: string | null
+          file_type?: string | null
+          file_url?: string | null
           headline?: string | null
           id?: string
           image_url?: string | null
@@ -2342,9 +2356,13 @@ export type Database = {
         }
         Update: {
           body?: string | null
+          category?: string | null
           client_id?: string | null
           created_at?: string | null
           cta?: string | null
+          description?: string | null
+          file_type?: string | null
+          file_url?: string | null
           headline?: string | null
           id?: string
           image_url?: string | null
@@ -3473,46 +3491,70 @@ export type Database = {
           caption: string | null
           client_id: string | null
           comments: number | null
+          comments_count: number | null
           created_at: string | null
           engagement_rate: number | null
           hashtags: string[] | null
           id: string
           image_url: string | null
+          is_inspiration_source: boolean | null
           likes: number | null
+          likes_count: number | null
+          media_url: string | null
+          owner_username: string | null
           platform_post_id: string | null
+          post_type: string | null
           source_url: string | null
           status: string | null
+          thumbnail_url: string | null
           video_url: string | null
+          views_count: number | null
         }
         Insert: {
           caption?: string | null
           client_id?: string | null
           comments?: number | null
+          comments_count?: number | null
           created_at?: string | null
           engagement_rate?: number | null
           hashtags?: string[] | null
           id?: string
           image_url?: string | null
+          is_inspiration_source?: boolean | null
           likes?: number | null
+          likes_count?: number | null
+          media_url?: string | null
+          owner_username?: string | null
           platform_post_id?: string | null
+          post_type?: string | null
           source_url?: string | null
           status?: string | null
+          thumbnail_url?: string | null
           video_url?: string | null
+          views_count?: number | null
         }
         Update: {
           caption?: string | null
           client_id?: string | null
           comments?: number | null
+          comments_count?: number | null
           created_at?: string | null
           engagement_rate?: number | null
           hashtags?: string[] | null
           id?: string
           image_url?: string | null
+          is_inspiration_source?: boolean | null
           likes?: number | null
+          likes_count?: number | null
+          media_url?: string | null
+          owner_username?: string | null
           platform_post_id?: string | null
+          post_type?: string | null
           source_url?: string | null
           status?: string | null
+          thumbnail_url?: string | null
           video_url?: string | null
+          views_count?: number | null
         }
         Relationships: [
           {
