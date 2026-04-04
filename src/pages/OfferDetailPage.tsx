@@ -12,11 +12,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import {
   ArrowLeft, Sparkles, Trash2, Video, Image, FileText,
   Mail, MessageSquare, Megaphone, Target, BarChart3, Globe, Loader2,
-  ExternalLink, Copy,
+  ExternalLink, Copy, ChevronRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
+import type { ClientOffer } from '@/hooks/useClientOffers';
 
 const ASSET_TYPE_CONFIG = [
   { key: 'research', label: 'Research', icon: BarChart3 },
@@ -35,12 +36,30 @@ function useOfferDetail(offerId: string | undefined) {
     queryKey: ['offer-detail', offerId],
     queryFn: async () => {
       if (!offerId) return null;
-      const { data, error } = await (supabase.from('client_offers') as any)
+      const { data, error } = await supabase
+        .from('client_offers' as any)
         .select('*')
         .eq('id', offerId)
         .single();
       if (error) throw error;
-      return data as any;
+      return data as unknown as ClientOffer;
+    },
+    enabled: !!offerId,
+  });
+}
+
+function useOfferAssets(offerId: string | undefined) {
+  return useQuery({
+    queryKey: ['offer-assets', offerId],
+    queryFn: async () => {
+      if (!offerId) return [];
+      const { data, error } = await supabase
+        .from('client_assets' as any)
+        .select('*')
+        .eq('offer_id', offerId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as any[];
     },
     enabled: !!offerId,
   });
@@ -51,7 +70,8 @@ function useOfferCreatives(offerId: string | undefined) {
     queryKey: ['offer-creatives', offerId],
     queryFn: async () => {
       if (!offerId) return [];
-      const { data, error } = await (supabase.from('creatives') as any)
+      const { data, error } = await supabase
+        .from('creatives' as any)
         .select('*')
         .eq('trigger_campaign_id', offerId)
         .order('created_at', { ascending: false });
@@ -67,7 +87,11 @@ function useClientInfo(clientId: string | undefined) {
     queryKey: ['client-info', clientId],
     queryFn: async () => {
       if (!clientId) return null;
-      const { data, error } = await supabase.from('clients').select('*').eq('id', clientId).single();
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', clientId)
+        .single();
       if (error) throw error;
       return data;
     },
@@ -80,17 +104,38 @@ export default function OfferDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: offer, isLoading: offerLoading } = useOfferDetail(offerId);
+  const { data: assets = [], isLoading: assetsLoading } = useOfferAssets(offerId);
   const { data: creatives = [] } = useOfferCreatives(offerId);
   const { data: client } = useClientInfo(clientId);
   const [activeTab, setActiveTab] = useState('overview');
   const [editPromptOpen, setEditPromptOpen] = useState(false);
   const [editPrompt, setEditPrompt] = useState('');
   const [editingCreativeUrl, setEditingCreativeUrl] = useState<string | null>(null);
+  const [editingCreativeId, setEditingCreativeId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+
+  // Group assets by type
+  const assetsByType: Record<string, any[]> = {};
+  assets.forEach((a: any) => {
+    if (!assetsByType[a.asset_type]) assetsByType[a.asset_type] = [];
+    assetsByType[a.asset_type].push(a);
+  });
+
+  const deleteAsset = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('client_assets' as any).delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['offer-assets', offerId] });
+      toast.success('Asset deleted');
+    },
+    onError: () => toast.error('Failed to delete asset'),
+  });
 
   const deleteCreative = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase.from('creatives') as any).delete().eq('id', id);
+      const { error } = await supabase.from('creatives' as any).delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -105,7 +150,12 @@ export default function OfferDetailPage() {
     setIsEditing(true);
     try {
       const { data, error } = await supabase.functions.invoke('edit-static-ad', {
-        body: { image_url: editingCreativeUrl, prompt: editPrompt.trim(), client_id: clientId, offer_id: offerId },
+        body: {
+          image_url: editingCreativeUrl,
+          prompt: editPrompt.trim(),
+          client_id: clientId,
+          offer_id: offerId,
+        },
       });
       if (error) throw error;
       toast.success('AI edit complete — new version saved');
@@ -143,6 +193,7 @@ export default function OfferDetailPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Header */}
       <div className="border-b border-border bg-card/50 sticky top-0 z-10 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -157,20 +208,31 @@ export default function OfferDetailPage() {
                   {offer.offer_type === 'offer' ? 'Offer' : offer.offer_type === 'document' ? 'Document' : 'File'}
                 </Badge>
               </div>
-              {client && <p className="text-xs text-muted-foreground">{client.name}</p>}
+              {client && (
+                <p className="text-xs text-muted-foreground">{client.name}</p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate(`/static-ads?clientId=${clientId}&offerId=${offerId}`)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/static-ads?clientId=${clientId}&offerId=${offerId}`)}
+            >
               <Image className="h-3.5 w-3.5 mr-1.5" /> Generate Static Ads
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate(`/batch-video?clientId=${clientId}&offerId=${offerId}`)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/batch-video?clientId=${clientId}&offerId=${offerId}`)}
+            >
               <Video className="h-3.5 w-3.5 mr-1.5" /> Generate Video
             </Button>
           </div>
         </div>
       </div>
 
+      {/* Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6">
@@ -178,13 +240,25 @@ export default function OfferDetailPage() {
             <TabsTrigger value="creatives">
               Creatives {creatives.length > 0 && <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5">{creatives.length}</Badge>}
             </TabsTrigger>
+            {ASSET_TYPE_CONFIG.map(t => {
+              const count = assetsByType[t.key]?.length || 0;
+              return (
+                <TabsTrigger key={t.key} value={t.key}>
+                  {t.label}
+                  {count > 0 && <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5">{count}</Badge>}
+                </TabsTrigger>
+              );
+            })}
           </TabsList>
 
+          {/* Overview Tab */}
           <TabsContent value="overview">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="p-5 lg:col-span-2 space-y-4">
                 <h2 className="font-semibold">Offer Details</h2>
-                {offer.description && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{offer.description}</p>}
+                {offer.description && (
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{offer.description}</p>
+                )}
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-muted-foreground">Created</span>
@@ -194,6 +268,12 @@ export default function OfferDetailPage() {
                     <span className="text-muted-foreground">Uploaded By</span>
                     <p className="font-medium">{offer.uploaded_by || 'Unknown'}</p>
                   </div>
+                  {offer.file_url && (
+                    <div>
+                      <span className="text-muted-foreground">File</span>
+                      <p className="font-medium">{offer.file_name || 'Attached'}</p>
+                    </div>
+                  )}
                 </div>
                 {offer.file_url && (
                   <Button variant="outline" size="sm" onClick={() => window.open(offer.file_url!, '_blank')}>
@@ -201,16 +281,29 @@ export default function OfferDetailPage() {
                   </Button>
                 )}
               </Card>
-              <Card className="p-4">
-                <h3 className="text-sm font-semibold mb-3">Asset Summary</h3>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Creatives</span>
-                  <span className="font-medium">{creatives.length}</span>
-                </div>
-              </Card>
+
+              {/* Quick Stats */}
+              <div className="space-y-4">
+                <Card className="p-4">
+                  <h3 className="text-sm font-semibold mb-3">Asset Summary</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Creatives</span>
+                      <span className="font-medium">{creatives.length}</span>
+                    </div>
+                    {ASSET_TYPE_CONFIG.map(t => (
+                      <div key={t.key} className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{t.label}</span>
+                        <span className="font-medium">{assetsByType[t.key]?.length || 0}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </div>
             </div>
           </TabsContent>
 
+          {/* Creatives Tab */}
           <TabsContent value="creatives">
             {creatives.length === 0 ? (
               <Card className="p-12 text-center">
@@ -237,12 +330,22 @@ export default function OfferDetailPage() {
                           <img src={creative.file_url} alt={creative.title} className="w-full h-full object-cover" />
                         )}
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <Button size="sm" variant="secondary" onClick={() => { setEditingCreativeUrl(creative.file_url); setEditPromptOpen(true); }}>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              setEditingCreativeUrl(creative.file_url);
+                              setEditingCreativeId(creative.id);
+                              setEditPromptOpen(true);
+                            }}
+                          >
                             <Sparkles className="h-3.5 w-3.5 mr-1" /> AI Edit
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button size="sm" variant="destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
+                              <Button size="sm" variant="destructive">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
@@ -264,16 +367,31 @@ export default function OfferDetailPage() {
                         <Badge variant="outline" className="text-[10px]">{creative.type}</Badge>
                         {creative.platform && <Badge variant="secondary" className="text-[10px]">{creative.platform}</Badge>}
                       </div>
-                      <p className="text-[10px] text-muted-foreground mt-1">{format(new Date(creative.created_at), 'MMM d, yyyy')}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        {format(new Date(creative.created_at), 'MMM d, yyyy')}
+                      </p>
                     </div>
                   </Card>
                 ))}
               </div>
             )}
           </TabsContent>
+
+          {/* Asset Type Tabs */}
+          {ASSET_TYPE_CONFIG.map(typeConfig => (
+            <TabsContent key={typeConfig.key} value={typeConfig.key}>
+              <AssetTypeContent
+                assets={assetsByType[typeConfig.key] || []}
+                typeConfig={typeConfig}
+                onDelete={(id) => deleteAsset.mutate(id)}
+                onCopy={copyToClipboard}
+              />
+            </TabsContent>
+          ))}
         </Tabs>
       </div>
 
+      {/* AI Edit Dialog */}
       <Dialog open={editPromptOpen} onOpenChange={setEditPromptOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -288,7 +406,7 @@ export default function OfferDetailPage() {
               </div>
             )}
             <Textarea
-              placeholder="Describe the changes you want..."
+              placeholder="Describe the changes you want... e.g. 'Change the headline to Earn 15% Returns' or 'Make the background darker and add a gold border'"
               value={editPrompt}
               onChange={(e) => setEditPrompt(e.target.value)}
               rows={3}
@@ -302,6 +420,82 @@ export default function OfferDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// Sub-component for generated text assets (ad copy, emails, etc.)
+function AssetTypeContent({
+  assets,
+  typeConfig,
+  onDelete,
+  onCopy,
+}: {
+  assets: any[];
+  typeConfig: { key: string; label: string; icon: any };
+  onDelete: (id: string) => void;
+  onCopy: (text: string) => void;
+}) {
+  const Icon = typeConfig.icon;
+
+  if (assets.length === 0) {
+    return (
+      <Card className="p-12 text-center">
+        <Icon className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+        <p className="text-muted-foreground">No {typeConfig.label.toLowerCase()} generated yet</p>
+        <p className="text-xs text-muted-foreground mt-1">Use "Generate All" from the overview to create this asset</p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {assets.map((asset: any) => {
+        const content = asset.content;
+        const textContent = typeof content === 'string'
+          ? content
+          : content?.markdown || content?.text || JSON.stringify(content, null, 2);
+
+        return (
+          <Card key={asset.id} className="p-5">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Icon className="h-4 w-4 text-muted-foreground" />
+                <h3 className="font-semibold text-sm">{asset.title || typeConfig.label}</h3>
+                <Badge variant="outline" className="text-[10px]">v{asset.version || 1}</Badge>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" onClick={() => onCopy(textContent)}>
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="sm">
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this asset?</AlertDialogTitle>
+                      <AlertDialogDescription>This will permanently remove this {typeConfig.label.toLowerCase()} asset.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => onDelete(asset.id)}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+            <div className="prose prose-sm dark:prose-invert max-w-none max-h-[400px] overflow-y-auto rounded-lg bg-muted/30 p-4">
+              <ReactMarkdown>{textContent}</ReactMarkdown>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2">
+              {format(new Date(asset.created_at), 'MMM d, yyyy h:mm a')}
+            </p>
+          </Card>
+        );
+      })}
     </div>
   );
 }
