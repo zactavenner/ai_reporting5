@@ -61,7 +61,7 @@ export default function AssetGeneratorTab({ client, assetType, icon: Icon, title
       .eq('client_id', client.id)
       .eq('asset_type', assetType)
       .order('created_at', { ascending: false });
-    setAssets((data as Asset[]) || []);
+    setAssets((data as unknown as Asset[]) || []);
     setLoading(false);
   };
 
