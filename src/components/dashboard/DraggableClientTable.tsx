@@ -1,7 +1,11 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAgencyMembers } from '@/hooks/useTasks';
 import { useDateFilter } from '@/contexts/DateFilterContext';
-import { differenceInDays } from 'date-fns';
+import { differenceInDays, subDays, format } from 'date-fns';
 import { Client, useUpdateClient } from '@/hooks/useClients';
+import { useClientAssignments, useUpdateClientAssignment } from '@/hooks/useClientAssignments';
 import { AggregatedMetrics } from '@/hooks/useMetrics';
 import { KPIThresholds, ClientSettings } from '@/hooks/useClientSettings';
 import { Badge } from '@/components/ui/badge';
