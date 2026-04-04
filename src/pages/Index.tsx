@@ -425,7 +425,7 @@ const Index = () => {
             )}
 
             {/* Funnel */}
-            {activeTab === 'funnel' && (
+            {activeTab === 'funnel-builder' && (
               <SectionErrorBoundary sectionName="Funnel Preview">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
                   <div>
@@ -454,6 +454,13 @@ const Index = () => {
                     <p className="text-muted-foreground">Select a client to view their funnel</p>
                   </div>
                 )}
+              </SectionErrorBoundary>
+            )}
+
+            {/* Quiz Builder */}
+            {activeTab === 'funnel-quiz' && (
+              <SectionErrorBoundary sectionName="Quiz Builder">
+                <QuizBuilderTab />
               </SectionErrorBoundary>
             )}
 
