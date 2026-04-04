@@ -123,8 +123,8 @@ export function useInstagramCreatives(filters?: {
   return useQuery({
     queryKey: ['instagram-creatives', filters],
     queryFn: async () => {
-      let query = supabase
-        .from('instagram_creatives')
+      let query = (supabase
+        .from('instagram_creatives') as any)
         .select('*')
         .order('created_at', { ascending: false });
 
