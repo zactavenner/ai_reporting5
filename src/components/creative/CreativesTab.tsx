@@ -1,4 +1,4 @@
-import { useState, useRef, lazy, Suspense } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useAllCreatives } from '@/hooks/useAllCreatives';
 import { useClients, Client } from '@/hooks/useClients';
@@ -7,10 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -24,12 +22,10 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { CreativeHorizontalPreview } from './CreativeHorizontalPreview';
 import { CreativeAIActions } from './CreativeAIActions';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
-import { formatFileSize } from '@/lib/uploadWithProgress';
 import {
   Search,
   Image,
@@ -54,13 +50,18 @@ import {
   Instagram,
   Scissors,
   History,
-  Inbox,
   Plus,
   Calendar,
   BarChart3,
-  FolderArchive,
   Trophy,
   Palette,
+  Headphones,
+  Camera,
+  Target,
+  PenTool,
+  LayoutDashboard,
+  ChevronRight,
+  Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import JSZip from 'jszip';
@@ -83,22 +84,80 @@ const CreativeAnalyticsLazy = lazy(() => import('@/components/creative/CreativeA
 const WinningAdsGalleryLazy = lazy(() => import('@/components/creative/WinningAdsGallery').then(m => ({ default: m.WinningAdsGallery })));
 const ManageStylesTabLazy = lazy(() => import('@/components/creative/ManageStylesTab').then(m => ({ default: m.ManageStylesTab })));
 
+// New AI Tools
+const CreativeCommandCenter = lazy(() => import('@/components/creative/CreativeCommandCenter').then(m => ({ default: m.CreativeCommandCenter })));
+const AIScriptWriter = lazy(() => import('@/components/creative/AIScriptWriter').then(m => ({ default: m.AIScriptWriter })));
+const PodcastAdsGenerator = lazy(() => import('@/components/creative/PodcastAdsGenerator').then(m => ({ default: m.PodcastAdsGenerator })));
+const HyperRealisticAds = lazy(() => import('@/components/creative/HyperRealisticAds').then(m => ({ default: m.HyperRealisticAds })));
+const DirectResponseToolkit = lazy(() => import('@/components/creative/DirectResponseToolkit').then(m => ({ default: m.DirectResponseToolkit })));
+
 interface CreativeWithClient extends Creative {
   clientName?: string;
 }
 
+// Sidebar navigation structure
+const NAV_SECTIONS = [
+  {
+    title: '',
+    items: [
+      { id: 'command-center', label: 'Command Center', icon: LayoutDashboard },
+    ],
+  },
+  {
+    title: 'AI Tools',
+    items: [
+      { id: 'ai-scripts', label: 'AI Script Writer', icon: PenTool, isNew: true },
+      { id: 'podcast-ads', label: 'Podcast Ads', icon: Headphones, isNew: true },
+      { id: 'hyper-realistic', label: 'Hyper-Realistic', icon: Camera, isNew: true },
+      { id: 'direct-response', label: 'DR Toolkit', icon: Target, isNew: true },
+    ],
+  },
+  {
+    title: 'Create',
+    items: [
+      { id: 'approvals', label: 'Approvals', icon: Upload, showBadge: true },
+      { id: 'briefs', label: 'Briefs & Scripts', icon: FileText },
+      { id: 'static-ads', label: 'Static Ads', icon: Image },
+      { id: 'batch-video', label: 'Batch Video', icon: Film },
+      { id: 'ad-variations', label: 'Ad Variations', icon: Wand2 },
+      { id: 'avatars', label: 'Avatars', icon: User },
+      { id: 'broll', label: 'B-Roll', icon: Film },
+      { id: 'video-editor', label: 'Video Editor', icon: Scissors },
+    ],
+  },
+  {
+    title: 'Research',
+    items: [
+      { id: 'ad-scraping', label: 'Ad Scraping', icon: Radar },
+      { id: 'instagram-intel', label: 'IG Intel', icon: Instagram },
+      { id: 'winning-ads', label: 'Winning Ads', icon: Trophy },
+    ],
+  },
+  {
+    title: 'Manage',
+    items: [
+      { id: 'manage-styles', label: 'Styles', icon: Palette },
+      { id: 'calendar', label: 'Calendar', icon: Calendar },
+      { id: 'history', label: 'History', icon: History },
+      { id: 'export', label: 'Export', icon: Download },
+      { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    ],
+  },
+];
+
 export function CreativesTab() {
-  const [activeSection, setActiveSection] = useState('approvals');
+  const [activeSection, setActiveSection] = useState('command-center');
   const { data: creatives = [], isLoading: creativesLoading } = useAllCreatives();
   const { data: clients = [] } = useClients();
   const updateStatus = useUpdateCreativeStatus();
   const deleteCreative = useDeleteCreative();
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedCreative, setSelectedCreative] = useState<CreativeWithClient | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Map client names to creatives
   const clientMap = clients.reduce((acc, client) => {
@@ -113,7 +172,7 @@ export function CreativesTab() {
 
   // Filter creatives
   const filteredCreatives = creativesWithClients.filter((creative) => {
-    const matchesSearch = 
+    const matchesSearch =
       creative.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       creative.clientName?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesClient = clientFilter === 'all' || creative.client_id === clientFilter;
@@ -172,11 +231,11 @@ export function CreativesTab() {
   };
 
   const handleStatusChange = (creative: CreativeWithClient, status: 'approved' | 'revisions' | 'rejected' | 'launched') => {
-    updateStatus.mutate({ 
-      id: creative.id, 
-      status, 
+    updateStatus.mutate({
+      id: creative.id,
+      status,
       clientId: creative.client_id,
-      creativeTitle: creative.title 
+      creativeTitle: creative.title
     });
   };
 
@@ -186,7 +245,6 @@ export function CreativesTab() {
     }
   };
 
-  // Bulk actions
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -222,41 +280,64 @@ export function CreativesTab() {
     return <CashBagLoader message="Loading creatives..." />;
   }
 
-  const pendingCount = creativesWithClients.filter(c => c.status === 'pending').length;
+  const pendingCount = statusCounts.pending;
   const SuspenseFallback = <CashBagLoader message="Loading section..." />;
 
-  return (
-    <div className="space-y-6">
-      {/* Section Tabs */}
-      <Tabs value={activeSection} onValueChange={setActiveSection}>
-        <TabsList className="bg-muted/50 flex-wrap h-auto gap-1 p-1">
-          <TabsTrigger value="approvals" className="gap-2">
-            <Upload className="h-4 w-4" />
-            Approvals
-            {pendingCount > 0 && (
-              <Badge variant="default" className="ml-1 h-5 min-w-[20px] flex items-center justify-center text-[10px] px-1.5">
-                {pendingCount}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="briefs" className="gap-2"><FileText className="h-4 w-4" />Briefs & Scripts</TabsTrigger>
-          <TabsTrigger value="static-ads" className="gap-2"><Image className="h-4 w-4" />Static Ads</TabsTrigger>
-          <TabsTrigger value="batch-video" className="gap-2"><Film className="h-4 w-4" />Batch Video</TabsTrigger>
-          <TabsTrigger value="ad-variations" className="gap-2"><Wand2 className="h-4 w-4" />Ad Variations</TabsTrigger>
-          <TabsTrigger value="avatars" className="gap-2"><User className="h-4 w-4" />Avatars</TabsTrigger>
-          <TabsTrigger value="ad-scraping" className="gap-2"><Radar className="h-4 w-4" />Ad Scraping</TabsTrigger>
-          <TabsTrigger value="instagram-intel" className="gap-2"><Instagram className="h-4 w-4" />IG Intel</TabsTrigger>
-          <TabsTrigger value="video-editor" className="gap-2"><Scissors className="h-4 w-4" />Video Editor</TabsTrigger>
-          <TabsTrigger value="broll" className="gap-2"><Film className="h-4 w-4" />B-Roll</TabsTrigger>
-          <TabsTrigger value="winning-ads" className="gap-2"><Trophy className="h-4 w-4" />Winning Ads</TabsTrigger>
-          <TabsTrigger value="manage-styles" className="gap-2"><Palette className="h-4 w-4" />Styles</TabsTrigger>
-          <TabsTrigger value="history" className="gap-2"><History className="h-4 w-4" />History</TabsTrigger>
-          <TabsTrigger value="export" className="gap-2"><Download className="h-4 w-4" />Export</TabsTrigger>
-          <TabsTrigger value="calendar" className="gap-2"><Calendar className="h-4 w-4" />Calendar</TabsTrigger>
-          <TabsTrigger value="analytics" className="gap-2"><BarChart3 className="h-4 w-4" />Analytics</TabsTrigger>
-        </TabsList>
+  const renderContent = () => {
+    switch (activeSection) {
+      case 'command-center':
+        return (
+          <Suspense fallback={SuspenseFallback}>
+            <CreativeCommandCenter onNavigate={setActiveSection} statusCounts={statusCounts} />
+          </Suspense>
+        );
+      case 'ai-scripts':
+        return <Suspense fallback={SuspenseFallback}><AIScriptWriter /></Suspense>;
+      case 'podcast-ads':
+        return <Suspense fallback={SuspenseFallback}><PodcastAdsGenerator /></Suspense>;
+      case 'hyper-realistic':
+        return <Suspense fallback={SuspenseFallback}><HyperRealisticAds /></Suspense>;
+      case 'direct-response':
+        return <Suspense fallback={SuspenseFallback}><DirectResponseToolkit /></Suspense>;
+      case 'approvals':
+        return renderApprovalsSection();
+      case 'briefs':
+        return <Suspense fallback={SuspenseFallback}><CreativeBriefs /></Suspense>;
+      case 'static-ads':
+        return <Suspense fallback={SuspenseFallback}><StaticCreativesPage /></Suspense>;
+      case 'batch-video':
+        return <Suspense fallback={SuspenseFallback}><BatchVideoWorkflow /></Suspense>;
+      case 'ad-variations':
+        return <Suspense fallback={SuspenseFallback}><AdVariationsPage /></Suspense>;
+      case 'avatars':
+        return <Suspense fallback={SuspenseFallback}><AvatarsPage /></Suspense>;
+      case 'ad-scraping':
+        return <Suspense fallback={SuspenseFallback}><AdScrapingPage /></Suspense>;
+      case 'instagram-intel':
+        return <Suspense fallback={SuspenseFallback}><InstagramIntelPage /></Suspense>;
+      case 'video-editor':
+        return <Suspense fallback={SuspenseFallback}><VideoEditorPage /></Suspense>;
+      case 'broll':
+        return <Suspense fallback={SuspenseFallback}><BrollPage /></Suspense>;
+      case 'winning-ads':
+        return <Suspense fallback={SuspenseFallback}><WinningAdsGalleryLazy embedded /></Suspense>;
+      case 'manage-styles':
+        return <Suspense fallback={SuspenseFallback}><ManageStylesTabLazy embedded /></Suspense>;
+      case 'history':
+        return <Suspense fallback={SuspenseFallback}><HistoryPage /></Suspense>;
+      case 'export':
+        return <Suspense fallback={SuspenseFallback}><ExportHubPage /></Suspense>;
+      case 'calendar':
+        return <Suspense fallback={SuspenseFallback}><CreativeCalendarLazy embedded /></Suspense>;
+      case 'analytics':
+        return <Suspense fallback={SuspenseFallback}><CreativeAnalyticsLazy embedded /></Suspense>;
+      default:
+        return null;
+    }
+  };
 
-        <TabsContent value="approvals" className="mt-4 space-y-6">
+  const renderApprovalsSection = () => (
+    <div className="space-y-6">
       {/* Search and Filters */}
       <div className="flex flex-wrap gap-4">
         <div className="relative flex-1 min-w-[200px]">
@@ -265,11 +346,11 @@ export function CreativesTab() {
             placeholder="Search creatives..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-11 rounded-xl"
           />
         </div>
         <Select value={clientFilter} onValueChange={setClientFilter}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-[200px] h-11 rounded-xl">
             <SelectValue placeholder="Filter by client" />
           </SelectTrigger>
           <SelectContent>
@@ -282,7 +363,7 @@ export function CreativesTab() {
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[180px] h-11 rounded-xl">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
@@ -299,18 +380,18 @@ export function CreativesTab() {
 
       {/* Bulk Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+        <div className="flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl backdrop-blur-sm">
           <CheckSquare className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
-          <Button size="sm" variant="default" onClick={() => handleBulkAction('approved')}>
+          <Button size="sm" variant="default" onClick={() => handleBulkAction('approved')} className="rounded-lg">
             <Check className="h-3 w-3 mr-1" />
             Approve All
           </Button>
-          <Button size="sm" variant="destructive" onClick={() => handleBulkAction('rejected')}>
+          <Button size="sm" variant="destructive" onClick={() => handleBulkAction('rejected')} className="rounded-lg">
             <X className="h-3 w-3 mr-1" />
             Reject All
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} className="rounded-lg">
             Clear
           </Button>
         </div>
@@ -318,319 +399,147 @@ export function CreativesTab() {
 
       {/* Status Summary */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-        <div className="bg-muted/50 rounded-lg p-3 text-center">
-          <p className="text-2xl font-bold">{statusCounts.all}</p>
-          <p className="text-xs text-muted-foreground">Total</p>
-        </div>
-        <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
-          <p className="text-2xl font-bold text-amber-600">{statusCounts.pending}</p>
-          <p className="text-xs text-muted-foreground">Pending</p>
-        </div>
-        <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center">
-          <p className="text-2xl font-bold text-green-600">{statusCounts.approved}</p>
-          <p className="text-xs text-muted-foreground">Approved</p>
-        </div>
-        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
-          <p className="text-2xl font-bold text-blue-600">{statusCounts.launched}</p>
-          <p className="text-xs text-muted-foreground">Launched</p>
-        </div>
-        <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-3 text-center">
-          <p className="text-2xl font-bold text-orange-600">{statusCounts.revisions}</p>
-          <p className="text-xs text-muted-foreground">Revisions</p>
-        </div>
-        <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center">
-          <p className="text-2xl font-bold text-red-600">{statusCounts.rejected}</p>
-          <p className="text-xs text-muted-foreground">Rejected</p>
-        </div>
+        {[
+          { label: 'Total', count: statusCounts.all, bg: 'bg-muted/50', color: '' },
+          { label: 'Pending', count: statusCounts.pending, bg: 'bg-amber-50 dark:bg-amber-900/20', color: 'text-amber-600' },
+          { label: 'Approved', count: statusCounts.approved, bg: 'bg-green-50 dark:bg-green-900/20', color: 'text-green-600' },
+          { label: 'Launched', count: statusCounts.launched, bg: 'bg-blue-50 dark:bg-blue-900/20', color: 'text-blue-600' },
+          { label: 'Revisions', count: statusCounts.revisions, bg: 'bg-orange-50 dark:bg-orange-900/20', color: 'text-orange-600' },
+          { label: 'Rejected', count: statusCounts.rejected, bg: 'bg-red-50 dark:bg-red-900/20', color: 'text-red-600' },
+        ].map(item => (
+          <div key={item.label} className={`${item.bg} rounded-2xl p-4 text-center`}>
+            <p className={`text-2xl font-bold ${item.color}`}>{item.count}</p>
+            <p className="text-xs text-muted-foreground">{item.label}</p>
+          </div>
+        ))}
       </div>
 
-      <Tabs defaultValue="creatives" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="creatives" className="gap-2">
-            <Upload className="h-4 w-4" />
-            All Creatives ({filteredCreatives.length})
-          </TabsTrigger>
-          <TabsTrigger value="ai-generated" className="gap-2">
-            <Sparkles className="h-4 w-4" />
-            AI Generated ({creativesWithClients.filter(c => c.source === 'ai-auto').length})
-          </TabsTrigger>
-          <TabsTrigger value="activity" className="gap-2">
-            <Clock className="h-4 w-4" />
-            Recent Activity
-          </TabsTrigger>
-        </TabsList>
+      {/* Creatives Grid */}
+      {filteredCreatives.length > 0 && (
+        <div className="flex items-center gap-2 mb-2">
+          <Checkbox
+            checked={selectedIds.size === filteredCreatives.length && filteredCreatives.length > 0}
+            onCheckedChange={toggleSelectAll}
+          />
+          <span className="text-sm text-muted-foreground">Select all</span>
+        </div>
+      )}
 
-        <TabsContent value="creatives" className="space-y-4">
-          {filteredCreatives.length > 0 && (
-            <div className="flex items-center gap-2 mb-2">
-              <Checkbox
-                checked={selectedIds.size === filteredCreatives.length && filteredCreatives.length > 0}
-                onCheckedChange={toggleSelectAll}
-              />
-              <span className="text-sm text-muted-foreground">Select all</span>
-            </div>
-          )}
-          {filteredCreatives.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Upload className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                <p className="text-muted-foreground">No creatives found</p>
-                <p className="text-sm text-muted-foreground">
-                  Upload creatives from individual client dashboards
+      {filteredCreatives.length === 0 ? (
+        <Card className="rounded-2xl">
+          <CardContent className="py-16 text-center">
+            <Upload className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
+            <p className="text-muted-foreground font-medium">No creatives found</p>
+            <p className="text-sm text-muted-foreground/60 mt-1">
+              Upload creatives from individual client dashboards
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredCreatives.map((creative) => (
+            <Card key={creative.id} className="overflow-hidden rounded-2xl hover:shadow-lg hover:border-primary/30 transition-all duration-300 relative group">
+              {/* Checkbox overlay */}
+              <div className="absolute top-3 left-3 z-10" onClick={(e) => e.stopPropagation()}>
+                <Checkbox
+                  checked={selectedIds.has(creative.id)}
+                  onCheckedChange={() => toggleSelect(creative.id)}
+                />
+              </div>
+              <div className="aspect-video bg-muted relative overflow-hidden">
+                {creative.type === 'image' && creative.file_url ? (
+                  <img
+                    src={creative.file_url}
+                    alt={creative.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                ) : creative.type === 'video' && creative.file_url ? (
+                  <video
+                    src={creative.file_url}
+                    className="w-full h-full object-cover"
+                    muted
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    {getTypeIcon(creative.type)}
+                    <span className="ml-2 text-sm text-muted-foreground capitalize">{creative.type}</span>
+                  </div>
+                )}
+                <Badge className={`absolute top-3 right-3 ${getStatusColor(creative.status)} rounded-lg`}>
+                  {getStatusIcon(creative.status)}
+                  <span className="ml-1 capitalize">{creative.status}</span>
+                </Badge>
+                {creative.source === 'ai-auto' && (
+                  <Badge className="absolute bottom-3 right-3 bg-violet-600 text-white dark:bg-violet-500 text-[10px] gap-1 rounded-lg">
+                    <Sparkles className="h-3 w-3" />
+                    AI Generated
+                  </Badge>
+                )}
+              </div>
+              <CardContent className="p-4">
+                <h4 className="font-semibold truncate">{creative.title}</h4>
+                <p className="text-xs text-muted-foreground truncate mt-0.5">{creative.clientName}</p>
+                <div className="flex items-center justify-between mt-3">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Badge variant="outline" className="text-xs rounded-lg">
+                      {creative.platform}
+                    </Badge>
+                    {creative.comments.length > 0 && (
+                      <span className="flex items-center gap-1">
+                        <MessageSquare className="h-3 w-3" />
+                        {creative.comments.length}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-1">
+                    {creative.file_url && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 rounded-lg"
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = creative.file_url!;
+                          link.download = creative.title || 'creative';
+                          link.target = '_blank';
+                          link.rel = 'noreferrer';
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                        title="Download"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 rounded-lg"
+                      onClick={() => setSelectedCreative(creative)}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 rounded-lg"
+                      onClick={() => handleDelete(creative)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {formatDistanceToNow(new Date(creative.created_at), { addSuffix: true })}
                 </p>
               </CardContent>
             </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredCreatives.map((creative) => (
-                <Card key={creative.id} className="overflow-hidden hover:border-primary/50 transition-all duration-200 relative">
-                  {/* Checkbox overlay */}
-                  <div className="absolute top-2 left-2 z-10" onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      checked={selectedIds.has(creative.id)}
-                      onCheckedChange={() => toggleSelect(creative.id)}
-                    />
-                  </div>
-                  <div className="aspect-video bg-muted relative overflow-hidden">
-                    {creative.type === 'image' && creative.file_url ? (
-                      <img
-                        src={creative.file_url}
-                        alt={creative.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : creative.type === 'video' && creative.file_url ? (
-                      <video
-                        src={creative.file_url}
-                        className="w-full h-full object-cover"
-                        muted
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        {getTypeIcon(creative.type)}
-                        <span className="ml-2 text-sm text-muted-foreground capitalize">{creative.type}</span>
-                      </div>
-                    )}
-                    <Badge className={`absolute top-2 right-2 ${getStatusColor(creative.status)}`}>
-                      {getStatusIcon(creative.status)}
-                      <span className="ml-1 capitalize">{creative.status}</span>
-                    </Badge>
-                    {creative.source === 'ai-auto' && (
-                      <Badge className="absolute bottom-2 right-2 bg-violet-600 text-white dark:bg-violet-500 text-[10px] gap-1">
-                        <Sparkles className="h-3 w-3" />
-                        Auto-Generated
-                      </Badge>
-                    )}
-                  </div>
-                  <CardContent className="p-3">
-                    <h4 className="font-medium truncate">{creative.title}</h4>
-                    <p className="text-xs text-muted-foreground truncate">{creative.clientName}</p>
-                    <div className="flex items-center justify-between mt-2">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline" className="text-xs">
-                          {creative.platform}
-                        </Badge>
-                        {creative.comments.length > 0 && (
-                          <span className="flex items-center gap-1">
-                            <MessageSquare className="h-3 w-3" />
-                            {creative.comments.length}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex gap-1">
-                        {creative.file_url && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = creative.file_url!;
-                              link.download = creative.title || 'creative';
-                              link.target = '_blank';
-                              link.rel = 'noreferrer';
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                            }}
-                            title="Download"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedCreative(creative)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(creative)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {formatDistanceToNow(new Date(creative.created_at), { addSuffix: true })}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
+          ))}
+        </div>
+      )}
 
-        {/* AI Generated Performance Tracking */}
-        <TabsContent value="ai-generated" className="space-y-4">
-          {(() => {
-            const aiCreatives = creativesWithClients.filter(c => c.source === 'ai-auto');
-            const aiApproved = aiCreatives.filter(c => c.status === 'approved' || c.status === 'launched').length;
-            const aiPending = aiCreatives.filter(c => c.status === 'pending').length;
-            const aiRejected = aiCreatives.filter(c => c.status === 'rejected').length;
-            
-            return (
-              <>
-                {/* AI Performance Summary */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Card className="p-4 text-center">
-                    <p className="text-2xl font-bold">{aiCreatives.length}</p>
-                    <p className="text-xs text-muted-foreground">Total AI Generated</p>
-                  </Card>
-                  <Card className="p-4 text-center">
-                    <p className="text-2xl font-bold text-amber-600">{aiPending}</p>
-                    <p className="text-xs text-muted-foreground">Awaiting Approval</p>
-                  </Card>
-                  <Card className="p-4 text-center">
-                    <p className="text-2xl font-bold text-green-600">{aiApproved}</p>
-                    <p className="text-xs text-muted-foreground">Approved / Launched</p>
-                  </Card>
-                  <Card className="p-4 text-center">
-                    <p className="text-2xl font-bold text-red-600">{aiRejected}</p>
-                    <p className="text-xs text-muted-foreground">Rejected</p>
-                  </Card>
-                </div>
-
-                {aiCreatives.length === 0 ? (
-                  <Card>
-                    <CardContent className="py-12 text-center">
-                      <Sparkles className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">No AI-generated creatives yet</p>
-                      <p className="text-sm text-muted-foreground">
-                        Creatives are auto-generated when CPL exceeds thresholds
-                      </p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {aiCreatives.map((creative) => (
-                      <Card key={creative.id} className="overflow-hidden hover:border-primary/50 transition-all duration-200 border-violet-500/30">
-                        <div className="aspect-video bg-muted relative overflow-hidden">
-                          {creative.file_url ? (
-                            <img src={creative.file_url} alt={creative.title} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Sparkles className="h-8 w-8 text-violet-500" />
-                            </div>
-                          )}
-                          <Badge className={`absolute top-2 right-2 ${getStatusColor(creative.status)}`}>
-                            {creative.status}
-                          </Badge>
-                          <Badge className="absolute bottom-2 right-2 bg-violet-600 text-white text-[10px] gap-1">
-                            <Sparkles className="h-3 w-3" />
-                            Auto-Generated
-                          </Badge>
-                        </div>
-                        <CardContent className="p-3">
-                          <h4 className="font-medium truncate">{creative.title}</h4>
-                          <p className="text-xs text-muted-foreground">{creative.clientName}</p>
-                          {creative.trigger_campaign_id && (
-                            <p className="text-xs text-violet-500 mt-1">CPL Triggered</p>
-                          )}
-                          <div className="flex items-center justify-between mt-2">
-                            <Badge variant="outline" className="text-xs">{creative.platform}</Badge>
-                            <div className="flex gap-1">
-                              <Button variant="ghost" size="sm" onClick={() => setSelectedCreative(creative)}>
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            {formatDistanceToNow(new Date(creative.created_at), { addSuffix: true })}
-                          </p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </>
-            );
-          })()}
-        </TabsContent>
-
-        <TabsContent value="activity" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Recent Creative Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[500px]">
-                <div className="space-y-3">
-                  {recentActivity.map((creative) => (
-                    <div
-                      key={creative.id}
-                      className="flex items-start gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors duration-200 cursor-pointer"
-                      onClick={() => setSelectedCreative(creative)}
-                    >
-                      <div className="w-16 h-16 rounded-md bg-muted overflow-hidden flex-shrink-0">
-                        {creative.type === 'image' && creative.file_url ? (
-                          <img
-                            src={creative.file_url}
-                            alt={creative.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : creative.type === 'video' && creative.file_url ? (
-                          <video
-                            src={creative.file_url}
-                            className="w-full h-full object-cover"
-                            muted
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            {getTypeIcon(creative.type)}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge className={getStatusColor(creative.status)}>
-                            {getStatusIcon(creative.status)}
-                            <span className="ml-1 capitalize">{creative.status}</span>
-                          </Badge>
-                          <Badge variant="outline">{creative.platform}</Badge>
-                        </div>
-                        <h4 className="font-medium truncate">{creative.title}</h4>
-                        <p className="text-sm text-muted-foreground">{creative.clientName}</p>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(creative.updated_at), 'MMM d, yyyy')}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(creative.updated_at), 'h:mm a')}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Creative Detail Modal - Horizontal Layout */}
+      {/* Creative Detail Modal */}
       <Dialog open={!!selectedCreative} onOpenChange={(open) => !open && setSelectedCreative(null)}>
         <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto sm:max-w-[95vw]">
           <DialogHeader>
@@ -651,19 +560,17 @@ export function CreativesTab() {
                 </span>
               </div>
 
-              {/* Horizontal Platform Preview - All platforms side by side */}
-              <CreativeHorizontalPreview 
-                creative={selectedCreative} 
+              <CreativeHorizontalPreview
+                creative={selectedCreative}
                 clientName={selectedCreative.clientName || 'Unknown Client'}
               />
 
-              {/* Download + AI Actions */}
               <div className="flex items-center gap-2 flex-wrap border-t pt-4">
                 {selectedCreative.file_url && (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="gap-2"
+                    className="gap-2 rounded-xl"
                     onClick={() => {
                       const link = document.createElement('a');
                       link.href = selectedCreative.file_url!;
@@ -685,12 +592,12 @@ export function CreativesTab() {
                 <CreativeAIActions creative={selectedCreative} />
               </div>
 
-              {/* Action Buttons */}
               <div className="flex gap-2 flex-wrap border-t pt-4">
                 {selectedCreative.status === 'pending' && (
                   <>
                     <Button
                       variant="default"
+                      className="rounded-xl"
                       onClick={() => handleStatusChange(selectedCreative, 'approved')}
                     >
                       <Check className="h-4 w-4 mr-1" />
@@ -698,6 +605,7 @@ export function CreativesTab() {
                     </Button>
                     <Button
                       variant="outline"
+                      className="rounded-xl"
                       onClick={() => handleStatusChange(selectedCreative, 'revisions')}
                     >
                       <RefreshCw className="h-4 w-4 mr-1" />
@@ -705,6 +613,7 @@ export function CreativesTab() {
                     </Button>
                     <Button
                       variant="destructive"
+                      className="rounded-xl"
                       onClick={() => handleStatusChange(selectedCreative, 'rejected')}
                     >
                       <X className="h-4 w-4 mr-1" />
@@ -715,6 +624,7 @@ export function CreativesTab() {
                 {selectedCreative.status === 'approved' && (
                   <Button
                     variant="default"
+                    className="rounded-xl"
                     onClick={() => handleStatusChange(selectedCreative, 'launched')}
                   >
                     <Rocket className="h-4 w-4 mr-1" />
@@ -723,6 +633,7 @@ export function CreativesTab() {
                 )}
                 <Button
                   variant="ghost"
+                  className="rounded-xl"
                   onClick={() => handleDelete(selectedCreative)}
                 >
                   <Trash2 className="h-4 w-4 mr-1 text-destructive" />
@@ -730,7 +641,6 @@ export function CreativesTab() {
                 </Button>
               </div>
 
-              {/* Approval History Timeline */}
               <div className="border-t pt-4">
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
                   <Clock className="h-4 w-4" />
@@ -754,19 +664,18 @@ export function CreativesTab() {
                 </div>
               </div>
 
-              {/* Comments */}
               <div className="border-t pt-4">
                 <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
                   Comments ({selectedCreative.comments.length})
                 </h4>
                 {selectedCreative.comments.length > 0 ? (
-                  <ScrollArea className="h-[200px] border rounded-lg p-3 mb-2">
+                  <ScrollArea className="h-[200px] border rounded-xl p-3 mb-2">
                     <div className="space-y-2">
                       {selectedCreative.comments.map((comment) => (
                         <div
                           key={comment.id}
-                          className={`p-2 rounded-lg text-sm ${
+                          className={`p-3 rounded-xl text-sm ${
                             comment.author === 'Client'
                               ? 'bg-primary/10 ml-4'
                               : 'bg-muted mr-4'
@@ -791,54 +700,69 @@ export function CreativesTab() {
           )}
         </DialogContent>
       </Dialog>
-        </TabsContent>
+    </div>
+  );
 
-        <TabsContent value="briefs" className="mt-4">
-          <Suspense fallback={SuspenseFallback}><CreativeBriefs /></Suspense>
-        </TabsContent>
-        <TabsContent value="static-ads" className="mt-4">
-          <Suspense fallback={SuspenseFallback}><StaticCreativesPage /></Suspense>
-        </TabsContent>
-        <TabsContent value="batch-video" className="mt-4">
-          <Suspense fallback={SuspenseFallback}><BatchVideoWorkflow /></Suspense>
-        </TabsContent>
-        <TabsContent value="ad-variations" className="mt-4">
-          <Suspense fallback={SuspenseFallback}><AdVariationsPage /></Suspense>
-        </TabsContent>
-        <TabsContent value="avatars" className="mt-4">
-          <Suspense fallback={SuspenseFallback}><AvatarsPage /></Suspense>
-        </TabsContent>
-        <TabsContent value="ad-scraping" className="mt-4">
-          <Suspense fallback={SuspenseFallback}><AdScrapingPage /></Suspense>
-        </TabsContent>
-        <TabsContent value="instagram-intel" className="mt-4">
-          <Suspense fallback={SuspenseFallback}><InstagramIntelPage /></Suspense>
-        </TabsContent>
-        <TabsContent value="video-editor" className="mt-4">
-          <Suspense fallback={SuspenseFallback}><VideoEditorPage /></Suspense>
-        </TabsContent>
-        <TabsContent value="broll" className="mt-4">
-          <Suspense fallback={SuspenseFallback}><BrollPage /></Suspense>
-        </TabsContent>
-        <TabsContent value="winning-ads" className="mt-4">
-          <Suspense fallback={SuspenseFallback}><WinningAdsGalleryLazy embedded /></Suspense>
-        </TabsContent>
-        <TabsContent value="manage-styles" className="mt-4">
-          <Suspense fallback={SuspenseFallback}><ManageStylesTabLazy embedded /></Suspense>
-        </TabsContent>
-        <TabsContent value="history" className="mt-4">
-          <Suspense fallback={SuspenseFallback}><HistoryPage /></Suspense>
-        </TabsContent>
-        <TabsContent value="export" className="mt-4">
-          <Suspense fallback={SuspenseFallback}><ExportHubPage /></Suspense>
-        </TabsContent>
-        <TabsContent value="calendar" className="mt-4">
-          <Suspense fallback={SuspenseFallback}><CreativeCalendarLazy embedded /></Suspense>
-        </TabsContent>
-        <TabsContent value="analytics" className="mt-4">
-          <Suspense fallback={SuspenseFallback}><CreativeAnalyticsLazy embedded /></Suspense>
-        </TabsContent>
-      </Tabs>
+  return (
+    <div className="flex gap-0 -mx-2 -mt-2">
+      {/* Apple-style Sidebar Navigation */}
+      <div className={`flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-16' : 'w-60'}`}>
+        <div className="sticky top-0 h-[calc(100vh-120px)]">
+          <ScrollArea className="h-full">
+            <div className={`py-3 ${sidebarCollapsed ? 'px-2' : 'px-3'} space-y-6`}>
+              {NAV_SECTIONS.map((section, sectionIdx) => (
+                <div key={sectionIdx}>
+                  {section.title && !sidebarCollapsed && (
+                    <p className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-3 mb-1.5">
+                      {section.title}
+                    </p>
+                  )}
+                  <div className="space-y-0.5">
+                    {section.items.map(item => {
+                      const isActive = activeSection === item.id;
+                      const Icon = item.icon;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => setActiveSection(item.id)}
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-200 ${
+                            isActive
+                              ? 'bg-primary/10 text-primary font-medium shadow-sm'
+                              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                          } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                          title={sidebarCollapsed ? item.label : undefined}
+                        >
+                          <Icon className={`h-4 w-4 flex-shrink-0 ${isActive ? 'text-primary' : ''}`} />
+                          {!sidebarCollapsed && (
+                            <>
+                              <span className="truncate">{item.label}</span>
+                              {'isNew' in item && item.isNew && (
+                                <Badge className="ml-auto text-[9px] px-1.5 py-0 h-4 bg-violet-500 text-white border-0">
+                                  NEW
+                                </Badge>
+                              )}
+                              {'showBadge' in item && item.showBadge && pendingCount > 0 && (
+                                <Badge className="ml-auto text-[10px] px-1.5 py-0 h-5 bg-amber-500 text-white border-0">
+                                  {pendingCount}
+                                </Badge>
+                              )}
+                            </>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 min-w-0 border-l pl-6 pr-2">
+        {renderContent()}
+      </div>
     </div>
   );
 }
