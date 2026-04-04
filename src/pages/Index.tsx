@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { AppHeader } from '@/components/layout/AppHeader';
@@ -29,6 +29,7 @@ import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
 import { AgencyBillingTab } from '@/components/billing/AgencyBillingTab';
 import { DealPipelineBoard } from '@/components/deals/DealPipelineBoard';
 import { DataHealthCard } from '@/components/dashboard/DataHealthCard';
+import { AgencyIntegrationsTab } from '@/components/settings/AgencyIntegrationsTab';
 import { IntegrationStatusCards } from '@/components/dashboard/IntegrationStatusCards';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -53,13 +54,17 @@ import { useUpdateClientOrder } from '@/hooks/useClientOrder';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
 import { toast } from 'sonner';
 
-// Inline page components for Database, Spam, Briefs (rendered inside sidebar layout)
+// Inline page components for Database, Spam (rendered inside sidebar layout)
 import DatabaseView from './DatabaseView';
 import SpamBlacklist from './SpamBlacklist';
-import CreativeBriefs from './CreativeBriefs';
+import { AdminAdsManagerTab } from '@/components/ads-manager/AdminAdsManagerTab';
+import { AdminOffersTab } from '@/components/offers/AdminOffersTab';
+import { QuizBuilderTab } from '@/components/quiz/QuizBuilderTab';
+import { AgentsTab } from '@/components/agents/AgentsTab';
 
 const Index = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { currentMember, logout } = useTeamMember();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -72,10 +77,19 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedFunnelClientId, setSelectedFunnelClientId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+
+  // Deep-link: if ?task= is present, auto-switch to tasks tab
+  useEffect(() => {
+    const taskId = searchParams.get('task');
+    if (taskId) {
+      setActiveTab('tasks');
+    }
+  }, [searchParams]);
   const updateClientOrder = useUpdateClientOrder();
 
   const { startDate, endDate, sourceFilter } = useDateFilter();
-  const { data: clients = [], isLoading: clientsLoading } = useClients();
+  const { data: allClients = [], isLoading: clientsLoading } = useClients();
+  const clients = useMemo(() => allClients.filter(c => c.status === 'active' || c.status === 'onboarding' || c.status === 'paused'), [allClients]);
   const { data: dailyMetrics = [], isLoading: metricsLoading } = useAllDailyMetrics(startDate, endDate);
   const { data: fundedInvestors = [] } = useFundedInvestors(undefined, startDate, endDate);
   const { data: allLeads = [] } = useLeads(undefined, startDate, endDate);
@@ -227,8 +241,19 @@ const Index = () => {
             {/* Spam utility page */}
             {activeTab === 'spam' && <SpamBlacklist embedded />}
 
-            {/* Briefs utility page */}
-            {activeTab === 'briefs' && <CreativeBriefs embedded />}
+            {/* Ads Manager */}
+            {activeTab === 'ads-manager' && <AdminAdsManagerTab platform="all" />}
+
+            {/* Offers */}
+            {activeTab === 'offers' && (
+              <SectionErrorBoundary sectionName="Offers">
+                <div className="mb-4">
+                  <h2 className="text-lg font-bold">Offers</h2>
+                  <p className="text-sm text-muted-foreground">Manage offers across all clients — the main feed for building statics & videos</p>
+                </div>
+                <AdminOffersTab clients={clients} />
+              </SectionErrorBoundary>
+            )}
 
             {/* Dashboard */}
             {activeTab === 'dashboard' && (
@@ -392,15 +417,15 @@ const Index = () => {
             {activeTab === 'creatives' && (
               <SectionErrorBoundary sectionName="Creatives">
                 <div className="mb-4">
-                  <h2 className="text-lg font-bold">Creative Approvals</h2>
-                  <p className="text-sm text-muted-foreground">Manage creative assets across all clients</p>
+                  <h2 className="text-lg font-bold">Creatives</h2>
+                  <p className="text-sm text-muted-foreground">Manage all creative assets, briefs, and tools</p>
                 </div>
                 <CreativesTab />
               </SectionErrorBoundary>
             )}
 
             {/* Funnel */}
-            {activeTab === 'funnel' && (
+            {activeTab === 'funnel-builder' && (
               <SectionErrorBoundary sectionName="Funnel Preview">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
                   <div>
@@ -429,6 +454,13 @@ const Index = () => {
                     <p className="text-muted-foreground">Select a client to view their funnel</p>
                   </div>
                 )}
+              </SectionErrorBoundary>
+            )}
+
+            {/* Quiz Builder */}
+            {activeTab === 'funnel-quiz' && (
+              <SectionErrorBoundary sectionName="Quiz Builder">
+                <QuizBuilderTab />
               </SectionErrorBoundary>
             )}
 
@@ -461,6 +493,20 @@ const Index = () => {
             {activeTab === 'data-audit' && currentMember?.role === 'admin' && (
               <SectionErrorBoundary sectionName="DataAccuracyAudit">
                 <DataAccuracyAuditPanel />
+              </SectionErrorBoundary>
+            )}
+
+            {/* Agents */}
+            {activeTab === 'agents' && (
+              <SectionErrorBoundary sectionName="Agents">
+                <AgentsTab clients={clients} />
+              </SectionErrorBoundary>
+            )}
+
+            {/* Integrations */}
+            {activeTab === 'integrations' && (
+              <SectionErrorBoundary sectionName="Integrations">
+                <AgencyIntegrationsTab />
               </SectionErrorBoundary>
             )}
           </main>
