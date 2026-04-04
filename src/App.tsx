@@ -28,6 +28,7 @@ import AdVariationsPage from "./pages/AdVariationsPage";
 import AvatarsPage from "./pages/AvatarsPage";
 import BrollPage from "./pages/BrollPage";
 import VideoEditorPage from "./pages/VideoEditorPage";
+import AvatarAdGeneratorPage from "./pages/AvatarAdGeneratorPage";
 import InstagramIntelPage from "./pages/InstagramIntelPage";
 import HistoryPage from "./pages/HistoryPage";
 import ExportHubPage from "./pages/ExportHubPage";
