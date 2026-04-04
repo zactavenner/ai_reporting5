@@ -110,13 +110,13 @@ export function useFlowboard({ projectId }: UseFlowboardOptions) {
   const { data: flowboard, isLoading } = useQuery({
     queryKey: ['flowboard', projectId],
     queryFn: async () => {
-      const { data, error } = await (supabase
+      const { data, error } = await (supabase as any)
         .from('flowboards')
         .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single() as any);
+        .single();
       if (error && error.code !== 'PGRST116') throw error;
       return data;
     },

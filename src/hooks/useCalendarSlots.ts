@@ -18,12 +18,12 @@ export function useCalendarSlots({ route, selectedDate, timezone = 'America/New_
   useEffect(() => {
     async function fetchMapping() {
       setLoadingCalendarId(true);
-      const { data, error } = await (supabase
+      const { data, error } = await (supabase as any)
         .from('calendar_mappings')
         .select('calendar_id')
-        .eq('route' as any, route)
+        .eq('route', route)
         .limit(1)
-        .maybeSingle() as any);
+        .maybeSingle();
 
       if (!error && data) {
         setCalendarId(data.calendar_id);
