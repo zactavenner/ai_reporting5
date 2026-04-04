@@ -88,7 +88,7 @@ export default function AssetGeneratorTab({ client, assetType, icon: Icon, title
         .eq('asset_type', 'angles')
         .order('created_at', { ascending: false })
         .limit(1);
-      if (angleAssets?.[0]?.content) existing_angles = angleAssets[0].content;
+      if ((angleAssets as any)?.[0]?.content) existing_angles = (angleAssets as any)[0].content;
     }
 
     return { existing_research, existing_angles };
