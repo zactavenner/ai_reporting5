@@ -16,16 +16,16 @@ Deno.serve(async (req) => {
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // Parse optional sinceDateDays from request body
-  let sinceDateDays: number | undefined;
+  // Parse optional sinceDateDays from request body (default: 14 days for contacts)
+  let sinceDateDays: number = 14;
   try {
     const body = await req.json();
     if (body?.sinceDateDays) {
-      sinceDateDays = Math.min(Math.max(parseInt(body.sinceDateDays) || 7, 1), 365);
+      sinceDateDays = Math.min(Math.max(parseInt(body.sinceDateDays) || 14, 1), 365);
     }
   } catch {}
 
-  console.log(`[sync-ghl-all-clients] Starting GHL sync${sinceDateDays ? ` (${sinceDateDays} days back)` : ''}`);
+  console.log(`[sync-ghl-all-clients] Starting GHL sync (${sinceDateDays} days back)`);
 
   // Get all clients with valid GHL credentials (sync every credentialed client)
   const { data: clients, error } = await supabase
@@ -53,10 +53,9 @@ Deno.serve(async (req) => {
       const clientResult = { clientId: client.id, name: client.name, contacts: false, calendar: false, pipelines: false, errors: [] as string[] };
       console.log(`[sync-ghl-all-clients] (${i + 1}/${ghlClients.length}) Syncing ${client.name}...`);
 
-      // 1. Sync contacts (leads) - pass sinceDateDays if provided
+      // 1. Sync contacts (leads) - always pass sinceDateDays to prevent full-history timeout
       try {
-        const contactsBody: Record<string, unknown> = { client_id: client.id, syncType: "contacts" };
-        if (sinceDateDays) contactsBody.sinceDateDays = sinceDateDays;
+        const contactsBody: Record<string, unknown> = { client_id: client.id, syncType: "contacts", sinceDateDays };
         
         const res = await fetch(`${supabaseUrl}/functions/v1/sync-ghl-contacts`, {
           method: "POST",
@@ -75,8 +74,7 @@ Deno.serve(async (req) => {
 
       // 2. Sync calendar appointments
       try {
-        const calendarBody: Record<string, unknown> = { clientId: client.id };
-        if (sinceDateDays) calendarBody.sinceDateDays = sinceDateDays;
+        const calendarBody: Record<string, unknown> = { clientId: client.id, sinceDateDays };
         
         const res = await fetch(`${supabaseUrl}/functions/v1/sync-calendar-appointments`, {
           method: "POST",
@@ -126,7 +124,7 @@ Deno.serve(async (req) => {
       const res = await fetch(`${supabaseUrl}/functions/v1/recalculate-daily-metrics`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseKey}` },
-        body: JSON.stringify({ days: sinceDateDays || 7 }),
+        body: JSON.stringify({ days: sinceDateDays }),
       });
       const data = await res.json();
       console.log(`[sync-ghl-all-clients] Metrics recalculation result:`, JSON.stringify(data));
@@ -141,7 +139,7 @@ Deno.serve(async (req) => {
     EdgeRuntime.waitUntil(doSync());
     return new Response(JSON.stringify({
       success: true,
-      message: `GHL sync started for ${ghlClients.length} clients (background)${sinceDateDays ? `, ${sinceDateDays} days back` : ''}`,
+      message: `GHL sync started for ${ghlClients.length} clients (background), ${sinceDateDays} days back`,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } else {
     const results = await doSync();

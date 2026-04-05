@@ -88,8 +88,18 @@ function getClientSyncStatus(client: Client): {
     const lastGhlSyncAt = client.last_ghl_sync_at;
     const ghlSyncError = client.ghl_sync_error;
     if (ghlSyncStatus) {
+      // Even if status is "healthy", check if sync is actually recent (within 48 hours)
+      let effectiveStatus = ghlSyncStatus as 'healthy' | 'stale' | 'error' | 'not_configured';
+      if (effectiveStatus === 'healthy' && lastGhlSyncAt) {
+        const hoursSinceSync = (Date.now() - new Date(lastGhlSyncAt).getTime()) / (1000 * 60 * 60);
+        if (hoursSinceSync > 48) {
+          effectiveStatus = 'stale';
+        }
+      } else if (effectiveStatus === 'healthy' && !lastGhlSyncAt) {
+        effectiveStatus = 'stale';
+      }
       return {
-        status: ghlSyncStatus as 'healthy' | 'stale' | 'error' | 'not_configured',
+        status: effectiveStatus,
         lastSyncAt: lastGhlSyncAt,
         error: ghlSyncError,
         source: 'ghl',
