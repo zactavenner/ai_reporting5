@@ -95,6 +95,56 @@ export function useUpdateQuizSubmission() {
   });
 }
 
+export interface QuizSubmission {
+  id: string;
+  quiz_funnel_id: string;
+  client_id: string;
+  answers: Record<string, string>;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  booking_date: string | null;
+  booking_time: string | null;
+  step_reached: number;
+  completed: boolean;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+  utm_term: string | null;
+  created_at: string;
+}
+
+export function useQuizSubmissions(quizFunnelId?: string) {
+  return useQuery({
+    queryKey: ['quiz-submissions', quizFunnelId],
+    queryFn: async () => {
+      if (!quizFunnelId) return [];
+      const { data, error } = await (supabase as any)
+        .from('quiz_submissions')
+        .select('*')
+        .eq('quiz_funnel_id', quizFunnelId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as QuizSubmission[];
+    },
+    enabled: !!quizFunnelId,
+  });
+}
+
+export function useUpdateQuizFunnel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<QuizFunnel> & { id: string }) => {
+      const { data, error } = await (supabase as any).from('quiz_funnels').update(updates).eq('id', id).select().single();
+      if (error) throw error;
+      return data as QuizFunnel;
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['quiz-funnels'] }); },
+  });
+}
+
 export function useDeleteQuizFunnel() {
   const queryClient = useQueryClient();
   return useMutation({
