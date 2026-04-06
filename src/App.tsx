@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,55 +6,76 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { DateFilterProvider } from "@/contexts/DateFilterContext";
 import { PasswordGate } from "@/components/auth/PasswordGate";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { Loader2 } from "lucide-react";
 
-// Core reporting pages
-import Index from "./pages/Index";
-import ClientDetail from "./pages/ClientDetail";
-import ClientRecords from "./pages/ClientRecords";
-import DatabaseView from "./pages/DatabaseView";
-import PublicReport from "./pages/PublicReport";
-import SpamBlacklist from "./pages/SpamBlacklist";
-import NotFound from "./pages/NotFound";
-import ClientCreatives from "./pages/ClientCreatives";
-import PublicCreatives from "./pages/PublicCreatives";
-import MetaAdsOverlay from "./pages/MetaAdsOverlay";
-import CreativeBriefs from "./pages/CreativeBriefs";
+// Auto-retry dynamic imports on failure (handles stale cache after deploys)
+function lazyRetry(fn: () => Promise<any>) {
+  return lazy(() => fn().catch(() => {
+    const key = 'chunk_reload';
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, '1');
+      window.location.reload();
+    }
+    sessionStorage.removeItem(key);
+    return fn();
+  }));
+}
+
+// Core reporting pages (lazy-loaded for code-splitting)
+const Index = lazyRetry(() => import("./pages/Index"));
+const ClientDetail = lazyRetry(() => import("./pages/ClientDetail"));
+const ClientRecords = lazyRetry(() => import("./pages/ClientRecords"));
+const DatabaseView = lazyRetry(() => import("./pages/DatabaseView"));
+const PublicReport = lazyRetry(() => import("./pages/PublicReport"));
+const SpamBlacklist = lazyRetry(() => import("./pages/SpamBlacklist"));
+const NotFound = lazyRetry(() => import("./pages/NotFound"));
+const ClientCreatives = lazyRetry(() => import("./pages/ClientCreatives"));
+const PublicCreatives = lazyRetry(() => import("./pages/PublicCreatives"));
+const MetaAdsOverlay = lazyRetry(() => import("./pages/MetaAdsOverlay"));
+const CreativeBriefs = lazyRetry(() => import("./pages/CreativeBriefs"));
+const QuizPage = lazyRetry(() => import("./pages/QuizPage"));
 
 // Creative tools pages (from ad-verse-ally)
-import StaticAdsPage from "./pages/StaticAdsPage";
-import StaticCreativesPage from "./pages/StaticCreativesPage";
-import BatchVideoPage from "./pages/BatchVideoPage";
-import AdScrapingPage from "./pages/AdScrapingPage";
-import AdVariationsPage from "./pages/AdVariationsPage";
-import AvatarsPage from "./pages/AvatarsPage";
-import BrollPage from "./pages/BrollPage";
-import VideoEditorPage from "./pages/VideoEditorPage";
-import AvatarAdGeneratorPage from "./pages/AvatarAdGeneratorPage";
-import InstagramIntelPage from "./pages/InstagramIntelPage";
-import HistoryPage from "./pages/HistoryPage";
-import ExportHubPage from "./pages/ExportHubPage";
-import ClientProjectsPage from "./pages/ClientProjectsPage";
-import ProjectPage from "./pages/ProjectPage";
+const StaticAdsPage = lazyRetry(() => import("./pages/StaticAdsPage"));
+const StaticCreativesPage = lazyRetry(() => import("./pages/StaticCreativesPage"));
+const BatchVideoPage = lazyRetry(() => import("./pages/BatchVideoPage"));
+const AdScrapingPage = lazyRetry(() => import("./pages/AdScrapingPage"));
+const AdVariationsPage = lazyRetry(() => import("./pages/AdVariationsPage"));
+const AvatarsPage = lazyRetry(() => import("./pages/AvatarsPage"));
+const BrollPage = lazyRetry(() => import("./pages/BrollPage"));
+const VideoEditorPage = lazyRetry(() => import("./pages/VideoEditorPage"));
+const AvatarAdGeneratorPage = lazyRetry(() => import("./pages/AvatarAdGeneratorPage"));
+const InstagramIntelPage = lazyRetry(() => import("./pages/InstagramIntelPage"));
+const HistoryPage = lazyRetry(() => import("./pages/HistoryPage"));
+const ExportHubPage = lazyRetry(() => import("./pages/ExportHubPage"));
+const ClientProjectsPage = lazyRetry(() => import("./pages/ClientProjectsPage"));
+const ProjectPage = lazyRetry(() => import("./pages/ProjectPage"));
+const OfferDetailPage = lazyRetry(() => import("./pages/OfferDetailPage"));
 
-// Funnel Builder pages (from aicapitalraising)
-import FunnelBuilderPage from "./pages/FunnelBuilderPage";
-import FunnelBookingPage from "./pages/FunnelBookingPage";
-import FunnelOnboardingPage from "./pages/FunnelOnboardingPage";
-import FunnelAdminPage from "./pages/FunnelAdminPage";
-import FunnelClientPage from "./pages/FunnelClientPage";
-import FunnelDeckPage from "./pages/FunnelDeckPage";
-import FunnelFulfillmentPage from "./pages/FunnelFulfillmentPage";
-import FunnelInvestPage from "./pages/FunnelInvestPage";
-import FunnelKickoffPage from "./pages/FunnelKickoffPage";
-import FunnelAccessPage from "./pages/FunnelAccessPage";
+// Funnel Builder pages
+const FunnelBuilderPage = lazyRetry(() => import("./pages/FunnelBuilderPage"));
+const FunnelBookingPage = lazyRetry(() => import("./pages/FunnelBookingPage"));
+const FunnelOnboardingPage = lazyRetry(() => import("./pages/FunnelOnboardingPage"));
+const FunnelAdminPage = lazyRetry(() => import("./pages/FunnelAdminPage"));
+const FunnelClientPage = lazyRetry(() => import("./pages/FunnelClientPage"));
+const FunnelDeckPage = lazyRetry(() => import("./pages/FunnelDeckPage"));
+const FunnelFulfillmentPage = lazyRetry(() => import("./pages/FunnelFulfillmentPage"));
+const FunnelInvestPage = lazyRetry(() => import("./pages/FunnelInvestPage"));
+const FunnelKickoffPage = lazyRetry(() => import("./pages/FunnelKickoffPage"));
+const FunnelAccessPage = lazyRetry(() => import("./pages/FunnelAccessPage"));
+const SyncHealthPage = lazyRetry(() => import("./pages/SyncHealthPage"));
+const DailyReportPage = lazyRetry(() => import("./pages/DailyReportPage"));
+const DailyReportThankYouPage = lazyRetry(() => import("./pages/DailyReportThankYouPage"));
+const ClientOnboardingPage = lazyRetry(() => import("./pages/ClientOnboardingPage"));
 
-// New pages from Reporting 6.0
-import ClientOnboardingPage from "./pages/ClientOnboardingPage";
-import SyncHealthPage from "./pages/SyncHealthPage";
-import DailyReportPage from "./pages/DailyReportPage";
-import DailyReportThankYouPage from "./pages/DailyReportThankYouPage";
-import OfferDetailPage from "./pages/OfferDetailPage";
-import QuizPage from "./pages/QuizPage";
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,18 +95,24 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Protected routes - require password */}
             <Route path="/" element={<PasswordGate><Index /></PasswordGate>} />
             <Route path="/client/:clientId" element={<PasswordGate><ClientDetail /></PasswordGate>} />
             <Route path="/client/:clientId/records" element={<PasswordGate><ClientRecords /></PasswordGate>} />
             <Route path="/client/:clientId/creatives" element={<PasswordGate><ClientCreatives /></PasswordGate>} />
+            <Route path="/client/:clientId/offer/:offerId" element={<PasswordGate><OfferDetailPage /></PasswordGate>} />
             <Route path="/database" element={<PasswordGate><DatabaseView /></PasswordGate>} />
             <Route path="/spam-blacklist" element={<PasswordGate><SpamBlacklist /></PasswordGate>} />
+            <Route path="/sync-health" element={<PasswordGate><SyncHealthPage /></PasswordGate>} />
+            <Route path="/daily" element={<PasswordGate><DailyReportPage /></PasswordGate>} />
+            <Route path="/daily/thank-you" element={<PasswordGate><DailyReportThankYouPage /></PasswordGate>} />
             <Route path="/briefs" element={<PasswordGate><CreativeBriefs /></PasswordGate>} />
 
             {/* Creative Tools - from ad-verse-ally */}
-            <Route path="/static-ads" element={<PasswordGate><StaticAdsPage /></PasswordGate>} />
+            <Route path="/static-ads" element={<PasswordGate><StaticCreativesPage /></PasswordGate>} />
             <Route path="/static-creatives" element={<PasswordGate><StaticCreativesPage /></PasswordGate>} />
             <Route path="/batch-video" element={<PasswordGate><BatchVideoPage /></PasswordGate>} />
             <Route path="/ad-scraping" element={<PasswordGate><AdScrapingPage /></PasswordGate>} />
@@ -111,11 +139,7 @@ const App = () => (
             <Route path="/funnel/:clientId/kickoff" element={<FunnelKickoffPage />} />
             <Route path="/funnel/:clientId/access" element={<FunnelAccessPage />} />
 
-            {/* New 6.0 routes */}
-            <Route path="/client/:clientId/offer/:offerId" element={<PasswordGate><OfferDetailPage /></PasswordGate>} />
-            <Route path="/sync-health" element={<PasswordGate><SyncHealthPage /></PasswordGate>} />
-            <Route path="/daily" element={<PasswordGate><DailyReportPage /></PasswordGate>} />
-            <Route path="/daily/thank-you" element={<PasswordGate><DailyReportThankYouPage /></PasswordGate>} />
+            {/* Onboarding */}
             <Route path="/onboarding" element={<ClientOnboardingPage />} />
 
             {/* Public routes - no password required */}
@@ -126,6 +150,8 @@ const App = () => (
 
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
+          </ErrorBoundary>
         </BrowserRouter>
       </DateFilterProvider>
     </TooltipProvider>
