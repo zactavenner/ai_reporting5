@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useAvatarAd } from '@/context/AvatarAdContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,8 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowRight, FileText, Sparkles } from 'lucide-react';
+import { ArrowRight, FileText, Sparkles, Building2 } from 'lucide-react';
 import { INVESTMENT_TYPE_LABELS, CTA_LABELS } from '@/lib/avatar-ad-prompts';
+import { useClients } from '@/hooks/useClients';
+import { useClientOffers } from '@/hooks/useClientOffers';
 import type { InvestmentType, TargetInvestor, CTAType } from '@/types/avatar-ad';
 
 const TEST_DATA = {
@@ -28,9 +31,28 @@ export function DealInputStep() {
   const { state, updateDeal, setStep } = useAvatarAd();
   const deal = state.deal;
 
+  const { data: clients = [] } = useClients();
+  const [selectedClientId, setSelectedClientId] = useState<string>(deal.clientId || '');
+  const { data: offers = [] } = useClientOffers(selectedClientId || undefined);
+
   const canProceed = deal.investmentType && deal.projectName && deal.location && deal.keyMetric && deal.minInvestment;
 
   const handleLoadTestData = () => updateDeal(TEST_DATA);
+
+  const handleClientChange = (clientId: string) => {
+    setSelectedClientId(clientId);
+    updateDeal({ clientId, offerId: undefined, projectName: '', usp: '', customScript: '' });
+  };
+
+  const handleOfferSelect = (offerId: string) => {
+    const offer = offers.find(o => o.id === offerId);
+    if (!offer) return;
+    updateDeal({
+      offerId,
+      projectName: offer.title,
+      customScript: offer.description || '',
+    });
+  };
 
   return (
     <Card>
@@ -46,6 +68,40 @@ export function DealInputStep() {
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
+        {/* Client & Offer Selection */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg border border-border bg-muted/30">
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1.5">
+              <Building2 className="h-3.5 w-3.5" /> Client
+            </Label>
+            <Select value={selectedClientId} onValueChange={handleClientChange}>
+              <SelectTrigger><SelectValue placeholder="Select a client" /></SelectTrigger>
+              <SelectContent>
+                {clients.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Offer / Deal</Label>
+            <Select
+              value={deal.offerId || ''}
+              onValueChange={handleOfferSelect}
+              disabled={!selectedClientId || offers.length === 0}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={!selectedClientId ? 'Select client first' : offers.length === 0 ? 'No offers found' : 'Select an offer'} />
+              </SelectTrigger>
+              <SelectContent>
+                {offers.map(o => (
+                  <SelectItem key={o.id} value={o.id}>{o.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         {/* Row 1 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
