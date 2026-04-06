@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Settings, DollarSign, Upload, History, Plus, ExternalLink, X, Phone, Video, BarChart3, TrendingUp, Palette, Layers, Cog } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Settings, DollarSign, Upload, History, Plus, ExternalLink, X, Phone, Video, BarChart3, TrendingUp, Palette, Layers, Cog, Megaphone, FileText, ClipboardList, CheckSquare, MessageSquare, Globe, Building2 } from 'lucide-react';
+import { SlackChatTab } from '@/components/slack/SlackChatTab';
 import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal';
 import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
 import { AdSpendDrillDownModal } from '@/components/drilldown/AdSpendDrillDownModal';
@@ -28,10 +29,17 @@ import { AIAnalysisChat } from '@/components/ai/AIAnalysisChat';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import { DataAuditSection } from '@/components/dashboard/DataAuditSection';
+import { OnboardingChecklist } from '@/components/onboarding/OnboardingChecklist';
 import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
 import { PipelineTab } from '@/components/pipeline/PipelineTab';
 import { AdsManagerTab } from '@/components/ads-manager/AdsManagerTab';
 import { ClientOffersSection } from '@/components/offers/ClientOffersSection';
+import { ClientFunnelsTab } from '@/components/quiz/ClientFunnelsTab';
+import { ClientFulfillmentWorkspace } from '@/components/fulfillment/ClientFulfillmentWorkspace';
+import { PropertyManagerTab } from '@/components/properties/PropertyManagerTab';
+import { AttributionSettings } from '@/components/ads-manager/AttributionSettings';
+import { SlackChannelMappingSection } from '@/components/settings/SlackChannelMappingSection';
+import { KPISettingsSection } from '@/components/settings/KPISettingsSection';
 import { ClientBillingTab } from '@/components/billing/ClientBillingTab';
 import { useClient } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors } from '@/hooks/useMetrics';
@@ -75,18 +83,27 @@ import {
 export default function ClientDetail() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [csvImportType, setCsvImportType] = useState<ImportType>('ad_spend');
   const [importHistoryOpen, setImportHistoryOpen] = useState(false);
   const [addTabOpen, setAddTabOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('performance');
+  const [activeTab, setActiveTab] = useState<string | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [selectedType, setSelectedType] = useState<string>('');
   const [drillDownModal, setDrillDownModal] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { currentMember } = useTeamMember();
   const isAdmin = currentMember?.role === 'admin';
+
+  // Deep-link: if ?task= is present, auto-switch to tasks tab
+  useEffect(() => {
+    const taskId = searchParams.get('task');
+    if (taskId) {
+      setActiveTab('tasks');
+    }
+  }, [searchParams]);
 
   // Collapsible section states
   const [kpiOpen, setKpiOpen] = useState(true);
@@ -117,10 +134,10 @@ export default function ClientDetail() {
 
   const handleActivityClick = (activityId: string, type: string) => {
     if (type.startsWith('task_')) {
-      setSelectedTaskId(activityId);
-      setActiveTab('performance');
+      setSearchParams({ task: activityId }, { replace: true });
+      setActiveTab('tasks');
     } else if (type.startsWith('creative_')) {
-      setActiveTab('ads-creatives');
+      setActiveTab('creatives');
     }
   };
 
@@ -141,6 +158,9 @@ export default function ClientDetail() {
 
   const thresholds = useMemo(() => getThresholdsFromSettings(settings), [settings]);
   const fundedInvestorLabel = settings?.funded_investor_label || 'Funded Investors';
+  const isLeasing = (client as any)?.client_type === 'LEASING' || ((client?.name || '').toLowerCase().includes('lscre') && (client?.name || '').toLowerCase().includes('leasing'));
+  const defaultTab = isLeasing ? 'properties' : 'performance';
+  const resolvedTab = activeTab || defaultTab;
   const isLoading = clientLoading || metricsLoading;
 
   if (isLoading) {
@@ -214,47 +234,62 @@ export default function ClientDetail() {
           </div>
           <div className="flex items-center gap-1.5">
             <VoiceRecordButton clientId={client.id} clientName={client.name} isPublicView={false} />
-            <ActivityPanel
-              tasks={clientTasks}
-              voiceNotes={voiceNotes}
-              meetings={meetings}
-              creatives={creatives}
-              isPublicView={false}
-              clientId={client.id}
-              clientName={client.name}
-              onActivityClick={handleActivityClick}
-            />
-            <ShareableLinkButton
-              clientId={client.id}
-              clientName={client.name}
-              publicToken={client.public_token}
-              slug={client.slug}
-            />
-            <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} title="Client Settings">
-              <Settings className="h-4 w-4" />
-            </Button>
             <ThemeToggle />
           </div>
         </div>
       </header>
 
-      <main className="p-6 space-y-6">
-        <DateRangeFilter showAddClient={false} onExportCSV={handleExportCSV} onRefresh={handleRefresh} />
+      <main className="flex-1 overflow-auto">
+        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border px-6 py-3">
+          <DateRangeFilter showAddClient={false} onExportCSV={handleExportCSV} onRefresh={handleRefresh} />
+        </div>
+        <div className="p-6 space-y-6">
 
-        {/* 4 Grouped Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-muted/50">
-            <TabsTrigger value="performance" className="gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Performance
+        {/* Grouped Tabs - matching 6.0 */}
+        <Tabs value={resolvedTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="bg-muted/50 flex-wrap">
+            {isLeasing ? (
+              <TabsTrigger value="properties" className="gap-2">
+                <Building2 className="h-4 w-4" />
+                Properties
+              </TabsTrigger>
+            ) : (
+              <TabsTrigger value="performance" className="gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Performance
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="tasks" className="gap-2">
+              <CheckSquare className="h-4 w-4" />
+              Tasks
             </TabsTrigger>
-            <TabsTrigger value="ads-creatives" className="gap-2">
+            <TabsTrigger value="records" className="gap-2">
+              <ClipboardList className="h-4 w-4" />
+              Attribution & Records
+            </TabsTrigger>
+            <TabsTrigger value="ads-manager" className="gap-2">
+              <Megaphone className="h-4 w-4" />
+              Ads Manager
+            </TabsTrigger>
+            <TabsTrigger value="creatives" className="gap-2">
               <Palette className="h-4 w-4" />
-              Ads & Creatives
+              Creatives
+            </TabsTrigger>
+            <TabsTrigger value="offers" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Offers
             </TabsTrigger>
             <TabsTrigger value="pipeline" className="gap-2">
               <Layers className="h-4 w-4" />
               Pipeline
+            </TabsTrigger>
+            <TabsTrigger value="slack" className="gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Slack
+            </TabsTrigger>
+            <TabsTrigger value="funnels" className="gap-2">
+              <Globe className="h-4 w-4" />
+              Funnels
             </TabsTrigger>
             <TabsTrigger value="client-settings" className="gap-2">
               <Cog className="h-4 w-4" />
@@ -262,9 +297,18 @@ export default function ClientDetail() {
             </TabsTrigger>
           </TabsList>
 
+          {/* ─── PROPERTIES TAB (LEASING) ─── */}
+          {isLeasing && (
+            <TabsContent value="properties" className="space-y-6">
+              <SectionErrorBoundary sectionName="Properties">
+                <PropertyManagerTab clientId={clientId!} clientName={client.name} />
+              </SectionErrorBoundary>
+            </TabsContent>
+          )}
+
           {/* ─── PERFORMANCE TAB ─── */}
           <TabsContent value="performance" className="space-y-6">
-            {/* KPIs - Collapsible */}
+            {clientId && <OnboardingChecklist clientId={clientId} clientType={(client as any)?.client_type} />}
             <Collapsible open={kpiOpen} onOpenChange={setKpiOpen}>
               <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
                 <h2 className="text-lg font-bold">Key Performance Indicators</h2>
@@ -284,12 +328,10 @@ export default function ClientDetail() {
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Periodic Stats */}
             <SectionErrorBoundary sectionName="Performance Summary">
               <PeriodicStatsTable clientId={clientId} />
             </SectionErrorBoundary>
 
-            {/* Charts - Collapsible */}
             <Collapsible open={chartsOpen} onOpenChange={setChartsOpen}>
               <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
                 <h2 className="text-lg font-bold">Metric Charts</h2>
@@ -302,36 +344,6 @@ export default function ClientDetail() {
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Attribution & Records - Collapsible, default closed */}
-            <Collapsible open={recordsOpen} onOpenChange={setRecordsOpen}>
-              <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
-                <h2 className="text-lg font-bold">Attribution & Records</h2>
-                <span className="text-xs text-muted-foreground">{recordsOpen ? '▾' : '▸'}</span>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3 space-y-6">
-                <SectionErrorBoundary sectionName="Records">
-                  <InlineRecordsView
-                    dailyMetrics={dailyMetrics}
-                    leads={leads}
-                    calls={calls}
-                    fundedInvestors={fundedInvestors}
-                    isLoading={metricsLoading || leadsLoading}
-                    onRecordSelect={handleRecordSelect}
-                    selectedRecord={selectedRecord}
-                    selectedType={selectedType}
-                    clientId={clientId}
-                    ghlLocationId={client.ghl_location_id}
-                  />
-                </SectionErrorBoundary>
-                {clientId && (
-                  <SectionErrorBoundary sectionName="Data Audit">
-                    <DataAuditSection clientId={clientId} />
-                  </SectionErrorBoundary>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* Meetings */}
             {meetings.length > 0 && (
               <Collapsible open={meetingsOpen} onOpenChange={setMeetingsOpen}>
                 <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
@@ -346,16 +358,54 @@ export default function ClientDetail() {
                 </CollapsibleContent>
               </Collapsible>
             )}
+          </TabsContent>
 
-            {/* Tasks inline */}
+          {/* ─── TASKS TAB ─── */}
+          <TabsContent value="tasks" className="space-y-6">
             <SectionErrorBoundary sectionName="Task Board">
               <h2 className="text-lg font-bold mb-3">Tasks</h2>
               <TaskBoardView clientId={clientId} />
             </SectionErrorBoundary>
           </TabsContent>
 
-          {/* ─── ADS & CREATIVES TAB ─── */}
-          <TabsContent value="ads-creatives" className="space-y-6">
+          {/* ─── ATTRIBUTION & RECORDS TAB ─── */}
+          <TabsContent value="records" className="space-y-6">
+            <SectionErrorBoundary sectionName="Records">
+              <h2 className="text-lg font-bold mb-3">Detailed Records</h2>
+              <InlineRecordsView
+                dailyMetrics={dailyMetrics}
+                leads={leads}
+                calls={calls}
+                fundedInvestors={fundedInvestors}
+                isLoading={metricsLoading || leadsLoading}
+                onRecordSelect={handleRecordSelect}
+                selectedRecord={selectedRecord}
+                selectedType={selectedType}
+                clientId={clientId}
+                ghlLocationId={client.ghl_location_id}
+              />
+            </SectionErrorBoundary>
+            {clientId && (
+              <SectionErrorBoundary sectionName="Data Audit">
+                <DataAuditSection clientId={clientId} />
+              </SectionErrorBoundary>
+            )}
+          </TabsContent>
+
+          {/* ─── ADS MANAGER TAB ─── */}
+          <TabsContent value="ads-manager" className="space-y-6">
+            <SectionErrorBoundary sectionName="Ads Manager">
+              <AdsManagerTab clientId={client.id} clientName={client.name} />
+            </SectionErrorBoundary>
+
+            <SectionErrorBoundary sectionName="Attribution Settings">
+              <h2 className="text-lg font-bold mb-3">Attribution Settings</h2>
+              <AttributionSettings clientId={client.id} />
+            </SectionErrorBoundary>
+          </TabsContent>
+
+          {/* ─── CREATIVES TAB ─── */}
+          <TabsContent value="creatives" className="space-y-6">
             <SectionErrorBoundary sectionName="Creatives">
               <h2 className="text-lg font-bold mb-3">Creative Assets</h2>
               <CreativesSection
@@ -364,10 +414,12 @@ export default function ClientDetail() {
                 isPublicView={false}
               />
             </SectionErrorBoundary>
+          </TabsContent>
 
-            <SectionErrorBoundary sectionName="Ads Manager">
-              <h2 className="text-lg font-bold mb-3">Ads Manager</h2>
-              <AdsManagerTab clientId={client.id} clientName={client.name} />
+          {/* ─── OFFERS TAB ─── */}
+          <TabsContent value="offers" className="space-y-6">
+            <SectionErrorBoundary sectionName="Offers">
+              <ClientFulfillmentWorkspace client={client} />
             </SectionErrorBoundary>
           </TabsContent>
 
@@ -382,15 +434,73 @@ export default function ClientDetail() {
               <h2 className="text-lg font-bold mb-3">Funnel Pages</h2>
               <FunnelPreviewTab clientId={client.id} isPublicView={false} />
             </SectionErrorBoundary>
+          </TabsContent>
 
-            <SectionErrorBoundary sectionName="Offers & Files">
-              <h2 className="text-lg font-bold mb-3">Offers & Files</h2>
-              <ClientOffersSection clientId={client.id} clientName={client.name} />
+          {/* ─── SLACK TAB ─── */}
+          <TabsContent value="slack" className="space-y-6">
+            <SectionErrorBoundary sectionName="Slack Chat">
+              <h2 className="text-lg font-bold mb-3">Slack Channels</h2>
+              <SlackChatTab clientId={client.id} clientName={client.name} />
+            </SectionErrorBoundary>
+          </TabsContent>
+
+          {/* ─── FUNNELS TAB ─── */}
+          <TabsContent value="funnels" className="space-y-6">
+            <SectionErrorBoundary sectionName="Funnels">
+              <ClientFunnelsTab
+                clientId={clientId!}
+                clientName={client?.name || ''}
+                clientSlug={(client as any)?.slug}
+                offerDescription={(client as any)?.offer_description}
+                logoUrl={(client as any)?.logo_url}
+              />
             </SectionErrorBoundary>
           </TabsContent>
 
           {/* ─── SETTINGS TAB ─── */}
           <TabsContent value="client-settings" className="space-y-6">
+            {/* Quick Actions */}
+            <div className="space-y-3">
+              <h2 className="text-lg font-bold">Quick Actions</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <VoiceRecordButton clientId={client.id} clientName={client.name} isPublicView={false} />
+                <ActivityPanel
+                  tasks={clientTasks}
+                  voiceNotes={voiceNotes}
+                  meetings={meetings}
+                  creatives={creatives}
+                  isPublicView={false}
+                  clientId={client.id}
+                  clientName={client.name}
+                  onActivityClick={handleActivityClick}
+                />
+                <ShareableLinkButton
+                  clientId={client.id}
+                  clientName={client.name}
+                  publicToken={client.public_token}
+                  slug={client.slug}
+                />
+                <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Client Settings
+                </Button>
+              </div>
+            </div>
+
+            {/* Slack Integration */}
+            <SectionErrorBoundary sectionName="Slack Integration">
+              <h2 className="text-lg font-bold mb-3">Slack Integration</h2>
+              <div className="border-2 border-border p-4">
+                <SlackChannelMappingSection clientId={client.id} />
+              </div>
+            </SectionErrorBoundary>
+
+            {/* KPI & Revenue Settings */}
+            <SectionErrorBoundary sectionName="KPI Settings">
+              <h2 className="text-lg font-bold mb-3">KPI & Revenue Settings</h2>
+              <KPISettingsSection clientId={client.id} standalone />
+            </SectionErrorBoundary>
+
             {/* Billing */}
             {isAdmin && (
               <SectionErrorBoundary sectionName="Billing">
@@ -502,6 +612,7 @@ export default function ClientDetail() {
             </div>
           </TabsContent>
         </Tabs>
+        </div>
       </main>
 
       {/* Modals */}
