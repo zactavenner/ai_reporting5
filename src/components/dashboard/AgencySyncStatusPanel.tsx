@@ -477,6 +477,12 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
                         <span>Health</span>
                       </div>
                     </TableHead>
+                    <TableHead className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <ShieldCheck className="h-3 w-3" />
+                        <span>Data Integrity</span>
+                      </div>
+                    </TableHead>
                     <TableHead className="text-center w-[80px]">Settings</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -818,6 +824,64 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
                                       </div>
                                     )}
                                     <p className="text-muted-foreground mt-1">Click to re-test</p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          })()}
+                        </TableCell>
+
+                        {/* Data Integrity */}
+                        <TableCell className="text-center py-2">
+                          {(() => {
+                            const m = clientMetrics[c.id];
+                            const adSpend = m?.totalAdSpend ?? 0;
+                            const crmLeads = m?.crmLeads ?? 0;
+                            const totalLeads = m?.totalLeads ?? 0;
+                            const totalCalls = m?.totalCalls ?? 0;
+                            const showedCalls = m?.showedCalls ?? 0;
+                            const issues: string[] = [];
+
+                            const hasGhl = !!(c.ghlApiKey && c.ghlLocationId);
+                            const hasMeta = !!c.metaAdAccountId;
+                            const hasCalendar = c.trackedCalendarIds && c.trackedCalendarIds.length > 0;
+
+                            if (hasMeta && adSpend > 0 && crmLeads === 0 && hasGhl) {
+                              issues.push('Ad spend but 0 CRM leads — GHL contact sync broken');
+                            }
+                            if (hasMeta && adSpend > 0 && crmLeads === 0 && !hasGhl) {
+                              issues.push('Ad spend but no GHL credentials configured');
+                            }
+                            if (crmLeads > 3 && totalCalls === 0 && !hasCalendar) {
+                              issues.push('Leads but no calendar IDs configured');
+                            }
+                            if (crmLeads > 3 && totalCalls === 0 && hasCalendar) {
+                              issues.push('Leads but 0 booked calls — calendar sync broken');
+                            }
+                            if (totalCalls > 3 && showedCalls === 0) {
+                              issues.push('Booked calls but 0 shows — check appointment statuses in GHL');
+                            }
+
+                            if (issues.length === 0) {
+                              return <CheckCircle className="h-3.5 w-3.5 text-chart-2 mx-auto" />;
+                            }
+
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center justify-center">
+                                    <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+                                    <span className="ml-1 text-xs text-destructive font-medium">{issues.length}</span>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-xs">
+                                  <div className="space-y-1">
+                                    {issues.map((issue, i) => (
+                                      <div key={i} className="text-xs flex items-start gap-1">
+                                        <XCircle className="h-3 w-3 text-destructive shrink-0 mt-0.5" />
+                                        <span>{issue}</span>
+                                      </div>
+                                    ))}
                                   </div>
                                 </TooltipContent>
                               </Tooltip>

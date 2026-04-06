@@ -580,12 +580,26 @@ export function DraggableClientTable({
                       (() => {
                         const crmTotal = m.crmLeads || 0;
                         const metaLeads = m.totalLeads || 0;
+                        const adSpend = m.totalAdSpend || 0;
+                        if (adSpend > 0 && crmTotal === 0) return 'text-destructive font-semibold';
                         if (crmTotal === 0 && metaLeads === 0) return 'text-muted-foreground';
                         if (crmTotal >= metaLeads) return 'text-chart-2';
                         return 'text-destructive font-semibold';
                       })()
                     )}>
-                      {m.crmLeads || 0}
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.crmLeads || 0}
+                        {(m.totalAdSpend || 0) > 0 && (m.crmLeads || 0) === 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-3 w-3 text-destructive shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-xs">
+                              <strong>GHL Integration Issue:</strong> This client has ${formatCurrency(m.totalAdSpend)} ad spend but 0 CRM leads synced. Check GHL API key, location ID, and contact sync.
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                     </TableCell>
 
                     {/* CPL */}
@@ -597,8 +611,23 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* Booked Calls */}
-                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {m.totalCalls || 0}
+                    <TableCell className={cn(
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
+                      (m.crmLeads || 0) > 0 && (m.totalCalls || 0) === 0 ? 'text-destructive' : ''
+                    )}>
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.totalCalls || 0}
+                        {(m.crmLeads || 0) > 3 && (m.totalCalls || 0) === 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-3 w-3 text-destructive shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-xs">
+                              <strong>Calendar Not Syncing:</strong> {m.crmLeads} CRM leads but 0 booked calls. Check that tracked_calendar_ids are configured in client settings.
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                     </TableCell>
 
                     {/* Cost per Call */}
@@ -610,8 +639,23 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* Shows */}
-                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {m.showedCalls || 0}
+                    <TableCell className={cn(
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
+                      (m.totalCalls || 0) > 3 && (m.showedCalls || 0) === 0 ? 'text-yellow-600 dark:text-yellow-500' : ''
+                    )}>
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.showedCalls || 0}
+                        {(m.totalCalls || 0) > 3 && (m.showedCalls || 0) === 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-3 w-3 text-yellow-600 dark:text-yellow-500 shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-xs">
+                              <strong>No Shows Recorded:</strong> {m.totalCalls} booked calls but 0 shows. Verify GHL appointment statuses are being updated (showed/completed).
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                     </TableCell>
 
                     {/* Funded */}
