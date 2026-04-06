@@ -10,6 +10,8 @@ export interface CreativeComment {
   author: string;
   text: string;
   createdAt: string;
+  attachmentUrl?: string;
+  attachmentType?: string;
 }
 
 export interface Creative {

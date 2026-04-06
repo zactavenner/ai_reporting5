@@ -26,6 +26,8 @@ import { CashBagLoader } from '@/components/ui/CashBagLoader';
 import { PlatformAdPreview } from './PlatformAdPreview';
 import { CreativeHorizontalPreview } from './CreativeHorizontalPreview';
 import { CreativeAIActions } from './CreativeAIActions';
+import { supabase } from '@/integrations/supabase/client';
+import { Json } from '@/integrations/supabase/types';
 import { 
   Upload, 
   Check, 
@@ -44,9 +46,15 @@ import {
   Sparkles,
   Link,
   SendHorizontal,
-  Download
+  Download,
+  History,
+  RotateCcw,
+  Paperclip,
+  FileUp,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface CreativeApprovalProps {
   clientId: string;
@@ -64,10 +72,8 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
   const deleteCreative = useDeleteCreative();
   const { currentMember } = useTeamMember();
   
-  // Check if this is an agency upload (team member logged in and not public view)
   const isAgencyUpload = !!currentMember && !isPublicView;
   
-  // Public view: filter out draft creatives (not yet approved by agency)
   const creatives = isPublicView 
     ? allCreatives.filter(c => c.status !== 'draft')
     : allCreatives;
@@ -140,7 +146,6 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
       let aspectRatio = null;
       
       if (newCreative.file && (newCreative.type === 'image' || newCreative.type === 'video')) {
-        // Detect aspect ratio before upload
         aspectRatio = await detectAspectRatio(newCreative.file);
         fileUrl = await uploadCreativeFile(newCreative.file, clientId);
       }
@@ -158,7 +163,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
         status: isAgencyUpload ? 'draft' : 'pending',
         comments: [],
         aspect_ratio: aspectRatio,
-        isAgencyUpload, // Pass the agency flag for AI spelling check
+        isAgencyUpload,
       });
 
       setUploadOpen(false);
@@ -193,12 +198,8 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
       for (const file of bulkFiles) {
         try {
           const isVideo = file.type.startsWith('video/');
-          
-          // Detect aspect ratio before upload
           const aspectRatio = await detectAspectRatio(file);
           const fileUrl = await uploadCreativeFile(file, clientId);
-          
-          // Generate dynamic title from filename
           const fileName = file.name.replace(/\.[^/.]+$/, '');
           const title = fileName.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
@@ -215,7 +216,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
             status: isAgencyUpload ? 'draft' : 'pending',
             comments: [],
             aspect_ratio: aspectRatio,
-            isAgencyUpload, // Pass the agency flag for AI spelling check
+            isAgencyUpload,
           });
           successCount++;
         } catch (err) {
@@ -244,14 +245,16 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
     updateStatus.mutate({ id: creative.id, status, clientId, creativeTitle: creative.title });
   };
 
-  const handleAddComment = (creative: Creative) => {
-    if (!commentText.trim()) return;
+  const handleAddComment = (creative: Creative, attachmentUrl?: string, attachmentType?: string) => {
+    if (!commentText.trim() && !attachmentUrl) return;
     
     const comment: CreativeComment = {
       id: Date.now().toString(),
       author: isPublicView ? 'Client' : 'Agency',
       text: commentText,
       createdAt: new Date().toISOString(),
+      attachmentUrl: attachmentUrl || undefined,
+      attachmentType: attachmentType || undefined,
     };
     
     addComment.mutate({ id: creative.id, comment, clientId });
@@ -302,14 +305,12 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {/* Copy Approval Link - agency only */}
           {!isPublicView && (
             <Button variant="outline" size="sm" onClick={handleCopyApprovalLink}>
               <Link className="h-4 w-4 mr-2" />
               Copy Approval Link
             </Button>
           )}
-          {/* Bulk Upload - available for public view too */}
           <Dialog open={bulkUploadOpen} onOpenChange={setBulkUploadOpen}>
             <DialogTrigger asChild>
               <Button variant={isPublicView ? 'default' : 'outline'}>
@@ -396,7 +397,6 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
             </DialogContent>
           </Dialog>
 
-          {/* Single Upload - agency only */}
           {!isPublicView && (
             <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
               <DialogTrigger asChild>
@@ -572,7 +572,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
                 <p className="text-sm">Upload your first creative to get started</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredCreatives.map((creative) => (
                   <CreativeCard
                     key={creative.id}
@@ -598,189 +598,26 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
           </TabsContent>
         </Tabs>
 
-        {/* Creative Detail Modal - Full horizontal preview */}
+        {/* Creative Detail Modal */}
         <Dialog open={!!selectedCreative} onOpenChange={() => setSelectedCreative(null)}>
           <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto sm:max-w-[95vw]">
             {selectedCreative && (
-              <>
-                <DialogHeader>
-                  <div className="flex items-center justify-between">
-                    <DialogTitle>{selectedCreative.title}</DialogTitle>
-                    <Badge className={getStatusColor(selectedCreative.status)}>
-                      {selectedCreative.status}
-                    </Badge>
-                  </div>
-                </DialogHeader>
-                
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge className={getStatusColor(selectedCreative.status)}>
-                      {selectedCreative.status}
-                    </Badge>
-                    <Badge variant="outline">{selectedCreative.platform}</Badge>
-                    <span className="text-sm text-muted-foreground">Client: {clientName}</span>
-                  </div>
-
-                  {/* Horizontal Platform Preview - All platforms side by side */}
-                  <CreativeHorizontalPreview 
-                    creative={selectedCreative} 
-                    clientName={clientName}
-                  />
-
-                  {/* Download + AI Tools */}
-                  <div className="flex items-center gap-2 flex-wrap border-t pt-4">
-                    {/* Download - available for both agency and public */}
-                    {selectedCreative.file_url && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = selectedCreative.file_url!;
-                          link.download = selectedCreative.title || 'creative';
-                          link.target = '_blank';
-                          link.rel = 'noreferrer';
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                          toast.success('Download started');
-                        }}
-                      >
-                        <Download className="h-4 w-4" />
-                        Download
-                      </Button>
-                    )}
-                    {/* AI Tools - agency only */}
-                    {!isPublicView && (
-                      <>
-                        <Sparkles className="h-4 w-4 text-primary ml-2" />
-                        <span className="text-sm font-medium mr-1">AI Tools:</span>
-                        <CreativeAIActions creative={selectedCreative} />
-                      </>
-                    )}
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 flex-wrap border-t pt-4">
-                    {selectedCreative.status === 'draft' && !isPublicView && (
-                      <Button
-                        className="bg-primary hover:bg-primary/90"
-                        onClick={() => {
-                          handleSendToClient(selectedCreative);
-                          setSelectedCreative(null);
-                        }}
-                      >
-                        <SendHorizontal className="h-4 w-4 mr-1" />
-                        Send to Client
-                      </Button>
-                    )}
-                    {selectedCreative.status !== 'launched' && selectedCreative.status !== 'draft' && (
-                      <>
-                        {selectedCreative.status === 'approved' && !isPublicView && (
-                          <Button
-                            className="bg-blue-600 hover:bg-blue-700 text-white"
-                            onClick={() => {
-                              handleLaunch(selectedCreative);
-                              setSelectedCreative(null);
-                            }}
-                          >
-                            <Play className="h-4 w-4 mr-1" />
-                            Launch
-                          </Button>
-                        )}
-                        <Button
-                          variant="default"
-                          onClick={() => handleStatusChange(selectedCreative, 'approved')}
-                        >
-                          <Check className="h-4 w-4 mr-1" />
-                          Approve
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => handleStatusChange(selectedCreative, 'revisions')}
-                        >
-                          <RefreshCw className="h-4 w-4 mr-1" />
-                          Revisions
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          onClick={() => handleStatusChange(selectedCreative, 'rejected')}
-                        >
-                          <X className="h-4 w-4 mr-1" />
-                          Reject
-                        </Button>
-                      </>
-                    )}
-                    {!isPublicView && (
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          deleteCreative.mutate({ id: selectedCreative.id, clientId });
-                          setSelectedCreative(null);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1 text-destructive" />
-                        Delete
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Comments */}
-                  <div className="border-t pt-4">
-                    <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      Comments ({selectedCreative.comments?.length || 0})
-                    </h4>
-                    {selectedCreative.comments && selectedCreative.comments.length > 0 ? (
-                      <ScrollArea className="h-[200px] border rounded-lg p-3 mb-2">
-                        <div className="space-y-2">
-                          {selectedCreative.comments.map((comment) => (
-                            <div 
-                              key={comment.id}
-                              className={`p-2 rounded-lg text-sm ${
-                                comment.author === 'Client' 
-                                  ? 'bg-primary/10 ml-4' 
-                                  : 'bg-muted mr-4'
-                              }`}
-                            >
-                              <div className="flex justify-between mb-0.5">
-                                <span className="text-xs font-medium">{comment.author}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(comment.createdAt).toLocaleString()}
-                                </span>
-                              </div>
-                              <p>{comment.text}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    ) : (
-                      <p className="text-sm text-muted-foreground mb-2">No comments yet</p>
-                    )}
-                    
-                    {/* Add comment */}
-                    <div className="flex gap-2 mt-2">
-                      <Input
-                        value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                        placeholder="Add a comment..."
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleAddComment(selectedCreative);
-                          }
-                        }}
-                      />
-                      <Button 
-                        size="icon"
-                        onClick={() => handleAddComment(selectedCreative)}
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </>
+              <CreativeDetailModal
+                creative={selectedCreative}
+                clientName={clientName}
+                clientId={clientId}
+                isPublicView={isPublicView}
+                getStatusColor={getStatusColor}
+                onStatusChange={handleStatusChange}
+                onLaunch={() => handleLaunch(selectedCreative)}
+                onSendToClient={() => handleSendToClient(selectedCreative)}
+                onClose={() => setSelectedCreative(null)}
+                onDelete={() => {
+                  deleteCreative.mutate({ id: selectedCreative.id, clientId });
+                  setSelectedCreative(null);
+                }}
+                addCommentMutation={addComment}
+              />
             )}
           </DialogContent>
         </Dialog>
@@ -789,18 +626,578 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false }:
   );
 }
 
-// Helper to get aspect ratio CSS class for card containers
+// Version history modal component
+function VersionHistorySection({ creative, clientId }: { creative: Creative; clientId: string }) {
+  const queryClient = useQueryClient();
+  const [revertingTo, setRevertingTo] = useState<string | null>(null);
+  const [confirmRevert, setConfirmRevert] = useState<string | null>(null);
+  const [selectedVersion, setSelectedVersion] = useState<string | null>(null);
+  
+  const versionHistory = ((creative as any).version_history as Array<{ file_url: string; uploaded_at: string; notes?: string }>) || [];
+  
+  if (versionHistory.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground py-4 text-center">
+        No previous versions
+      </div>
+    );
+  }
+
+  const handleRevert = async (versionUrl: string) => {
+    setRevertingTo(versionUrl);
+    try {
+      // Save current as a version entry
+      const currentEntry = {
+        file_url: creative.file_url,
+        uploaded_at: new Date().toISOString(),
+        notes: 'Auto-saved before revert',
+      };
+      const updatedHistory = [...versionHistory, currentEntry];
+      
+      const { error } = await supabase
+        .from('creatives')
+        .update({ 
+          file_url: versionUrl,
+          version_history: updatedHistory as unknown as Json,
+        })
+        .eq('id', creative.id);
+      
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['creatives', clientId] });
+      toast.success('Reverted to previous version');
+      setConfirmRevert(null);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to revert');
+    } finally {
+      setRevertingTo(null);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <h4 className="text-sm font-medium flex items-center gap-2">
+        <History className="h-4 w-4" />
+        Version History ({versionHistory.length})
+      </h4>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        {/* Current version */}
+        <div className="border-2 border-green-500 rounded-lg overflow-hidden">
+          <div className="aspect-square bg-muted relative cursor-pointer" onClick={() => setSelectedVersion(creative.file_url)}>
+            {creative.file_url && (
+              creative.type === 'video' ? (
+                <video src={creative.file_url} className="w-full h-full object-cover" />
+              ) : (
+                <img src={creative.file_url} alt="Current" className="w-full h-full object-cover" />
+              )
+            )}
+          </div>
+          <div className="p-2 text-center">
+            <span className="text-xs font-medium text-green-600">Current</span>
+          </div>
+        </div>
+        {/* Previous versions */}
+        {[...versionHistory].reverse().map((version, i) => (
+          <div key={i} className="border rounded-lg overflow-hidden hover:border-primary transition-colors">
+            <div className="aspect-square bg-muted relative cursor-pointer" onClick={() => setSelectedVersion(version.file_url)}>
+              {version.file_url && (
+                creative.type === 'video' ? (
+                  <video src={version.file_url} className="w-full h-full object-cover" />
+                ) : (
+                  <img src={version.file_url} alt={`v${versionHistory.length - i}`} className="w-full h-full object-cover" />
+                )
+              )}
+            </div>
+            <div className="p-2 text-center space-y-1">
+              <span className="text-xs text-muted-foreground block">v{versionHistory.length - i}</span>
+              {confirmRevert === version.file_url ? (
+                <div className="flex gap-1 justify-center">
+                  <Button size="sm" className="h-6 text-[10px] gap-0.5" onClick={() => handleRevert(version.file_url)} disabled={!!revertingTo}>
+                    {revertingTo === version.file_url ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                    Yes
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setConfirmRevert(null)}>
+                    No
+                  </Button>
+                </div>
+              ) : (
+                <Button size="sm" variant="outline" className="h-6 text-[10px] gap-0.5 w-full" onClick={() => setConfirmRevert(version.file_url)}>
+                  <RotateCcw className="h-3 w-3" />
+                  Revert
+                </Button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Large version preview dialog */}
+      <Dialog open={!!selectedVersion} onOpenChange={() => setSelectedVersion(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle>Version Preview</DialogTitle>
+          </DialogHeader>
+          {selectedVersion && (
+            <div className="flex items-center justify-center max-h-[70vh] overflow-auto">
+              {creative.type === 'video' ? (
+                <video src={selectedVersion} controls className="max-w-full max-h-[65vh] rounded" />
+              ) : (
+                <img src={selectedVersion} alt="Version preview" className="max-w-full max-h-[65vh] object-contain rounded" />
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// Comment attachment upload
+function CommentAttachmentUpload({ 
+  clientId, 
+  onUploaded 
+}: { 
+  clientId: string; 
+  onUploaded: (url: string, type: string) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${clientId}/comments/${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('creatives')
+        .upload(fileName, file, { upsert: true });
+      
+      if (error) throw error;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('creatives')
+        .getPublicUrl(data.path);
+      
+      const type = file.type.startsWith('video/') ? 'video' : 'image';
+      onUploaded(publicUrl, type);
+      toast.success('Attachment uploaded');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to upload attachment');
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*,video/*"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-7 w-7 flex-shrink-0"
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+      >
+        {uploading ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />}
+      </Button>
+    </>
+  );
+}
+
+// Comment display with attachment support
+function CommentBubble({ comment, isInline = false }: { comment: CreativeComment; isInline?: boolean }) {
+  const [showFullImage, setShowFullImage] = useState(false);
+  const hasAttachment = comment.attachmentUrl;
+  
+  return (
+    <>
+      <div 
+        className={`p-2 rounded-lg text-sm ${
+          comment.author === 'Client' 
+            ? 'bg-primary/10 ml-4' 
+            : comment.author === 'AI Review'
+            ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800'
+            : 'bg-muted mr-4'
+        }`}
+      >
+        <div className="flex justify-between mb-0.5">
+          <span className="text-xs font-medium">{comment.author}:</span>
+          {!isInline && (
+            <span className="text-xs text-muted-foreground">
+              {new Date(comment.createdAt).toLocaleString()}
+            </span>
+          )}
+        </div>
+        {comment.text && <p className={isInline ? 'text-muted-foreground' : ''}>{comment.text}</p>}
+        {hasAttachment && (
+          <div className="mt-1.5">
+            {comment.attachmentType === 'video' ? (
+              <video 
+                src={comment.attachmentUrl} 
+                controls 
+                className="max-w-full max-h-48 rounded cursor-pointer"
+              />
+            ) : (
+              <img 
+                src={comment.attachmentUrl} 
+                alt="Attachment" 
+                className="max-w-full max-h-48 rounded cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => setShowFullImage(true)}
+              />
+            )}
+          </div>
+        )}
+      </div>
+      {showFullImage && comment.attachmentUrl && (
+        <Dialog open={showFullImage} onOpenChange={setShowFullImage}>
+          <DialogContent className="max-w-4xl max-h-[85vh]">
+            <img src={comment.attachmentUrl} alt="Full size" className="max-w-full max-h-[75vh] object-contain mx-auto" />
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
+  );
+}
+
+// Creative detail modal content
+function CreativeDetailModal({
+  creative, clientName, clientId, isPublicView, getStatusColor,
+  onStatusChange, onLaunch, onSendToClient, onClose, onDelete, addCommentMutation
+}: {
+  creative: Creative;
+  clientName: string;
+  clientId: string;
+  isPublicView: boolean;
+  getStatusColor: (s: string) => string;
+  onStatusChange: (c: Creative, s: 'approved' | 'revisions' | 'rejected') => void;
+  onLaunch: () => void;
+  onSendToClient: () => void;
+  onClose: () => void;
+  onDelete: () => void;
+  addCommentMutation: ReturnType<typeof useAddCreativeComment>;
+}) {
+  const [commentText, setCommentText] = useState('');
+  const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: string } | null>(null);
+
+  const handleAddComment = () => {
+    if (!commentText.trim() && !pendingAttachment) return;
+    const comment: CreativeComment = {
+      id: Date.now().toString(),
+      author: isPublicView ? 'Client' : 'Agency',
+      text: commentText,
+      createdAt: new Date().toISOString(),
+      attachmentUrl: pendingAttachment?.url,
+      attachmentType: pendingAttachment?.type,
+    };
+    addCommentMutation.mutate({ id: creative.id, comment, clientId });
+    setCommentText('');
+    setPendingAttachment(null);
+  };
+
+  return (
+    <>
+      <DialogHeader>
+        <div className="flex items-center justify-between">
+          <DialogTitle>{creative.title}</DialogTitle>
+          <Badge className={getStatusColor(creative.status)}>
+            {creative.status}
+          </Badge>
+        </div>
+      </DialogHeader>
+      
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge className={getStatusColor(creative.status)}>
+            {creative.status}
+          </Badge>
+          <Badge variant="outline">{creative.platform}</Badge>
+          <span className="text-sm text-muted-foreground">Client: {clientName}</span>
+        </div>
+
+        <CreativeHorizontalPreview 
+          creative={creative} 
+          clientName={clientName}
+        />
+
+        {/* Upload New Version + Download + AI Tools */}
+        <div className="flex items-center gap-2 flex-wrap border-t pt-4">
+          {creative.file_url && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => {
+                const link = document.createElement('a');
+                link.href = creative.file_url!;
+                link.download = creative.title || 'creative';
+                link.target = '_blank';
+                link.rel = 'noreferrer';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                toast.success('Download started');
+              }}
+            >
+              <Download className="h-4 w-4" />
+              Download
+            </Button>
+          )}
+          {!isPublicView && (
+            <UploadNewVersionButton creative={creative} clientId={clientId} />
+          )}
+          {!isPublicView && (
+            <>
+              <Sparkles className="h-4 w-4 text-primary ml-2" />
+              <span className="text-sm font-medium mr-1">AI Tools:</span>
+              <CreativeAIActions creative={creative} />
+            </>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 flex-wrap border-t pt-4">
+          {creative.status === 'draft' && !isPublicView && (
+            <Button
+              className="bg-primary hover:bg-primary/90"
+              onClick={() => { onSendToClient(); onClose(); }}
+            >
+              <SendHorizontal className="h-4 w-4 mr-1" />
+              Send to Client
+            </Button>
+          )}
+          {/* Request Approval - for public/client view on draft or revisions */}
+          {isPublicView && (creative.status === 'revisions' || creative.status === 'rejected') && (
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              onClick={() => {
+                onStatusChange(creative, 'approved');
+                toast.success('Approval requested');
+              }}
+            >
+              <FileUp className="h-4 w-4 mr-1" />
+              Request Approval
+            </Button>
+          )}
+          {creative.status !== 'launched' && creative.status !== 'draft' && (
+            <>
+              {creative.status === 'approved' && !isPublicView && (
+                <Button
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={() => { onLaunch(); onClose(); }}
+                >
+                  <Play className="h-4 w-4 mr-1" />
+                  Launch
+                </Button>
+              )}
+              <Button
+                variant="default"
+                onClick={() => onStatusChange(creative, 'approved')}
+              >
+                <Check className="h-4 w-4 mr-1" />
+                Approve
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => onStatusChange(creative, 'revisions')}
+              >
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Revisions
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => onStatusChange(creative, 'rejected')}
+              >
+                <X className="h-4 w-4 mr-1" />
+                Reject
+              </Button>
+            </>
+          )}
+          {!isPublicView && (
+            <Button variant="ghost" onClick={onDelete}>
+              <Trash2 className="h-4 w-4 mr-1 text-destructive" />
+              Delete
+            </Button>
+          )}
+        </div>
+
+        {/* Version History */}
+        <div className="border-t pt-4">
+          <VersionHistorySection creative={creative} clientId={clientId} />
+        </div>
+
+        {/* Comments with attachment support */}
+        <div className="border-t pt-4">
+          <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Comments ({creative.comments?.length || 0})
+          </h4>
+          {creative.comments && creative.comments.length > 0 ? (
+            <ScrollArea className="h-[250px] border rounded-lg p-3 mb-2">
+              <div className="space-y-2">
+                {creative.comments.map((comment) => (
+                  <CommentBubble key={comment.id} comment={comment} />
+                ))}
+              </div>
+            </ScrollArea>
+          ) : (
+            <p className="text-sm text-muted-foreground mb-2">No comments yet</p>
+          )}
+          
+          {/* Pending attachment preview */}
+          {pendingAttachment && (
+            <div className="flex items-center gap-2 mb-2 p-2 bg-muted rounded-lg">
+              {pendingAttachment.type === 'video' ? (
+                <Video className="h-4 w-4" />
+              ) : (
+                <Image className="h-4 w-4" />
+              )}
+              <span className="text-xs truncate flex-1">Attachment ready</span>
+              <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setPendingAttachment(null)}>
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+          
+          <div className="flex gap-2 mt-2">
+            <Input
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="Add a comment..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleAddComment();
+              }}
+            />
+            <CommentAttachmentUpload
+              clientId={clientId}
+              onUploaded={(url, type) => setPendingAttachment({ url, type })}
+            />
+            <Button 
+              size="icon"
+              onClick={handleAddComment}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Upload New Version button - saves current to version_history
+function UploadNewVersionButton({ creative, clientId }: { creative: Creative; clientId: string }) {
+  const queryClient = useQueryClient();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleNewVersion = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      // Upload new file
+      const newUrl = await uploadCreativeFile(file, clientId);
+      
+      // Save current file_url to version_history
+      const existingHistory = ((creative as any).version_history as any[]) || [];
+      const updatedHistory = [
+        ...existingHistory,
+        {
+          file_url: creative.file_url,
+          uploaded_at: new Date().toISOString(),
+          notes: `Previous version`,
+        },
+      ];
+
+      const { error } = await supabase
+        .from('creatives')
+        .update({
+          file_url: newUrl,
+          version_history: updatedHistory as unknown as Json,
+        })
+        .eq('id', creative.id);
+      
+      if (error) throw error;
+      
+      // Add system comment about new version
+      const comment: CreativeComment = {
+        id: Date.now().toString(),
+        author: 'System',
+        text: `📎 Previous version: ${creative.file_url}`,
+        createdAt: new Date().toISOString(),
+      };
+      
+      const { data: current } = await supabase
+        .from('creatives')
+        .select('comments')
+        .eq('id', creative.id)
+        .single();
+      
+      const existingComments = (current?.comments as unknown as CreativeComment[]) || [];
+      await supabase
+        .from('creatives')
+        .update({ comments: [...existingComments, comment] as unknown as Json })
+        .eq('id', creative.id);
+
+      queryClient.invalidateQueries({ queryKey: ['creatives', clientId] });
+      toast.success('New version uploaded');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to upload new version');
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*,video/*"
+        className="hidden"
+        onChange={handleNewVersion}
+      />
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-2"
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+      >
+        {uploading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+        Upload New
+      </Button>
+    </>
+  );
+}
+
+// Helper to get aspect ratio CSS class
 function getCardAspectClass(aspectRatio: string | null | undefined): string {
   switch (aspectRatio) {
     case '16:9': return 'aspect-video';
-    case '9:16': return 'aspect-[9/16] max-h-[500px]';
+    case '9:16': return 'aspect-[9/16] max-h-[400px]';
     case '1:1': return 'aspect-square';
     case '4:5': return 'aspect-[4/5]';
-    default: return 'aspect-[4/5]';
+    default: return 'aspect-square';
   }
 }
 
-// Inline video player component for card grid
+// Inline video player
 function InlineVideoPlayer({ src, aspectRatio }: { src: string; aspectRatio?: string | null }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -843,7 +1240,7 @@ function InlineVideoPlayer({ src, aspectRatio }: { src: string; aspectRatio?: st
   );
 }
 
-// Creative card with inline actions
+// Creative card (compact for 4-col grid)
 function CreativeCard({ 
   creative, clientName, clientId, isPublicView, getStatusColor, getTypeIcon,
   onPreview, onStatusChange, onLaunch, onSendToClient, onDelete, commentText, onCommentTextChange, addCommentMutation
@@ -858,7 +1255,7 @@ function CreativeCard({
   onStatusChange: (c: Creative, s: 'approved' | 'revisions' | 'rejected') => void;
   onLaunch: () => void;
   onSendToClient: () => void;
-  onAddComment: (c: Creative) => void;
+  onAddComment: (c: Creative, attachmentUrl?: string, attachmentType?: string) => void;
   onDelete: () => void;
   commentText: string;
   onCommentTextChange: (t: string) => void;
@@ -883,8 +1280,7 @@ function CreativeCard({
       <CardContent className="p-0">
         {/* Media area */}
         <div className="relative">
-          <Badge className={`absolute top-3 right-3 z-10 ${getStatusColor(creative.status)}`}>
-            <Clock className="h-3 w-3 mr-1" />
+          <Badge className={`absolute top-2 right-2 z-10 text-[10px] ${getStatusColor(creative.status)}`}>
             {creative.status.charAt(0).toUpperCase() + creative.status.slice(1)}
           </Badge>
           
@@ -893,15 +1289,15 @@ function CreativeCard({
               <img 
                 src={creative.file_url} 
                 alt={creative.title}
-                className="w-full h-full object-contain cursor-pointer"
+                className="w-full h-full object-cover cursor-pointer"
                 onClick={onPreview}
               />
             ) : creative.type === 'video' && creative.file_url ? (
               <InlineVideoPlayer src={creative.file_url} aspectRatio={creative.aspect_ratio} />
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center cursor-pointer" onClick={onPreview}>
+              <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center cursor-pointer" onClick={onPreview}>
                 {getTypeIcon(creative.type)}
-                <p className="text-sm text-muted-foreground mt-2">
+                <p className="text-xs text-muted-foreground mt-1">
                   {creative.headline || 'Ad Copy'}
                 </p>
               </div>
@@ -909,80 +1305,64 @@ function CreativeCard({
           </div>
         </div>
         
-        {/* Info + title row */}
-        <div className="px-4 pt-3 pb-2">
+        {/* Info */}
+        <div className="px-3 pt-2 pb-1.5">
           <div className="flex items-start justify-between">
             <div className="min-w-0 flex-1">
-              <h4 className="font-medium text-sm truncate">{creative.title}</h4>
-              <p className="text-xs text-muted-foreground">{clientName}</p>
+              <h4 className="font-medium text-xs truncate">{creative.title}</h4>
+              <p className="text-[10px] text-muted-foreground">{clientName}</p>
             </div>
-            <Badge variant="outline" className="text-xs ml-2 flex-shrink-0">
+            <Badge variant="outline" className="text-[10px] ml-1 flex-shrink-0">
               {creative.platform}
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-[10px] text-muted-foreground mt-0.5">
             {formatDistanceToNow(new Date(creative.created_at), { addSuffix: true })}
           </p>
         </div>
 
-        {/* Action buttons row */}
-        <div className="px-4 pb-2 flex items-center gap-2 flex-wrap">
+        {/* Action buttons - compact */}
+        <div className="px-3 pb-1.5 flex items-center gap-1 flex-wrap">
           {creative.status === 'draft' && !isPublicView && (
-            <Button
-              size="sm"
-              className="h-7 text-xs gap-1 bg-primary hover:bg-primary/90"
-              onClick={onSendToClient}
-            >
-              <SendHorizontal className="h-3 w-3" />
-              Send to Client
+            <Button size="sm" className="h-6 text-[10px] gap-0.5 bg-primary hover:bg-primary/90" onClick={onSendToClient}>
+              <SendHorizontal className="h-2.5 w-2.5" />
+              Send
             </Button>
           )}
-          {creative.status !== 'launched' && creative.status !== 'draft' && (
+          {/* Request Approval for public/client view */}
+          {isPublicView && creative.status !== 'approved' && creative.status !== 'launched' && (
+            <Button size="sm" className="h-6 text-[10px] gap-0.5 bg-amber-600 hover:bg-amber-700 text-white" onClick={() => onStatusChange(creative, 'approved')}>
+              <FileUp className="h-2.5 w-2.5" />
+              Request Approval
+            </Button>
+          )}
+          {creative.status !== 'launched' && creative.status !== 'draft' && !isPublicView && (
             <>
-              {creative.status === 'approved' && !isPublicView && (
-                <Button
-                  size="sm"
-                  className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white"
-                  onClick={onLaunch}
-                >
-                  <Play className="h-3 w-3" />
+              {creative.status === 'approved' && (
+                <Button size="sm" className="h-6 text-[10px] gap-0.5 bg-blue-600 hover:bg-blue-700 text-white" onClick={onLaunch}>
+                  <Play className="h-2.5 w-2.5" />
                   Launch
                 </Button>
               )}
-              <Button
-                size="sm"
-                className="h-7 text-xs gap-1"
-                onClick={() => onStatusChange(creative, 'approved')}
-              >
-                <Check className="h-3 w-3" />
+              <Button size="sm" className="h-6 text-[10px] gap-0.5" onClick={() => onStatusChange(creative, 'approved')}>
+                <Check className="h-2.5 w-2.5" />
                 Approve
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs gap-1"
-                onClick={() => onStatusChange(creative, 'revisions')}
-              >
-                <RefreshCw className="h-3 w-3" />
+              <Button variant="outline" size="sm" className="h-6 text-[10px] gap-0.5" onClick={() => onStatusChange(creative, 'revisions')}>
+                <RefreshCw className="h-2.5 w-2.5" />
                 Revisions
               </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                className="h-7 text-xs gap-1"
-                onClick={() => onStatusChange(creative, 'rejected')}
-              >
-                <X className="h-3 w-3" />
+              <Button variant="destructive" size="sm" className="h-6 text-[10px] gap-0.5" onClick={() => onStatusChange(creative, 'rejected')}>
+                <X className="h-2.5 w-2.5" />
                 Reject
               </Button>
             </>
           )}
-          {/* Download button on card */}
           {creative.file_url && (
             <Button
               variant="outline"
               size="sm"
-              className="h-7 text-xs gap-1"
+              className="h-6 text-[10px] gap-0.5"
               onClick={(e) => {
                 e.stopPropagation();
                 const link = document.createElement('a');
@@ -995,44 +1375,42 @@ function CreativeCard({
                 document.body.removeChild(link);
               }}
             >
-              <Download className="h-3 w-3" />
+              <Download className="h-2.5 w-2.5" />
               Download
             </Button>
           )}
           <Button
             variant="secondary"
             size="sm"
-            className="h-7 text-xs gap-1 ml-auto"
+            className="h-6 text-[10px] gap-0.5 ml-auto"
             onClick={onPreview}
           >
-            <Eye className="h-3 w-3" />
+            <Eye className="h-2.5 w-2.5" />
             Preview
           </Button>
           {!isPublicView && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={onDelete}
-            >
-              <Trash2 className="h-3 w-3 text-destructive" />
+            <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={onDelete}>
+              <Trash2 className="h-2.5 w-2.5 text-destructive" />
             </Button>
           )}
         </div>
 
         {/* Inline comment section */}
-        <div className="px-4 pb-3 border-t border-border mt-1 pt-2">
+        <div className="px-3 pb-2 border-t border-border mt-1 pt-1.5">
           {commentCount > 0 && (
-            <div className="mb-2 max-h-24 overflow-y-auto space-y-1">
+            <div className="mb-1.5 max-h-20 overflow-y-auto space-y-0.5">
               {creative.comments.slice(-2).map((comment) => (
-                <div key={comment.id} className="text-xs bg-muted rounded px-2 py-1">
+                <div key={comment.id} className="text-[10px] bg-muted rounded px-1.5 py-0.5">
                   <span className="font-medium">{comment.author}:</span>{' '}
                   <span className="text-muted-foreground">{comment.text}</span>
+                  {comment.attachmentUrl && (
+                    <span className="text-primary ml-1">📎</span>
+                  )}
                 </div>
               ))}
               {commentCount > 2 && (
                 <button 
-                  className="text-xs text-primary hover:underline"
+                  className="text-[10px] text-primary hover:underline"
                   onClick={onPreview}
                 >
                   View all {commentCount} comments
@@ -1040,22 +1418,22 @@ function CreativeCard({
               )}
             </div>
           )}
-          <div className="flex gap-1.5">
+          <div className="flex gap-1">
             <Input
               value={commentText}
               onChange={(e) => onCommentTextChange(e.target.value)}
               placeholder="Add a comment..."
-              className="h-7 text-xs"
+              className="h-6 text-[10px]"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleCardComment();
               }}
             />
             <Button 
               size="icon"
-              className="h-7 w-7 flex-shrink-0"
+              className="h-6 w-6 flex-shrink-0"
               onClick={handleCardComment}
             >
-              <Send className="h-3 w-3" />
+              <Send className="h-2.5 w-2.5" />
             </Button>
           </div>
         </div>
