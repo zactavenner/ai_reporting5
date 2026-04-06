@@ -23,12 +23,14 @@ import {
   BarChart3,
   Lightbulb,
   Flame,
-  MessageCircle,
   Type,
   AlignLeft,
   MousePointer,
   Eye,
   ArrowDown,
+  Bookmark,
+  Star,
+  Award,
 } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
 import { toast } from 'sonner';
@@ -39,61 +41,68 @@ const DR_TOOLS = [
     label: 'Hook Generator',
     description: 'Generate scroll-stopping hooks for ads',
     icon: Flame,
-    color: 'from-red-500/10 to-orange-500/10',
-    borderColor: 'border-red-500/20',
-    iconColor: 'text-red-500',
-    iconBg: 'bg-red-500/20',
+    color: 'text-red-500',
+    bg: 'bg-red-500/10',
+    gradient: 'from-red-500/8 to-orange-500/8',
+    borderColor: 'border-red-500/15',
   },
   {
     id: 'headline-variations',
     label: 'Headline Variations',
     description: 'A/B test headlines with AI-powered variations',
     icon: Type,
-    color: 'from-blue-500/10 to-indigo-500/10',
-    borderColor: 'border-blue-500/20',
-    iconColor: 'text-blue-500',
-    iconBg: 'bg-blue-500/20',
+    color: 'text-blue-500',
+    bg: 'bg-blue-500/10',
+    gradient: 'from-blue-500/8 to-indigo-500/8',
+    borderColor: 'border-blue-500/15',
   },
   {
     id: 'cta-optimizer',
     label: 'CTA Optimizer',
     description: 'Test and optimize calls-to-action',
     icon: MousePointer,
-    color: 'from-green-500/10 to-emerald-500/10',
-    borderColor: 'border-green-500/20',
-    iconColor: 'text-green-500',
-    iconBg: 'bg-green-500/20',
+    color: 'text-green-500',
+    bg: 'bg-green-500/10',
+    gradient: 'from-green-500/8 to-emerald-500/8',
+    borderColor: 'border-green-500/15',
   },
   {
     id: 'body-copy',
     label: 'Body Copy Writer',
     description: 'Generate persuasive body copy for any platform',
     icon: AlignLeft,
-    color: 'from-purple-500/10 to-violet-500/10',
-    borderColor: 'border-purple-500/20',
-    iconColor: 'text-purple-500',
-    iconBg: 'bg-purple-500/20',
+    color: 'text-purple-500',
+    bg: 'bg-purple-500/10',
+    gradient: 'from-purple-500/8 to-violet-500/8',
+    borderColor: 'border-purple-500/15',
   },
   {
     id: 'ad-audit',
     label: 'Ad Copy Audit',
     description: 'AI-powered review of existing ad copy',
     icon: Eye,
-    color: 'from-amber-500/10 to-yellow-500/10',
-    borderColor: 'border-amber-500/20',
-    iconColor: 'text-amber-500',
-    iconBg: 'bg-amber-500/20',
+    color: 'text-amber-500',
+    bg: 'bg-amber-500/10',
+    gradient: 'from-amber-500/8 to-yellow-500/8',
+    borderColor: 'border-amber-500/15',
   },
   {
     id: 'funnel-copy',
     label: 'Funnel Copy Suite',
     description: 'Complete copy for landing pages, emails, and VSLs',
     icon: ArrowDown,
-    color: 'from-teal-500/10 to-cyan-500/10',
-    borderColor: 'border-teal-500/20',
-    iconColor: 'text-teal-500',
-    iconBg: 'bg-teal-500/20',
+    color: 'text-teal-500',
+    bg: 'bg-teal-500/10',
+    gradient: 'from-teal-500/8 to-cyan-500/8',
+    borderColor: 'border-teal-500/15',
   },
+];
+
+const DR_BENCHMARKS = [
+  { metric: 'Hook Rate', benchmark: '> 30%', description: 'Viewers who watch past 3 seconds', icon: Flame },
+  { metric: 'Hold Rate', benchmark: '> 15%', description: 'Viewers who watch 50%+ of ad', icon: Eye },
+  { metric: 'CTR', benchmark: '> 1.5%', description: 'Click-through rate on CTA', icon: MousePointer },
+  { metric: 'Thumb Stop', benchmark: '> 3.5%', description: 'Scroll-stop ratio in feed', icon: Zap },
 ];
 
 interface GeneratedItem {
@@ -113,6 +122,7 @@ export function DirectResponseToolkit() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [results, setResults] = useState<GeneratedItem[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
 
   const activeTool = DR_TOOLS.find(t => t.id === selectedTool);
 
@@ -138,13 +148,18 @@ export function DirectResponseToolkit() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleSave = (item: GeneratedItem) => {
+    setSavedIds(prev => new Set([...prev, item.id]));
+    toast.success('Saved to copy library');
+  };
+
   return (
     <div className="space-y-8">
-      {/* Hero Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-500/10 via-pink-500/5 to-red-500/10 border border-rose-500/20 p-8">
+      {/* Hero Header — Apple-style */}
+      <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-rose-500/8 via-pink-500/4 to-red-500/8 border border-rose-500/15 p-8">
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-10 w-10 rounded-xl bg-rose-500/20 flex items-center justify-center">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-11 w-11 rounded-2xl bg-rose-500/15 flex items-center justify-center">
               <Target className="h-5 w-5 text-rose-500" />
             </div>
             <div>
@@ -152,17 +167,37 @@ export function DirectResponseToolkit() {
               <p className="text-sm text-muted-foreground">AI-powered tools for hooks, headlines, CTAs, body copy, and full funnel copywriting</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 mt-4">
-            <Badge variant="outline" className="gap-1 px-3 py-1"><Flame className="h-3 w-3" />Scroll-Stopping Hooks</Badge>
-            <Badge variant="outline" className="gap-1 px-3 py-1"><TrendingUp className="h-3 w-3" />A/B Test Ready</Badge>
-            <Badge variant="outline" className="gap-1 px-3 py-1"><BarChart3 className="h-3 w-3" />Performance Scored</Badge>
-          </div>
         </div>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-rose-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-rose-500/5 rounded-full blur-[80px]" />
+      </div>
+
+      {/* DR Benchmarks */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          <p className="text-sm font-medium text-muted-foreground">Direct Response Benchmarks</p>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {DR_BENCHMARKS.map(item => {
+            const Icon = item.icon;
+            return (
+              <div key={item.metric} className="p-4 rounded-2xl border bg-card hover:bg-muted/30 transition-all duration-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="h-7 w-7 rounded-lg bg-rose-500/10 flex items-center justify-center">
+                    <Icon className="h-3.5 w-3.5 text-rose-500" />
+                  </div>
+                  <p className="text-sm font-semibold">{item.metric}</p>
+                </div>
+                <p className="text-xl font-bold text-green-600">{item.benchmark}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">{item.description}</p>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Tool Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {DR_TOOLS.map(tool => {
           const isActive = selectedTool === tool.id;
           const Icon = tool.icon;
@@ -175,17 +210,17 @@ export function DirectResponseToolkit() {
               }}
               className={`flex items-start gap-3 p-5 rounded-2xl border text-left transition-all duration-300 ${
                 isActive
-                  ? `bg-gradient-to-br ${tool.color} ${tool.borderColor} shadow-lg shadow-${tool.iconColor}/5 scale-[1.02]`
-                  : 'bg-background hover:bg-muted/30 border-border hover:shadow-sm'
+                  ? `bg-gradient-to-br ${tool.gradient} ${tool.borderColor} shadow-md`
+                  : 'bg-background hover:bg-muted/30 border-border/60 hover:shadow-sm'
               }`}
             >
               <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                isActive ? tool.iconBg : 'bg-muted'
+                isActive ? tool.bg : 'bg-muted/60'
               }`}>
-                <Icon className={`h-5 w-5 ${isActive ? tool.iconColor : 'text-muted-foreground'}`} />
+                <Icon className={`h-5 w-5 ${isActive ? tool.color : 'text-muted-foreground'}`} />
               </div>
               <div>
-                <p className={`text-sm font-semibold ${isActive ? tool.iconColor : ''}`}>{tool.label}</p>
+                <p className={`text-sm font-semibold ${isActive ? tool.color : ''}`}>{tool.label}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
               </div>
             </button>
@@ -201,8 +236,8 @@ export function DirectResponseToolkit() {
             <div className="flex items-center gap-3 mb-2">
               {activeTool && (
                 <>
-                  <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${activeTool.iconBg}`}>
-                    <activeTool.icon className={`h-4 w-4 ${activeTool.iconColor}`} />
+                  <div className={`h-9 w-9 rounded-xl flex items-center justify-center ${activeTool.bg}`}>
+                    <activeTool.icon className={`h-4.5 w-4.5 ${activeTool.color}`} />
                   </div>
                   <h3 className="text-lg font-semibold">{activeTool.label}</h3>
                 </>
@@ -210,9 +245,9 @@ export function DirectResponseToolkit() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Client</label>
+              <label className="text-[13px] font-medium text-foreground/80">Client</label>
               <Select value={clientId} onValueChange={setClientId}>
-                <SelectTrigger className="h-11 rounded-xl">
+                <SelectTrigger className="h-11 rounded-xl border-border/60">
                   <SelectValue placeholder="Select a client" />
                 </SelectTrigger>
                 <SelectContent>
@@ -224,7 +259,7 @@ export function DirectResponseToolkit() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">
+              <label className="text-[13px] font-medium text-foreground/80">
                 {selectedTool === 'hook-generator' && 'Offer / Product to Hook'}
                 {selectedTool === 'headline-variations' && 'Base Headline or Topic'}
                 {selectedTool === 'cta-optimizer' && 'Current CTA or Desired Action'}
@@ -236,24 +271,24 @@ export function DirectResponseToolkit() {
                 placeholder={getPlaceholder(selectedTool)}
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                className="min-h-[140px] rounded-xl resize-none"
+                className="min-h-[140px] rounded-xl resize-none border-border/60"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Target Audience</label>
+                <label className="text-[13px] font-medium text-foreground/80">Target Audience</label>
                 <Input
                   placeholder="e.g., Business owners, 35-55"
                   value={targetAudience}
                   onChange={(e) => setTargetAudience(e.target.value)}
-                  className="h-11 rounded-xl"
+                  className="h-11 rounded-xl border-border/60"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Platform</label>
+                <label className="text-[13px] font-medium text-foreground/80">Platform</label>
                 <Select value={platform} onValueChange={setPlatform}>
-                  <SelectTrigger className="h-11 rounded-xl">
+                  <SelectTrigger className="h-11 rounded-xl border-border/60">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -269,10 +304,23 @@ export function DirectResponseToolkit() {
               </div>
             </div>
 
+            {/* Tool-specific pro tips */}
+            <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-500/5 border border-rose-500/10">
+              <Lightbulb className="h-3.5 w-3.5 text-rose-500 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {selectedTool === 'hook-generator' && 'The best hooks create an open loop in the viewer\'s mind. Use pattern interrupts, bold claims, or specific numbers to stop the scroll within 3 seconds.'}
+                {selectedTool === 'headline-variations' && 'Test at least 5 headline variations per ad set. Headlines with specific numbers convert 36% better than generic ones.'}
+                {selectedTool === 'cta-optimizer' && 'The best CTAs are specific, benefit-driven, and low-friction. "See the Full Breakdown" outperforms "Learn More" by 2.4x on average.'}
+                {selectedTool === 'body-copy' && 'Structure body copy as: Problem → Agitate → Solution → Proof → CTA. Use short paragraphs and bullet points for mobile readability.'}
+                {selectedTool === 'ad-audit' && 'Paste your full ad copy including headline, body, and CTA. The audit will score each section and provide actionable improvements.'}
+                {selectedTool === 'funnel-copy' && 'Include your offer details, target market, and funnel structure. The suite generates cohesive copy across landing page, emails, and VSL.'}
+              </p>
+            </div>
+
             <Button
               onClick={handleGenerate}
               disabled={isGenerating || !inputText}
-              className="w-full h-12 rounded-xl text-base font-medium gap-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700"
+              className="w-full h-12 rounded-xl text-[15px] font-medium gap-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 shadow-lg shadow-rose-500/20 transition-all duration-300"
             >
               {isGenerating ? (
                 <><Loader2 className="h-5 w-5 animate-spin" />Generating...</>
@@ -285,9 +333,9 @@ export function DirectResponseToolkit() {
           {/* Output */}
           <div className="space-y-4">
             {results.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full min-h-[400px] rounded-2xl border-2 border-dashed border-muted-foreground/20 p-8">
-                <div className="h-16 w-16 rounded-2xl bg-rose-500/10 flex items-center justify-center mb-4">
-                  <Zap className="h-8 w-8 text-rose-500/50" />
+              <div className="flex flex-col items-center justify-center h-full min-h-[400px] rounded-2xl border-2 border-dashed border-muted-foreground/15 p-8">
+                <div className="h-16 w-16 rounded-[20px] bg-rose-500/8 flex items-center justify-center mb-4">
+                  <Zap className="h-8 w-8 text-rose-500/40" />
                 </div>
                 <p className="text-muted-foreground font-medium">Results will appear here</p>
                 <p className="text-sm text-muted-foreground/60 mt-1">Fill in the details and generate</p>
@@ -296,18 +344,18 @@ export function DirectResponseToolkit() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">{results.length} Variations</h3>
-                  <Badge variant="outline" className="gap-1">
+                  <Badge variant="outline" className="gap-1 rounded-full text-xs px-3 py-1">
                     <Sparkles className="h-3 w-3" />
                     AI Scored
                   </Badge>
                 </div>
-                {results.map((item, idx) => (
-                  <Card key={item.id} className="overflow-hidden rounded-2xl hover:shadow-md transition-all duration-200">
+                {results.map(item => (
+                  <Card key={item.id} className="overflow-hidden rounded-2xl hover:shadow-md transition-all duration-200 border-border/60">
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1">
                           {item.label && (
-                            <Badge variant="outline" className="text-xs mb-2">{item.label}</Badge>
+                            <Badge variant="outline" className="text-[10px] mb-2 rounded-full px-2 py-0">{item.label}</Badge>
                           )}
                           <p className="text-sm leading-relaxed whitespace-pre-line">{item.content}</p>
                         </div>
@@ -321,14 +369,25 @@ export function DirectResponseToolkit() {
                               {item.score}/100
                             </div>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCopy(item)}
-                            className="h-8 w-8 p-0"
-                          >
-                            {copiedId === item.id ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                          </Button>
+                          <div className="flex gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSave(item)}
+                              className="h-7 w-7 p-0 rounded-lg"
+                              disabled={savedIds.has(item.id)}
+                            >
+                              <Bookmark className={`h-3.5 w-3.5 ${savedIds.has(item.id) ? 'fill-current text-rose-500' : ''}`} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCopy(item)}
+                              className="h-7 w-7 p-0 rounded-lg"
+                            >
+                              {copiedId === item.id ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </CardContent>

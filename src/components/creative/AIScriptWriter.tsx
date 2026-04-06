@@ -29,19 +29,25 @@ import {
   Clock,
   DollarSign,
   AlertTriangle,
+  Bookmark,
+  Star,
+  Info,
+  Lightbulb,
+  ArrowRight,
+  ChevronDown,
 } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
 import { toast } from 'sonner';
 
 const MARKETING_ANGLES = [
-  { id: 'pain-agitate-solve', label: 'Pain-Agitate-Solve', icon: AlertTriangle, description: 'Identify pain, amplify it, present the solution' },
-  { id: 'social-proof', label: 'Social Proof', icon: Heart, description: 'Leverage testimonials and results to build trust' },
-  { id: 'urgency-scarcity', label: 'Urgency & Scarcity', icon: Clock, description: 'Time-limited offers and exclusive access' },
-  { id: 'authority', label: 'Authority & Credibility', icon: Shield, description: 'Expert positioning and institutional trust' },
-  { id: 'roi-logic', label: 'ROI & Logic', icon: DollarSign, description: 'Numbers-driven case for the investment' },
-  { id: 'story-hook', label: 'Story Hook', icon: Megaphone, description: 'Personal narrative that pulls the viewer in' },
-  { id: 'contrarian', label: 'Contrarian Take', icon: TrendingUp, description: 'Challenge conventional wisdom to stop the scroll' },
-  { id: 'curiosity-gap', label: 'Curiosity Gap', icon: Zap, description: 'Create an irresistible need to know more' },
+  { id: 'pain-agitate-solve', label: 'Pain-Agitate-Solve', icon: AlertTriangle, description: 'Identify pain, amplify it, present the solution', color: 'text-red-500', bg: 'bg-red-500/10' },
+  { id: 'social-proof', label: 'Social Proof', icon: Heart, description: 'Leverage testimonials and results to build trust', color: 'text-pink-500', bg: 'bg-pink-500/10' },
+  { id: 'urgency-scarcity', label: 'Urgency & Scarcity', icon: Clock, description: 'Time-limited offers and exclusive access', color: 'text-amber-500', bg: 'bg-amber-500/10' },
+  { id: 'authority', label: 'Authority & Credibility', icon: Shield, description: 'Expert positioning and institutional trust', color: 'text-blue-500', bg: 'bg-blue-500/10' },
+  { id: 'roi-logic', label: 'ROI & Logic', icon: DollarSign, description: 'Numbers-driven case for the investment', color: 'text-green-500', bg: 'bg-green-500/10' },
+  { id: 'story-hook', label: 'Story Hook', icon: Megaphone, description: 'Personal narrative that pulls the viewer in', color: 'text-violet-500', bg: 'bg-violet-500/10' },
+  { id: 'contrarian', label: 'Contrarian Take', icon: TrendingUp, description: 'Challenge conventional wisdom to stop the scroll', color: 'text-orange-500', bg: 'bg-orange-500/10' },
+  { id: 'curiosity-gap', label: 'Curiosity Gap', icon: Zap, description: 'Create an irresistible need to know more', color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
 ];
 
 const AD_FORMATS = [
@@ -56,12 +62,12 @@ const AD_FORMATS = [
 ];
 
 const PLATFORMS = [
-  { id: 'meta', label: 'Meta (FB/IG)' },
-  { id: 'youtube', label: 'YouTube' },
-  { id: 'tiktok', label: 'TikTok' },
-  { id: 'linkedin', label: 'LinkedIn' },
-  { id: 'google', label: 'Google Ads' },
-  { id: 'email', label: 'Email / VSL' },
+  { id: 'meta', label: 'Meta (FB/IG)', tip: 'Lead with pattern interrupt. 15-30s performs best. Native-looking UGC outperforms polished 2.3x.' },
+  { id: 'youtube', label: 'YouTube', tip: 'First 5 seconds = skip or watch. Use strong curiosity gap. Pre-roll or mid-roll podcast style.' },
+  { id: 'tiktok', label: 'TikTok', tip: 'Don\'t make ads, make TikToks. Use trending sounds, fast cuts, and text overlays.' },
+  { id: 'linkedin', label: 'LinkedIn', tip: 'Authority-first. Lead with data and credibility. Educational tone converts best.' },
+  { id: 'google', label: 'Google Ads', tip: 'Intent-based. Match search intent. Benefit-led headlines with specific numbers.' },
+  { id: 'email', label: 'Email / VSL', tip: 'Long-form storytelling works. Open with a bold claim or personal story. Build to the offer.' },
 ];
 
 interface GeneratedScript {
@@ -87,6 +93,9 @@ export function AIScriptWriter() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedScripts, setGeneratedScripts] = useState<GeneratedScript[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+
+  const selectedPlatformData = PLATFORMS.find(p => p.id === selectedPlatform);
 
   const toggleAngle = (angleId: string) => {
     setSelectedAngles(prev =>
@@ -103,8 +112,6 @@ export function AIScriptWriter() {
     }
 
     setIsGenerating(true);
-
-    // Simulate AI generation (replace with actual Supabase edge function call)
     await new Promise(resolve => setTimeout(resolve, 2500));
 
     const scripts: GeneratedScript[] = selectedAngles.map((angleId, idx) => {
@@ -137,13 +144,18 @@ export function AIScriptWriter() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleSave = (script: GeneratedScript) => {
+    setSavedIds(prev => new Set([...prev, script.id]));
+    toast.success('Script saved to library');
+  };
+
   return (
     <div className="space-y-8">
-      {/* Hero Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500/10 via-purple-500/5 to-fuchsia-500/10 border border-violet-500/20 p-8">
+      {/* Hero Header — Apple-style clean */}
+      <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-violet-500/8 via-purple-500/4 to-fuchsia-500/8 border border-violet-500/15 p-8">
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-10 w-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-11 w-11 rounded-2xl bg-violet-500/15 flex items-center justify-center">
               <FileText className="h-5 w-5 text-violet-500" />
             </div>
             <div>
@@ -152,7 +164,7 @@ export function AIScriptWriter() {
             </div>
           </div>
         </div>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/5 rounded-full blur-[80px]" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
@@ -160,9 +172,9 @@ export function AIScriptWriter() {
         <div className="lg:col-span-2 space-y-6">
           {/* Client Selection */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Client</label>
+            <label className="text-[13px] font-medium text-foreground/80">Client</label>
             <Select value={clientId} onValueChange={setClientId}>
-              <SelectTrigger className="h-11 rounded-xl">
+              <SelectTrigger className="h-11 rounded-xl border-border/60">
                 <SelectValue placeholder="Select a client" />
               </SelectTrigger>
               <SelectContent>
@@ -175,49 +187,55 @@ export function AIScriptWriter() {
 
           {/* Offer Description */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Offer / Product Description</label>
+            <label className="text-[13px] font-medium text-foreground/80">Offer / Product Description</label>
             <Textarea
               placeholder="Describe your offer, product, or service. Include key benefits, pricing, and what makes it unique..."
               value={offerDescription}
               onChange={(e) => setOfferDescription(e.target.value)}
-              className="min-h-[120px] rounded-xl resize-none"
+              className="min-h-[120px] rounded-xl resize-none border-border/60"
             />
           </div>
 
           {/* Target Audience */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Target Audience</label>
+            <label className="text-[13px] font-medium text-foreground/80">Target Audience</label>
             <Input
               placeholder="e.g., Accredited investors aged 35-65 looking for passive income"
               value={targetAudience}
               onChange={(e) => setTargetAudience(e.target.value)}
-              className="h-11 rounded-xl"
+              className="h-11 rounded-xl border-border/60"
             />
           </div>
 
-          {/* Platform */}
+          {/* Platform with contextual tip */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Platform</label>
+            <label className="text-[13px] font-medium text-foreground/80">Platform</label>
             <div className="grid grid-cols-3 gap-2">
               {PLATFORMS.map(platform => (
                 <button
                   key={platform.id}
                   onClick={() => setSelectedPlatform(platform.id)}
-                  className={`px-3 py-2 text-xs font-medium rounded-xl border transition-all duration-200 ${
+                  className={`px-3 py-2.5 text-xs font-medium rounded-xl border transition-all duration-200 ${
                     selectedPlatform === platform.id
                       ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                      : 'bg-background hover:bg-muted/50 border-border'
+                      : 'bg-background hover:bg-muted/50 border-border/60'
                   }`}
                 >
                   {platform.label}
                 </button>
               ))}
             </div>
+            {selectedPlatformData && (
+              <div className="flex items-start gap-2 p-3 rounded-xl bg-violet-500/5 border border-violet-500/10 mt-2">
+                <Lightbulb className="h-3.5 w-3.5 text-violet-500 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-muted-foreground leading-relaxed">{selectedPlatformData.tip}</p>
+              </div>
+            )}
           </div>
 
           {/* Ad Format */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Ad Format</label>
+            <label className="text-[13px] font-medium text-foreground/80">Ad Format</label>
             <div className="grid grid-cols-2 gap-2">
               {AD_FORMATS.map(format => (
                 <button
@@ -226,7 +244,7 @@ export function AIScriptWriter() {
                   className={`px-3 py-2.5 text-xs font-medium rounded-xl border transition-all duration-200 text-left ${
                     selectedFormat === format.id
                       ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                      : 'bg-background hover:bg-muted/50 border-border'
+                      : 'bg-background hover:bg-muted/50 border-border/60'
                   }`}
                 >
                   {format.label}
@@ -237,16 +255,16 @@ export function AIScriptWriter() {
 
           {/* Tone */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Tone</label>
+            <label className="text-[13px] font-medium text-foreground/80">Tone</label>
             <div className="flex gap-2 flex-wrap">
               {['conversational', 'professional', 'urgent', 'educational', 'provocative'].map(t => (
                 <button
                   key={t}
                   onClick={() => setTone(t)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all duration-200 capitalize ${
+                  className={`px-3.5 py-1.5 text-xs font-medium rounded-full border transition-all duration-200 capitalize ${
                     tone === t
                       ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-background hover:bg-muted/50 border-border'
+                      : 'bg-background hover:bg-muted/50 border-border/60'
                   }`}
                 >
                   {t}
@@ -261,8 +279,8 @@ export function AIScriptWriter() {
           {/* Marketing Angles */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Marketing Angles <span className="text-muted-foreground">(select up to 3)</span></label>
-              <Badge variant="outline" className="text-xs">{selectedAngles.length}/3</Badge>
+              <label className="text-[13px] font-medium text-foreground/80">Marketing Angles <span className="text-muted-foreground">(select up to 3)</span></label>
+              <span className="text-xs text-muted-foreground font-medium">{selectedAngles.length}/3</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {MARKETING_ANGLES.map(angle => {
@@ -274,21 +292,21 @@ export function AIScriptWriter() {
                     onClick={() => toggleAngle(angle.id)}
                     className={`flex items-start gap-3 p-4 rounded-2xl border text-left transition-all duration-200 ${
                       isSelected
-                        ? 'bg-violet-500/10 border-violet-500/30 shadow-sm'
-                        : 'bg-background hover:bg-muted/30 border-border'
+                        ? `${angle.bg} border-current/20 shadow-sm`
+                        : 'bg-background hover:bg-muted/30 border-border/60'
                     }`}
                   >
                     <div className={`h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                      isSelected ? 'bg-violet-500/20' : 'bg-muted'
+                      isSelected ? angle.bg : 'bg-muted/60'
                     }`}>
-                      <Icon className={`h-4 w-4 ${isSelected ? 'text-violet-500' : 'text-muted-foreground'}`} />
+                      <Icon className={`h-4 w-4 ${isSelected ? angle.color : 'text-muted-foreground'}`} />
                     </div>
-                    <div className="min-w-0">
-                      <p className={`text-sm font-medium ${isSelected ? 'text-violet-600 dark:text-violet-400' : ''}`}>{angle.label}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-medium ${isSelected ? angle.color : ''}`}>{angle.label}</p>
                       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{angle.description}</p>
                     </div>
                     {isSelected && (
-                      <Check className="h-4 w-4 text-violet-500 flex-shrink-0 mt-0.5" />
+                      <Check className={`h-4 w-4 ${angle.color} flex-shrink-0 mt-0.5`} />
                     )}
                   </button>
                 );
@@ -300,7 +318,7 @@ export function AIScriptWriter() {
           <Button
             onClick={handleGenerate}
             disabled={isGenerating || !offerDescription || selectedAngles.length === 0 || !selectedFormat}
-            className="w-full h-12 rounded-xl text-base font-medium gap-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+            className="w-full h-12 rounded-xl text-[15px] font-medium gap-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 shadow-lg shadow-violet-500/20 transition-all duration-300"
           >
             {isGenerating ? (
               <>
@@ -318,48 +336,63 @@ export function AIScriptWriter() {
           {/* Generated Scripts */}
           {generatedScripts.length > 0 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-violet-500" />
-                Generated Scripts
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-violet-500" />
+                  Generated Scripts
+                </h3>
+                <span className="text-xs text-muted-foreground">{generatedScripts.length} scripts</span>
+              </div>
               {generatedScripts.map(script => (
-                <Card key={script.id} className="overflow-hidden rounded-2xl border-violet-500/20">
+                <Card key={script.id} className="overflow-hidden rounded-2xl border-violet-500/15 hover:shadow-lg hover:shadow-violet-500/5 transition-all duration-300">
                   <CardContent className="p-0">
-                    <div className="flex items-center justify-between p-4 border-b bg-muted/30">
-                      <div className="flex items-center gap-3">
-                        <Badge className="bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20">
+                    <div className="flex items-center justify-between p-4 border-b bg-violet-500/[0.03]">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <Badge className="bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20 rounded-lg">
                           <Target className="h-3 w-3 mr-1" />
                           {script.angle}
                         </Badge>
-                        <Badge variant="outline">{script.format}</Badge>
+                        <Badge variant="outline" className="rounded-lg">{script.format}</Badge>
                         {script.estimatedDuration !== 'N/A' && (
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs rounded-lg">
                             <Clock className="h-3 w-3 mr-1" />
                             {script.estimatedDuration}
                           </Badge>
                         )}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCopy(script)}
-                        className="gap-1.5"
-                      >
-                        {copiedId === script.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                        {copiedId === script.id ? 'Copied' : 'Copy'}
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSave(script)}
+                          className="gap-1.5 h-8 rounded-lg"
+                          disabled={savedIds.has(script.id)}
+                        >
+                          <Bookmark className={`h-3.5 w-3.5 ${savedIds.has(script.id) ? 'fill-current text-violet-500' : ''}`} />
+                          {savedIds.has(script.id) ? 'Saved' : 'Save'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopy(script)}
+                          className="gap-1.5 h-8 rounded-lg"
+                        >
+                          {copiedId === script.id ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                          {copiedId === script.id ? 'Copied' : 'Copy'}
+                        </Button>
+                      </div>
                     </div>
-                    <div className="p-4 space-y-4">
+                    <div className="p-5 space-y-5">
                       <div>
-                        <p className="text-xs font-medium text-violet-500 uppercase tracking-wider mb-1">Hook</p>
+                        <p className="text-[11px] font-semibold text-violet-500 uppercase tracking-wider mb-1.5">Hook</p>
                         <p className="text-sm leading-relaxed">{script.hook}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-blue-500 uppercase tracking-wider mb-1">Body</p>
-                        <p className="text-sm leading-relaxed whitespace-pre-line">{script.body}</p>
+                        <p className="text-[11px] font-semibold text-blue-500 uppercase tracking-wider mb-1.5">Body</p>
+                        <p className="text-sm leading-relaxed whitespace-pre-line text-muted-foreground">{script.body}</p>
                       </div>
-                      <div>
-                        <p className="text-xs font-medium text-green-500 uppercase tracking-wider mb-1">Call to Action</p>
+                      <div className="p-4 rounded-xl bg-green-500/5 border border-green-500/10">
+                        <p className="text-[11px] font-semibold text-green-500 uppercase tracking-wider mb-1.5">Call to Action</p>
                         <p className="text-sm leading-relaxed font-medium">{script.cta}</p>
                       </div>
                     </div>
