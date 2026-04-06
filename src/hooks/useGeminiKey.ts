@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { getStoredKeys, saveStoredKeys, type ApiKeyConfig } from './useApiRateLimiter';
 
-const DEFAULT_GEMINI_KEY = 'AIzaSyCbOTwdc8c8YGYpl63BKSNPvU2Xd29t_4o';
+const DEFAULT_GEMINI_KEY = '';
 
 /**
  * Simple hook for Gemini API key access WITHOUT rate limiting.
