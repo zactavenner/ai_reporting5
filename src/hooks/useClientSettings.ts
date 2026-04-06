@@ -45,6 +45,8 @@ export interface ClientSettings {
   // Stripe billing
   stripe_customer_id?: string | null;
   stripe_email?: string | null;
+  // Webhook mappings (attribution, etc.)
+  webhook_mappings?: Record<string, any> | null;
 }
 
 export interface KPIThresholds {
