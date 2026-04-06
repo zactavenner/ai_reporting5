@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import type {
   AvatarAdState, AvatarAdStep, DealInput, GeneratedScript,
-  AvatarConfig, GeneratedAvatar, VideoSegment, CaptionStyle, HeadlineStyle,
+  AvatarConfig, GeneratedAvatar, SelectedAvatar, VideoSegment, CaptionStyle, HeadlineStyle,
 } from '@/types/avatar-ad';
 
 const DEFAULT_STATE: AvatarAdState = {
@@ -19,6 +19,7 @@ const DEFAULT_STATE: AvatarAdState = {
   script: null,
   avatarConfig: { gender: 'female', age: '25-30', hair: 'blonde' },
   avatar: null,
+  selectedExistingAvatar: null,
   videoSegments: [],
   captionStyle: 'black_box',
   headlineStyle: 'white_banner',
@@ -32,6 +33,7 @@ interface AvatarAdContextType {
   setScript: (script: GeneratedScript) => void;
   updateAvatarConfig: (updates: Partial<AvatarConfig>) => void;
   setAvatar: (avatar: GeneratedAvatar) => void;
+  setSelectedExistingAvatar: (avatar: SelectedAvatar | null) => void;
   setVideoSegments: (segments: VideoSegment[]) => void;
   updateVideoSegment: (segmentId: number, updates: Partial<VideoSegment>) => void;
   setCaptionStyle: (style: CaptionStyle) => void;
@@ -52,6 +54,8 @@ export function AvatarAdProvider({ children }: { children: ReactNode }) {
   const updateAvatarConfig = useCallback((updates: Partial<AvatarConfig>) =>
     setState(p => ({ ...p, avatarConfig: { ...p.avatarConfig, ...updates } })), []);
   const setAvatar = useCallback((avatar: GeneratedAvatar) => setState(p => ({ ...p, avatar })), []);
+  const setSelectedExistingAvatar = useCallback((selectedExistingAvatar: SelectedAvatar | null) =>
+    setState(p => ({ ...p, selectedExistingAvatar })), []);
   const setVideoSegments = useCallback((videoSegments: VideoSegment[]) =>
     setState(p => ({ ...p, videoSegments })), []);
   const updateVideoSegment = useCallback((segmentId: number, updates: Partial<VideoSegment>) =>
@@ -67,7 +71,7 @@ export function AvatarAdProvider({ children }: { children: ReactNode }) {
   return (
     <AvatarAdContext.Provider value={{
       state, setStep, updateDeal, setScript, updateAvatarConfig,
-      setAvatar, setVideoSegments, updateVideoSegment,
+      setAvatar, setSelectedExistingAvatar, setVideoSegments, updateVideoSegment,
       setCaptionStyle, setHeadlineStyle, setProcessing, reset,
     }}>
       {children}
