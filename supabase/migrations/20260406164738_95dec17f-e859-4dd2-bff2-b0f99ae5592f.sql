@@ -1,0 +1,1 @@
+ALTER TABLE public.creatives ADD COLUMN IF NOT EXISTS version_history jsonb DEFAULT '[]'::jsonb;

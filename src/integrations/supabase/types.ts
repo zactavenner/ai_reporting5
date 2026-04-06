@@ -2324,6 +2324,7 @@ export type Database = {
           trigger_campaign_id: string | null
           type: string
           updated_at: string
+          version_history: Json | null
         }
         Insert: {
           ai_performance_score?: number | null
@@ -2343,6 +2344,7 @@ export type Database = {
           trigger_campaign_id?: string | null
           type?: string
           updated_at?: string
+          version_history?: Json | null
         }
         Update: {
           ai_performance_score?: number | null
@@ -2362,6 +2364,7 @@ export type Database = {
           trigger_campaign_id?: string | null
           type?: string
           updated_at?: string
+          version_history?: Json | null
         }
         Relationships: [
           {
