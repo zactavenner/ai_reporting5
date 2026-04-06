@@ -27,6 +27,9 @@ export interface DealInput {
   ctaType: CTAType;
   customCta?: string;
   customScript?: string;
+  // New: link to client offer
+  clientId?: string;
+  offerId?: string;
 }
 
 export interface ScriptSegment {
@@ -54,6 +57,13 @@ export interface GeneratedAvatar {
   prompt: string;
 }
 
+export interface SelectedAvatar {
+  id: string;
+  name: string;
+  imageUrl: string;
+  isStock: boolean;
+}
+
 export interface VideoSegment {
   segmentId: number;
   status: 'queued' | 'generating' | 'polling' | 'done' | 'failed';
@@ -76,6 +86,7 @@ export interface AvatarAdState {
   script: GeneratedScript | null;
   avatarConfig: AvatarConfig;
   avatar: GeneratedAvatar | null;
+  selectedExistingAvatar: SelectedAvatar | null;
   videoSegments: VideoSegment[];
   captionStyle: CaptionStyle;
   headlineStyle: HeadlineStyle;
