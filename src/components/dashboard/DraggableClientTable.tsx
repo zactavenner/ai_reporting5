@@ -184,15 +184,24 @@ export function DraggableClientTable({
     const clientIdsInTable = new Set(clients.map(c => c.id));
     const clientsWithData = new Set(yesterdayMetrics.map((m: any) => m.client_id));
     clientIdsInTable.forEach(id => {
-      if (!clientsWithData.has(id)) set.add(id);
+      if (!clientsWithData.has(id)) {
+        // No daily_metrics row — but check RPC metrics (source tables) before marking inactive
+        const m = metrics[id];
+        if (!m || ((m.totalAdSpend || 0) === 0 && (m.crmLeads || 0) === 0 && (m.totalCalls || 0) === 0)) {
+          set.add(id);
+        }
+      }
     });
     yesterdayMetrics.forEach((m: any) => {
-      if ((m.ad_spend ?? 0) === 0 && (m.leads ?? 0) === 0) {
+      // Only mark as inactive if both daily_metrics AND RPC metrics show no activity
+      const rpcM = metrics[m.client_id];
+      const hasRpcData = rpcM && ((rpcM.totalAdSpend || 0) > 0 || (rpcM.crmLeads || 0) > 0 || (rpcM.totalCalls || 0) > 0);
+      if ((m.ad_spend ?? 0) === 0 && (m.leads ?? 0) === 0 && !hasRpcData) {
         set.add(m.client_id);
       }
     });
     return set;
-  }, [yesterdayMetrics, clients]);
+  }, [yesterdayMetrics, clients, metrics]);
   const duplicateMetaAccounts = useMemo(() => {
     const counts: Record<string, number> = {};
     clients.forEach(c => {
@@ -580,12 +589,27 @@ export function DraggableClientTable({
                       (() => {
                         const crmTotal = m.crmLeads || 0;
                         const metaLeads = m.totalLeads || 0;
+                        const hasAdSpend = (m.totalAdSpend || 0) > 0;
+                        // Flag: client has ad spend but 0 CRM leads = GHL integration broken
+                        if (crmTotal === 0 && hasAdSpend) return 'text-destructive font-semibold';
                         if (crmTotal === 0 && metaLeads === 0) return 'text-muted-foreground';
                         if (crmTotal >= metaLeads) return 'text-chart-2';
                         return 'text-destructive font-semibold';
                       })()
                     )}>
-                      {m.crmLeads || 0}
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.crmLeads || 0}
+                        {(m.crmLeads || 0) === 0 && (m.totalAdSpend || 0) > 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-2.5 w-2.5 text-destructive shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-xs">
+                              <strong>GHL Integration Issue:</strong> This client has ad spend but 0 CRM leads synced. Check GHL API key, location ID, and sync status.
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                     </TableCell>
 
                     {/* CPL */}
@@ -597,8 +621,23 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* Booked Calls */}
-                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {m.totalCalls || 0}
+                    <TableCell className={cn(
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
+                      (m.totalCalls || 0) === 0 && (m.crmLeads || 0) > 0 ? 'text-destructive' : ''
+                    )}>
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.totalCalls || 0}
+                        {(m.totalCalls || 0) === 0 && (m.crmLeads || 0) > 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-2.5 w-2.5 text-destructive shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-xs">
+                              <strong>Calendar Issue:</strong> Client has {m.crmLeads} CRM leads but 0 booked calls. Check tracked calendar IDs in client settings.
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                     </TableCell>
 
                     {/* Cost per Call */}

@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Activity, Settings2, Calendar, Users, TrendingUp, Save, ArrowUpDown, ShieldCheck, Plug, Eye, EyeOff, Key, Stethoscope, HeartPulse } from 'lucide-react';
 import { formatDistanceToNow, differenceInDays, parseISO, format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 
@@ -508,8 +509,13 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
                     if (pipelineStatus !== 'not_configured') gaps.push(getMissedDays(c.lastGhlSyncAt || c.lastHubspotSyncAt, 30));
                     const maxGap = gaps.length > 0 ? Math.max(...gaps) : 0;
 
+                    // Data integrity: check if client has ad spend but no CRM leads
+                    const cm = clientMetrics[c.id] || {};
+                    const hasSpendNoCRM = (cm.totalAdSpend || 0) > 0 && (cm.crmLeads || 0) === 0;
+                    const hasLeadsNoCalls = (cm.crmLeads || 0) > 0 && (cm.totalCalls || 0) === 0;
+
                     return (
-                      <TableRow key={c.id}>
+                      <TableRow key={c.id} className={cn(hasSpendNoCRM && 'bg-destructive/5')}>
                         <TableCell className="font-medium text-sm py-2">
                           <div className="flex items-center gap-2">
                             <Badge variant={c.status === 'active' ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0">
@@ -521,6 +527,12 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
                             ) : (c.ghlLocationId && c.ghlApiKey) ? (
                               <Badge variant="outline" className="text-[9px] px-1 py-0 border-blue-400 text-blue-600 dark:text-blue-400">GHL</Badge>
                             ) : null}
+                            {hasSpendNoCRM && (
+                              <Badge variant="destructive" className="text-[8px] px-1 py-0">No CRM</Badge>
+                            )}
+                            {hasLeadsNoCalls && !hasSpendNoCRM && (
+                              <Badge variant="outline" className="text-[8px] px-1 py-0 border-yellow-500 text-yellow-600">No Cal</Badge>
+                            )}
                           </div>
                         </TableCell>
 
