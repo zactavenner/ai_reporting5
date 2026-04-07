@@ -95,7 +95,7 @@ interface CreativeWithClient extends Creative {
   clientName?: string;
 }
 
-// Sidebar navigation structure
+// Sidebar navigation structure — Apple-style grouped sections
 const NAV_SECTIONS = [
   {
     title: '',
@@ -106,7 +106,7 @@ const NAV_SECTIONS = [
   {
     title: 'AI Tools',
     items: [
-      { id: 'ai-scripts', label: 'AI Script Writer', icon: PenTool, isNew: true },
+      { id: 'ai-scripts', label: 'Script Writer', icon: PenTool, isNew: true },
       { id: 'podcast-ads', label: 'Podcast Ads', icon: Headphones, isNew: true },
       { id: 'hyper-realistic', label: 'Hyper-Realistic', icon: Camera, isNew: true },
       { id: 'direct-response', label: 'DR Toolkit', icon: Target, isNew: true },
@@ -706,18 +706,18 @@ export function CreativesTab() {
   return (
     <div className="flex gap-0 -mx-2 -mt-2">
       {/* Apple-style Sidebar Navigation */}
-      <div className={`flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-16' : 'w-60'}`}>
+      <div className={`flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-14' : 'w-56'}`}>
         <div className="sticky top-0 h-[calc(100vh-120px)]">
           <ScrollArea className="h-full">
-            <div className={`py-3 ${sidebarCollapsed ? 'px-2' : 'px-3'} space-y-6`}>
+            <div className={`py-4 ${sidebarCollapsed ? 'px-1.5' : 'px-2.5'} space-y-5`}>
               {NAV_SECTIONS.map((section, sectionIdx) => (
                 <div key={sectionIdx}>
                   {section.title && !sidebarCollapsed && (
-                    <p className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-3 mb-1.5">
+                    <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-[0.12em] px-3 mb-2">
                       {section.title}
                     </p>
                   )}
-                  <div className="space-y-0.5">
+                  <div className="space-y-px">
                     {section.items.map(item => {
                       const isActive = activeSection === item.id;
                       const Icon = item.icon;
@@ -725,26 +725,26 @@ export function CreativesTab() {
                         <button
                           key={item.id}
                           onClick={() => setActiveSection(item.id)}
-                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-200 ${
+                          className={`w-full flex items-center gap-2.5 px-3 py-[7px] rounded-[10px] text-[13px] transition-all duration-200 ${
                             isActive
-                              ? 'bg-primary/10 text-primary font-medium shadow-sm'
-                              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                              ? 'bg-primary/10 text-primary font-medium'
+                              : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
                           } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
                           title={sidebarCollapsed ? item.label : undefined}
                         >
-                          <Icon className={`h-4 w-4 flex-shrink-0 ${isActive ? 'text-primary' : ''}`} />
+                          <Icon className={`h-[15px] w-[15px] flex-shrink-0 ${isActive ? 'text-primary' : 'opacity-60'}`} />
                           {!sidebarCollapsed && (
                             <>
                               <span className="truncate">{item.label}</span>
                               {'isNew' in item && item.isNew && (
-                                <Badge className="ml-auto text-[9px] px-1.5 py-0 h-4 bg-violet-500 text-white border-0">
+                                <span className="ml-auto text-[9px] font-semibold px-1.5 py-px rounded-full bg-violet-500/15 text-violet-500">
                                   NEW
-                                </Badge>
+                                </span>
                               )}
                               {'showBadge' in item && item.showBadge && pendingCount > 0 && (
-                                <Badge className="ml-auto text-[10px] px-1.5 py-0 h-5 bg-amber-500 text-white border-0">
+                                <span className="ml-auto min-w-[20px] text-center text-[10px] font-semibold px-1.5 py-px rounded-full bg-amber-500 text-white">
                                   {pendingCount}
-                                </Badge>
+                                </span>
                               )}
                             </>
                           )}
@@ -760,7 +760,7 @@ export function CreativesTab() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 min-w-0 border-l pl-6 pr-2">
+      <div className="flex-1 min-w-0 border-l border-border/50 pl-6 pr-2">
         {renderContent()}
       </div>
     </div>

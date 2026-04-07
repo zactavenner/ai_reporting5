@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Slider } from '@/components/ui/slider';
 import {
   Select,
   SelectContent,
@@ -17,7 +16,6 @@ import {
   Headphones,
   Sparkles,
   Play,
-  Pause,
   Download,
   Copy,
   Check,
@@ -26,16 +24,18 @@ import {
   Volume2,
   Clock,
   Users,
-  Waveform,
+  Lightbulb,
+  Star,
+  ChevronRight,
 } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
 import { toast } from 'sonner';
 
 const PODCAST_STYLES = [
-  { id: 'host-read', label: 'Host-Read Ad', description: 'Natural read by a single host, like a personal recommendation', icon: Mic },
-  { id: 'interview-clip', label: 'Interview Clip', description: 'Two-person conversation style, Q&A format', icon: Users },
-  { id: 'narrative', label: 'Narrative Story', description: 'Story-driven format with ambient sound design', icon: Radio },
-  { id: 'dynamic-insert', label: 'Dynamic Insert', description: 'Short, punchy pre-roll/mid-roll ad spot', icon: Volume2 },
+  { id: 'host-read', label: 'Host-Read Ad', description: 'Natural read by a single host, like a personal recommendation', icon: Mic, bestFor: 'Trust & authenticity' },
+  { id: 'interview-clip', label: 'Interview Clip', description: 'Two-person conversation style, Q&A format', icon: Users, bestFor: 'Credibility & depth' },
+  { id: 'narrative', label: 'Narrative Story', description: 'Story-driven format with ambient sound design', icon: Radio, bestFor: 'Premium brands' },
+  { id: 'dynamic-insert', label: 'Dynamic Insert', description: 'Short, punchy pre-roll/mid-roll ad spot', icon: Volume2, bestFor: 'Scale & frequency' },
 ];
 
 const VOICE_TONES = [
@@ -48,10 +48,17 @@ const VOICE_TONES = [
 ];
 
 const DURATIONS = [
-  { id: '15', label: ':15 Pre-Roll' },
-  { id: '30', label: ':30 Mid-Roll' },
-  { id: '60', label: ':60 Standard' },
-  { id: '90', label: ':90 Extended' },
+  { id: '15', label: ':15', sublabel: 'Pre-Roll' },
+  { id: '30', label: ':30', sublabel: 'Mid-Roll' },
+  { id: '60', label: ':60', sublabel: 'Standard' },
+  { id: '90', label: ':90', sublabel: 'Extended' },
+];
+
+const PODCAST_PLATFORMS = [
+  { id: 'spotify', label: 'Spotify', note: 'Dynamic ad insertion, audio + display' },
+  { id: 'apple', label: 'Apple Podcasts', note: 'Host-read preferred, loyal listener base' },
+  { id: 'youtube', label: 'YouTube Podcasts', note: 'Video + audio, visual hooks matter' },
+  { id: 'general', label: 'General / RSS', note: 'Works across all podcast apps' },
 ];
 
 interface GeneratedPodcastAd {
@@ -61,6 +68,7 @@ interface GeneratedPodcastAd {
   script: string;
   speakerNotes: string;
   soundDesign: string;
+  wordCount: number;
 }
 
 export function PodcastAdsGenerator() {
@@ -72,6 +80,7 @@ export function PodcastAdsGenerator() {
   const [selectedStyle, setSelectedStyle] = useState('');
   const [selectedTone, setSelectedTone] = useState('');
   const [selectedDuration, setSelectedDuration] = useState('60');
+  const [selectedPodPlatform, setSelectedPodPlatform] = useState('general');
   const [promoCode, setPromoCode] = useState('');
   const [landingUrl, setLandingUrl] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -90,22 +99,27 @@ export function PodcastAdsGenerator() {
     const duration = DURATIONS.find(d => d.id === selectedDuration)?.label || ':60';
     const style = PODCAST_STYLES.find(s => s.id === selectedStyle)?.label || selectedStyle;
 
+    const scriptA = generatePodcastScript(selectedStyle, productName, offerDetails, targetListener, selectedDuration, promoCode, landingUrl);
+    const scriptB = generatePodcastScriptB(selectedStyle, productName, offerDetails, targetListener, selectedDuration, promoCode, landingUrl);
+
     const ads: GeneratedPodcastAd[] = [
       {
         id: `pod-${Date.now()}-1`,
         style,
         duration,
-        script: generatePodcastScript(selectedStyle, productName, offerDetails, targetListener, selectedDuration, promoCode, landingUrl),
+        script: scriptA,
         speakerNotes: generateSpeakerNotes(selectedStyle, selectedTone),
         soundDesign: generateSoundDesign(selectedStyle),
+        wordCount: scriptA.split(/\s+/).length,
       },
       {
         id: `pod-${Date.now()}-2`,
         style: `${style} (Variation B)`,
         duration,
-        script: generatePodcastScriptB(selectedStyle, productName, offerDetails, targetListener, selectedDuration, promoCode, landingUrl),
+        script: scriptB,
         speakerNotes: generateSpeakerNotes(selectedStyle, selectedTone),
         soundDesign: generateSoundDesign(selectedStyle),
+        wordCount: scriptB.split(/\s+/).length,
       },
     ];
 
@@ -122,19 +136,32 @@ export function PodcastAdsGenerator() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const selectedPodPlatformData = PODCAST_PLATFORMS.find(p => p.id === selectedPodPlatform);
+
   return (
-    <div className="space-y-8">
-      {/* Hero Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500/10 via-amber-500/5 to-yellow-500/10 border border-orange-500/20 p-8">
+    <div className="space-y-8 pb-8">
+      {/* Hero Header — Apple-style */}
+      <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-b from-orange-500/[0.08] via-amber-500/[0.04] to-transparent border border-orange-500/15 p-8">
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-3">
-            <div className="h-10 w-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
+            <div className="h-11 w-11 rounded-[14px] bg-orange-500/15 flex items-center justify-center">
               <Headphones className="h-5 w-5 text-orange-500" />
             </div>
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight">Podcast Ad Generator</h2>
-              <p className="text-sm text-muted-foreground">Create compelling podcast ads — host-reads, interview clips, narrative stories, and dynamic inserts</p>
+              <h2 className="text-[24px] font-semibold tracking-tight">Podcast Ad Generator</h2>
+              <p className="text-[13px] text-muted-foreground">Create compelling podcast ads — host-reads, interview clips, narrative stories, and dynamic inserts</p>
             </div>
+          </div>
+          <div className="flex items-center gap-3 mt-5">
+            <Badge variant="outline" className="gap-1.5 px-3 py-1 text-[11px] font-medium border-orange-500/20">
+              <Mic className="h-3 w-3" /> 4 Ad Styles
+            </Badge>
+            <Badge variant="outline" className="gap-1.5 px-3 py-1 text-[11px] font-medium border-orange-500/20">
+              <Clock className="h-3 w-3" /> :15 to :90
+            </Badge>
+            <Badge variant="outline" className="gap-1.5 px-3 py-1 text-[11px] font-medium border-orange-500/20">
+              <Star className="h-3 w-3" /> A/B Variations
+            </Badge>
           </div>
         </div>
         <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/5 rounded-full blur-3xl" />
@@ -142,11 +169,11 @@ export function PodcastAdsGenerator() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Configuration */}
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Client</label>
+        <div className="space-y-5">
+          <div className="space-y-1.5">
+            <label className="text-[13px] font-medium">Client</label>
             <Select value={clientId} onValueChange={setClientId}>
-              <SelectTrigger className="h-11 rounded-xl">
+              <SelectTrigger className="h-11 rounded-[12px]">
                 <SelectValue placeholder="Select a client" />
               </SelectTrigger>
               <SelectContent>
@@ -158,61 +185,87 @@ export function PodcastAdsGenerator() {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Product / Brand Name</label>
+            <div className="space-y-1.5">
+              <label className="text-[13px] font-medium">Product / Brand Name</label>
               <Input
                 placeholder="e.g., Westfield Capital"
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
-                className="h-11 rounded-xl"
+                className="h-11 rounded-[12px] text-[13px]"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Promo Code (optional)</label>
+            <div className="space-y-1.5">
+              <label className="text-[13px] font-medium">Promo Code (optional)</label>
               <Input
                 placeholder="e.g., INVEST50"
                 value={promoCode}
                 onChange={(e) => setPromoCode(e.target.value)}
-                className="h-11 rounded-xl"
+                className="h-11 rounded-[12px] text-[13px]"
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Offer Details</label>
+          <div className="space-y-1.5">
+            <label className="text-[13px] font-medium">Offer Details</label>
             <Textarea
               placeholder="What's the offer? Include key benefits, unique value proposition, and any specific details the host should mention..."
               value={offerDetails}
               onChange={(e) => setOfferDetails(e.target.value)}
-              className="min-h-[100px] rounded-xl resize-none"
+              className="min-h-[100px] rounded-[12px] resize-none text-[13px]"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Target Listener</label>
+            <div className="space-y-1.5">
+              <label className="text-[13px] font-medium">Target Listener</label>
               <Input
                 placeholder="e.g., Business owners, 35-55"
                 value={targetListener}
                 onChange={(e) => setTargetListener(e.target.value)}
-                className="h-11 rounded-xl"
+                className="h-11 rounded-[12px] text-[13px]"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Landing URL</label>
+            <div className="space-y-1.5">
+              <label className="text-[13px] font-medium">Landing URL</label>
               <Input
                 placeholder="e.g., brand.com/podcast"
                 value={landingUrl}
                 onChange={(e) => setLandingUrl(e.target.value)}
-                className="h-11 rounded-xl"
+                className="h-11 rounded-[12px] text-[13px]"
               />
             </div>
           </div>
 
+          {/* Podcast Platform */}
+          <div className="space-y-1.5">
+            <label className="text-[13px] font-medium">Distribution Platform</label>
+            <div className="grid grid-cols-2 gap-2">
+              {PODCAST_PLATFORMS.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedPodPlatform(p.id)}
+                  className={`px-3 py-2.5 text-[12px] font-medium rounded-[10px] border transition-all duration-200 text-left ${
+                    selectedPodPlatform === p.id
+                      ? 'bg-orange-500/10 border-orange-500/25 text-orange-600 dark:text-orange-400'
+                      : 'bg-background hover:bg-muted/50 border-border'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            {selectedPodPlatformData && (
+              <p className="text-[11px] text-orange-500 flex items-center gap-1.5 mt-1 pl-1">
+                <Lightbulb className="h-3 w-3" />
+                {selectedPodPlatformData.note}
+              </p>
+            )}
+          </div>
+
           {/* Podcast Style */}
-          <div className="space-y-3">
-            <label className="text-sm font-medium">Ad Style</label>
-            <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <label className="text-[13px] font-medium">Ad Style</label>
+            <div className="grid grid-cols-2 gap-2.5">
               {PODCAST_STYLES.map(style => {
                 const isSelected = selectedStyle === style.id;
                 const Icon = style.icon;
@@ -220,20 +273,21 @@ export function PodcastAdsGenerator() {
                   <button
                     key={style.id}
                     onClick={() => setSelectedStyle(style.id)}
-                    className={`flex items-start gap-3 p-4 rounded-2xl border text-left transition-all duration-200 ${
+                    className={`flex items-start gap-3 p-4 rounded-[14px] border text-left transition-all duration-200 ${
                       isSelected
-                        ? 'bg-orange-500/10 border-orange-500/30 shadow-sm'
+                        ? 'bg-orange-500/[0.08] border-orange-500/25 shadow-sm'
                         : 'bg-background hover:bg-muted/30 border-border'
                     }`}
                   >
-                    <div className={`h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                      isSelected ? 'bg-orange-500/20' : 'bg-muted'
+                    <div className={`h-9 w-9 rounded-[10px] flex items-center justify-center flex-shrink-0 ${
+                      isSelected ? 'bg-orange-500/15' : 'bg-muted/80'
                     }`}>
                       <Icon className={`h-4 w-4 ${isSelected ? 'text-orange-500' : 'text-muted-foreground'}`} />
                     </div>
                     <div>
-                      <p className={`text-sm font-medium ${isSelected ? 'text-orange-600 dark:text-orange-400' : ''}`}>{style.label}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{style.description}</p>
+                      <p className={`text-[13px] font-medium ${isSelected ? 'text-orange-600 dark:text-orange-400' : ''}`}>{style.label}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{style.description}</p>
+                      <p className={`text-[10px] mt-1 ${isSelected ? 'text-orange-500' : 'text-muted-foreground/60'}`}>Best for: {style.bestFor}</p>
                     </div>
                   </button>
                 );
@@ -243,32 +297,33 @@ export function PodcastAdsGenerator() {
 
           {/* Duration & Tone */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <label className="text-sm font-medium">Duration</label>
-              <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-2">
+              <label className="text-[13px] font-medium">Duration</label>
+              <div className="grid grid-cols-4 gap-1.5">
                 {DURATIONS.map(d => (
                   <button
                     key={d.id}
                     onClick={() => setSelectedDuration(d.id)}
-                    className={`px-3 py-2 text-xs font-medium rounded-xl border transition-all duration-200 ${
+                    className={`flex flex-col items-center py-2.5 text-[12px] font-medium rounded-[10px] border transition-all duration-200 ${
                       selectedDuration === d.id
                         ? 'bg-primary text-primary-foreground border-primary'
                         : 'bg-background hover:bg-muted/50 border-border'
                     }`}
                   >
-                    {d.label}
+                    <span className="font-semibold">{d.label}</span>
+                    <span className={`text-[9px] ${selectedDuration === d.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{d.sublabel}</span>
                   </button>
                 ))}
               </div>
             </div>
-            <div className="space-y-3">
-              <label className="text-sm font-medium">Voice Tone</label>
-              <div className="flex flex-wrap gap-2">
+            <div className="space-y-2">
+              <label className="text-[13px] font-medium">Voice Tone</label>
+              <div className="flex flex-wrap gap-1.5">
                 {VOICE_TONES.map(t => (
                   <button
                     key={t.id}
                     onClick={() => setSelectedTone(t.id)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all duration-200 ${
+                    className={`px-2.5 py-1.5 text-[11px] font-medium rounded-full border transition-all duration-200 ${
                       selectedTone === t.id
                         ? 'bg-primary text-primary-foreground border-primary'
                         : 'bg-background hover:bg-muted/50 border-border'
@@ -284,7 +339,7 @@ export function PodcastAdsGenerator() {
           <Button
             onClick={handleGenerate}
             disabled={isGenerating || !productName || !offerDetails || !selectedStyle}
-            className="w-full h-12 rounded-xl text-base font-medium gap-2 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700"
+            className="w-full h-12 rounded-[12px] text-[15px] font-medium gap-2 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 shadow-lg shadow-orange-500/20"
           >
             {isGenerating ? (
               <><Loader2 className="h-5 w-5 animate-spin" />Generating Podcast Ads...</>
@@ -297,54 +352,67 @@ export function PodcastAdsGenerator() {
         {/* Generated Ads */}
         <div className="space-y-4">
           {generatedAds.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full min-h-[400px] rounded-2xl border-2 border-dashed border-muted-foreground/20 p-8">
-              <div className="h-16 w-16 rounded-2xl bg-orange-500/10 flex items-center justify-center mb-4">
-                <Headphones className="h-8 w-8 text-orange-500/50" />
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] rounded-[20px] border-2 border-dashed border-muted-foreground/15 p-8">
+              <div className="h-16 w-16 rounded-[18px] bg-orange-500/10 flex items-center justify-center mb-4">
+                <Headphones className="h-8 w-8 text-orange-500/40" />
               </div>
-              <p className="text-muted-foreground font-medium">Your podcast ads will appear here</p>
-              <p className="text-sm text-muted-foreground/60 mt-1">Configure your settings and hit generate</p>
+              <p className="text-[15px] text-muted-foreground font-medium">Your podcast ads will appear here</p>
+              <p className="text-[13px] text-muted-foreground/50 mt-1">Configure your settings and hit generate</p>
             </div>
           ) : (
-            generatedAds.map(ad => (
-              <Card key={ad.id} className="overflow-hidden rounded-2xl border-orange-500/20">
-                <CardContent className="p-0">
-                  <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-orange-500/5 to-amber-500/5">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                        <Mic className="h-4 w-4 text-orange-500" />
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[17px] font-semibold tracking-tight">Generated Ads</h3>
+                <Badge variant="outline" className="text-[11px] gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  A/B Variations
+                </Badge>
+              </div>
+              {generatedAds.map(ad => (
+                <Card key={ad.id} className="overflow-hidden rounded-[16px] border-orange-500/15 hover:shadow-lg transition-all duration-300">
+                  <CardContent className="p-0">
+                    <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-orange-500/[0.04] to-amber-500/[0.04]">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-[8px] bg-orange-500/15 flex items-center justify-center">
+                          <Mic className="h-4 w-4 text-orange-500" />
+                        </div>
+                        <div>
+                          <p className="text-[13px] font-medium">{ad.style}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[11px] text-muted-foreground">{ad.duration}</span>
+                            <span className="text-[10px] text-muted-foreground/50">·</span>
+                            <span className="text-[11px] text-muted-foreground">{ad.wordCount} words</span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium">{ad.style}</p>
-                        <p className="text-xs text-muted-foreground">{ad.duration}</p>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleCopy(ad)} className="gap-1.5 text-[12px] rounded-[8px]">
+                          {copiedId === ad.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                          {copiedId === ad.id ? 'Copied' : 'Copy'}
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleCopy(ad)} className="gap-1.5">
-                        {copiedId === ad.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                        {copiedId === ad.id ? 'Copied' : 'Copy'}
-                      </Button>
-                    </div>
-                  </div>
 
-                  <div className="p-4 space-y-4">
-                    <div>
-                      <p className="text-xs font-medium text-orange-500 uppercase tracking-wider mb-2">Script</p>
-                      <p className="text-sm leading-relaxed whitespace-pre-line">{ad.script}</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-3 rounded-xl bg-muted/30">
-                        <p className="text-xs font-medium text-blue-500 uppercase tracking-wider mb-1">Speaker Notes</p>
-                        <p className="text-xs text-muted-foreground leading-relaxed">{ad.speakerNotes}</p>
+                    <div className="p-5 space-y-4">
+                      <div>
+                        <p className="text-[10px] font-semibold text-orange-500 uppercase tracking-[0.1em] mb-2">Script</p>
+                        <p className="text-[13px] leading-relaxed whitespace-pre-line">{ad.script}</p>
                       </div>
-                      <div className="p-3 rounded-xl bg-muted/30">
-                        <p className="text-xs font-medium text-purple-500 uppercase tracking-wider mb-1">Sound Design</p>
-                        <p className="text-xs text-muted-foreground leading-relaxed">{ad.soundDesign}</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 rounded-[10px] bg-muted/30">
+                          <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-[0.1em] mb-1">Speaker Notes</p>
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">{ad.speakerNotes}</p>
+                        </div>
+                        <div className="p-3 rounded-[10px] bg-muted/30">
+                          <p className="text-[10px] font-semibold text-purple-500 uppercase tracking-[0.1em] mb-1">Sound Design</p>
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">{ad.soundDesign}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                  </CardContent>
+                </Card>
+              ))}
+            </>
           )}
         </div>
       </div>

@@ -140,29 +140,29 @@ export function DirectResponseToolkit() {
 
   return (
     <div className="space-y-8">
-      {/* Hero Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-500/10 via-pink-500/5 to-red-500/10 border border-rose-500/20 p-8">
+      {/* Hero Header — Apple-style */}
+      <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-b from-rose-500/[0.08] via-pink-500/[0.04] to-transparent border border-rose-500/15 p-8">
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-3">
-            <div className="h-10 w-10 rounded-xl bg-rose-500/20 flex items-center justify-center">
+            <div className="h-11 w-11 rounded-[14px] bg-rose-500/15 flex items-center justify-center">
               <Target className="h-5 w-5 text-rose-500" />
             </div>
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight">Direct Response Toolkit</h2>
-              <p className="text-sm text-muted-foreground">AI-powered tools for hooks, headlines, CTAs, body copy, and full funnel copywriting</p>
+              <h2 className="text-[24px] font-semibold tracking-tight">Direct Response Toolkit</h2>
+              <p className="text-[13px] text-muted-foreground">AI-powered tools for hooks, headlines, CTAs, body copy, and full funnel copywriting</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 mt-4">
-            <Badge variant="outline" className="gap-1 px-3 py-1"><Flame className="h-3 w-3" />Scroll-Stopping Hooks</Badge>
-            <Badge variant="outline" className="gap-1 px-3 py-1"><TrendingUp className="h-3 w-3" />A/B Test Ready</Badge>
-            <Badge variant="outline" className="gap-1 px-3 py-1"><BarChart3 className="h-3 w-3" />Performance Scored</Badge>
+          <div className="flex items-center gap-3 mt-5">
+            <Badge variant="outline" className="gap-1.5 px-3 py-1 text-[11px] font-medium border-rose-500/20"><Flame className="h-3 w-3" />Scroll-Stopping Hooks</Badge>
+            <Badge variant="outline" className="gap-1.5 px-3 py-1 text-[11px] font-medium border-rose-500/20"><TrendingUp className="h-3 w-3" />A/B Test Ready</Badge>
+            <Badge variant="outline" className="gap-1.5 px-3 py-1 text-[11px] font-medium border-rose-500/20"><BarChart3 className="h-3 w-3" />Performance Scored</Badge>
           </div>
         </div>
         <div className="absolute top-0 right-0 w-64 h-64 bg-rose-500/5 rounded-full blur-3xl" />
       </div>
 
-      {/* Tool Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      {/* Tool Grid — Apple card style */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {DR_TOOLS.map(tool => {
           const isActive = selectedTool === tool.id;
           const Icon = tool.icon;
@@ -173,20 +173,20 @@ export function DirectResponseToolkit() {
                 setSelectedTool(tool.id);
                 setResults([]);
               }}
-              className={`flex items-start gap-3 p-5 rounded-2xl border text-left transition-all duration-300 ${
+              className={`flex items-start gap-3 p-5 rounded-[16px] border text-left transition-all duration-300 ${
                 isActive
-                  ? `bg-gradient-to-br ${tool.color} ${tool.borderColor} shadow-lg shadow-${tool.iconColor}/5 scale-[1.02]`
-                  : 'bg-background hover:bg-muted/30 border-border hover:shadow-sm'
+                  ? `bg-gradient-to-br ${tool.color} ${tool.borderColor} shadow-lg scale-[1.01]`
+                  : 'bg-card hover:bg-muted/40 border-border hover:shadow-md hover:shadow-black/[0.03] dark:hover:shadow-black/20'
               }`}
             >
-              <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                isActive ? tool.iconBg : 'bg-muted'
+              <div className={`h-10 w-10 rounded-[12px] flex items-center justify-center flex-shrink-0 ${
+                isActive ? tool.iconBg : 'bg-muted/80'
               }`}>
                 <Icon className={`h-5 w-5 ${isActive ? tool.iconColor : 'text-muted-foreground'}`} />
               </div>
               <div>
-                <p className={`text-sm font-semibold ${isActive ? tool.iconColor : ''}`}>{tool.label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
+                <p className={`text-[13px] font-semibold ${isActive ? tool.iconColor : ''}`}>{tool.label}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{tool.description}</p>
               </div>
             </button>
           );
@@ -272,7 +272,7 @@ export function DirectResponseToolkit() {
             <Button
               onClick={handleGenerate}
               disabled={isGenerating || !inputText}
-              className="w-full h-12 rounded-xl text-base font-medium gap-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700"
+              className="w-full h-12 rounded-[12px] text-[15px] font-medium gap-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 shadow-lg shadow-rose-500/20"
             >
               {isGenerating ? (
                 <><Loader2 className="h-5 w-5 animate-spin" />Generating...</>

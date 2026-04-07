@@ -124,22 +124,22 @@ export function HyperRealisticAds() {
 
   return (
     <div className="space-y-8">
-      {/* Hero Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-500/10 via-blue-500/5 to-indigo-500/10 border border-cyan-500/20 p-8">
+      {/* Hero Header — Apple-style */}
+      <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-b from-cyan-500/[0.08] via-blue-500/[0.04] to-transparent border border-cyan-500/15 p-8">
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-3">
-            <div className="h-10 w-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
+            <div className="h-11 w-11 rounded-[14px] bg-cyan-500/15 flex items-center justify-center">
               <Camera className="h-5 w-5 text-cyan-500" />
             </div>
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight">Hyper-Realistic Ad Generator</h2>
-              <p className="text-sm text-muted-foreground">Create photorealistic AI visuals for ads — product shots, lifestyle scenes, and cinematic content</p>
+              <h2 className="text-[24px] font-semibold tracking-tight">Hyper-Realistic Ad Generator</h2>
+              <p className="text-[13px] text-muted-foreground">Create photorealistic AI visuals for ads — product shots, lifestyle scenes, and cinematic content</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 mt-4">
-            <Badge variant="outline" className="gap-1 px-3 py-1"><Eye className="h-3 w-3" />Photorealistic Quality</Badge>
-            <Badge variant="outline" className="gap-1 px-3 py-1"><Layers className="h-3 w-3" />Multi-Scene Batch</Badge>
-            <Badge variant="outline" className="gap-1 px-3 py-1"><Film className="h-3 w-3" />Video-Ready Frames</Badge>
+          <div className="flex items-center gap-3 mt-5">
+            <Badge variant="outline" className="gap-1.5 px-3 py-1 text-[11px] font-medium border-cyan-500/20"><Eye className="h-3 w-3" />Photorealistic Quality</Badge>
+            <Badge variant="outline" className="gap-1.5 px-3 py-1 text-[11px] font-medium border-cyan-500/20"><Layers className="h-3 w-3" />Multi-Scene Batch</Badge>
+            <Badge variant="outline" className="gap-1.5 px-3 py-1 text-[11px] font-medium border-cyan-500/20"><Film className="h-3 w-3" />Video-Ready Frames</Badge>
           </div>
         </div>
         <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl" />
@@ -302,7 +302,7 @@ export function HyperRealisticAds() {
           <Button
             onClick={handleGenerate}
             disabled={isGenerating || !brandDescription || !selectedStyle || selectedScenes.length === 0}
-            className="w-full h-12 rounded-xl text-base font-medium gap-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700"
+            className="w-full h-12 rounded-[12px] text-[15px] font-medium gap-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20"
           >
             {isGenerating ? (
               <><Loader2 className="h-5 w-5 animate-spin" />Generating {batchCount} Visuals...</>
