@@ -359,6 +359,9 @@ function ClientOnboardingCard({
     assetsByType[a.asset_type].push(a);
   });
 
+  // Build quick-glance intake fields from offer + client data
+  const intakeFields = buildIntakeFields(primaryOffer, client);
+
   return (
     <Card className="overflow-hidden">
       <CardHeader className="pb-3">
@@ -412,6 +415,9 @@ function ClientOnboardingCard({
             <Progress value={progress} className="h-2" />
           </div>
         )}
+
+        {/* Always-visible intake summary */}
+        <QuickIntakeSummary fields={intakeFields} />
       </CardHeader>
 
       {isExpanded && (
