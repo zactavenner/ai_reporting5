@@ -36,6 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sliders, CheckCircle, RefreshCw, Wifi, Smartphone } from 'lucide-react';
 import { MasterMetaTokenCard } from '@/components/dashboard/MasterMetaTokenCard';
 import { OutreachTab } from '@/components/outreach/OutreachTab';
+import { OnboardingTab } from '@/components/dashboard/OnboardingTab';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, useFundedInvestors, AggregatedMetrics } from '@/hooks/useMetrics';
 import { aggregateFromSourceData, SourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
@@ -245,6 +246,9 @@ const Index = () => {
 
             {/* Spam utility page */}
             {activeTab === 'spam' && <SpamBlacklist embedded />}
+
+            {/* Onboarding */}
+            {activeTab === 'onboarding' && <OnboardingTab />}
 
             {/* Ads Manager */}
             {activeTab === 'ads-manager' && <AdminAdsManagerTab platform="all" />}
