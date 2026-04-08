@@ -576,7 +576,112 @@ function ClientOnboardingCard({
   );
 }
 
-// ─── Intake Data View ───
+// ─── Intake Quick-Glance (always visible on card) ───
+
+interface IntakeField {
+  label: string;
+  value: string;
+  filled: boolean;
+}
+
+const INTAKE_QUESTIONS = [
+  { key: 'fund_type', label: 'Fund Type' },
+  { key: 'raise_amount', label: 'Raise Amount' },
+  { key: 'min_investment', label: 'Min Investment' },
+  { key: 'timeline', label: 'Timeline' },
+  { key: 'target_investor', label: 'Target Investor' },
+  { key: 'targeted_returns', label: 'Targeted Returns' },
+  { key: 'hold_period', label: 'Hold Period' },
+  { key: 'distribution_schedule', label: 'Distribution' },
+  { key: 'investment_range', label: 'Investment Range' },
+  { key: 'tax_advantages', label: 'Tax Advantages' },
+  { key: 'speaker_name', label: 'Speaker' },
+  { key: 'industry_focus', label: 'Industry' },
+  { key: 'credibility', label: 'Credibility' },
+  { key: 'fund_history', label: 'Fund History' },
+  { key: 'website_url', label: 'Website' },
+  { key: 'brand_notes', label: 'Brand Notes' },
+  { key: 'additional_notes', label: 'Additional Notes' },
+  { key: 'budget_amount', label: 'Budget' },
+  { key: 'budget_mode', label: 'Budget Mode' },
+  { key: 'meta_ad_account_id', label: 'Meta Ad Account' },
+  { key: 'ghl_location_id', label: 'GHL Location' },
+  { key: 'pitch_deck_url', label: 'Pitch Deck' },
+] as const;
+
+function buildIntakeFields(offer: ClientOffer | undefined, client: ClientOnboardingData): IntakeField[] {
+  const fields: IntakeField[] = [];
+
+  // Pull from offer first, fallback to client-level description fields
+  for (const q of INTAKE_QUESTIONS) {
+    let val: string | null = null;
+
+    if (offer) {
+      const offerVal = (offer as any)[q.key];
+      if (offerVal != null && offerVal !== '' && offerVal !== false) {
+        val = String(offerVal);
+      }
+    }
+
+    // Fallback: check client description/offer_description for key info
+    if (!val && q.key === 'website_url') val = client.clientWebsite || null;
+
+    fields.push({
+      label: q.label,
+      value: val || '—',
+      filled: !!val,
+    });
+  }
+
+  // Add client-level description if present
+  if (client.clientDescription) {
+    fields.unshift({ label: 'Description', value: client.clientDescription, filled: true });
+  }
+  if (client.clientOfferDescription && client.clientOfferDescription !== client.clientDescription) {
+    fields.splice(1, 0, { label: 'Offer Details', value: client.clientOfferDescription, filled: true });
+  }
+
+  return fields;
+}
+
+function QuickIntakeSummary({ fields }: { fields: IntakeField[] }) {
+  const filled = fields.filter(f => f.filled);
+  const missing = fields.filter(f => !f.filled);
+
+  if (filled.length === 0) {
+    return (
+      <div className="mt-3 p-3 rounded-lg bg-muted/30 border border-dashed">
+        <p className="text-xs text-muted-foreground text-center">No intake data — expand to add details or upload files for AI context</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 space-y-2">
+      {/* Answered questions grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1.5 p-3 rounded-lg bg-muted/30">
+        {filled.map(f => (
+          <div key={f.label} className="min-w-0">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{f.label}</p>
+            <p className="text-xs font-medium truncate" title={f.value}>{f.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Missing fields indicator */}
+      {missing.length > 0 && (
+        <div className="flex items-center gap-1.5 px-1">
+          <AlertCircle className="h-3 w-3 text-muted-foreground shrink-0" />
+          <p className="text-[10px] text-muted-foreground">
+            Missing: {missing.map(m => m.label).join(', ')}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 
 function IntakeDataView({ offer, clientName }: { offer?: ClientOffer; clientName: string }) {
   if (!offer) {
