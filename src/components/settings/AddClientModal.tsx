@@ -208,6 +208,7 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
       setBrandColors([]);
       setBrandFonts([]);
       setWebsiteInput('');
+      setScrapedDescription('');
     }
     onOpenChange(open);
   };
