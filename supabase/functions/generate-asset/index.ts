@@ -65,20 +65,43 @@ Return ONLY valid JSON array.`,
 - variation: number (generate 3 per angle)
 Return ONLY valid JSON array.`,
 
-  scripts: `You are a video script writer. Generate video scripts as JSON array. Each object:
+  scripts: `You are an expert video script writer specializing in social media ads and AI-generated video content (veo3, avatar-based, b-roll compilations, UGC-style).
+Generate video scripts as JSON array. Each object:
 - title: script name
-- type: one of "avatar", "broll", "ugc", "vsl_short"
-- hook: opening 3-second hook
-- body: main script body
+- type: one of "avatar_talking_head", "broll_montage", "ugc_testimonial", "vsl_short", "veo3_cinematic", "veo3_product_demo"
+- hook: opening 3-second hook (attention-grabbing, pattern-interrupt)
+- body: main script body with clear scene directions in brackets [SCENE: ...]
 - cta: closing call to action
 - angle_used: marketing angle
 - format: "9:16", "1:1", or "16:9"
-- duration_estimate: estimated seconds
-Generate 4-6 scripts mixing types. Return ONLY valid JSON array.`,
+- duration_estimate: estimated seconds (15, 30, 45, or 60)
+- visual_direction: detailed visual notes for AI video generation (camera movements, transitions, mood, lighting)
+- veo3_prompt: if type includes "veo3", provide an optimized text-to-video prompt describing the exact scene for AI generation
+- music_mood: suggested music mood (e.g. "upbeat corporate", "emotional piano", "energetic EDM")
+- caption_style: "bold_overlay", "subtitle", "kinetic_typography"
+Generate 6-8 scripts mixing types, with at least 2 veo3-optimized scripts. Return ONLY valid JSON array.`,
 
-  creatives: `You are a creative director for ad campaigns. Generate creative concepts as JSON with keys:
-- static_concepts: array of 5 objects, each with: headline, supporting_text, visual_direction, layout_idea, format ("1080x1080", "1080x1920", "1200x628")
-- video_concepts: array of 3 objects, each with: style, setting, visual_scenes (array), caption_direction, hook_concept, format
+  creatives: `You are a senior creative director for performance marketing campaigns.
+Generate creative concepts as JSON with keys:
+- static_concepts: array of 6 objects, each with:
+  - headline: bold headline text
+  - supporting_text: body copy
+  - visual_direction: detailed art direction (colors, composition, style, mood)
+  - layout_idea: specific layout description
+  - format: "1080x1080", "1080x1920", or "1200x628"
+  - style: one of "editorial", "bold_graphic", "testimonial_card", "data_visualization", "lifestyle", "comparison"
+  - ai_image_prompt: a detailed prompt suitable for AI image generation (Gemini/DALL-E) to create this concept
+- video_concepts: array of 4 objects, each with:
+  - title: concept name
+  - style: one of "cinematic", "motion_graphics", "talking_head", "product_demo", "testimonial"
+  - setting: environment description
+  - visual_scenes: array of scene descriptions with timing
+  - caption_direction: text overlay strategy
+  - hook_concept: opening hook approach
+  - format: "9:16", "1:1", or "16:9"
+  - veo3_scene_prompts: array of text-to-video prompts for each scene, optimized for AI video generation
+  - duration_seconds: 15, 30, or 60
+  - music_mood: suggested background music style
 Return ONLY valid JSON.`,
 
   report: `You are a content strategist. Generate a special report / lead magnet as JSON:
