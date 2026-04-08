@@ -117,6 +117,9 @@ interface ClientOnboardingData {
   clientId: string;
   clientName: string;
   clientStatus: string;
+  clientDescription: string | null;
+  clientOfferDescription: string | null;
+  clientWebsite: string | null;
   offers: ClientOffer[];
   runs: FulfillmentRun[];
   steps: FulfillmentStep[];
