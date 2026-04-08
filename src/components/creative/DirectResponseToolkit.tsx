@@ -23,12 +23,16 @@ import {
   BarChart3,
   Lightbulb,
   Flame,
-  MessageCircle,
   Type,
   AlignLeft,
   MousePointer,
   Eye,
   ArrowDown,
+  Star,
+  ChevronRight,
+  RotateCcw,
+  Save,
+  Download,
 } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
 import { toast } from 'sonner';
@@ -39,60 +43,60 @@ const DR_TOOLS = [
     label: 'Hook Generator',
     description: 'Generate scroll-stopping hooks for ads',
     icon: Flame,
-    color: 'from-red-500/10 to-orange-500/10',
-    borderColor: 'border-red-500/20',
+    color: 'from-red-500/15 to-orange-500/10',
     iconColor: 'text-red-500',
-    iconBg: 'bg-red-500/20',
+    iconBg: 'bg-red-500/15',
+    tip: 'The hook determines 80% of ad performance. Test at least 5 hooks per winning body copy.',
   },
   {
     id: 'headline-variations',
     label: 'Headline Variations',
-    description: 'A/B test headlines with AI-powered variations',
+    description: 'A/B test headlines with AI variations',
     icon: Type,
-    color: 'from-blue-500/10 to-indigo-500/10',
-    borderColor: 'border-blue-500/20',
+    color: 'from-blue-500/15 to-indigo-500/10',
     iconColor: 'text-blue-500',
-    iconBg: 'bg-blue-500/20',
+    iconBg: 'bg-blue-500/15',
+    tip: 'The best headlines are specific, benefit-driven, and under 10 words. Numbers outperform vague claims.',
   },
   {
     id: 'cta-optimizer',
     label: 'CTA Optimizer',
     description: 'Test and optimize calls-to-action',
     icon: MousePointer,
-    color: 'from-green-500/10 to-emerald-500/10',
-    borderColor: 'border-green-500/20',
+    color: 'from-green-500/15 to-emerald-500/10',
     iconColor: 'text-green-500',
-    iconBg: 'bg-green-500/20',
+    iconBg: 'bg-green-500/15',
+    tip: 'Action-specific CTAs ("Get the Free Report") convert 3x better than generic ones ("Learn More").',
   },
   {
     id: 'body-copy',
     label: 'Body Copy Writer',
-    description: 'Generate persuasive body copy for any platform',
+    description: 'Persuasive body copy for any platform',
     icon: AlignLeft,
-    color: 'from-purple-500/10 to-violet-500/10',
-    borderColor: 'border-purple-500/20',
+    color: 'from-purple-500/15 to-violet-500/10',
     iconColor: 'text-purple-500',
-    iconBg: 'bg-purple-500/20',
+    iconBg: 'bg-purple-500/15',
+    tip: 'Great body copy follows: Problem → Agitate → Solution → Proof → CTA. Keep paragraphs to 2-3 lines.',
   },
   {
     id: 'ad-audit',
     label: 'Ad Copy Audit',
-    description: 'AI-powered review of existing ad copy',
+    description: 'AI review of existing ad copy',
     icon: Eye,
-    color: 'from-amber-500/10 to-yellow-500/10',
-    borderColor: 'border-amber-500/20',
+    color: 'from-amber-500/15 to-yellow-500/10',
     iconColor: 'text-amber-500',
-    iconBg: 'bg-amber-500/20',
+    iconBg: 'bg-amber-500/15',
+    tip: 'Paste any ad and get a DR score with specific, actionable improvements for each section.',
   },
   {
     id: 'funnel-copy',
     label: 'Funnel Copy Suite',
-    description: 'Complete copy for landing pages, emails, and VSLs',
+    description: 'Complete copy for landing pages, emails, VSLs',
     icon: ArrowDown,
-    color: 'from-teal-500/10 to-cyan-500/10',
-    borderColor: 'border-teal-500/20',
+    color: 'from-teal-500/15 to-cyan-500/10',
     iconColor: 'text-teal-500',
-    iconBg: 'bg-teal-500/20',
+    iconBg: 'bg-teal-500/15',
+    tip: 'Full-funnel copy consistency increases conversion by 40%. Match the ad promise to the landing page headline.',
   },
 ];
 
@@ -138,31 +142,44 @@ export function DirectResponseToolkit() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleCopyAll = () => {
+    const all = results.map(r => `[${r.label || 'Variation'}]\n${r.content}`).join('\n\n---\n\n');
+    navigator.clipboard.writeText(all);
+    toast.success('All variations copied');
+  };
+
   return (
     <div className="space-y-8">
-      {/* Hero Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-500/10 via-pink-500/5 to-red-500/10 border border-rose-500/20 p-8">
+      {/* Apple-Style Hero Header */}
+      <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-[#1d1d1f] via-[#2a2a2e] to-[#1d1d1f] p-8 md:p-10">
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-10 w-10 rounded-xl bg-rose-500/20 flex items-center justify-center">
-              <Target className="h-5 w-5 text-rose-500" />
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-lg shadow-rose-500/20">
+              <Target className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight">Direct Response Toolkit</h2>
-              <p className="text-sm text-muted-foreground">AI-powered tools for hooks, headlines, CTAs, body copy, and full funnel copywriting</p>
+              <h2 className="text-2xl font-bold tracking-tight text-white">Direct Response Toolkit</h2>
+              <p className="text-sm text-white/40">AI-powered tools for hooks, headlines, CTAs, body copy, and full funnel copywriting</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 mt-4">
-            <Badge variant="outline" className="gap-1 px-3 py-1"><Flame className="h-3 w-3" />Scroll-Stopping Hooks</Badge>
-            <Badge variant="outline" className="gap-1 px-3 py-1"><TrendingUp className="h-3 w-3" />A/B Test Ready</Badge>
-            <Badge variant="outline" className="gap-1 px-3 py-1"><BarChart3 className="h-3 w-3" />Performance Scored</Badge>
+          <div className="flex items-center gap-3 mt-5">
+            <Badge className="bg-white/[0.07] text-white/80 border-white/[0.08] backdrop-blur-sm gap-1.5 px-3 py-1 rounded-full text-xs font-medium">
+              <Flame className="h-3 w-3 text-red-400" />Scroll-Stopping Hooks
+            </Badge>
+            <Badge className="bg-white/[0.07] text-white/80 border-white/[0.08] backdrop-blur-sm gap-1.5 px-3 py-1 rounded-full text-xs font-medium">
+              <TrendingUp className="h-3 w-3 text-green-400" />A/B Test Ready
+            </Badge>
+            <Badge className="bg-white/[0.07] text-white/80 border-white/[0.08] backdrop-blur-sm gap-1.5 px-3 py-1 rounded-full text-xs font-medium">
+              <BarChart3 className="h-3 w-3 text-blue-400" />Performance Scored
+            </Badge>
           </div>
         </div>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-rose-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-0 right-0 w-80 h-80 bg-rose-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-1/4 w-60 h-60 bg-pink-500/8 rounded-full blur-3xl" />
       </div>
 
-      {/* Tool Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      {/* Tool Selection Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {DR_TOOLS.map(tool => {
           const isActive = selectedTool === tool.id;
           const Icon = tool.icon;
@@ -175,18 +192,18 @@ export function DirectResponseToolkit() {
               }}
               className={`flex items-start gap-3 p-5 rounded-2xl border text-left transition-all duration-300 ${
                 isActive
-                  ? `bg-gradient-to-br ${tool.color} ${tool.borderColor} shadow-lg shadow-${tool.iconColor}/5 scale-[1.02]`
-                  : 'bg-background hover:bg-muted/30 border-border hover:shadow-sm'
+                  ? `bg-gradient-to-br ${tool.color} border-primary/20 shadow-lg`
+                  : 'bg-card hover:bg-muted/30 border-border/50 hover:shadow-sm'
               }`}
             >
-              <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                isActive ? tool.iconBg : 'bg-muted'
+              <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                isActive ? tool.iconBg : 'bg-muted/70'
               }`}>
-                <Icon className={`h-5 w-5 ${isActive ? tool.iconColor : 'text-muted-foreground'}`} />
+                <Icon className={`h-5 w-5 ${isActive ? tool.iconColor : 'text-muted-foreground/60'}`} />
               </div>
               <div>
-                <p className={`text-sm font-semibold ${isActive ? tool.iconColor : ''}`}>{tool.label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
+                <p className={`text-sm font-semibold ${isActive ? '' : 'text-foreground/80'}`}>{tool.label}</p>
+                <p className="text-[11px] text-muted-foreground/50 mt-0.5">{tool.description}</p>
               </div>
             </button>
           );
@@ -195,149 +212,165 @@ export function DirectResponseToolkit() {
 
       {/* Active Tool Panel */}
       {selectedTool && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Input */}
-          <div className="space-y-5">
-            <div className="flex items-center gap-3 mb-2">
-              {activeTool && (
-                <>
-                  <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${activeTool.iconBg}`}>
-                    <activeTool.icon className={`h-4 w-4 ${activeTool.iconColor}`} />
-                  </div>
-                  <h3 className="text-lg font-semibold">{activeTool.label}</h3>
-                </>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Client</label>
-              <Select value={clientId} onValueChange={setClientId}>
-                <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue placeholder="Select a client" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map(client => (
-                    <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                {selectedTool === 'hook-generator' && 'Offer / Product to Hook'}
-                {selectedTool === 'headline-variations' && 'Base Headline or Topic'}
-                {selectedTool === 'cta-optimizer' && 'Current CTA or Desired Action'}
-                {selectedTool === 'body-copy' && 'Product / Offer Description'}
-                {selectedTool === 'ad-audit' && 'Paste Your Current Ad Copy'}
-                {selectedTool === 'funnel-copy' && 'Offer & Funnel Details'}
-              </label>
-              <Textarea
-                placeholder={getPlaceholder(selectedTool)}
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                className="min-h-[140px] rounded-xl resize-none"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Target Audience</label>
-                <Input
-                  placeholder="e.g., Business owners, 35-55"
-                  value={targetAudience}
-                  onChange={(e) => setTargetAudience(e.target.value)}
-                  className="h-11 rounded-xl"
-                />
+        <>
+          {/* Pro Tip for selected tool */}
+          {activeTool?.tip && (
+            <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-muted/30 border border-border/30">
+              <Lightbulb className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground">Pro Tip</p>
+                <p className="text-sm text-muted-foreground/70 mt-0.5">{activeTool.tip}</p>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Platform</label>
-                <Select value={platform} onValueChange={setPlatform}>
-                  <SelectTrigger className="h-11 rounded-xl">
-                    <SelectValue />
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Input */}
+            <div className="space-y-5">
+              <div className="flex items-center gap-3 mb-2">
+                {activeTool && (
+                  <>
+                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${activeTool.iconBg}`}>
+                      <activeTool.icon className={`h-4 w-4 ${activeTool.iconColor}`} />
+                    </div>
+                    <h3 className="text-lg font-bold">{activeTool.label}</h3>
+                  </>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Client</label>
+                <Select value={clientId} onValueChange={setClientId}>
+                  <SelectTrigger className="h-11 rounded-xl bg-muted/30 border-border/50">
+                    <SelectValue placeholder="Select a client" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="meta">Meta (FB/IG)</SelectItem>
-                    <SelectItem value="youtube">YouTube</SelectItem>
-                    <SelectItem value="tiktok">TikTok</SelectItem>
-                    <SelectItem value="linkedin">LinkedIn</SelectItem>
-                    <SelectItem value="google">Google Ads</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="landing">Landing Page</SelectItem>
+                    {clients.map(client => (
+                      <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">
+                  {selectedTool === 'hook-generator' && 'Offer / Product to Hook'}
+                  {selectedTool === 'headline-variations' && 'Base Headline or Topic'}
+                  {selectedTool === 'cta-optimizer' && 'Current CTA or Desired Action'}
+                  {selectedTool === 'body-copy' && 'Product / Offer Description'}
+                  {selectedTool === 'ad-audit' && 'Paste Your Current Ad Copy'}
+                  {selectedTool === 'funnel-copy' && 'Offer & Funnel Details'}
+                </label>
+                <Textarea
+                  placeholder={getPlaceholder(selectedTool)}
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  className="min-h-[140px] rounded-xl resize-none bg-muted/30 border-border/50"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Target Audience</label>
+                  <Input placeholder="e.g., Business owners, 35-55" value={targetAudience} onChange={(e) => setTargetAudience(e.target.value)} className="h-11 rounded-xl bg-muted/30 border-border/50" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Platform</label>
+                  <Select value={platform} onValueChange={setPlatform}>
+                    <SelectTrigger className="h-11 rounded-xl bg-muted/30 border-border/50">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="meta">Meta (FB/IG)</SelectItem>
+                      <SelectItem value="youtube">YouTube</SelectItem>
+                      <SelectItem value="tiktok">TikTok</SelectItem>
+                      <SelectItem value="linkedin">LinkedIn</SelectItem>
+                      <SelectItem value="google">Google Ads</SelectItem>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="landing">Landing Page</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleGenerate}
+                disabled={isGenerating || !inputText}
+                className="w-full h-13 rounded-2xl text-base font-semibold gap-2.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 shadow-lg shadow-rose-500/20 transition-all duration-300"
+              >
+                {isGenerating ? (
+                  <><Loader2 className="h-5 w-5 animate-spin" />Generating...</>
+                ) : (
+                  <><Sparkles className="h-5 w-5" />Generate Variations</>
+                )}
+              </Button>
             </div>
 
-            <Button
-              onClick={handleGenerate}
-              disabled={isGenerating || !inputText}
-              className="w-full h-12 rounded-xl text-base font-medium gap-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700"
-            >
-              {isGenerating ? (
-                <><Loader2 className="h-5 w-5 animate-spin" />Generating...</>
+            {/* Output */}
+            <div className="space-y-4">
+              {results.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full min-h-[400px] rounded-2xl border-2 border-dashed border-muted-foreground/15 p-8">
+                  <div className="h-16 w-16 rounded-2xl bg-rose-500/10 flex items-center justify-center mb-4">
+                    <Zap className="h-8 w-8 text-rose-500/40" />
+                  </div>
+                  <p className="text-muted-foreground/70 font-semibold">Results will appear here</p>
+                  <p className="text-sm text-muted-foreground/40 mt-1">Fill in the details and generate</p>
+                </div>
               ) : (
-                <><Sparkles className="h-5 w-5" />Generate Variations</>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold">{results.length} Variations</h3>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="sm" onClick={handleCopyAll} className="gap-1.5 text-xs rounded-lg">
+                        <Copy className="h-3 w-3" />
+                        Copy All
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={handleGenerate} className="gap-1.5 text-xs rounded-lg">
+                        <RotateCcw className="h-3 w-3" />
+                        Regenerate
+                      </Button>
+                    </div>
+                  </div>
+                  {results.map((item) => (
+                    <Card key={item.id} className="overflow-hidden rounded-2xl border-border/50 hover:shadow-md transition-all duration-200 group">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            {item.label && (
+                              <Badge variant="outline" className="text-[10px] mb-2.5 rounded-lg font-semibold">{item.label}</Badge>
+                            )}
+                            <p className="text-sm leading-relaxed whitespace-pre-line">{item.content}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                            {item.score !== undefined && (
+                              <div className={`text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1 ${
+                                item.score >= 85 ? 'bg-green-500/10 text-green-600' :
+                                item.score >= 70 ? 'bg-blue-500/10 text-blue-600' :
+                                item.score >= 50 ? 'bg-amber-500/10 text-amber-600' :
+                                'bg-red-500/10 text-red-600'
+                              }`}>
+                                <Star className="h-3 w-3" />
+                                {item.score}
+                              </div>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCopy(item)}
+                              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              {copiedId === item.id ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               )}
-            </Button>
+            </div>
           </div>
-
-          {/* Output */}
-          <div className="space-y-4">
-            {results.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full min-h-[400px] rounded-2xl border-2 border-dashed border-muted-foreground/20 p-8">
-                <div className="h-16 w-16 rounded-2xl bg-rose-500/10 flex items-center justify-center mb-4">
-                  <Zap className="h-8 w-8 text-rose-500/50" />
-                </div>
-                <p className="text-muted-foreground font-medium">Results will appear here</p>
-                <p className="text-sm text-muted-foreground/60 mt-1">Fill in the details and generate</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">{results.length} Variations</h3>
-                  <Badge variant="outline" className="gap-1">
-                    <Sparkles className="h-3 w-3" />
-                    AI Scored
-                  </Badge>
-                </div>
-                {results.map((item, idx) => (
-                  <Card key={item.id} className="overflow-hidden rounded-2xl hover:shadow-md transition-all duration-200">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          {item.label && (
-                            <Badge variant="outline" className="text-xs mb-2">{item.label}</Badge>
-                          )}
-                          <p className="text-sm leading-relaxed whitespace-pre-line">{item.content}</p>
-                        </div>
-                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                          {item.score !== undefined && (
-                            <div className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                              item.score >= 85 ? 'bg-green-500/10 text-green-600' :
-                              item.score >= 70 ? 'bg-amber-500/10 text-amber-600' :
-                              'bg-red-500/10 text-red-600'
-                            }`}>
-                              {item.score}/100
-                            </div>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCopy(item)}
-                            className="h-8 w-8 p-0"
-                          >
-                            {copiedId === item.id ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        </>
       )}
     </div>
   );
@@ -350,7 +383,7 @@ function getPlaceholder(tool: string): string {
     'cta-optimizer': 'Enter your current CTA or describe the action you want users to take...',
     'body-copy': 'Describe the product/offer in detail. Include benefits, features, and proof points...',
     'ad-audit': 'Paste your existing ad copy here and we\'ll analyze it for DR best practices...',
-    'funnel-copy': 'Describe your offer, target market, and funnel structure (landing page → email → VSL)...',
+    'funnel-copy': 'Describe your offer, target market, and funnel structure (landing page > email > VSL)...',
   };
   return placeholders[tool] || 'Enter your details...';
 }
@@ -406,8 +439,8 @@ function generateDRContent(tool: string, input: string, audience: string, platfo
 
   // body-copy default
   return [
-    { id: `bc-${Date.now()}-1`, content: `Here's the truth most financial advisors won't tell you:\n\nThe traditional investment playbook — stocks, bonds, index funds — was designed for a different era.\n\nToday's smartest investors are diversifying into alternative assets that deliver:\n\n• Consistent monthly cash flow\n• Tax-advantaged returns\n• Protection against market volatility\n• Full transparency into every deal\n\nWe've helped over 2,400 investors access institutional-quality deals that were previously reserved for the ultra-wealthy.\n\nNo complexity. No guesswork. Just results you can verify.`, score: 88, label: 'Long-form' },
+    { id: `bc-${Date.now()}-1`, content: `Here's the truth most financial advisors won't tell you:\n\nThe traditional investment playbook — stocks, bonds, index funds — was designed for a different era.\n\nToday's smartest investors are diversifying into alternative assets that deliver:\n\n- Consistent monthly cash flow\n- Tax-advantaged returns\n- Protection against market volatility\n- Full transparency into every deal\n\nWe've helped over 2,400 investors access institutional-quality deals that were previously reserved for the ultra-wealthy.\n\nNo complexity. No guesswork. Just results you can verify.`, score: 88, label: 'Long-form' },
     { id: `bc-${Date.now()}-2`, content: `Tired of watching your money sit idle?\n\nOur investors earn 15-22% annually — with full transparency and hands-off management.\n\nNo stock market stress. No tenant headaches. Just consistent returns.\n\nSee how it works.`, score: 85, label: 'Short-form' },
-    { id: `bc-${Date.now()}-3`, content: `Most people think building wealth requires:\n❌ Picking individual stocks\n❌ Managing rental properties\n❌ Timing the market perfectly\n\nBut our investors know better:\n✅ Institutional-grade deals\n✅ Hands-off management\n✅ 15-22% annual returns\n✅ Full transparency\n\nJoin 2,400+ investors who chose a smarter path.`, score: 86, label: 'Emoji / Social' },
+    { id: `bc-${Date.now()}-3`, content: `Most people think building wealth requires:\n- Picking individual stocks\n- Managing rental properties\n- Timing the market perfectly\n\nBut our investors know better:\n+ Institutional-grade deals\n+ Hands-off management\n+ 15-22% annual returns\n+ Full transparency\n\nJoin 2,400+ investors who chose a smarter path.`, score: 86, label: 'Comparison / Social' },
   ];
 }

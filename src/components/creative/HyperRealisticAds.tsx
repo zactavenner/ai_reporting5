@@ -14,11 +14,9 @@ import {
 import {
   Sparkles,
   Camera,
-  Clapperboard,
   Eye,
   Loader2,
   Download,
-  RotateCcw,
   Settings2,
   Film,
   Image,
@@ -27,17 +25,24 @@ import {
   MonitorPlay,
   Smartphone,
   Square,
+  Star,
+  Lightbulb,
+  RotateCcw,
+  ChevronRight,
+  Check,
+  Save,
+  Copy,
 } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
 import { toast } from 'sonner';
 
 const VISUAL_STYLES = [
-  { id: 'photorealistic', label: 'Photorealistic', description: 'Indistinguishable from real photography' },
-  { id: 'cinematic', label: 'Cinematic 4K', description: 'Film-grade lighting and color grading' },
-  { id: 'editorial', label: 'Editorial / Magazine', description: 'High-fashion editorial look' },
-  { id: 'lifestyle', label: 'Lifestyle Authentic', description: 'Natural, candid feel like real UGC' },
-  { id: 'luxury', label: 'Luxury / Premium', description: 'High-end product showcase aesthetic' },
-  { id: 'tech-modern', label: 'Tech / Modern', description: 'Clean, futuristic tech aesthetic' },
+  { id: 'photorealistic', label: 'Photorealistic', description: 'Indistinguishable from real photography', tip: 'Best for product ads and lifestyle scenes' },
+  { id: 'cinematic', label: 'Cinematic 4K', description: 'Film-grade lighting and color grading', tip: 'Best for brand storytelling and hero content' },
+  { id: 'editorial', label: 'Editorial / Magazine', description: 'High-fashion editorial look', tip: 'Best for luxury and premium brands' },
+  { id: 'lifestyle', label: 'Lifestyle Authentic', description: 'Natural, candid feel like real UGC', tip: 'Best for social media and Meta ads' },
+  { id: 'luxury', label: 'Luxury / Premium', description: 'High-end product showcase aesthetic', tip: 'Best for finance, real estate, and premium offers' },
+  { id: 'tech-modern', label: 'Tech / Modern', description: 'Clean, futuristic tech aesthetic', tip: 'Best for SaaS and tech products' },
 ];
 
 const SCENE_TYPES = [
@@ -82,6 +87,9 @@ export function HyperRealisticAds() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedVisuals, setGeneratedVisuals] = useState<GeneratedVisual[]>([]);
   const [batchCount, setBatchCount] = useState(4);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const selectedStyleData = VISUAL_STYLES.find(s => s.id === selectedStyle);
 
   const toggleScene = (sceneId: string) => {
     setSelectedScenes(prev =>
@@ -89,6 +97,13 @@ export function HyperRealisticAds() {
         ? prev.filter(s => s !== sceneId)
         : prev.length < 4 ? [...prev, sceneId] : prev
     );
+  };
+
+  const handleCopyPrompt = (visual: GeneratedVisual) => {
+    navigator.clipboard.writeText(visual.prompt);
+    setCopiedId(visual.id);
+    toast.success('Prompt copied');
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   const handleGenerate = async () => {
@@ -114,7 +129,6 @@ export function HyperRealisticAds() {
       }));
     }).slice(0, batchCount);
 
-    // Simulate generation delay
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     setGeneratedVisuals(visuals);
@@ -124,34 +138,52 @@ export function HyperRealisticAds() {
 
   return (
     <div className="space-y-8">
-      {/* Hero Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-500/10 via-blue-500/5 to-indigo-500/10 border border-cyan-500/20 p-8">
+      {/* Apple-Style Hero Header */}
+      <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-[#1d1d1f] via-[#2a2a2e] to-[#1d1d1f] p-8 md:p-10">
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-10 w-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
-              <Camera className="h-5 w-5 text-cyan-500" />
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+              <Camera className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight">Hyper-Realistic Ad Generator</h2>
-              <p className="text-sm text-muted-foreground">Create photorealistic AI visuals for ads — product shots, lifestyle scenes, and cinematic content</p>
+              <h2 className="text-2xl font-bold tracking-tight text-white">Hyper-Realistic Ad Generator</h2>
+              <p className="text-sm text-white/40">Create photorealistic AI visuals for ads — product shots, lifestyle scenes, and cinematic content</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 mt-4">
-            <Badge variant="outline" className="gap-1 px-3 py-1"><Eye className="h-3 w-3" />Photorealistic Quality</Badge>
-            <Badge variant="outline" className="gap-1 px-3 py-1"><Layers className="h-3 w-3" />Multi-Scene Batch</Badge>
-            <Badge variant="outline" className="gap-1 px-3 py-1"><Film className="h-3 w-3" />Video-Ready Frames</Badge>
+          <div className="flex items-center gap-3 mt-5">
+            <Badge className="bg-white/[0.07] text-white/80 border-white/[0.08] backdrop-blur-sm gap-1.5 px-3 py-1 rounded-full text-xs font-medium">
+              <Eye className="h-3 w-3 text-cyan-400" />Photorealistic Quality
+            </Badge>
+            <Badge className="bg-white/[0.07] text-white/80 border-white/[0.08] backdrop-blur-sm gap-1.5 px-3 py-1 rounded-full text-xs font-medium">
+              <Layers className="h-3 w-3 text-blue-400" />Multi-Scene Batch
+            </Badge>
+            <Badge className="bg-white/[0.07] text-white/80 border-white/[0.08] backdrop-blur-sm gap-1.5 px-3 py-1 rounded-full text-xs font-medium">
+              <Film className="h-3 w-3 text-violet-400" />Video-Ready Frames
+            </Badge>
           </div>
+
+          {/* Style-specific tip */}
+          {selectedStyleData && (
+            <div className="mt-5 flex items-start gap-2.5 px-4 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] backdrop-blur-sm">
+              <Lightbulb className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-white/70">{selectedStyleData.label} Style</p>
+                <p className="text-sm text-white/50 mt-0.5">{selectedStyleData.tip}</p>
+              </div>
+            </div>
+          )}
         </div>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-1/4 w-60 h-60 bg-blue-500/8 rounded-full blur-3xl" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
         {/* Configuration Panel */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Client</label>
+        <div className="lg:col-span-2 space-y-5">
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Client</label>
             <Select value={clientId} onValueChange={setClientId}>
-              <SelectTrigger className="h-11 rounded-xl">
+              <SelectTrigger className="h-11 rounded-xl bg-muted/30 border-border/50">
                 <SelectValue placeholder="Select a client" />
               </SelectTrigger>
               <SelectContent>
@@ -162,40 +194,25 @@ export function HyperRealisticAds() {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Brand / Company Description</label>
-            <Textarea
-              placeholder="Describe the brand: industry, aesthetic, target market, brand values..."
-              value={brandDescription}
-              onChange={(e) => setBrandDescription(e.target.value)}
-              className="min-h-[100px] rounded-xl resize-none"
-            />
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Brand / Company</label>
+            <Textarea placeholder="Describe the brand: industry, aesthetic, target market, brand values..." value={brandDescription} onChange={(e) => setBrandDescription(e.target.value)} className="min-h-[100px] rounded-xl resize-none bg-muted/30 border-border/50" />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Product / Offer Details</label>
-            <Input
-              placeholder="e.g., Luxury lakefront investment property in Lake Tahoe"
-              value={productDetails}
-              onChange={(e) => setProductDetails(e.target.value)}
-              className="h-11 rounded-xl"
-            />
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Product / Offer</label>
+            <Input placeholder="e.g., Luxury lakefront investment property in Lake Tahoe" value={productDetails} onChange={(e) => setProductDetails(e.target.value)} className="h-11 rounded-xl bg-muted/30 border-border/50" />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Color Palette (optional)</label>
-            <Input
-              placeholder="e.g., Navy blue, gold accents, white"
-              value={colorPalette}
-              onChange={(e) => setColorPalette(e.target.value)}
-              className="h-11 rounded-xl"
-            />
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Color Palette</label>
+            <Input placeholder="e.g., Navy blue, gold accents, white" value={colorPalette} onChange={(e) => setColorPalette(e.target.value)} className="h-11 rounded-xl bg-muted/30 border-border/50" />
           </div>
 
           {/* Visual Style */}
-          <div className="space-y-3">
-            <label className="text-sm font-medium">Visual Style</label>
-            <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Visual Style</label>
+            <div className="grid grid-cols-2 gap-1.5">
               {VISUAL_STYLES.map(style => (
                 <button
                   key={style.id}
@@ -203,20 +220,20 @@ export function HyperRealisticAds() {
                   className={`p-3 rounded-xl border text-left transition-all duration-200 ${
                     selectedStyle === style.id
                       ? 'bg-cyan-500/10 border-cyan-500/30 shadow-sm'
-                      : 'bg-background hover:bg-muted/30 border-border'
+                      : 'bg-muted/20 hover:bg-muted/40 border-border/50'
                   }`}
                 >
-                  <p className={`text-sm font-medium ${selectedStyle === style.id ? 'text-cyan-600 dark:text-cyan-400' : ''}`}>{style.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{style.description}</p>
+                  <p className={`text-xs font-semibold ${selectedStyle === style.id ? 'text-cyan-600 dark:text-cyan-400' : ''}`}>{style.label}</p>
+                  <p className="text-[10px] text-muted-foreground/50 mt-0.5">{style.description}</p>
                 </button>
               ))}
             </div>
           </div>
 
           {/* Aspect Ratio */}
-          <div className="space-y-3">
-            <label className="text-sm font-medium">Aspect Ratio</label>
-            <div className="grid grid-cols-4 gap-2">
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Aspect Ratio</label>
+            <div className="grid grid-cols-4 gap-1.5">
               {ASPECT_RATIOS.map(ratio => {
                 const Icon = ratio.icon;
                 return (
@@ -225,13 +242,13 @@ export function HyperRealisticAds() {
                     onClick={() => setSelectedRatio(ratio.id)}
                     className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all duration-200 ${
                       selectedRatio === ratio.id
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-background hover:bg-muted/50 border-border'
+                        ? 'bg-foreground text-background border-foreground'
+                        : 'bg-muted/20 hover:bg-muted/40 border-border/50'
                     }`}
                   >
                     <Icon className="h-4 w-4" />
-                    <span className="text-xs font-medium">{ratio.label}</span>
-                    <span className={`text-[10px] ${selectedRatio === ratio.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{ratio.description}</span>
+                    <span className="text-xs font-bold">{ratio.label}</span>
+                    <span className={`text-[9px] ${selectedRatio === ratio.id ? 'text-background/60' : 'text-muted-foreground/50'}`}>{ratio.description}</span>
                   </button>
                 );
               })}
@@ -240,16 +257,16 @@ export function HyperRealisticAds() {
 
           {/* Batch Count */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Images to Generate</label>
-            <div className="flex gap-2">
+            <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Batch Size</label>
+            <div className="flex gap-1.5">
               {[2, 4, 8, 12].map(n => (
                 <button
                   key={n}
                   onClick={() => setBatchCount(n)}
-                  className={`flex-1 py-2 text-sm font-medium rounded-xl border transition-all duration-200 ${
+                  className={`flex-1 py-2.5 text-sm font-bold rounded-xl border transition-all duration-200 ${
                     batchCount === n
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-background hover:bg-muted/50 border-border'
+                      ? 'bg-foreground text-background border-foreground'
+                      : 'bg-muted/20 hover:bg-muted/40 border-border/50'
                   }`}
                 >
                   {n}
@@ -259,36 +276,31 @@ export function HyperRealisticAds() {
           </div>
 
           {/* Custom Prompt */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Additional Prompt Instructions (optional)</label>
-            <Textarea
-              placeholder="Add specific visual details, props, settings, lighting notes..."
-              value={customPrompt}
-              onChange={(e) => setCustomPrompt(e.target.value)}
-              className="min-h-[80px] rounded-xl resize-none"
-            />
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Additional Instructions</label>
+            <Textarea placeholder="Add specific visual details, props, settings, lighting notes..." value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} className="min-h-[80px] rounded-xl resize-none bg-muted/30 border-border/50" />
           </div>
         </div>
 
         {/* Right: Scene Selection & Output */}
         <div className="lg:col-span-3 space-y-6">
           {/* Scene Types */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Scene Types <span className="text-muted-foreground">(select up to 4)</span></label>
-              <Badge variant="outline" className="text-xs">{selectedScenes.length}/4</Badge>
+              <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Scene Types <span className="text-muted-foreground/40 normal-case">(up to 4)</span></label>
+              <span className="text-xs font-bold text-muted-foreground/50">{selectedScenes.length}/4</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               {SCENE_TYPES.map(scene => {
                 const isSelected = selectedScenes.includes(scene.id);
                 return (
                   <button
                     key={scene.id}
                     onClick={() => toggleScene(scene.id)}
-                    className={`px-3 py-3 text-sm font-medium rounded-xl border transition-all duration-200 ${
+                    className={`px-3 py-3 text-xs font-semibold rounded-xl border transition-all duration-200 ${
                       isSelected
                         ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-400'
-                        : 'bg-background hover:bg-muted/30 border-border'
+                        : 'bg-muted/20 hover:bg-muted/40 border-border/50'
                     }`}
                   >
                     {scene.label}
@@ -302,7 +314,7 @@ export function HyperRealisticAds() {
           <Button
             onClick={handleGenerate}
             disabled={isGenerating || !brandDescription || !selectedStyle || selectedScenes.length === 0}
-            className="w-full h-12 rounded-xl text-base font-medium gap-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700"
+            className="w-full h-13 rounded-2xl text-base font-semibold gap-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 shadow-lg shadow-cyan-500/20 transition-all duration-300"
           >
             {isGenerating ? (
               <><Loader2 className="h-5 w-5 animate-spin" />Generating {batchCount} Visuals...</>
@@ -314,54 +326,65 @@ export function HyperRealisticAds() {
           {/* Generated Visuals Grid */}
           {generatedVisuals.length > 0 ? (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Camera className="h-5 w-5 text-cyan-500" />
-                Generated Visuals
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <Camera className="h-5 w-5 text-cyan-500" />
+                  Generated Visuals
+                </h3>
+                <Button variant="ghost" size="sm" onClick={handleGenerate} className="gap-1.5 text-xs rounded-lg">
+                  <RotateCcw className="h-3 w-3" />
+                  Regenerate
+                </Button>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 {generatedVisuals.map(visual => (
-                  <Card key={visual.id} className="overflow-hidden rounded-2xl border-cyan-500/10 group">
-                    <div className="aspect-square bg-gradient-to-br from-muted/50 to-muted relative overflow-hidden">
+                  <Card key={visual.id} className="overflow-hidden rounded-2xl border-border/50 group hover:shadow-lg transition-all duration-300">
+                    <div className="aspect-square bg-gradient-to-br from-muted/30 to-muted/60 relative overflow-hidden">
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="text-center p-4">
-                          <Camera className="h-10 w-10 text-cyan-500/30 mx-auto mb-2" />
-                          <p className="text-xs text-muted-foreground">AI Visual Preview</p>
-                          <p className="text-[10px] text-muted-foreground/60 mt-1">{visual.aspectRatio}</p>
+                          <Camera className="h-10 w-10 text-cyan-500/25 mx-auto mb-2" />
+                          <p className="text-xs text-muted-foreground/50 font-medium">AI Visual Preview</p>
+                          <p className="text-[10px] text-muted-foreground/30 mt-1">{visual.aspectRatio}</p>
                         </div>
                       </div>
                       {/* Hover overlay */}
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2">
-                        <Button variant="secondary" size="sm" className="rounded-lg gap-1">
+                        <Button variant="secondary" size="sm" className="rounded-lg gap-1 shadow-lg">
                           <Eye className="h-3 w-3" />Preview
                         </Button>
-                        <Button variant="secondary" size="sm" className="rounded-lg gap-1">
+                        <Button variant="secondary" size="sm" className="rounded-lg gap-1 shadow-lg">
                           <Download className="h-3 w-3" />Save
                         </Button>
                       </div>
                     </div>
-                    <CardContent className="p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge className="text-xs bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20">{visual.style}</Badge>
-                        <Badge variant="outline" className="text-xs">{visual.scene}</Badge>
+                    <CardContent className="p-3.5">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge className="text-[10px] bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20 rounded-lg">{visual.style}</Badge>
+                        <Badge variant="outline" className="text-[10px] rounded-lg">{visual.scene}</Badge>
                       </div>
-                      <details className="mt-2">
-                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
-                          View prompt
-                        </summary>
-                        <p className="text-xs text-muted-foreground mt-1 p-2 bg-muted/30 rounded-lg">{visual.prompt}</p>
-                      </details>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-[10px] gap-1 px-2 rounded-md"
+                          onClick={() => handleCopyPrompt(visual)}
+                        >
+                          {copiedId === visual.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                          {copiedId === visual.id ? 'Copied' : 'Copy prompt'}
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center min-h-[300px] rounded-2xl border-2 border-dashed border-muted-foreground/20 p-8">
+            <div className="flex flex-col items-center justify-center min-h-[300px] rounded-2xl border-2 border-dashed border-muted-foreground/15 p-8">
               <div className="h-16 w-16 rounded-2xl bg-cyan-500/10 flex items-center justify-center mb-4">
-                <Camera className="h-8 w-8 text-cyan-500/50" />
+                <Camera className="h-8 w-8 text-cyan-500/40" />
               </div>
-              <p className="text-muted-foreground font-medium">Your visuals will appear here</p>
-              <p className="text-sm text-muted-foreground/60 mt-1">Select style, scenes, and generate</p>
+              <p className="text-muted-foreground/70 font-semibold">Your visuals will appear here</p>
+              <p className="text-sm text-muted-foreground/40 mt-1">Select style, scenes, and generate</p>
             </div>
           )}
         </div>
