@@ -140,8 +140,9 @@ const App = () => (
             <Route path="/funnel/:clientId/kickoff" element={<FunnelKickoffPage />} />
             <Route path="/funnel/:clientId/access" element={<FunnelAccessPage />} />
 
-            {/* Onboarding */}
+            {/* Onboarding & Fulfillment */}
             <Route path="/onboarding" element={<ClientOnboardingPage />} />
+            <Route path="/fulfillment-review/:clientId" element={<PasswordGate><FulfillmentReviewPage /></PasswordGate>} />
 
             {/* Public routes - no password required */}
             <Route path="/public/:token" element={<PublicReport />} />
