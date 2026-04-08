@@ -423,6 +423,7 @@ function OfferCard({
 }: any) {
   const [aiDescribing, setAiDescribing] = useState(false);
   const { data: files = [] } = useOfferFiles(offer.id);
+  const queryClient = (await import('@tanstack/react-query')).useQueryClient();
 
   const handleAiDescribe = async () => {
     setAiDescribing(true);
