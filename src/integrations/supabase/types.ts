@@ -1475,6 +1475,57 @@ export type Database = {
           },
         ]
       }
+      client_assets: {
+        Row: {
+          asset_type: string
+          client_id: string
+          content: Json | null
+          created_at: string
+          id: string
+          offer_id: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          asset_type: string
+          client_id: string
+          content?: Json | null
+          created_at?: string
+          id?: string
+          offer_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          asset_type?: string
+          client_id?: string
+          content?: Json | null
+          created_at?: string
+          id?: string
+          offer_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_assets_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "client_offers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_assignments: {
         Row: {
           account_manager: string | null
