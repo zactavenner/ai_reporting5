@@ -84,7 +84,10 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
       if (error) throw error;
 
       if (data.company_name) form.setValue('name', data.company_name);
-      if (data.description) form.setValue('description', data.description);
+      if (data.description) {
+        form.setValue('description', data.description);
+        setScrapedDescription(data.description);
+      }
       if (data.logo_url) form.setValue('logo_url', data.logo_url);
 
       // Normalize URL
