@@ -199,8 +199,12 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const systemPrompt = SYSTEM_PROMPTS[asset_type];
-    if (!systemPrompt) throw new Error(`Unknown asset type: ${asset_type}`);
+    const baseSystemPrompt = SYSTEM_PROMPTS[asset_type];
+    if (!baseSystemPrompt) throw new Error(`Unknown asset type: ${asset_type}`);
+
+    // Prepend the AI Capital Raising Copy System context for compliance + templates
+    const copySystemContext = getCopySystemContext(asset_type);
+    const systemPrompt = copySystemContext + '\n' + baseSystemPrompt;
 
     const userPrompt = buildUserPrompt(client_data, asset_type, existing_research, existing_angles);
 
