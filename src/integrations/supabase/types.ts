@@ -1590,6 +1590,60 @@ export type Database = {
           },
         ]
       }
+      client_offer_files: {
+        Row: {
+          client_id: string
+          created_at: string
+          file_name: string
+          file_size_bytes: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          offer_id: string
+          sort_order: number | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          file_name: string
+          file_size_bytes?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          offer_id: string
+          sort_order?: number | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          file_name?: string
+          file_size_bytes?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          offer_id?: string
+          sort_order?: number | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_offer_files_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_offer_files_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "client_offers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_offers: {
         Row: {
           client_id: string
