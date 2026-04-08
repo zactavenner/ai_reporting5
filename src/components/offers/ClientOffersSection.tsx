@@ -452,8 +452,7 @@ function OfferCard({
       if (error) throw error;
       if (data?.description) {
         toast.success('Offer description updated by AI');
-        // Trigger refetch
-        window.dispatchEvent(new CustomEvent('offer-updated'));
+        queryClient.invalidateQueries({ queryKey: ['client-offers', clientId] });
       }
     } catch (err: any) {
       toast.error(`AI describe failed: ${err.message || 'Unknown error'}`);
