@@ -68,6 +68,7 @@ const SyncHealthPage = lazyRetry(() => import("./pages/SyncHealthPage"));
 const DailyReportPage = lazyRetry(() => import("./pages/DailyReportPage"));
 const DailyReportThankYouPage = lazyRetry(() => import("./pages/DailyReportThankYouPage"));
 const ClientOnboardingPage = lazyRetry(() => import("./pages/ClientOnboardingPage"));
+const FulfillmentReviewPage = lazyRetry(() => import("./pages/FulfillmentReviewPage"));
 
 function PageLoader() {
   return (
