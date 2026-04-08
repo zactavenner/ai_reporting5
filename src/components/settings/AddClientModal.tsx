@@ -106,6 +106,9 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
     }
   };
 
+  // Store scraped description for auto-offer
+  const [scrapedDescription, setScrapedDescription] = useState('');
+
   const onSubmit = async (values: AddClientFormValues) => {
     setSaving(true);
     try {
@@ -163,12 +166,30 @@ export function AddClientModal({ open, onOpenChange }: AddClientModalProps) {
         if (alertError) console.error('Error creating alert configs:', alertError);
       }
 
+      // Auto-create an offer from scraped website data
+      if (scrapedDescription || values.description) {
+        try {
+          await supabase
+            .from('client_offers' as any)
+            .insert({
+              client_id: client.id,
+              title: `${values.name} — Primary Offer`,
+              description: scrapedDescription || values.description || null,
+              offer_type: 'offer',
+              uploaded_by: 'AI Auto-fill',
+            } as any);
+        } catch (offerErr) {
+          console.error('Error auto-creating offer:', offerErr);
+        }
+      }
+
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       toast.success(`Client "${values.name}" created successfully`);
       form.reset();
       setBrandColors([]);
       setBrandFonts([]);
       setWebsiteInput('');
+      setScrapedDescription('');
       onOpenChange(false);
     } catch (error) {
       console.error('Error creating client:', error);
