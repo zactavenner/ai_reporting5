@@ -124,6 +124,44 @@ Return ONLY valid JSON.`,
 - investor_portal_intro: { welcome_headline, welcome_body, sections (array of {title, description}) }
 - faqs: array of {question, answer}
 Return ONLY valid JSON.`,
+
+  vsl: `You are an expert direct-response video copywriter specializing in compliant investment marketing. Generate a 3-minute Video Sales Letter script as JSON with these keys:
+- cold_open: object with { text, duration: "0-2s", note: "compliance overlay" }
+- hook: object with { text, duration: "2-9s", technique: "pattern-interrupt" }
+- credibility: object with { text, duration: "9-24s", focus: "track record" }
+- problem_mechanism: object with { text, duration: "24-54s", focus: "pain + solution" }
+- evidence: object with { text, duration: "54-84s", focus: "balanced performance data" }
+- terms: object with { text, duration: "84-104s", focus: "investment structure" }
+- risk: object with { text, duration: "104-119s", focus: "honest risk acknowledgment" }
+- cta: object with { text, duration: "119-135s", focus: "clear next step" }
+- hook_variants: array of 3 alternative hooks
+- full_script: continuous spoken piece (all sections combined)
+- disclaimer: legal disclaimer text
+Rules: spoken word only, use "targeted returns" never "guaranteed", under 3 minutes read time, every claim must be supportable.
+Return ONLY valid JSON.`,
+
+  caller: `You are an expert at building AI phone agent scripts for investor outreach. Generate a complete AI caller config as JSON with these keys:
+- opening_script: opening greeting (10s)
+- qualification_questions: array of objects { question, purpose } covering accredited status, investment size, timeline
+- pitch_script: main pitch (45s)
+- objection_responses: object with keys { send_info_first, talk_to_advisor, what_are_risks, not_interested } each with a response string
+- booking_script: transition to booking (15s)
+- voicemail_script: voicemail message
+- close_script: closing (10s)
+- do_not_say: array of phrases to avoid
+- always_include: array of required disclaimers/phrases
+- call_structure: object { opening: "10s", qualify: "30s", pitch: "45s", objections: "30s", book: "15s", close: "10s" }
+Professional, warm, efficient tone. Never guarantee returns.
+Return ONLY valid JSON.`,
+
+  setter: `You are an expert at building AI setter/chatbot scripts for investor qualification. Generate a complete AI setter config as JSON:
+- greeting: initial message
+- qualification_flow: array of { question, response_handlers: { positive, negative, unclear } }
+- booking_prompt: how to transition to booking
+- objection_handlers: object with common objections and responses
+- disqualification_message: polite exit for non-qualified leads
+- follow_up_sequences: array of follow-up messages with timing
+Return ONLY valid JSON.`,
 };
 
 function buildUserPrompt(client_data: any, asset_type: string, existing_research: any, existing_angles: any): string {
