@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClientOffers, useCreateOffer, useUpdateOffer, useDeleteOffer, uploadOfferFile, ClientOffer } from '@/hooks/useClientOffers';
 import { useOfferFiles, useAddOfferFile, useDeleteOfferFile, OfferFile } from '@/hooks/useOfferFiles';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, FileText, Image, File, Trash2, Download, ExternalLink, Upload, Pencil, ChevronRight, Paperclip, X } from 'lucide-react';
+import { Plus, FileText, Image, File, Trash2, Download, ExternalLink, Upload, Pencil, ChevronRight, Paperclip, X, Sparkles, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { OfferAssetHub } from './OfferAssetHub';
@@ -82,8 +83,8 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
 
-  // For viewing/adding files to existing offer
   const [filesViewOffer, setFilesViewOffer] = useState<ClientOffer | null>(null);
 
   const resetForm = () => {
@@ -111,7 +112,6 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
 
     setUploading(true);
     try {
-      // For the primary file (first selected), attach to the offer itself
       let fileUrl: string | undefined;
       let fileName: string | undefined;
       let fileType: string | undefined;
@@ -140,13 +140,12 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
         }
         await updateOffer.mutateAsync({ id: editOffer.id, clientId, updates });
 
-        // Upload additional files to client_offer_files
         if (selectedFiles.length > 1) {
           for (let i = 1; i < selectedFiles.length; i++) {
             const f = selectedFiles[i];
             const res = await uploadOfferFile(clientId, f);
             const ft = f.name.split('.').pop()?.toLowerCase() || 'unknown';
-            await (await import('@/integrations/supabase/client')).supabase
+            await supabase
               .from('client_offer_files' as any)
               .insert({
                 offer_id: editOffer.id,
@@ -172,14 +171,13 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
           uploaded_by: currentMember?.name || 'Unknown',
         });
 
-        // Upload additional files
         const newOfferId = (newOffer as any)?.id;
         if (newOfferId && selectedFiles.length > 1) {
           for (let i = 1; i < selectedFiles.length; i++) {
             const f = selectedFiles[i];
             const res = await uploadOfferFile(clientId, f);
             const ft = f.name.split('.').pop()?.toLowerCase() || 'unknown';
-            await (await import('@/integrations/supabase/client')).supabase
+            await supabase
               .from('client_offer_files' as any)
               .insert({
                 offer_id: newOfferId,
@@ -215,6 +213,29 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
     setSelectedFiles(prev => prev.filter((_, i) => i !== idx));
   };
 
+  // Drag and drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      setSelectedFiles(prev => [...prev, ...Array.from(files)]);
+    }
+  }, []);
+
   const getFileIcon = (fileType: string | null) => {
     if (!fileType) return <File className="h-5 w-5" />;
     if (['pdf'].includes(fileType)) return <FileText className="h-5 w-5 text-destructive" />;
@@ -237,7 +258,7 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
     }
   };
 
-  const isImage = (fileType: string | null) => {
+  const isImageFile = (fileType: string | null) => {
     return fileType && ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(fileType);
   };
 
@@ -265,13 +286,7 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
       ) : offers.length === 0 ? (
         <Card className="p-8 text-center">
           <FileText className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-          <p className="text-muted-foreground">No offers or files uploaded yet</p>
-          {!isPublicView && (
-            <Button variant="outline" size="sm" className="mt-3" onClick={() => { resetForm(); setAddOpen(true); }}>
-              <Plus className="h-4 w-4 mr-1" />
-              Upload First File
-            </Button>
-          )}
+          <p className="text-muted-foreground">Setting up your first offer...</p>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -292,9 +307,9 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
               getFileIcon={getFileIcon}
               formatFileSize={formatFileSize}
               getTypeBadge={getTypeBadge}
-              isImage={isImage}
+              isImage={isImageFile}
               onEdit={openEdit}
-              onDelete={(id) => deleteOffer.mutate({ id, clientId })}
+              onDelete={(id: string) => deleteOffer.mutate({ id, clientId })}
               onViewFiles={() => setFilesViewOffer(offer)}
               navigate={navigate}
             />
@@ -342,11 +357,18 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
                 Files {selectedFiles.length > 0 && `(${selectedFiles.length})`}
               </label>
               <div
-                className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                  dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                }`}
                 onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
               >
                 <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">Click to select files (multiple allowed)</p>
+                <p className="text-sm text-muted-foreground">
+                  {dragOver ? 'Drop files here' : 'Drag & drop or click to select files'}
+                </p>
               </div>
               <input
                 ref={fileInputRef}
@@ -386,6 +408,7 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
         <OfferFilesDialog
           offer={filesViewOffer}
           clientId={clientId}
+          clientName={clientName}
           onClose={() => setFilesViewOffer(null)}
         />
       )}
@@ -398,6 +421,47 @@ function OfferCard({
   offer, clientId, clientName, isPublicView, brandColors, brandFonts, clientDescription, offerDescription, websiteUrl, industry, clientType,
   getFileIcon, formatFileSize, getTypeBadge, isImage, onEdit, onDelete, onViewFiles, navigate,
 }: any) {
+  const [aiDescribing, setAiDescribing] = useState(false);
+  const { data: files = [] } = useOfferFiles(offer.id);
+
+  const handleAiDescribe = async () => {
+    setAiDescribing(true);
+    try {
+      const allFileNames = [
+        ...(offer.file_name ? [offer.file_name] : []),
+        ...files.map((f: OfferFile) => f.file_name),
+      ];
+      const allFileUrls = [
+        ...(offer.file_url ? [offer.file_url] : []),
+        ...files.map((f: OfferFile) => f.file_url),
+      ];
+
+      const { data, error } = await supabase.functions.invoke('analyze-offer', {
+        body: {
+          offer_id: offer.id,
+          client_id: clientId,
+          client_name: clientName,
+          file_urls: allFileUrls,
+          file_names: allFileNames,
+          current_description: offer.description,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.description) {
+        toast.success('Offer description updated by AI');
+        // Trigger refetch
+        window.dispatchEvent(new CustomEvent('offer-updated'));
+      }
+    } catch (err: any) {
+      toast.error(`AI describe failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setAiDescribing(false);
+    }
+  };
+
+  const totalFiles = (offer.file_url ? 1 : 0) + files.length;
+
   return (
     <Card className="p-4 space-y-3">
       {isImage(offer.file_type) && offer.file_url && (
@@ -414,13 +478,16 @@ function OfferCard({
             {offer.file_name && (
               <p className="text-xs text-muted-foreground truncate">{offer.file_name}</p>
             )}
+            {totalFiles > 1 && (
+              <p className="text-xs text-muted-foreground">{totalFiles} files attached</p>
+            )}
           </div>
         </div>
         {getTypeBadge(offer.offer_type)}
       </div>
 
       {offer.description && (
-        <p className="text-xs text-muted-foreground line-clamp-2">{offer.description}</p>
+        <p className="text-xs text-muted-foreground line-clamp-3">{offer.description}</p>
       )}
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -430,6 +497,23 @@ function OfferCard({
           {offer.uploaded_by && <span>• {offer.uploaded_by}</span>}
         </div>
       </div>
+
+      {/* AI Auto-Describe */}
+      {!isPublicView && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full gap-1.5"
+          onClick={handleAiDescribe}
+          disabled={aiDescribing}
+        >
+          {aiDescribing ? (
+            <><Loader2 className="h-3 w-3 animate-spin" /> Analyzing...</>
+          ) : (
+            <><Sparkles className="h-3 w-3" /> AI Auto-Describe</>
+          )}
+        </Button>
+      )}
 
       {!isPublicView && (
         <OfferAssetHub
@@ -460,7 +544,7 @@ function OfferCard({
       <div className="flex items-center gap-2">
         {!isPublicView && (
           <Button variant="outline" size="sm" className="gap-1" onClick={onViewFiles}>
-            <Paperclip className="h-3 w-3" /> Files
+            <Paperclip className="h-3 w-3" /> Files {totalFiles > 0 && `(${totalFiles})`}
           </Button>
         )}
         {offer.file_url && (
@@ -510,17 +594,16 @@ function OfferCard({
   );
 }
 
-// --- Offer Files Dialog ---
-function OfferFilesDialog({ offer, clientId, onClose }: { offer: ClientOffer; clientId: string; onClose: () => void }) {
+// --- Offer Files Dialog with drag-drop ---
+function OfferFilesDialog({ offer, clientId, clientName, onClose }: { offer: ClientOffer; clientId: string; clientName: string; onClose: () => void }) {
   const { data: files = [], isLoading } = useOfferFiles(offer.id);
   const addFile = useAddOfferFile();
   const deleteFile = useDeleteOfferFile();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { currentMember } = useTeamMember();
+  const [dragOver, setDragOver] = useState(false);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const fileList = e.target.files;
-    if (!fileList) return;
+  const handleUpload = async (fileList: FileList | File[]) => {
     for (const file of Array.from(fileList)) {
       await addFile.mutateAsync({
         offerId: offer.id,
@@ -529,8 +612,23 @@ function OfferFilesDialog({ offer, clientId, onClose }: { offer: ClientOffer; cl
         uploadedBy: currentMember?.name,
       });
     }
+  };
+
+  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList) return;
+    await handleUpload(fileList);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    if (e.dataTransfer.files.length > 0) {
+      await handleUpload(e.dataTransfer.files);
+    }
+  }, [offer.id, clientId]);
 
   const formatFileSize = (bytes: number | null) => {
     if (!bytes) return '';
@@ -586,13 +684,20 @@ function OfferFilesDialog({ offer, clientId, onClose }: { offer: ClientOffer; cl
             <p className="text-sm text-muted-foreground text-center py-4">No files attached</p>
           ) : null}
 
-          {/* Upload more */}
+          {/* Upload with drag-drop */}
           <div
-            className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
+            className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+              dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+            }`}
             onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
+            onDrop={handleDrop}
           >
             <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
-            <p className="text-sm text-muted-foreground">Add more files</p>
+            <p className="text-sm text-muted-foreground">
+              {dragOver ? 'Drop files here' : 'Drag & drop or click to add files'}
+            </p>
           </div>
           <input
             ref={fileInputRef}
@@ -600,7 +705,7 @@ function OfferFilesDialog({ offer, clientId, onClose }: { offer: ClientOffer; cl
             className="hidden"
             multiple
             accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.doc,.docx,.xls,.xlsx,.pptx,.csv,.txt"
-            onChange={handleUpload}
+            onChange={handleInputChange}
           />
         </div>
       </DialogContent>
