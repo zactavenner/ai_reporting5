@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClientOffers, useCreateOffer, useUpdateOffer, useDeleteOffer, uploadOfferFile, ClientOffer } from '@/hooks/useClientOffers';
+import { useOfferFiles, useAddOfferFile, useDeleteOfferFile, OfferFile } from '@/hooks/useOfferFiles';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, FileText, Image, File, Trash2, Download, ExternalLink, Upload, Pencil, ChevronRight } from 'lucide-react';
+import { Plus, FileText, Image, File, Trash2, Download, ExternalLink, Upload, Pencil, ChevronRight, Paperclip, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { OfferAssetHub } from './OfferAssetHub';
@@ -63,14 +64,17 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
   const [description, setDescription] = useState('');
   const [offerType, setOfferType] = useState('file');
   const [uploading, setUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // For viewing/adding files to existing offer
+  const [filesViewOffer, setFilesViewOffer] = useState<ClientOffer | null>(null);
 
   const resetForm = () => {
     setTitle('');
     setDescription('');
     setOfferType('file');
-    setSelectedFile(null);
+    setSelectedFiles([]);
     setEditOffer(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -80,7 +84,7 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
     setTitle(offer.title);
     setDescription(offer.description || '');
     setOfferType(offer.offer_type);
-    setSelectedFile(null);
+    setSelectedFiles([]);
   };
 
   const handleSubmit = async () => {
@@ -91,17 +95,19 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
 
     setUploading(true);
     try {
+      // For the primary file (first selected), attach to the offer itself
       let fileUrl: string | undefined;
       let fileName: string | undefined;
       let fileType: string | undefined;
       let fileSizeBytes: number | undefined;
 
-      if (selectedFile) {
-        const result = await uploadOfferFile(clientId, selectedFile);
+      if (selectedFiles.length > 0) {
+        const primaryFile = selectedFiles[0];
+        const result = await uploadOfferFile(clientId, primaryFile);
         fileUrl = result.url;
-        fileName = selectedFile.name;
-        fileType = selectedFile.name.split('.').pop()?.toLowerCase() || 'unknown';
-        fileSizeBytes = selectedFile.size;
+        fileName = primaryFile.name;
+        fileType = primaryFile.name.split('.').pop()?.toLowerCase() || 'unknown';
+        fileSizeBytes = primaryFile.size;
       }
 
       if (editOffer) {
@@ -110,15 +116,35 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
           description: description.trim() || null,
           offer_type: offerType,
         };
-        if (selectedFile && fileUrl) {
+        if (selectedFiles.length > 0 && fileUrl) {
           updates.file_url = fileUrl;
           updates.file_name = fileName;
           updates.file_type = fileType;
           updates.file_size_bytes = fileSizeBytes;
         }
         await updateOffer.mutateAsync({ id: editOffer.id, clientId, updates });
+
+        // Upload additional files to client_offer_files
+        if (selectedFiles.length > 1) {
+          for (let i = 1; i < selectedFiles.length; i++) {
+            const f = selectedFiles[i];
+            const res = await uploadOfferFile(clientId, f);
+            const ft = f.name.split('.').pop()?.toLowerCase() || 'unknown';
+            await (await import('@/integrations/supabase/client')).supabase
+              .from('client_offer_files' as any)
+              .insert({
+                offer_id: editOffer.id,
+                client_id: clientId,
+                file_url: res.url,
+                file_name: f.name,
+                file_type: ft,
+                file_size_bytes: f.size,
+                uploaded_by: currentMember?.name || 'Unknown',
+              } as any);
+          }
+        }
       } else {
-        await createOffer.mutateAsync({
+        const { data: newOffer } = await createOffer.mutateAsync({
           client_id: clientId,
           title: title.trim(),
           description: description.trim() || undefined,
@@ -129,6 +155,26 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
           offer_type: offerType,
           uploaded_by: currentMember?.name || 'Unknown',
         });
+
+        // Upload additional files
+        if (newOffer && selectedFiles.length > 1) {
+          for (let i = 1; i < selectedFiles.length; i++) {
+            const f = selectedFiles[i];
+            const res = await uploadOfferFile(clientId, f);
+            const ft = f.name.split('.').pop()?.toLowerCase() || 'unknown';
+            await (await import('@/integrations/supabase/client')).supabase
+              .from('client_offer_files' as any)
+              .insert({
+                offer_id: (newOffer as any).id,
+                client_id: clientId,
+                file_url: res.url,
+                file_name: f.name,
+                file_type: ft,
+                file_size_bytes: f.size,
+                uploaded_by: currentMember?.name || 'Unknown',
+              } as any);
+          }
+        }
       }
 
       resetForm();
@@ -138,6 +184,18 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      setSelectedFiles(prev => [...prev, ...Array.from(files)]);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeSelectedFile = (idx: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== idx));
   };
 
   const getFileIcon = (fileType: string | null) => {
@@ -201,110 +259,28 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {offers.map((offer) => (
-            <Card key={offer.id} className="p-4 space-y-3">
-              {isImage(offer.file_type) && offer.file_url && (
-                <div className="rounded-md overflow-hidden border border-border bg-muted/30">
-                  <img src={offer.file_url} alt={offer.title} className="w-full h-40 object-cover" />
-                </div>
-              )}
-
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2 min-w-0">
-                  {getFileIcon(offer.file_type)}
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm truncate">{offer.title}</p>
-                    {offer.file_name && (
-                      <p className="text-xs text-muted-foreground truncate">{offer.file_name}</p>
-                    )}
-                  </div>
-                </div>
-                {getTypeBadge(offer.offer_type)}
-              </div>
-
-              {offer.description && (
-                <p className="text-xs text-muted-foreground line-clamp-2">{offer.description}</p>
-              )}
-
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{format(new Date(offer.created_at), 'MMM d, yyyy')}</span>
-                <div className="flex items-center gap-1">
-                  {offer.file_size_bytes && <span>{formatFileSize(offer.file_size_bytes)}</span>}
-                  {offer.uploaded_by && <span>• {offer.uploaded_by}</span>}
-                </div>
-              </div>
-
-              {/* Generate All Assets button */}
-              {!isPublicView && (
-                <OfferAssetHub
-                  offer={offer}
-                  clientId={clientId}
-                  clientName={clientName}
-                  brandColors={brandColors}
-                  brandFonts={brandFonts}
-                  clientDescription={clientDescription}
-                  offerDescription={offerDescription}
-                  websiteUrl={websiteUrl}
-                  industry={industry}
-                  clientType={clientType}
-                />
-              )}
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="flex-1 gap-1.5"
-                  onClick={() => navigate(`/client/${clientId}/offer/${offer.id}`)}
-                >
-                  View All Assets <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {offer.file_url && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => window.open(offer.file_url!, '_blank')}
-                  >
-                    {offer.file_type === 'pdf' ? (
-                      <><ExternalLink className="h-3 w-3 mr-1" /> View</>
-                    ) : (
-                      <><Download className="h-3 w-3 mr-1" /> Download</>
-                    )}
-                  </Button>
-                )}
-                {!isPublicView && (
-                  <>
-                    <Button variant="outline" size="sm" onClick={() => openEdit(offer)}>
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <Trash2 className="h-3 w-3 text-destructive" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete "{offer.title}"?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently remove this file. This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => deleteOffer.mutate({ id: offer.id, clientId })}>
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </>
-                )}
-              </div>
-            </Card>
+            <OfferCard
+              key={offer.id}
+              offer={offer}
+              clientId={clientId}
+              clientName={clientName}
+              isPublicView={isPublicView}
+              brandColors={brandColors}
+              brandFonts={brandFonts}
+              clientDescription={clientDescription}
+              offerDescription={offerDescription}
+              websiteUrl={websiteUrl}
+              industry={industry}
+              clientType={clientType}
+              getFileIcon={getFileIcon}
+              formatFileSize={formatFileSize}
+              getTypeBadge={getTypeBadge}
+              isImage={isImage}
+              onEdit={openEdit}
+              onDelete={(id) => deleteOffer.mutate({ id, clientId })}
+              onViewFiles={() => setFilesViewOffer(offer)}
+              navigate={navigate}
+            />
           ))}
         </div>
       )}
@@ -346,28 +322,35 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
             </div>
             <div>
               <label className="text-sm font-semibold">
-                {editOffer ? 'Replace File (optional)' : 'File'}
+                Files {selectedFiles.length > 0 && `(${selectedFiles.length})`}
               </label>
               <div
                 className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                {selectedFile ? (
-                  <p className="text-sm font-medium">{selectedFile.name} ({formatFileSize(selectedFile.size)})</p>
-                ) : editOffer?.file_name ? (
-                  <p className="text-sm text-muted-foreground">Current: {editOffer.file_name} — click to replace</p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Click to select PDF, PNG, JPG, etc.</p>
-                )}
+                <p className="text-sm text-muted-foreground">Click to select files (multiple allowed)</p>
               </div>
               <input
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
+                multiple
                 accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.doc,.docx,.xls,.xlsx,.pptx,.csv,.txt"
-                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                onChange={handleFilesSelected}
               />
+              {selectedFiles.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {selectedFiles.map((f, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-sm bg-muted/50 rounded px-2 py-1">
+                      <span className="truncate flex-1">{f.name} ({formatFileSize(f.size)})</span>
+                      <button type="button" onClick={() => removeSelectedFile(idx)} className="ml-2 text-muted-foreground hover:text-foreground">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => { resetForm(); setAddOpen(false); }}>
@@ -380,6 +363,230 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Files viewer for existing offer */}
+      {filesViewOffer && (
+        <OfferFilesDialog
+          offer={filesViewOffer}
+          clientId={clientId}
+          onClose={() => setFilesViewOffer(null)}
+        />
+      )}
     </div>
+  );
+}
+
+// --- Offer Card ---
+function OfferCard({
+  offer, clientId, clientName, isPublicView, brandColors, brandFonts, clientDescription, offerDescription, websiteUrl, industry, clientType,
+  getFileIcon, formatFileSize, getTypeBadge, isImage, onEdit, onDelete, onViewFiles, navigate,
+}: any) {
+  return (
+    <Card className="p-4 space-y-3">
+      {isImage(offer.file_type) && offer.file_url && (
+        <div className="rounded-md overflow-hidden border border-border bg-muted/30">
+          <img src={offer.file_url} alt={offer.title} className="w-full h-40 object-cover" />
+        </div>
+      )}
+
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2 min-w-0">
+          {getFileIcon(offer.file_type)}
+          <div className="min-w-0">
+            <p className="font-semibold text-sm truncate">{offer.title}</p>
+            {offer.file_name && (
+              <p className="text-xs text-muted-foreground truncate">{offer.file_name}</p>
+            )}
+          </div>
+        </div>
+        {getTypeBadge(offer.offer_type)}
+      </div>
+
+      {offer.description && (
+        <p className="text-xs text-muted-foreground line-clamp-2">{offer.description}</p>
+      )}
+
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>{format(new Date(offer.created_at), 'MMM d, yyyy')}</span>
+        <div className="flex items-center gap-1">
+          {offer.file_size_bytes && <span>{formatFileSize(offer.file_size_bytes)}</span>}
+          {offer.uploaded_by && <span>• {offer.uploaded_by}</span>}
+        </div>
+      </div>
+
+      {!isPublicView && (
+        <OfferAssetHub
+          offer={offer}
+          clientId={clientId}
+          clientName={clientName}
+          brandColors={brandColors}
+          brandFonts={brandFonts}
+          clientDescription={clientDescription}
+          offerDescription={offerDescription}
+          websiteUrl={websiteUrl}
+          industry={industry}
+          clientType={clientType}
+        />
+      )}
+
+      <div className="flex items-center gap-2">
+        <Button
+          variant="default"
+          size="sm"
+          className="flex-1 gap-1.5"
+          onClick={() => navigate(`/client/${clientId}/offer/${offer.id}`)}
+        >
+          View All Assets <ChevronRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {!isPublicView && (
+          <Button variant="outline" size="sm" className="gap-1" onClick={onViewFiles}>
+            <Paperclip className="h-3 w-3" /> Files
+          </Button>
+        )}
+        {offer.file_url && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            onClick={() => window.open(offer.file_url!, '_blank')}
+          >
+            {offer.file_type === 'pdf' ? (
+              <><ExternalLink className="h-3 w-3 mr-1" /> View</>
+            ) : (
+              <><Download className="h-3 w-3 mr-1" /> Download</>
+            )}
+          </Button>
+        )}
+        {!isPublicView && (
+          <>
+            <Button variant="outline" size="sm" onClick={() => onEdit(offer)}>
+              <Pencil className="h-3 w-3" />
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <Trash2 className="h-3 w-3 text-destructive" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete "{offer.title}"?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently remove this file. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => onDelete(offer.id)}>
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+// --- Offer Files Dialog ---
+function OfferFilesDialog({ offer, clientId, onClose }: { offer: ClientOffer; clientId: string; onClose: () => void }) {
+  const { data: files = [], isLoading } = useOfferFiles(offer.id);
+  const addFile = useAddOfferFile();
+  const deleteFile = useDeleteOfferFile();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { currentMember } = useTeamMember();
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList) return;
+    for (const file of Array.from(fileList)) {
+      await addFile.mutateAsync({
+        offerId: offer.id,
+        clientId,
+        file,
+        uploadedBy: currentMember?.name,
+      });
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const formatFileSize = (bytes: number | null) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1048576).toFixed(1)} MB`;
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Files — {offer.title}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          {/* Primary file */}
+          {offer.file_url && (
+            <div className="flex items-center justify-between bg-muted/50 rounded-md px-3 py-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm truncate">{offer.file_name || 'Primary file'}</span>
+                {offer.file_size_bytes && <span className="text-xs text-muted-foreground">({formatFileSize(offer.file_size_bytes)})</span>}
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => window.open(offer.file_url!, '_blank')}>
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+
+          {/* Additional files */}
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading files...</p>
+          ) : files.length > 0 ? (
+            files.map((f) => (
+              <div key={f.id} className="flex items-center justify-between bg-muted/50 rounded-md px-3 py-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm truncate">{f.file_name}</span>
+                  {f.file_size_bytes && <span className="text-xs text-muted-foreground">({formatFileSize(f.file_size_bytes)})</span>}
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => window.open(f.file_url, '_blank')}>
+                    <ExternalLink className="h-3 w-3" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => deleteFile.mutate({ id: f.id, offerId: offer.id })}>
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          ) : !offer.file_url ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No files attached</p>
+          ) : null}
+
+          {/* Upload more */}
+          <div
+            className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
+            <p className="text-sm text-muted-foreground">Add more files</p>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            multiple
+            accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.doc,.docx,.xls,.xlsx,.pptx,.csv,.txt"
+            onChange={handleUpload}
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
