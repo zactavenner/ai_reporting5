@@ -171,7 +171,7 @@ export function OnboardingTab() {
 
       const runs = (runsRes.data || []) as FulfillmentRun[];
       const offers = (offersRes.data || []) as ClientOffer[];
-      const assets = (assetsRes.data || []) as ClientAsset[];
+      const assets = ((assetsRes.data || []) as unknown) as ClientAsset[];
 
       // Fetch steps for all runs
       const runIds = runs.map(r => r.id);
