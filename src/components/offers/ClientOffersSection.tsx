@@ -166,7 +166,7 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
             await (await import('@/integrations/supabase/client')).supabase
               .from('client_offer_files' as any)
               .insert({
-                offer_id: (newOffer as any).id,
+                offer_id: newOfferId,
                 client_id: clientId,
                 file_url: res.url,
                 file_name: f.name,
