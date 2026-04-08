@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useClients } from '@/hooks/useClients';
@@ -13,7 +13,8 @@ import {
   CheckCircle2, Clock, XCircle, Loader2, ChevronDown, ChevronRight,
   Eye, Play, Pause, FileText, Image, Video, MessageSquare, Mail,
   Bot, RefreshCw, Rocket, BarChart3, Target, Megaphone, Globe,
-  Sparkles, AlertCircle,
+  Sparkles, AlertCircle, Upload, Trash2, Download, ClipboardList,
+  Building2, DollarSign, Users, Phone, Calendar, Link, Shield,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -68,6 +69,48 @@ interface ClientOffer {
   description: string | null;
   offer_type: string;
   status: string | null;
+  fund_name: string | null;
+  fund_type: string | null;
+  raise_amount: string | null;
+  min_investment: string | null;
+  timeline: string | null;
+  target_investor: string | null;
+  targeted_returns: string | null;
+  hold_period: string | null;
+  distribution_schedule: string | null;
+  investment_range: string | null;
+  tax_advantages: string | null;
+  credibility: string | null;
+  fund_history: string | null;
+  website_url: string | null;
+  speaker_name: string | null;
+  industry_focus: string | null;
+  brand_notes: string | null;
+  additional_notes: string | null;
+  brand_colors: any;
+  brand_fonts: any;
+  logo_url: string | null;
+  pitch_deck_url: string | null;
+  budget_amount: number | null;
+  budget_mode: string | null;
+  accredited_only: boolean | null;
+  reg_d_type: string | null;
+  ghl_location_id: string | null;
+  meta_ad_account_id: string | null;
+  meta_page_id: string | null;
+  meta_pixel_id: string | null;
+  raw_form_data: any;
+}
+
+interface OfferFile {
+  id: string;
+  offer_id: string;
+  client_id: string;
+  file_name: string;
+  file_url: string;
+  file_type: string | null;
+  file_size_bytes: number | null;
+  created_at: string;
 }
 
 interface ClientOnboardingData {
@@ -78,6 +121,7 @@ interface ClientOnboardingData {
   runs: FulfillmentRun[];
   steps: FulfillmentStep[];
   assets: ClientAsset[];
+  offerFiles: OfferFile[];
 }
 
 // ─── Constants ───
@@ -138,16 +182,13 @@ export function OnboardingTab() {
     fetchAllData();
   }, [onboardingClients.length]);
 
-  // Realtime subscriptions
   useEffect(() => {
     if (onboardingClients.length === 0) return;
-
     const channel = supabase
       .channel('onboarding-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fulfillment_runs' }, () => fetchAllData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fulfillment_steps' }, () => fetchAllData())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [onboardingClients.length]);
 
@@ -162,18 +203,18 @@ export function OnboardingTab() {
     try {
       const clientIds = onboardingClients.map(c => c.id);
 
-      // Fetch all data in parallel
-      const [runsRes, offersRes, assetsRes] = await Promise.all([
+      const [runsRes, offersRes, assetsRes, filesRes] = await Promise.all([
         supabase.from('fulfillment_runs').select('*').in('client_id', clientIds).order('created_at', { ascending: false }),
-        supabase.from('client_offers').select('id, client_id, title, description, offer_type, status').in('client_id', clientIds).order('created_at', { ascending: false }),
+        supabase.from('client_offers').select('*').in('client_id', clientIds).order('created_at', { ascending: false }),
         supabase.from('client_assets' as any).select('*').in('client_id', clientIds).order('created_at', { ascending: false }),
+        supabase.from('client_offer_files').select('*').in('client_id', clientIds).order('created_at', { ascending: false }),
       ]);
 
       const runs = (runsRes.data || []) as FulfillmentRun[];
-      const offers = (offersRes.data || []) as ClientOffer[];
+      const offers = (offersRes.data || []) as unknown as ClientOffer[];
       const assets = ((assetsRes.data || []) as unknown) as ClientAsset[];
+      const offerFiles = (filesRes.data || []) as unknown as OfferFile[];
 
-      // Fetch steps for all runs
       const runIds = runs.map(r => r.id);
       let steps: FulfillmentStep[] = [];
       if (runIds.length > 0) {
@@ -189,6 +230,7 @@ export function OnboardingTab() {
         runs: runs.filter(r => r.client_id === client.id),
         steps: steps.filter(s => runs.some(r => r.id === s.run_id && r.client_id === client.id)),
         assets: assets.filter(a => a.client_id === client.id),
+        offerFiles: offerFiles.filter(f => f.client_id === client.id),
       }));
 
       setClientData(grouped);
@@ -203,11 +245,7 @@ export function OnboardingTab() {
     setLaunchingPipeline(clientId);
     try {
       const { data, error } = await supabase.functions.invoke('fulfill-client', {
-        body: {
-          password: 'HPA1234$',
-          client_id: clientId,
-          offer_id: offerId || null,
-        },
+        body: { password: 'HPA1234$', client_id: clientId, offer_id: offerId || null },
       });
       if (error) throw error;
       toast.success(`Pipeline launched! Run ID: ${data?.run_id?.slice(0, 8)}`);
@@ -238,9 +276,7 @@ export function OnboardingTab() {
           <CardContent className="py-12 text-center">
             <CheckCircle2 className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
             <p className="text-muted-foreground font-medium">No clients currently onboarding</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Set a client's status to "onboarding" to see them here
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">Set a client's status to "onboarding" to see them here</p>
           </CardContent>
         </Card>
       </div>
@@ -257,8 +293,7 @@ export function OnboardingTab() {
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchAllData}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
+          <RefreshCw className="h-4 w-4 mr-2" /> Refresh
         </Button>
       </div>
 
@@ -304,9 +339,7 @@ function ClientOnboardingCard({
     ? Math.round((latestRun.completed_steps / latestRun.total_steps) * 100) : 0;
   const primaryOffer = client.offers[0];
   const isPipelineRunning = latestRun?.status === 'running';
-  const isPaused = latestRun?.current_phase === 'video' && latestRun?.status === 'completed';
 
-  // Group steps by phase
   const runSteps = client.steps.filter(s => s.run_id === latestRun?.id);
   const phases: Record<string, FulfillmentStep[]> = {};
   runSteps.forEach(s => {
@@ -314,7 +347,6 @@ function ClientOnboardingCard({
     phases[s.phase].push(s);
   });
 
-  // Group assets by type
   const assetsByType: Record<string, ClientAsset[]> = {};
   client.assets.forEach(a => {
     if (!assetsByType[a.asset_type]) assetsByType[a.asset_type] = [];
@@ -333,9 +365,7 @@ function ClientOnboardingCard({
               <CardTitle className="text-base">{client.clientName}</CardTitle>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 {primaryOffer && (
-                  <Badge variant="outline" className="text-xs">
-                    {primaryOffer.title}
-                  </Badge>
+                  <Badge variant="outline" className="text-xs">{primaryOffer.title}</Badge>
                 )}
                 <Badge variant={
                   latestRun?.status === 'completed' ? 'default' :
@@ -356,23 +386,12 @@ function ClientOnboardingCard({
           </div>
           <div className="flex items-center gap-2">
             {!latestRun && (
-              <Button
-                size="sm"
-                onClick={() => onLaunchPipeline(client.clientId, primaryOffer?.id)}
-                disabled={isLaunching}
-              >
-                {isLaunching ? (
-                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Starting…</>
-                ) : (
-                  <><Rocket className="h-4 w-4 mr-1" /> Launch Pipeline</>
-                )}
+              <Button size="sm" onClick={() => onLaunchPipeline(client.clientId, primaryOffer?.id)} disabled={isLaunching}>
+                {isLaunching ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Starting…</> : <><Rocket className="h-4 w-4 mr-1" /> Launch Pipeline</>}
               </Button>
             )}
             {latestRun && (
-              <Button
-                variant="outline" size="sm"
-                onClick={() => navigate(`/fulfillment-review/${client.clientId}`)}
-              >
+              <Button variant="outline" size="sm" onClick={() => navigate(`/fulfillment-review/${client.clientId}`)}>
                 <Eye className="h-4 w-4 mr-1" /> Full Review
               </Button>
             )}
@@ -391,18 +410,26 @@ function ClientOnboardingCard({
 
       {isExpanded && (
         <CardContent className="pt-0 border-t">
-          <Tabs defaultValue="assets" className="mt-3">
+          <Tabs defaultValue="intake" className="mt-3">
             <TabsList className="bg-muted/50 h-8">
+              <TabsTrigger value="intake" className="text-xs h-7 gap-1">
+                <ClipboardList className="h-3 w-3" /> Intake
+              </TabsTrigger>
               <TabsTrigger value="assets" className="text-xs h-7 gap-1">
                 <FileText className="h-3 w-3" /> Assets ({client.assets.length})
               </TabsTrigger>
               <TabsTrigger value="pipeline" className="text-xs h-7 gap-1">
                 <Sparkles className="h-3 w-3" /> Pipeline
               </TabsTrigger>
-              <TabsTrigger value="offer" className="text-xs h-7 gap-1">
-                <Target className="h-3 w-3" /> Offer
+              <TabsTrigger value="files" className="text-xs h-7 gap-1">
+                <Upload className="h-3 w-3" /> Files ({client.offerFiles.length})
               </TabsTrigger>
             </TabsList>
+
+            {/* Intake Tab - Full onboarding data from aicapitalraising.com */}
+            <TabsContent value="intake" className="mt-3">
+              <IntakeDataView offer={primaryOffer} clientName={client.clientName} />
+            </TabsContent>
 
             {/* Assets Tab */}
             <TabsContent value="assets" className="mt-3 space-y-3">
@@ -431,21 +458,16 @@ function ClientOnboardingCard({
                               <Badge variant="outline" className="text-[10px]">{latestAsset.status}</Badge>
                             </div>
                             <div className="flex items-center gap-2">
-                              {assets.length > 1 && (
-                                <span className="text-[10px] text-muted-foreground">{assets.length} versions</span>
-                              )}
+                              {assets.length > 1 && <span className="text-[10px] text-muted-foreground">{assets.length} versions</span>}
                               {isAssetExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                             </div>
                           </button>
                         </CollapsibleTrigger>
                         <CollapsibleContent>
                           <div className="border-t p-3 space-y-3">
-                            {/* Asset Preview */}
                             <div className="bg-muted/30 rounded-lg p-3 max-h-64 overflow-y-auto">
                               <AssetPreview content={latestAsset.content} assetType={type} />
                             </div>
-
-                            {/* Inline AI Chat */}
                             <AssetInlineChat
                               assetId={latestAsset.id}
                               assetType={label}
@@ -487,9 +509,7 @@ function ClientOnboardingCard({
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium">{PHASE_LABELS[phase]}</span>
-                          {isCurrentPhase && isPipelineRunning && (
-                            <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                          )}
+                          {isCurrentPhase && isPipelineRunning && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
                         </div>
                         <div className="flex items-center gap-1.5 text-xs">
                           {completed > 0 && <Badge variant="outline" className="text-green-600 text-[10px]">{completed}✓</Badge>}
@@ -528,42 +548,14 @@ function ClientOnboardingCard({
               )}
             </TabsContent>
 
-            {/* Offer Tab */}
-            <TabsContent value="offer" className="mt-3">
-              {client.offers.length === 0 ? (
-                <div className="text-center py-6 text-muted-foreground">
-                  <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No offer linked</p>
-                  <p className="text-xs mt-1">Create an offer for this client to use as pipeline input</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {client.offers.map(offer => (
-                    <Card key={offer.id} className="p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-semibold">{offer.title}</h4>
-                        <Badge variant="outline" className="text-xs">{offer.offer_type}</Badge>
-                      </div>
-                      {offer.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-3">{offer.description}</p>
-                      )}
-                      <div className="flex gap-2 mt-3">
-                        <Button
-                          size="sm" variant="outline"
-                          onClick={() => navigate(`/client/${client.clientId}/offer/${offer.id}`)}
-                        >
-                          <Eye className="h-3 w-3 mr-1" /> View Offer
-                        </Button>
-                        {!latestRun && (
-                          <Button size="sm" onClick={() => onLaunchPipeline(client.clientId, offer.id)} disabled={isLaunching}>
-                            <Rocket className="h-3 w-3 mr-1" /> Launch with this Offer
-                          </Button>
-                        )}
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              )}
+            {/* Files Tab - Upload & manage context files */}
+            <TabsContent value="files" className="mt-3">
+              <FilesManager
+                clientId={client.clientId}
+                offerId={primaryOffer?.id}
+                files={client.offerFiles}
+                onRefresh={onRefresh}
+              />
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -572,12 +564,293 @@ function ClientOnboardingCard({
   );
 }
 
+// ─── Intake Data View ───
+
+function IntakeDataView({ offer, clientName }: { offer?: ClientOffer; clientName: string }) {
+  if (!offer) {
+    return (
+      <div className="text-center py-6 text-muted-foreground">
+        <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+        <p className="text-sm">No offer/intake data found</p>
+        <p className="text-xs mt-1">This client hasn't completed the onboarding form yet</p>
+      </div>
+    );
+  }
+
+  const sections = [
+    {
+      title: 'Company & Contact',
+      icon: Building2,
+      fields: [
+        { label: 'Fund Name', value: offer.fund_name },
+        { label: 'Fund Type', value: offer.fund_type },
+        { label: 'Industry Focus', value: offer.industry_focus },
+        { label: 'Speaker / Key Person', value: offer.speaker_name },
+        { label: 'Website', value: offer.website_url, isLink: true },
+        { label: 'Logo', value: offer.logo_url, isLink: true },
+      ],
+    },
+    {
+      title: 'Raise & Investment Details',
+      icon: DollarSign,
+      fields: [
+        { label: 'Raise Amount', value: offer.raise_amount },
+        { label: 'Min Investment', value: offer.min_investment },
+        { label: 'Investment Range', value: offer.investment_range },
+        { label: 'Timeline', value: offer.timeline },
+        { label: 'Target Investor', value: offer.target_investor },
+        { label: 'Targeted Returns', value: offer.targeted_returns },
+        { label: 'Hold Period', value: offer.hold_period },
+        { label: 'Distribution Schedule', value: offer.distribution_schedule },
+        { label: 'Tax Advantages', value: offer.tax_advantages },
+        { label: 'Accredited Only', value: offer.accredited_only ? 'Yes' : offer.accredited_only === false ? 'No' : null },
+        { label: 'Reg D Type', value: offer.reg_d_type },
+      ],
+    },
+    {
+      title: 'Credibility & History',
+      icon: Shield,
+      fields: [
+        { label: 'Credibility', value: offer.credibility },
+        { label: 'Fund History', value: offer.fund_history },
+      ],
+    },
+    {
+      title: 'Budget & Advertising',
+      icon: Target,
+      fields: [
+        { label: 'Budget Mode', value: offer.budget_mode },
+        { label: 'Budget Amount', value: offer.budget_amount ? `$${offer.budget_amount.toLocaleString()}` : null },
+        { label: 'Meta Ad Account', value: offer.meta_ad_account_id },
+        { label: 'Meta Page ID', value: offer.meta_page_id },
+        { label: 'Meta Pixel ID', value: offer.meta_pixel_id },
+        { label: 'GHL Location', value: offer.ghl_location_id },
+      ],
+    },
+    {
+      title: 'Brand & Notes',
+      icon: Megaphone,
+      fields: [
+        { label: 'Brand Colors', value: offer.brand_colors ? JSON.stringify(offer.brand_colors) : null },
+        { label: 'Brand Fonts', value: offer.brand_fonts ? JSON.stringify(offer.brand_fonts) : null },
+        { label: 'Brand Notes', value: offer.brand_notes },
+        { label: 'Additional Notes', value: offer.additional_notes },
+        { label: 'Pitch Deck', value: offer.pitch_deck_url, isLink: true },
+      ],
+    },
+  ];
+
+  // Check for raw form data from GHL webhook
+  const hasRawData = offer.raw_form_data && Object.keys(offer.raw_form_data).length > 0;
+
+  return (
+    <div className="space-y-4">
+      {/* Offer description summary */}
+      {offer.description && (
+        <div className="bg-muted/30 rounded-lg p-3">
+          <p className="text-xs font-medium text-muted-foreground mb-1">Offer Description</p>
+          <p className="text-sm whitespace-pre-wrap">{offer.description}</p>
+        </div>
+      )}
+
+      {/* Structured sections */}
+      {sections.map(section => {
+        const filledFields = section.fields.filter(f => f.value);
+        if (filledFields.length === 0) return null;
+        const Icon = section.icon;
+
+        return (
+          <div key={section.title} className="border rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Icon className="h-4 w-4 text-muted-foreground" />
+              <h4 className="text-sm font-semibold">{section.title}</h4>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+              {filledFields.map(field => (
+                <div key={field.label}>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{field.label}</p>
+                  {field.isLink ? (
+                    <a href={String(field.value)} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline truncate block">
+                      {String(field.value).replace(/^https?:\/\//, '').slice(0, 40)}
+                    </a>
+                  ) : (
+                    <p className="text-xs font-medium">{String(field.value)}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Raw form data fallback */}
+      {hasRawData && (
+        <Collapsible>
+          <CollapsibleTrigger asChild>
+            <button className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full">
+              <ChevronRight className="h-3 w-3" />
+              <span>Raw form data ({Object.keys(offer.raw_form_data).length} fields)</span>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="mt-2 bg-muted/30 rounded-lg p-3 max-h-48 overflow-y-auto">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                {Object.entries(offer.raw_form_data).map(([key, val]) => (
+                  <div key={key}>
+                    <p className="text-[10px] text-muted-foreground">{key.replace(/_/g, ' ')}</p>
+                    <p className="text-xs font-medium truncate">{String(val)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+    </div>
+  );
+}
+
+// ─── Files Manager (Upload + List) ───
+
+function FilesManager({ clientId, offerId, files, onRefresh }: {
+  clientId: string;
+  offerId?: string;
+  files: OfferFile[];
+  onRefresh: () => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files;
+    if (!selectedFiles || selectedFiles.length === 0) return;
+    if (!offerId) {
+      toast.error('No offer linked — create an offer first');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      for (const file of Array.from(selectedFiles)) {
+        const path = `${clientId}/${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from('client-offers')
+          .upload(path, file, { upsert: true });
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage.from('client-offers').getPublicUrl(path);
+
+        await supabase.from('client_offer_files').insert({
+          client_id: clientId,
+          offer_id: offerId,
+          file_name: file.name,
+          file_url: urlData.publicUrl,
+          file_type: file.type || null,
+          file_size_bytes: file.size,
+        } as any);
+      }
+      toast.success(`${selectedFiles.length} file(s) uploaded`);
+      onRefresh();
+    } catch (err: any) {
+      toast.error(`Upload failed: ${err.message}`);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDelete = async (fileId: string) => {
+    setDeleting(fileId);
+    try {
+      await supabase.from('client_offer_files').delete().eq('id', fileId);
+      toast.success('File removed');
+      onRefresh();
+    } catch (err: any) {
+      toast.error(`Delete failed: ${err.message}`);
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const formatSize = (bytes: number | null) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Upload area */}
+      <div
+        className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp4,.mov"
+          className="hidden"
+          onChange={handleUpload}
+        />
+        {uploading ? (
+          <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+        ) : (
+          <>
+            <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
+            <p className="text-sm text-muted-foreground">
+              Click to upload pitch decks, investor lists, brand assets, or any context files
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              PDF, DOCX, PPTX, images, videos — files are used as AI context for asset generation
+            </p>
+          </>
+        )}
+      </div>
+
+      {/* Files list */}
+      {files.length === 0 ? (
+        <p className="text-xs text-muted-foreground text-center py-2">No files uploaded yet</p>
+      ) : (
+        <div className="space-y-1.5">
+          {files.map(file => (
+            <div key={file.id} className="flex items-center gap-3 p-2 rounded-lg border hover:bg-muted/30 group">
+              <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{file.file_name}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {file.file_type || 'unknown'} · {formatSize(file.file_size_bytes)} · {new Date(file.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <a href={file.file_url} target="_blank" rel="noopener noreferrer">
+                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                </a>
+                <Button
+                  variant="ghost" size="icon" className="h-7 w-7 text-destructive"
+                  onClick={() => handleDelete(file.id)}
+                  disabled={deleting === file.id}
+                >
+                  {deleting === file.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Asset Preview ───
 
 function AssetPreview({ content, assetType }: { content: any; assetType: string }) {
   if (!content) return <p className="text-xs text-muted-foreground">No content</p>;
 
-  // Array content (emails, sms, angles, etc.)
   if (Array.isArray(content)) {
     return (
       <div className="space-y-2">
@@ -591,14 +864,11 @@ function AssetPreview({ content, assetType }: { content: any; assetType: string 
             {item.headline && <p className="text-[10px] text-muted-foreground">{item.headline}</p>}
           </div>
         ))}
-        {content.length > 5 && (
-          <p className="text-[10px] text-muted-foreground">+{content.length - 5} more items</p>
-        )}
+        {content.length > 5 && <p className="text-[10px] text-muted-foreground">+{content.length - 5} more items</p>}
       </div>
     );
   }
 
-  // Object content (research, report, funnel, etc.)
   if (typeof content === 'object') {
     const entries = Object.entries(content).slice(0, 6);
     return (
