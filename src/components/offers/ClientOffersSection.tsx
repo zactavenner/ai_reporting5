@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useClientOffers, useCreateOffer, useUpdateOffer, useDeleteOffer, uploadOfferFile, ClientOffer } from '@/hooks/useClientOffers';
 import { useOfferFiles, useAddOfferFile, useDeleteOfferFile, OfferFile } from '@/hooks/useOfferFiles';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
