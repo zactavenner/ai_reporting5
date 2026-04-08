@@ -58,7 +58,7 @@ serve(async (req) => {
     const videoPrompt = prompt || 'Create a subtle, professional animation from this image with gentle motion.';
 
     // Use Veo 3 via Google Generative Language API (async / long-running operation)
-    const veoUrl = `https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-preview:predictLongRunning?key=${apiKey}`;
+    const veoUrl = `https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning?key=${apiKey}`;
 
     const veoBody: Record<string, unknown> = {
       instances: [
