@@ -144,7 +144,7 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
           }
         }
       } else {
-        const { data: newOffer } = await createOffer.mutateAsync({
+        const newOffer = await createOffer.mutateAsync({
           client_id: clientId,
           title: title.trim(),
           description: description.trim() || undefined,
@@ -157,7 +157,8 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
         });
 
         // Upload additional files
-        if (newOffer && selectedFiles.length > 1) {
+        const newOfferId = (newOffer as any)?.id;
+        if (newOfferId && selectedFiles.length > 1) {
           for (let i = 1; i < selectedFiles.length; i++) {
             const f = selectedFiles[i];
             const res = await uploadOfferFile(clientId, f);
