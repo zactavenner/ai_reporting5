@@ -57,6 +57,22 @@ export function ClientOffersSection({ clientId, clientName, isPublicView = false
   const deleteOffer = useDeleteOffer();
   const { currentMember } = useTeamMember();
   const navigate = useNavigate();
+  const [autoCreated, setAutoCreated] = useState(false);
+
+  // Auto-create a primary offer if none exist for this client
+  useEffect(() => {
+    if (!isLoading && offers.length === 0 && !autoCreated && !isPublicView && clientId) {
+      setAutoCreated(true);
+      const desc = clientDescription || offerDescription || '';
+      createOffer.mutate({
+        client_id: clientId,
+        title: 'Primary Offer',
+        description: desc ? desc.substring(0, 2000) : undefined,
+        offer_type: 'offer',
+        uploaded_by: currentMember?.name || 'Auto',
+      });
+    }
+  }, [isLoading, offers.length, autoCreated, isPublicView, clientId]);
 
   const [addOpen, setAddOpen] = useState(false);
   const [editOffer, setEditOffer] = useState<ClientOffer | null>(null);
