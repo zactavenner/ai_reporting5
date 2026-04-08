@@ -122,6 +122,7 @@ interface InlineRecordsViewProps {
   dailyMetrics: DailyMetric[];
   leads: Lead[];
   calls: Call[];
+  showedCallsByScheduledDate?: Call[];
   fundedInvestors: FundedInvestor[];
   isLoading?: boolean;
   onRecordSelect?: (record: any, type: string) => void;
@@ -145,6 +146,7 @@ export function InlineRecordsView({
   dailyMetrics,
   leads,
   calls,
+  showedCallsByScheduledDate,
   fundedInvestors,
   isLoading,
   onRecordSelect,
@@ -314,17 +316,24 @@ export function InlineRecordsView({
   }, []);
 
   // Separate call types into distinct arrays
-  const bookedCalls = useMemo(() => 
+  const bookedCalls = useMemo(() =>
     calls.filter(c => !c.is_reconnect), [calls]);
 
-  const showedCalls = useMemo(() => 
-    bookedCalls.filter(c => c.showed), [bookedCalls]);
+  // Showed calls: prefer the scheduled_at-filtered list when available (matches RPC date attribution)
+  const showedCalls = useMemo(() =>
+    showedCallsByScheduledDate
+      ? showedCallsByScheduledDate.filter(c => !c.is_reconnect)
+      : bookedCalls.filter(c => c.showed),
+    [showedCallsByScheduledDate, bookedCalls]);
 
-  const reconnectCalls = useMemo(() => 
-    calls.filter(c => c.is_reconnect && !c.showed), [calls]);
+  const reconnectCalls = useMemo(() =>
+    calls.filter(c => c.is_reconnect), [calls]);
 
-  const reconnectShowedCalls = useMemo(() => 
-    calls.filter(c => c.is_reconnect && c.showed), [calls]);
+  const reconnectShowedCalls = useMemo(() =>
+    showedCallsByScheduledDate
+      ? showedCallsByScheduledDate.filter(c => c.is_reconnect)
+      : calls.filter(c => c.is_reconnect && c.showed),
+    [showedCallsByScheduledDate, calls]);
 
   // Commitments from funded_investors with commitment_amount > 0
   const commitments = useMemo(() => 
@@ -1351,6 +1360,18 @@ export function InlineRecordsView({
                   <CheckCircle className="h-4 w-4" />
                   Showed ({showedCalls.length})
                 </TabsTrigger>
+                {reconnectCalls.length > 0 && (
+                  <TabsTrigger value="reconnect" className="flex items-center gap-1">
+                    <RefreshCcw className="h-4 w-4" />
+                    Reconnect ({reconnectCalls.length})
+                  </TabsTrigger>
+                )}
+                {reconnectShowedCalls.length > 0 && (
+                  <TabsTrigger value="reconnect-showed" className="flex items-center gap-1">
+                    <RefreshCw className="h-4 w-4" />
+                    RC Showed ({reconnectShowedCalls.length})
+                  </TabsTrigger>
+                )}
                 <TabsTrigger value="commitments" className="flex items-center gap-1">
                   <Handshake className="h-4 w-4" />
                   Commitments ({commitments.length})
@@ -1683,6 +1704,15 @@ export function InlineRecordsView({
                 {renderCallTable(paginatedShowedCalls, 'showed')}
               </TabsContent>
 
+              {/* Reconnect Calls Tab */}
+              <TabsContent value="reconnect" className="mt-0">
+                {renderCallTable(paginatedReconnectCalls, 'reconnect')}
+              </TabsContent>
+
+              {/* Reconnect Showed Tab */}
+              <TabsContent value="reconnect-showed" className="mt-0">
+                {renderCallTable(paginatedReconnectShowedCalls, 'reconnect-showed')}
+              </TabsContent>
 
               {/* Commitments Tab */}
               <TabsContent value="commitments" className="mt-0">

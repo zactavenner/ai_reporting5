@@ -59,13 +59,19 @@ export interface SourceAggregatedMetrics {
 /**
  * Aggregates metrics directly from source tables (leads, calls, funded_investors)
  * Ad spend, impressions, clicks, commitments still come from daily_metrics as they're not in source tables
+ *
+ * @param showedCallsByScheduledDate - Optional: calls that showed, filtered by scheduled_at (appointment date).
+ *   When provided, showed/reconnect-showed counts use this list instead of filtering from `calls` (which
+ *   are filtered by booked_at). This matches the RPC get_client_source_metrics behaviour and ensures
+ *   the client detail page is consistent with the main agency dashboard.
  */
 export function aggregateFromSourceData(
   leads: LeadLike[],
   calls: CallLike[],
   fundedInvestors: FundedInvestorLike[],
   dailyMetrics: DailyMetric[] = [],
-  defaultLeadPipelineValue?: number
+  defaultLeadPipelineValue?: number,
+  showedCallsByScheduledDate?: CallLike[]
 ): SourceAggregatedMetrics {
   // Ad spend and click metrics come from daily_metrics (no other source)
   const dailyTotals = dailyMetrics.reduce(
@@ -89,11 +95,17 @@ export function aggregateFromSourceData(
   const validLeads = leads.filter(l => !l.is_spam && l.email && l.phone);
   const spamLeads = leads.filter(l => l.is_spam);
 
-  // Calculate calls from source
+  // Calculate calls from source — booked calls are always from the booked_at-filtered list
   const nonReconnectCalls = calls.filter(c => !c.is_reconnect);
-  const showedCalls = calls.filter(c => c.showed && !c.is_reconnect);
   const reconnectCalls = calls.filter(c => c.is_reconnect);
-  const reconnectShowed = reconnectCalls.filter(c => c.showed);
+
+  // Showed calls: prefer the scheduled_at-filtered list when available (matches RPC behaviour)
+  const showedCalls = showedCallsByScheduledDate
+    ? showedCallsByScheduledDate.filter(c => !c.is_reconnect)
+    : calls.filter(c => c.showed && !c.is_reconnect);
+  const reconnectShowed = showedCallsByScheduledDate
+    ? showedCallsByScheduledDate.filter(c => c.is_reconnect)
+    : reconnectCalls.filter(c => c.showed);
 
   // Calculate funded from source
   // Use commitment_amount as fallback when funded_amount is 0
@@ -170,9 +182,10 @@ export function useSourceAggregatedMetrics(
   calls: CallLike[],
   fundedInvestors: FundedInvestorLike[],
   dailyMetrics: DailyMetric[] = [],
-  defaultLeadPipelineValue?: number
+  defaultLeadPipelineValue?: number,
+  showedCallsByScheduledDate?: CallLike[]
 ): SourceAggregatedMetrics {
   return useMemo(() => {
-    return aggregateFromSourceData(leads, calls, fundedInvestors, dailyMetrics, defaultLeadPipelineValue);
-  }, [leads, calls, fundedInvestors, dailyMetrics, defaultLeadPipelineValue]);
+    return aggregateFromSourceData(leads, calls, fundedInvestors, dailyMetrics, defaultLeadPipelineValue, showedCallsByScheduledDate);
+  }, [leads, calls, fundedInvestors, dailyMetrics, defaultLeadPipelineValue, showedCallsByScheduledDate]);
 }

@@ -116,11 +116,11 @@ export function useCalls(clientId?: string, showedOnly?: boolean, startDate?: st
           .from('calls')
           .select('*')
           .order('booked_at', { ascending: false });
-        
+
         if (clientId) {
           query = query.eq('client_id', clientId);
         }
-        
+
         if (showedOnly) {
           query = query.eq('showed', true);
         }
@@ -133,7 +133,44 @@ export function useCalls(clientId?: string, showedOnly?: boolean, startDate?: st
           endNext.setUTCDate(endNext.getUTCDate() + 1);
           query = query.lt('booked_at', endNext.toISOString());
         }
-        
+
+        return query;
+      });
+
+      return data as Call[];
+    },
+  });
+}
+
+/**
+ * Fetches calls that actually showed, filtered by scheduled_at (the appointment date).
+ * This matches the RPC get_client_source_metrics which counts showed calls by scheduled_at,
+ * ensuring consistency between the main dashboard and client detail pages.
+ */
+export function useShowedCallsByScheduledDate(clientId?: string, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ['showed-calls-by-scheduled', clientId, startDate, endDate],
+    queryFn: async () => {
+      const data = await fetchAllRows((sb) => {
+        let query = sb
+          .from('calls')
+          .select('*')
+          .eq('showed', true)
+          .order('scheduled_at', { ascending: false });
+
+        if (clientId) {
+          query = query.eq('client_id', clientId);
+        }
+
+        if (startDate) {
+          query = query.gte('scheduled_at', startDate + 'T00:00:00.000Z');
+        }
+        if (endDate) {
+          const endNext = new Date(endDate + 'T00:00:00.000Z');
+          endNext.setUTCDate(endNext.getUTCDate() + 1);
+          query = query.lt('scheduled_at', endNext.toISOString());
+        }
+
         return query;
       });
 
