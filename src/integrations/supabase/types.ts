@@ -1125,6 +1125,100 @@ export type Database = {
           },
         ]
       }
+      browser_tasks: {
+        Row: {
+          claimed_at: string | null
+          claimed_by: string | null
+          client_id: string
+          completed_at: string | null
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          fulfillment_run_id: string | null
+          fulfillment_step_id: string | null
+          id: string
+          input_data: Json
+          max_retries: number | null
+          offer_id: string | null
+          output_data: Json | null
+          priority: number | null
+          retry_count: number | null
+          screenshot_url: string | null
+          started_at: string | null
+          status: string
+          task_group: string | null
+          task_type: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          client_id: string
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          fulfillment_run_id?: string | null
+          fulfillment_step_id?: string | null
+          id?: string
+          input_data?: Json
+          max_retries?: number | null
+          offer_id?: string | null
+          output_data?: Json | null
+          priority?: number | null
+          retry_count?: number | null
+          screenshot_url?: string | null
+          started_at?: string | null
+          status?: string
+          task_group?: string | null
+          task_type: string
+        }
+        Update: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          fulfillment_run_id?: string | null
+          fulfillment_step_id?: string | null
+          id?: string
+          input_data?: Json
+          max_retries?: number | null
+          offer_id?: string | null
+          output_data?: Json | null
+          priority?: number | null
+          retry_count?: number | null
+          screenshot_url?: string | null
+          started_at?: string | null
+          status?: string
+          task_group?: string | null
+          task_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "browser_tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "browser_tasks_fulfillment_run_id_fkey"
+            columns: ["fulfillment_run_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "browser_tasks_fulfillment_step_id_fkey"
+            columns: ["fulfillment_step_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_mappings: {
         Row: {
           calendar_id: string | null
@@ -1646,46 +1740,142 @@ export type Database = {
       }
       client_offers: {
         Row: {
+          accredited_only: boolean | null
+          additional_notes: string | null
+          brand_colors: Json | null
+          brand_fonts: Json | null
+          brand_notes: string | null
+          budget_amount: number | null
+          budget_mode: string | null
           client_id: string
           created_at: string
+          credibility: string | null
           description: string | null
+          distribution_schedule: string | null
           file_name: string | null
           file_size_bytes: number | null
           file_type: string | null
           file_url: string | null
+          fund_history: string | null
+          fund_name: string | null
+          fund_type: string | null
+          ghl_location_id: string | null
+          hold_period: string | null
           id: string
+          industry_focus: string | null
+          investment_range: string | null
+          logo_url: string | null
+          meta_ad_account_id: string | null
+          meta_page_id: string | null
+          meta_pixel_id: string | null
+          min_investment: string | null
           offer_type: string
+          pitch_deck_url: string | null
+          raise_amount: string | null
+          raw_form_data: Json | null
+          reg_d_type: string | null
+          speaker_name: string | null
+          status: string | null
+          target_investor: string | null
+          targeted_returns: string | null
+          tax_advantages: string | null
+          timeline: string | null
           title: string
           updated_at: string
           uploaded_by: string | null
+          website_url: string | null
         }
         Insert: {
+          accredited_only?: boolean | null
+          additional_notes?: string | null
+          brand_colors?: Json | null
+          brand_fonts?: Json | null
+          brand_notes?: string | null
+          budget_amount?: number | null
+          budget_mode?: string | null
           client_id: string
           created_at?: string
+          credibility?: string | null
           description?: string | null
+          distribution_schedule?: string | null
           file_name?: string | null
           file_size_bytes?: number | null
           file_type?: string | null
           file_url?: string | null
+          fund_history?: string | null
+          fund_name?: string | null
+          fund_type?: string | null
+          ghl_location_id?: string | null
+          hold_period?: string | null
           id?: string
+          industry_focus?: string | null
+          investment_range?: string | null
+          logo_url?: string | null
+          meta_ad_account_id?: string | null
+          meta_page_id?: string | null
+          meta_pixel_id?: string | null
+          min_investment?: string | null
           offer_type?: string
+          pitch_deck_url?: string | null
+          raise_amount?: string | null
+          raw_form_data?: Json | null
+          reg_d_type?: string | null
+          speaker_name?: string | null
+          status?: string | null
+          target_investor?: string | null
+          targeted_returns?: string | null
+          tax_advantages?: string | null
+          timeline?: string | null
           title: string
           updated_at?: string
           uploaded_by?: string | null
+          website_url?: string | null
         }
         Update: {
+          accredited_only?: boolean | null
+          additional_notes?: string | null
+          brand_colors?: Json | null
+          brand_fonts?: Json | null
+          brand_notes?: string | null
+          budget_amount?: number | null
+          budget_mode?: string | null
           client_id?: string
           created_at?: string
+          credibility?: string | null
           description?: string | null
+          distribution_schedule?: string | null
           file_name?: string | null
           file_size_bytes?: number | null
           file_type?: string | null
           file_url?: string | null
+          fund_history?: string | null
+          fund_name?: string | null
+          fund_type?: string | null
+          ghl_location_id?: string | null
+          hold_period?: string | null
           id?: string
+          industry_focus?: string | null
+          investment_range?: string | null
+          logo_url?: string | null
+          meta_ad_account_id?: string | null
+          meta_page_id?: string | null
+          meta_pixel_id?: string | null
+          min_investment?: string | null
           offer_type?: string
+          pitch_deck_url?: string | null
+          raise_amount?: string | null
+          raw_form_data?: Json | null
+          reg_d_type?: string | null
+          speaker_name?: string | null
+          status?: string | null
+          target_investor?: string | null
+          targeted_returns?: string | null
+          tax_advantages?: string | null
+          timeline?: string | null
           title?: string
           updated_at?: string
           uploaded_by?: string | null
+          website_url?: string | null
         }
         Relationships: [
           {
@@ -3043,6 +3233,149 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fulfillment_runs: {
+        Row: {
+          client_id: string
+          completed_at: string | null
+          completed_steps: number | null
+          config: Json | null
+          created_at: string
+          current_phase: string | null
+          error_summary: string | null
+          failed_steps: number | null
+          id: string
+          offer_id: string | null
+          run_mode: string
+          started_at: string | null
+          status: string
+          total_steps: number | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          completed_at?: string | null
+          completed_steps?: number | null
+          config?: Json | null
+          created_at?: string
+          current_phase?: string | null
+          error_summary?: string | null
+          failed_steps?: number | null
+          id?: string
+          offer_id?: string | null
+          run_mode?: string
+          started_at?: string | null
+          status?: string
+          total_steps?: number | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          completed_at?: string | null
+          completed_steps?: number | null
+          config?: Json | null
+          created_at?: string
+          current_phase?: string | null
+          error_summary?: string | null
+          failed_steps?: number | null
+          id?: string
+          offer_id?: string | null
+          run_mode?: string
+          started_at?: string | null
+          status?: string
+          total_steps?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_runs_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "client_offers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fulfillment_steps: {
+        Row: {
+          asset_id: string | null
+          completed_at: string | null
+          created_at: string
+          depends_on: string[] | null
+          duration_ms: number | null
+          error_message: string | null
+          function_name: string | null
+          function_params: Json | null
+          id: string
+          max_retries: number | null
+          output_data: Json | null
+          phase: string
+          retry_count: number | null
+          run_id: string
+          sort_order: number | null
+          started_at: string | null
+          status: string
+          step_name: string
+          step_type: string
+        }
+        Insert: {
+          asset_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          depends_on?: string[] | null
+          duration_ms?: number | null
+          error_message?: string | null
+          function_name?: string | null
+          function_params?: Json | null
+          id?: string
+          max_retries?: number | null
+          output_data?: Json | null
+          phase: string
+          retry_count?: number | null
+          run_id: string
+          sort_order?: number | null
+          started_at?: string | null
+          status?: string
+          step_name: string
+          step_type?: string
+        }
+        Update: {
+          asset_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          depends_on?: string[] | null
+          duration_ms?: number | null
+          error_message?: string | null
+          function_name?: string | null
+          function_params?: Json | null
+          id?: string
+          max_retries?: number | null
+          output_data?: Json | null
+          phase?: string
+          retry_count?: number | null
+          run_id?: string
+          sort_order?: number | null
+          started_at?: string | null
+          status?: string
+          step_name?: string
+          step_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_steps_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_runs"
             referencedColumns: ["id"]
           },
         ]
