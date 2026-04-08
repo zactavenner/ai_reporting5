@@ -178,6 +178,15 @@ function buildUserPrompt(client_data: any, asset_type: string, existing_research
   if (client_data.offer_description) userPrompt += `- Offer: ${client_data.offer_description}\n`;
   if (client_data.brand_notes) userPrompt += `- Brand Notes: ${client_data.brand_notes}\n`;
   if (client_data.additional_notes) userPrompt += `- Additional Notes: ${client_data.additional_notes}\n`;
+  // Capital raising specific fields for copy system variable replacement
+  if (client_data.speaker_name) userPrompt += `- Speaker/Spokesperson: ${client_data.speaker_name}\n`;
+  if (client_data.targeted_returns) userPrompt += `- Targeted Returns: ${client_data.targeted_returns}\n`;
+  if (client_data.hold_period) userPrompt += `- Hold Period: ${client_data.hold_period}\n`;
+  if (client_data.distribution_schedule) userPrompt += `- Distribution Schedule: ${client_data.distribution_schedule}\n`;
+  if (client_data.investment_range) userPrompt += `- Investment Range: ${client_data.investment_range}\n`;
+  if (client_data.tax_advantages) userPrompt += `- Tax Advantages: ${client_data.tax_advantages}\n`;
+  if (client_data.credibility) userPrompt += `- Credibility/Track Record: ${client_data.credibility}\n`;
+  if (client_data.fund_history) userPrompt += `- Fund History/Backstory: ${client_data.fund_history}\n`;
 
   if (existing_research && asset_type !== "research") {
     userPrompt += `\n=== MARKET RESEARCH (use this data extensively) ===\n${JSON.stringify(existing_research, null, 2)}\n`;
@@ -186,7 +195,7 @@ function buildUserPrompt(client_data: any, asset_type: string, existing_research
     userPrompt += `\n=== MARKETING ANGLES (build on these) ===\n${JSON.stringify(existing_angles, null, 2)}\n`;
   }
 
-  userPrompt += `\nGenerate the ${asset_type} content now. Return ONLY valid JSON.`;
+  userPrompt += `\nGenerate the ${asset_type} content now. Follow the AI Capital Raising Copy System templates exactly. Replace ALL bracketed variables with the actual client data above. Return ONLY valid JSON.`;
   return userPrompt;
 }
 
