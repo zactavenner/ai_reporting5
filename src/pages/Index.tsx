@@ -456,9 +456,7 @@ const Index = () => {
                   <h2 className="text-lg font-bold">Top Performers</h2>
                   <p className="text-sm text-muted-foreground">Best performing creatives across all clients</p>
                 </div>
-                <Suspense fallback={<div className="animate-pulse h-64 bg-muted/30 rounded-lg" />}>
-                  <TopPerformersInline clients={clients} />
-                </Suspense>
+                <TopPerformersSection clients={clients} />
               </SectionErrorBoundary>
             )}
 
