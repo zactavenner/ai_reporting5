@@ -260,7 +260,7 @@ Deno.serve(async (req) => {
       console.log(`Created ${initialTasks.length} PM tasks for ${company_name}`);
     }
 
-    // === NEW: Create first Offer from intake data ===
+    // === Create Offer with ALL intake fields populated ===
     const offerDescription = [
       fund_type ? `Fund Type: ${fund_type}` : null,
       raise_amount ? `Raise Amount: $${raise_amount}` : null,
@@ -284,6 +284,28 @@ Deno.serve(async (req) => {
         title: offerTitle,
         description: offerDescription || null,
         offer_type: 'campaign',
+        fund_name: company_name,
+        fund_type: fund_type || null,
+        raise_amount: raise_amount || null,
+        min_investment: min_investment || null,
+        timeline: timeline || null,
+        target_investor: target_investor || 'Accredited Investors',
+        targeted_returns: targeted_returns || null,
+        hold_period: hold_period || null,
+        distribution_schedule: distribution_schedule || null,
+        investment_range: investment_range || null,
+        tax_advantages: tax_advantages || null,
+        credibility: credibility || null,
+        fund_history: fund_history || null,
+        website_url: website || null,
+        speaker_name: speaker_name || null,
+        industry_focus: industry_focus || null,
+        brand_notes: brand_notes || null,
+        additional_notes: additional_notes || null,
+        budget_amount: budget_amount ? Number(budget_amount) : null,
+        budget_mode: budget_mode || null,
+        pitch_deck_url: pitch_deck_link || null,
+        status: 'active',
       })
       .select('id')
       .single();
@@ -302,40 +324,27 @@ Deno.serve(async (req) => {
       .eq('id', clientId)
       .single();
 
-    // === NEW: Trigger auto-generation pipeline (background) ===
+    // === Trigger fulfill-client pipeline (single source of truth) ===
     const cloudUrl = Deno.env.get('SUPABASE_URL') || '';
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 
-    const autoGenPayload = {
-      password: PASSWORD,
-      client_id: clientId,
-      offer_id: offerId,
-      offer_description: offerDescription,
-      company_name,
-      brand_colors: clientBrand?.brand_colors || [],
-      brand_fonts: clientBrand?.brand_fonts || [],
-      website_url: clientBrand?.website_url || website || null,
-      intake_data: {
-        fund_type, raise_amount, timeline, min_investment, target_investor,
-        speaker_name, industry_focus, targeted_returns, hold_period,
-        distribution_schedule, investment_range, tax_advantages,
-        credibility, fund_history, brand_notes, additional_notes,
-      },
-    };
-
-    // Fire-and-forget: don't await — let it run in background
+    // Fire-and-forget: triggers the full pipeline (research → copy → ads → avatar → video)
     EdgeRuntime.waitUntil(
-      fetch(`${cloudUrl}/functions/v1/auto-generate-onboarding`, {
+      fetch(`${cloudUrl}/functions/v1/fulfill-client`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${anonKey}`,
         },
-        body: JSON.stringify(autoGenPayload),
+        body: JSON.stringify({
+          password: PASSWORD,
+          client_id: clientId,
+          offer_id: offerId,
+        }),
       }).then(res => {
-        console.log(`Auto-generate triggered: ${res.status}`);
+        console.log(`Fulfill-client triggered: ${res.status}`);
       }).catch(err => {
-        console.error('Auto-generate trigger failed:', err);
+        console.error('Fulfill-client trigger failed:', err);
       })
     );
 

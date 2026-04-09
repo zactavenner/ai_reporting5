@@ -176,6 +176,7 @@ export function OnboardingTab() {
   const [expandedAsset, setExpandedAsset] = useState<string | null>(null);
   const [launchingPipeline, setLaunchingPipeline] = useState<string | null>(null);
 
+  // Show clients with status 'onboarding' OR recently created active clients that have offers
   const onboardingClients = useMemo(() =>
     allClients.filter(c => c.status === 'onboarding'),
     [allClients]
@@ -263,6 +264,17 @@ export function OnboardingTab() {
     }
   };
 
+  const markActive = async (clientId: string) => {
+    try {
+      const { error } = await supabase.from('clients').update({ status: 'active' } as any).eq('id', clientId);
+      if (error) throw error;
+      toast.success('Client marked as active');
+      await fetchAllData();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update status');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -315,6 +327,7 @@ export function OnboardingTab() {
             onLaunchPipeline={launchPipeline}
             isLaunching={launchingPipeline === client.clientId}
             onRefresh={fetchAllData}
+            onMarkActive={markActive}
           />
         ))}
       </div>
@@ -333,11 +346,12 @@ interface ClientCardProps {
   onLaunchPipeline: (clientId: string, offerId?: string) => void;
   isLaunching: boolean;
   onRefresh: () => void;
+  onMarkActive: (clientId: string) => void;
 }
 
 function ClientOnboardingCard({
   client, isExpanded, onToggle, expandedAsset, onToggleAsset,
-  onLaunchPipeline, isLaunching, onRefresh,
+  onLaunchPipeline, isLaunching, onRefresh, onMarkActive,
 }: ClientCardProps) {
   const navigate = useNavigate();
   const latestRun = client.runs[0];
@@ -394,9 +408,17 @@ function ClientOnboardingCard({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {!latestRun && (
+            {!latestRun && primaryOffer && (
               <Button size="sm" onClick={() => onLaunchPipeline(client.clientId, primaryOffer?.id)} disabled={isLaunching}>
                 {isLaunching ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Starting…</> : <><Rocket className="h-4 w-4 mr-1" /> Launch Pipeline</>}
+              </Button>
+            )}
+            {!latestRun && !primaryOffer && (
+              <Badge variant="outline" className="text-xs">Awaiting offer data</Badge>
+            )}
+            {latestRun?.status === 'completed' && (
+              <Button size="sm" variant="default" onClick={() => onMarkActive(client.clientId)}>
+                <CheckCircle2 className="h-4 w-4 mr-1" /> Mark Active
               </Button>
             )}
             {latestRun && (

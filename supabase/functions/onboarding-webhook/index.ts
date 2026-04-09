@@ -16,7 +16,6 @@ serve(async (req) => {
   try {
     const body = await req.json();
 
-    // Validate required fields
     if (!body.company_name) {
       return new Response(JSON.stringify({ error: 'company_name is required' }), {
         status: 400,
@@ -39,20 +38,23 @@ serve(async (req) => {
       .single();
 
     let clientId: string;
+    let isNew = false;
 
     if (existingClient) {
       clientId = existingClient.id;
       console.log(`[onboarding-webhook] Existing client found: ${clientId}`);
+      // Update status to onboarding so it appears in the Onboarding tab
+      await supabase.from('clients').update({ status: 'onboarding' }).eq('id', clientId);
     } else {
-      // 2. Create new client
+      // 2. Create new client with status 'onboarding'
       const { data: newClient, error: clientError } = await supabase
         .from('clients')
         .insert({
           name: body.company_name,
           website_url: body.website_url || null,
           description: body.offer_description || null,
-          industry: body.industry || 'Capital Raising',
-          status: 'active',
+          industry: body.industry || body.fund_type || 'Capital Raising',
+          status: 'onboarding',
           brand_colors: body.brand_colors || null,
           brand_fonts: body.brand_fonts || null,
         })
@@ -61,21 +63,54 @@ serve(async (req) => {
 
       if (clientError) throw clientError;
       clientId = newClient.id;
+      isNew = true;
       console.log(`[onboarding-webhook] Created client: ${clientId}`);
 
       // Create client_settings
       await supabase.from('client_settings').insert({ client_id: clientId });
     }
 
-    // 3. Create offer from intake data
+    // 3. Create offer with ALL intake fields populated
     const { data: offer, error: offerError } = await supabase
       .from('client_offers')
       .insert({
         client_id: clientId,
         title: body.offer_title || `${body.company_name} - Primary Offer`,
         description: body.offer_description || null,
-        offer_type: 'offer',
+        offer_type: 'campaign',
         uploaded_by: 'onboarding-webhook',
+        fund_name: body.fund_name || body.company_name,
+        fund_type: body.fund_type || null,
+        raise_amount: body.raise_amount || null,
+        min_investment: body.min_investment || body.minimum_investment || null,
+        timeline: body.timeline || null,
+        target_investor: body.target_investor || body.target_audience || 'Accredited Investors',
+        targeted_returns: body.targeted_returns || body.target_return || null,
+        hold_period: body.hold_period || null,
+        distribution_schedule: body.distribution_schedule || null,
+        investment_range: body.investment_range || null,
+        tax_advantages: body.tax_advantages || null,
+        credibility: body.credibility || null,
+        fund_history: body.fund_history || null,
+        website_url: body.website_url || null,
+        speaker_name: body.speaker_name || null,
+        industry_focus: body.industry_focus || body.industry || null,
+        brand_notes: body.brand_notes || null,
+        additional_notes: body.additional_notes || null,
+        brand_colors: body.brand_colors || null,
+        brand_fonts: body.brand_fonts || null,
+        budget_amount: body.budget_amount ? Number(body.budget_amount) : null,
+        budget_mode: body.budget_mode || null,
+        accredited_only: body.accredited_only ?? null,
+        reg_d_type: body.reg_d_type || null,
+        logo_url: body.logo_url || null,
+        pitch_deck_url: body.pitch_deck_url || body.pitch_deck_link || null,
+        ghl_location_id: body.ghl_location_id || null,
+        meta_ad_account_id: body.meta_ad_account_id || null,
+        meta_page_id: body.meta_page_id || null,
+        meta_pixel_id: body.meta_pixel_id || null,
+        raw_form_data: body.extra_data || body.raw_form_data || null,
+        status: 'active',
       })
       .select('id')
       .single();
@@ -100,40 +135,20 @@ serve(async (req) => {
       console.log(`[onboarding-webhook] Attached ${body.files.length} files`);
     }
 
-    // 5. Trigger the full auto-generate pipeline in the background
+    // 5. Trigger the fulfill-client pipeline (the single source of truth for onboarding)
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
-    const pipelinePayload = {
-      password: PASSWORD,
-      client_id: clientId,
-      offer_id: offerId,
-      offer_description: body.offer_description || '',
-      company_name: body.company_name,
-      brand_colors: body.brand_colors || [],
-      brand_fonts: body.brand_fonts || [],
-      website_url: body.website_url || '',
-      intake_data: {
-        fund_name: body.fund_name || body.company_name,
-        fund_type: body.fund_type || '',
-        target_return: body.target_return || '',
-        minimum_investment: body.minimum_investment || '',
-        fund_size: body.fund_size || '',
-        asset_class: body.asset_class || '',
-        investment_thesis: body.investment_thesis || '',
-        key_differentiators: body.key_differentiators || '',
-        target_audience: body.target_audience || 'Accredited Investors',
-        compliance_notes: body.compliance_notes || '',
-        ...body.extra_data,
-      },
-    };
 
-    // Fire and forget - don't await, let it run in background
-    fetch(`${supabaseUrl}/functions/v1/auto-generate-onboarding`, {
+    fetch(`${supabaseUrl}/functions/v1/fulfill-client`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${anonKey}`,
       },
-      body: JSON.stringify(pipelinePayload),
+      body: JSON.stringify({
+        password: PASSWORD,
+        client_id: clientId,
+        offer_id: offerId,
+      }),
     }).catch(err => console.error('[onboarding-webhook] Pipeline trigger error:', err));
 
     console.log(`[onboarding-webhook] Pipeline triggered for client ${clientId}`);
@@ -143,7 +158,8 @@ serve(async (req) => {
         success: true,
         client_id: clientId,
         offer_id: offerId,
-        message: 'Onboarding received. Full generation pipeline started.',
+        is_new_client: isNew,
+        message: 'Onboarding received. Fulfillment pipeline started.',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
