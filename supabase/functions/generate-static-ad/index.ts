@@ -108,7 +108,9 @@ DESIGN REQUIREMENTS:
     : '';
 
   if (prompt && !stylePrompt) {
-    return `${prompt}
+    return `${capitalDirective}
+
+${prompt}
 
 ${productContext}
 ${offerContext}
