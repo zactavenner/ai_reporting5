@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
@@ -64,6 +64,10 @@ import { QuizBuilderTab } from '@/components/quiz/QuizBuilderTab';
 import { AgentsTab } from '@/components/agents/AgentsTab';
 import { AvatarAdProvider } from '@/context/AvatarAdContext';
 import { AvatarAdWizard } from '@/components/avatar-ad/AvatarAdWizard';
+
+const StaticCreativesInline = lazy(() => import('@/pages/StaticCreativesPage'));
+const AvatarAdGenInline = lazy(() => import('@/components/avatar-ad/AvatarAdWizard').then(m => ({ default: () => <AvatarAdProvider><AvatarAdWizard /></AvatarAdProvider> })));
+const TopPerformersInline = lazy(() => import('@/components/creative/TopPerformersSection').then(m => ({ default: m.TopPerformersSection })));
 
 const Index = () => {
   const navigate = useNavigate();
