@@ -429,7 +429,9 @@ const Index = () => {
             {/* Static Ads */}
             {activeTab === 'static-ads' && (
               <SectionErrorBoundary sectionName="Static Ads">
-                <StaticCreativesInline />
+                <Suspense fallback={<div className="animate-pulse h-64 bg-muted/30 rounded-lg" />}>
+                  <StaticCreativesInline />
+                </Suspense>
               </SectionErrorBoundary>
             )}
 
@@ -440,7 +442,9 @@ const Index = () => {
                   <h2 className="text-lg font-bold">Video Ads</h2>
                   <p className="text-sm text-muted-foreground">Generate AI-powered video ads with avatars</p>
                 </div>
-                <AvatarAdGenInline />
+                <Suspense fallback={<div className="animate-pulse h-64 bg-muted/30 rounded-lg" />}>
+                  <AvatarAdGenInline />
+                </Suspense>
               </SectionErrorBoundary>
             )}
 
@@ -451,7 +455,9 @@ const Index = () => {
                   <h2 className="text-lg font-bold">Top Performers</h2>
                   <p className="text-sm text-muted-foreground">Best performing creatives across all clients</p>
                 </div>
-                <TopPerformersInline clients={clients} />
+                <Suspense fallback={<div className="animate-pulse h-64 bg-muted/30 rounded-lg" />}>
+                  <TopPerformersInline clients={clients} />
+                </Suspense>
               </SectionErrorBoundary>
             )}
 
