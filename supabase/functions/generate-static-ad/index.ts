@@ -40,11 +40,15 @@ function getImageDimensions(aspectRatio: string): { width: number; height: numbe
 }
 
 function buildAdPrompt(params: GenerateAdRequest): string {
-  const { prompt, stylePrompt, productDescription, productUrl, brandColors, brandFonts, aspectRatio, offerDescription, referenceImages, primaryReferenceImage, includeDisclaimer, disclaimerText, strictBrandAdherence } = params;
+  const { prompt, stylePrompt, styleName, productDescription, productUrl, brandColors, brandFonts, aspectRatio, offerDescription, referenceImages, primaryReferenceImage, includeDisclaimer, disclaimerText, strictBrandAdherence } = params;
   
   const dimensions = getImageDimensions(aspectRatio);
   const hasReferenceImages = referenceImages && referenceImages.length > 0;
   const hasBrandColors = brandColors && brandColors.length > 0;
+
+  // Auto-inject Capital Creative design system when using capital raising style
+  const isCapitalStyle = styleName?.toLowerCase().includes('capital') || false;
+  const capitalDirective = isCapitalStyle ? getCapitalCreativeDirective() : '';
 
   const colorInstruction = hasBrandColors
     ? strictBrandAdherence
