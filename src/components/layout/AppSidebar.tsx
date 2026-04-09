@@ -27,6 +27,7 @@ import {
   FileText,
   Plug,
   Cpu,
+  TrendingUp,
 } from 'lucide-react';
 import {
   Sidebar,
