@@ -264,6 +264,17 @@ export function OnboardingTab() {
     }
   };
 
+  const markActive = async (clientId: string) => {
+    try {
+      const { error } = await supabase.from('clients').update({ status: 'active' } as any).eq('id', clientId);
+      if (error) throw error;
+      toast.success('Client marked as active');
+      await fetchAllData();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update status');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
