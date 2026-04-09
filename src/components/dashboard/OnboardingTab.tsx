@@ -166,6 +166,93 @@ const STATUS_CONFIG: Record<string, { color: string; icon: any }> = {
   queued: { color: 'text-yellow-500', icon: Clock },
 };
 
+// ─── Google Doc Export ───
+
+function exportToGoogleDoc(client: ClientOnboardingData, offer: ClientOffer | undefined) {
+  const lines: string[] = [];
+
+  lines.push(`${client.clientName} — Onboarding Package`);
+  lines.push('='.repeat(50));
+  lines.push('');
+
+  // Offer details
+  if (offer) {
+    lines.push('OFFER DETAILS');
+    lines.push('-'.repeat(30));
+    const fields: [string, string | null | undefined][] = [
+      ['Title', offer.title],
+      ['Offer Type', offer.offer_type],
+      ['Fund Name', offer.fund_name],
+      ['Fund Type', offer.fund_type],
+      ['Raise Amount', offer.raise_amount],
+      ['Min Investment', offer.min_investment],
+      ['Target Investor', offer.target_investor],
+      ['Targeted Returns', offer.targeted_returns],
+      ['Hold Period', offer.hold_period],
+      ['Distribution Schedule', offer.distribution_schedule],
+      ['Investment Range', offer.investment_range],
+      ['Tax Advantages', offer.tax_advantages],
+      ['Timeline', offer.timeline],
+      ['Reg D Type', offer.reg_d_type],
+      ['Industry Focus', offer.industry_focus],
+      ['Speaker Name', offer.speaker_name],
+      ['Website', offer.website_url],
+      ['Credibility', offer.credibility],
+      ['Fund History', offer.fund_history],
+      ['Brand Notes', offer.brand_notes],
+      ['Additional Notes', offer.additional_notes],
+    ];
+    fields.forEach(([label, val]) => {
+      if (val) lines.push(`${label}: ${val}`);
+    });
+    if (offer.budget_amount) lines.push(`Budget: $${offer.budget_amount.toLocaleString()} (${offer.budget_mode || 'N/A'})`);
+    lines.push('');
+  }
+
+  // Assets
+  if (client.assets.length > 0) {
+    lines.push('GENERATED ASSETS');
+    lines.push('='.repeat(50));
+    lines.push('');
+
+    const assetsByType: Record<string, ClientAsset[]> = {};
+    client.assets.forEach(a => {
+      if (!assetsByType[a.asset_type]) assetsByType[a.asset_type] = [];
+      assetsByType[a.asset_type].push(a);
+    });
+
+    Object.entries(assetsByType).forEach(([type, assets]) => {
+      const label = ASSET_TYPE_CONFIG[type]?.label || type;
+      const latestAsset = assets[0];
+      lines.push(`── ${label.toUpperCase()} ──`);
+      lines.push(`Status: ${latestAsset.status}`);
+      lines.push('');
+
+      const content = latestAsset.content;
+      if (typeof content === 'string') {
+        lines.push(content);
+      } else if (content) {
+        lines.push(JSON.stringify(content, null, 2));
+      }
+      lines.push('');
+      lines.push('');
+    });
+  } else {
+    lines.push('No assets generated yet.');
+  }
+
+  const fullText = lines.join('\n');
+  const title = `${client.clientName} - Onboarding Package`;
+
+  navigator.clipboard.writeText(fullText).then(() => {
+    const url = `https://docs.google.com/document/create?title=${encodeURIComponent(title)}`;
+    window.open(url, '_blank');
+    toast.success('Content copied to clipboard! Paste it into the new Google Doc (Ctrl+V / Cmd+V)');
+  }).catch(() => {
+    toast.error('Failed to copy to clipboard');
+  });
+}
+
 // ─── Component ───
 
 export function OnboardingTab() {
