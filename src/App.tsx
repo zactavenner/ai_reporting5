@@ -35,6 +35,7 @@ const PublicCreatives = lazyRetry(() => import("./pages/PublicCreatives"));
 const MetaAdsOverlay = lazyRetry(() => import("./pages/MetaAdsOverlay"));
 const CreativeBriefs = lazyRetry(() => import("./pages/CreativeBriefs"));
 const QuizPage = lazyRetry(() => import("./pages/QuizPage"));
+const CreativesHubPage = lazyRetry(() => import("./pages/CreativesHubPage"));
 
 // Creative tools pages (from ad-verse-ally)
 const StaticAdsPage = lazyRetry(() => import("./pages/StaticAdsPage"));
@@ -111,6 +112,7 @@ const App = () => (
             <Route path="/daily" element={<PasswordGate><DailyReportPage /></PasswordGate>} />
             <Route path="/daily/thank-you" element={<PasswordGate><DailyReportThankYouPage /></PasswordGate>} />
             <Route path="/briefs" element={<PasswordGate><CreativeBriefs /></PasswordGate>} />
+            <Route path="/creative-studio" element={<PasswordGate><CreativesHubPage /></PasswordGate>} />
 
             {/* Creative Tools - from ad-verse-ally */}
             <Route path="/static-ads" element={<PasswordGate><StaticCreativesPage /></PasswordGate>} />

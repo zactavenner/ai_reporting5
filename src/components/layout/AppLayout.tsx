@@ -15,6 +15,7 @@ const navSections = [
   {
     label: 'Creative Tools',
     items: [
+      { path: '/creative-studio', label: 'Creative Studio', icon: Sparkles },
       { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
       { path: '/', label: 'Clients', icon: Users },
       { path: '/avatars', label: 'Avatars', icon: User },
