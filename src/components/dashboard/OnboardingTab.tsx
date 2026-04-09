@@ -395,9 +395,17 @@ function ClientOnboardingCard({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {!latestRun && (
+            {!latestRun && primaryOffer && (
               <Button size="sm" onClick={() => onLaunchPipeline(client.clientId, primaryOffer?.id)} disabled={isLaunching}>
                 {isLaunching ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Starting…</> : <><Rocket className="h-4 w-4 mr-1" /> Launch Pipeline</>}
+              </Button>
+            )}
+            {!latestRun && !primaryOffer && (
+              <Badge variant="outline" className="text-xs">Awaiting offer data</Badge>
+            )}
+            {latestRun?.status === 'completed' && (
+              <Button size="sm" variant="default" onClick={() => onMarkActive(client.clientId)}>
+                <CheckCircle2 className="h-4 w-4 mr-1" /> Mark Active
               </Button>
             )}
             {latestRun && (
