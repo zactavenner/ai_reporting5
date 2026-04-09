@@ -334,11 +334,12 @@ interface ClientCardProps {
   onLaunchPipeline: (clientId: string, offerId?: string) => void;
   isLaunching: boolean;
   onRefresh: () => void;
+  onMarkActive: (clientId: string) => void;
 }
 
 function ClientOnboardingCard({
   client, isExpanded, onToggle, expandedAsset, onToggleAsset,
-  onLaunchPipeline, isLaunching, onRefresh,
+  onLaunchPipeline, isLaunching, onRefresh, onMarkActive,
 }: ClientCardProps) {
   const navigate = useNavigate();
   const latestRun = client.runs[0];
