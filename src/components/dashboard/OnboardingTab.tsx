@@ -327,6 +327,7 @@ export function OnboardingTab() {
             onLaunchPipeline={launchPipeline}
             isLaunching={launchingPipeline === client.clientId}
             onRefresh={fetchAllData}
+            onMarkActive={markActive}
           />
         ))}
       </div>
