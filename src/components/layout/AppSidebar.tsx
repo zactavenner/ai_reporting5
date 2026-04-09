@@ -27,6 +27,7 @@ import {
   FileText,
   Plug,
   Cpu,
+  TrendingUp,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -95,8 +96,9 @@ const navStructure = [
     value: 'creatives-group',
     icon: Palette,
     children: [
-      { title: 'Creative Hub', value: 'creatives', icon: Palette },
-      { title: 'Avatar Ad Gen', value: 'avatar-ad-gen', icon: Video },
+      { title: 'Static Ads', value: 'static-ads', icon: Palette },
+      { title: 'Video Ads', value: 'avatar-ad-gen', icon: Video },
+      { title: 'Top Performers', value: 'top-performers', icon: TrendingUp },
     ],
   },
   {

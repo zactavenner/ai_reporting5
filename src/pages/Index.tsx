@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
@@ -22,7 +22,7 @@ import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal'
 import { FundedInvestorsDrillDownModal } from '@/components/drilldown/FundedInvestorsDrillDownModal';
 import { AdSpendDrillDownModal } from '@/components/drilldown/AdSpendDrillDownModal';
 import { MeetingsTab } from '@/components/meetings/MeetingsTab';
-import { CreativesTab } from '@/components/creative/CreativesTab';
+
 import { PendingTasksReview } from '@/components/meetings/PendingTasksReview';
 import { SectionErrorBoundary } from '@/components/ui/SectionErrorBoundary';
 import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
@@ -64,6 +64,10 @@ import { QuizBuilderTab } from '@/components/quiz/QuizBuilderTab';
 import { AgentsTab } from '@/components/agents/AgentsTab';
 import { AvatarAdProvider } from '@/context/AvatarAdContext';
 import { AvatarAdWizard } from '@/components/avatar-ad/AvatarAdWizard';
+
+const StaticCreativesInline = lazy(() => import('@/pages/StaticCreativesPage'));
+const AvatarAdGenInline = lazy(() => Promise.resolve({ default: () => <AvatarAdProvider><AvatarAdWizard /></AvatarAdProvider> }));
+import { TopPerformersSection } from '@/components/creative/TopPerformersSection';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -422,14 +426,36 @@ const Index = () => {
               </SectionErrorBoundary>
             )}
 
-            {/* Creatives */}
-            {activeTab === 'creatives' && (
-              <SectionErrorBoundary sectionName="Creatives">
+            {/* Static Ads */}
+            {activeTab === 'static-ads' && (
+              <SectionErrorBoundary sectionName="Static Ads">
+                <Suspense fallback={<div className="animate-pulse h-64 bg-muted/30 rounded-lg" />}>
+                  <StaticCreativesInline />
+                </Suspense>
+              </SectionErrorBoundary>
+            )}
+
+            {/* Video Ads (Avatar Ad Gen) */}
+            {activeTab === 'avatar-ad-gen' && (
+              <SectionErrorBoundary sectionName="Video Ads">
                 <div className="mb-4">
-                  <h2 className="text-lg font-bold">Creatives</h2>
-                  <p className="text-sm text-muted-foreground">Manage all creative assets, briefs, and tools</p>
+                  <h2 className="text-lg font-bold">Video Ads</h2>
+                  <p className="text-sm text-muted-foreground">Generate AI-powered video ads with avatars</p>
                 </div>
-                <CreativesTab />
+                <Suspense fallback={<div className="animate-pulse h-64 bg-muted/30 rounded-lg" />}>
+                  <AvatarAdGenInline />
+                </Suspense>
+              </SectionErrorBoundary>
+            )}
+
+            {/* Top Performers */}
+            {activeTab === 'top-performers' && (
+              <SectionErrorBoundary sectionName="Top Performers">
+                <div className="mb-4">
+                  <h2 className="text-lg font-bold">Top Performers</h2>
+                  <p className="text-sm text-muted-foreground">Best performing creatives across all clients</p>
+                </div>
+                <TopPerformersSection clients={clients} />
               </SectionErrorBoundary>
             )}
 
