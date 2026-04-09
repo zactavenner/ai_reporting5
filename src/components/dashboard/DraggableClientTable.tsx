@@ -181,18 +181,29 @@ export function DraggableClientTable({
 
   const inactiveClientIds = useMemo(() => {
     const set = new Set<string>();
-    const clientIdsInTable = new Set(clients.map(c => c.id));
-    const clientsWithData = new Set(yesterdayMetrics.map((m: any) => m.client_id));
-    clientIdsInTable.forEach(id => {
-      if (!clientsWithData.has(id)) set.add(id);
-    });
-    yesterdayMetrics.forEach((m: any) => {
-      if ((m.ad_spend ?? 0) === 0 && (m.leads ?? 0) === 0) {
-        set.add(m.client_id);
+    const yesterdayDataByClient = new Map(yesterdayMetrics.map((m: any) => [m.client_id, m]));
+
+    for (const client of clients) {
+      const ym = yesterdayDataByClient.get(client.id);
+      const adSpend = ym ? (ym.ad_spend ?? 0) : 0;
+      const leads = ym ? (ym.leads ?? 0) : 0;
+      // Also check current period metrics from RPC — daily_metrics.leads may be stale
+      // if recalculate hasn't run yet after the latest GHL sync
+      const rpcMetrics = metrics[client.id];
+      const rpcLeads = rpcMetrics?.crmLeads || rpcMetrics?.totalLeads || 0;
+
+      // Only flag as inactive if there's no ad spend AND no leads from both sources
+      // Don't flag if the client has no Meta account configured (they wouldn't have ad spend)
+      const hasMetaAccount = !!client.meta_ad_account_id;
+      if (hasMetaAccount && adSpend === 0 && leads === 0 && rpcLeads === 0) {
+        set.add(client.id);
+      } else if (!hasMetaAccount && !client.ghl_api_key && !client.hubspot_portal_id) {
+        // No integrations configured at all
+        set.add(client.id);
       }
-    });
+    }
     return set;
-  }, [yesterdayMetrics, clients]);
+  }, [yesterdayMetrics, clients, metrics]);
   const duplicateMetaAccounts = useMemo(() => {
     const counts: Record<string, number> = {};
     clients.forEach(c => {
@@ -580,12 +591,52 @@ export function DraggableClientTable({
                       (() => {
                         const crmTotal = m.crmLeads || 0;
                         const metaLeads = m.totalLeads || 0;
+                        const hasAdSpend = (m.totalAdSpend || 0) > 0;
+                        const hasGhlConfig = !!(client.ghl_api_key && client.ghl_location_id);
+                        const hasHubspotConfig = !!(client.hubspot_portal_id && client.hubspot_access_token);
+                        const hasCrmConfig = hasGhlConfig || hasHubspotConfig;
+                        // Flag: has ad spend but 0 CRM leads — likely broken GHL integration
+                        if (hasAdSpend && crmTotal === 0 && !hasCrmConfig) return 'text-destructive font-semibold';
+                        if (hasAdSpend && crmTotal === 0 && hasCrmConfig) return 'text-destructive font-semibold';
                         if (crmTotal === 0 && metaLeads === 0) return 'text-muted-foreground';
                         if (crmTotal >= metaLeads) return 'text-chart-2';
                         return 'text-destructive font-semibold';
                       })()
                     )}>
-                      {m.crmLeads || 0}
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.crmLeads || 0}
+                        {(() => {
+                          const hasAdSpend = (m.totalAdSpend || 0) > 0;
+                          const crmTotal = m.crmLeads || 0;
+                          const hasGhlConfig = !!(client.ghl_api_key && client.ghl_location_id);
+                          const hasHubspotConfig = !!(client.hubspot_portal_id && client.hubspot_access_token);
+                          if (hasAdSpend && crmTotal === 0 && !hasGhlConfig && !hasHubspotConfig) {
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <AlertTriangle className="h-2.5 w-2.5 text-destructive shrink-0" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs max-w-[200px]">
+                                  No GHL/HubSpot configured. Client has ad spend but no CRM leads — integration required.
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          }
+                          if (hasAdSpend && crmTotal === 0 && (hasGhlConfig || hasHubspotConfig)) {
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <XCircle className="h-2.5 w-2.5 text-destructive shrink-0" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs max-w-[200px]">
+                                  CRM configured but 0 leads synced. Check {hasGhlConfig ? 'GHL' : 'HubSpot'} API key and sync status.
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </span>
                     </TableCell>
 
                     {/* CPL */}
@@ -598,7 +649,42 @@ export function DraggableClientTable({
 
                     {/* Booked Calls */}
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {m.totalCalls || 0}
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.totalCalls || 0}
+                        {(() => {
+                          const hasAdSpend = (m.totalAdSpend || 0) > 0;
+                          const hasCrmLeads = (m.crmLeads || 0) > 0;
+                          const totalCalls = m.totalCalls || 0;
+                          const hasGhlConfig = !!(client.ghl_api_key && client.ghl_location_id);
+                          const trackedCals = (fullSettings[client.id] as any)?.tracked_calendar_ids;
+                          const hasCalendars = Array.isArray(trackedCals) && trackedCals.length > 0;
+                          if (hasAdSpend && hasCrmLeads && totalCalls === 0 && hasGhlConfig && !hasCalendars) {
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <AlertTriangle className="h-2.5 w-2.5 text-yellow-600 dark:text-yellow-400 shrink-0" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs max-w-[200px]">
+                                  No tracked calendars configured. Set tracked_calendar_ids in client settings to sync booked calls.
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          }
+                          if (hasAdSpend && hasCrmLeads && totalCalls === 0 && hasCalendars) {
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <XCircle className="h-2.5 w-2.5 text-destructive shrink-0" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs max-w-[200px]">
+                                  Calendars configured but 0 booked calls. Check GHL calendar sync and appointment statuses.
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </span>
                     </TableCell>
 
                     {/* Cost per Call */}

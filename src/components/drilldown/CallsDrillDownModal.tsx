@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Download, Trash2, Plus, ChevronLeft, ChevronRight, Eye, Filter, FileText } from 'lucide-react';
-import { useCalls, Call, useLeads } from '@/hooks/useLeadsAndCalls';
+import { useCalls, useShowedCallsByScheduledDate, Call, useLeads } from '@/hooks/useLeadsAndCalls';
 import { useClient } from '@/hooks/useClients';
 import { useDateFilter } from '@/contexts/DateFilterContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -54,7 +54,17 @@ const PAGE_SIZE = 150;
 export const CallsDrillDownModal = forwardRef<HTMLDivElement, CallsDrillDownModalProps>(function CallsDrillDownModal({ clientId, showedOnly, open, onOpenChange }, ref) {
   const { startDate, endDate } = useDateFilter();
   const { data: client } = useClient(clientId);
-  const { data: calls = [], isLoading } = useCalls(clientId, showedOnly, startDate, endDate);
+  // For showed calls, filter by scheduled_at (when the call actually happened)
+  // For all calls, filter by booked_at (when the appointment was created)
+  const { data: bookedCalls = [], isLoading: bookedLoading } = useCalls(clientId, showedOnly, startDate, endDate);
+  const { data: showedBySchedule = [], isLoading: showedLoading } = useShowedCallsByScheduledDate(
+    showedOnly ? clientId : undefined,
+    showedOnly ? startDate : undefined,
+    showedOnly ? endDate : undefined
+  );
+  // Use scheduled_at-filtered calls for showed drill-down, booked_at-filtered for all calls
+  const calls = showedOnly ? showedBySchedule : bookedCalls;
+  const isLoading = showedOnly ? showedLoading : bookedLoading;
   const { data: leads = [] } = useLeads(clientId, startDate, endDate);
   const [isAdding, setIsAdding] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);

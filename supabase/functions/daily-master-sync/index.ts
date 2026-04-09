@@ -102,6 +102,9 @@ Deno.serve(async (req) => {
     }
 
     // ── Step 2: GHL All Clients (contacts, calendar, pipelines) ──
+    // NOTE: sync-ghl-all-clients runs in background via EdgeRuntime.waitUntil.
+    // It handles its own recalculate-daily-metrics call after all clients are synced.
+    // The response returns immediately — actual sync takes several minutes.
     if (!skipSteps.includes("ghl")) {
       const start = Date.now();
       console.log(`[daily-master-sync] Step 2: sync-ghl-all-clients`);
@@ -120,7 +123,8 @@ Deno.serve(async (req) => {
           `The daily GHL all-clients sync failed: ${res.error}. Check GHL API keys.`
         );
       }
-      await new Promise(r => setTimeout(r, 10000));
+      // GHL sync runs in background — wait longer to allow partial completion
+      await new Promise(r => setTimeout(r, 30000));
     }
 
     // ── Step 3: HubSpot All Clients ──
@@ -145,10 +149,14 @@ Deno.serve(async (req) => {
       await new Promise(r => setTimeout(r, 5000));
     }
 
-    // ── Step 4: Recalculate Daily Metrics ──
+    // ── Step 4: Recalculate Daily Metrics (safety net) ──
+    // NOTE: sync-ghl-all-clients already recalculates metrics after completing its
+    // background sync. This step is a safety net that covers the partial data
+    // available now. The GHL sync's own recalculate will update again later
+    // once all contacts and calendar appointments are fully synced.
     if (!skipSteps.includes("recalculate")) {
       const start = Date.now();
-      console.log(`[daily-master-sync] Step 4: recalculate-daily-metrics`);
+      console.log(`[daily-master-sync] Step 4: recalculate-daily-metrics (safety net — GHL sync may still be running)`);
       const res = await callFunction(supabaseUrl, supabaseKey, "recalculate-daily-metrics");
       const duration = Date.now() - start;
       results.push({

@@ -116,11 +116,11 @@ export function useCalls(clientId?: string, showedOnly?: boolean, startDate?: st
           .from('calls')
           .select('*')
           .order('booked_at', { ascending: false });
-        
+
         if (clientId) {
           query = query.eq('client_id', clientId);
         }
-        
+
         if (showedOnly) {
           query = query.eq('showed', true);
         }
@@ -133,7 +133,45 @@ export function useCalls(clientId?: string, showedOnly?: boolean, startDate?: st
           endNext.setUTCDate(endNext.getUTCDate() + 1);
           query = query.lt('booked_at', endNext.toISOString());
         }
-        
+
+        return query;
+      });
+
+      return data as Call[];
+    },
+  });
+}
+
+/**
+ * Fetches showed calls filtered by scheduled_at (when the appointment actually occurred).
+ * This is needed because showed calls should be counted by the date the call was scheduled,
+ * not when it was booked. The main useCalls hook filters by booked_at which misses
+ * calls booked earlier but scheduled in the date range.
+ */
+export function useShowedCallsByScheduledDate(clientId?: string, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ['showed-calls-scheduled', clientId, startDate, endDate],
+    queryFn: async () => {
+      const data = await fetchAllRows((sb) => {
+        let query = sb
+          .from('calls')
+          .select('*')
+          .eq('showed', true)
+          .order('scheduled_at', { ascending: false });
+
+        if (clientId) {
+          query = query.eq('client_id', clientId);
+        }
+
+        if (startDate) {
+          query = query.gte('scheduled_at', startDate + 'T00:00:00.000Z');
+        }
+        if (endDate) {
+          const endNext = new Date(endDate + 'T00:00:00.000Z');
+          endNext.setUTCDate(endNext.getUTCDate() + 1);
+          query = query.lt('scheduled_at', endNext.toISOString());
+        }
+
         return query;
       });
 

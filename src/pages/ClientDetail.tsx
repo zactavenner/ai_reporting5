@@ -45,7 +45,7 @@ import { useClient } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors } from '@/hooks/useMetrics';
 import { useSourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
 import { usePriorPeriodMetrics } from '@/hooks/usePriorMetrics';
-import { useLeads, useCalls } from '@/hooks/useLeadsAndCalls';
+import { useLeads, useCalls, useShowedCallsByScheduledDate } from '@/hooks/useLeadsAndCalls';
 import { useClientSettings, getThresholdsFromSettings } from '@/hooks/useClientSettings';
 import { useCustomTabs, useDeleteCustomTab } from '@/hooks/useCustomTabs';
 import { useAllTasks } from '@/hooks/useTasks';
@@ -118,6 +118,8 @@ export default function ClientDetail() {
   const { data: priorMetrics } = usePriorPeriodMetrics(clientId, startDate, endDate);
   const { data: leads = [], isLoading: leadsLoading } = useLeads(clientId, startDate, endDate);
   const { data: calls = [] } = useCalls(clientId, false, startDate, endDate);
+  // Showed calls filtered by scheduled_at (actual appointment date) for correct showed counts
+  const { data: showedCallsBySchedule = [] } = useShowedCallsByScheduledDate(clientId, startDate, endDate);
   const { data: settings } = useClientSettings(clientId);
   const { data: customTabs = [] } = useCustomTabs(clientId);
   const { data: allTasks = [] } = useAllTasks();
@@ -153,7 +155,8 @@ export default function ClientDetail() {
     hasSourceFilter ? filteredCalls : calls,
     hasSourceFilter ? filteredFundedInvestors : fundedInvestors,
     dailyMetrics,
-    (settings as any)?.default_lead_pipeline_value || 0
+    (settings as any)?.default_lead_pipeline_value || 0,
+    showedCallsBySchedule
   );
 
   const thresholds = useMemo(() => getThresholdsFromSettings(settings), [settings]);
