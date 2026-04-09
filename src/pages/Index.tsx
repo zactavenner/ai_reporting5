@@ -67,7 +67,7 @@ import { AvatarAdWizard } from '@/components/avatar-ad/AvatarAdWizard';
 
 const StaticCreativesInline = lazy(() => import('@/pages/StaticCreativesPage'));
 const AvatarAdGenInline = lazy(() => Promise.resolve({ default: () => <AvatarAdProvider><AvatarAdWizard /></AvatarAdProvider> }));
-const TopPerformersInline = lazy(() => import('@/components/creative/TopPerformersSection').then(m => ({ default: m.TopPerformersSection })));
+import { TopPerformersSection } from '@/components/creative/TopPerformersSection';
 
 const Index = () => {
   const navigate = useNavigate();
