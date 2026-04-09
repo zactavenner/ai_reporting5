@@ -15,6 +15,7 @@ import {
   Bot, RefreshCw, Rocket, BarChart3, Target, Megaphone, Globe,
   Sparkles, AlertCircle, Upload, Trash2, Download, ClipboardList,
   Building2, DollarSign, Users, Phone, Calendar, Link, Shield,
+  FileDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
