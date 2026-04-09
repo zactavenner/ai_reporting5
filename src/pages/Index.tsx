@@ -22,7 +22,7 @@ import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal'
 import { FundedInvestorsDrillDownModal } from '@/components/drilldown/FundedInvestorsDrillDownModal';
 import { AdSpendDrillDownModal } from '@/components/drilldown/AdSpendDrillDownModal';
 import { MeetingsTab } from '@/components/meetings/MeetingsTab';
-import { CreativesTab } from '@/components/creative/CreativesTab';
+
 import { PendingTasksReview } from '@/components/meetings/PendingTasksReview';
 import { SectionErrorBoundary } from '@/components/ui/SectionErrorBoundary';
 import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
