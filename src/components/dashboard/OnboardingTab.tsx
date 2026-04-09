@@ -176,6 +176,7 @@ export function OnboardingTab() {
   const [expandedAsset, setExpandedAsset] = useState<string | null>(null);
   const [launchingPipeline, setLaunchingPipeline] = useState<string | null>(null);
 
+  // Show clients with status 'onboarding' OR recently created active clients that have offers
   const onboardingClients = useMemo(() =>
     allClients.filter(c => c.status === 'onboarding'),
     [allClients]
