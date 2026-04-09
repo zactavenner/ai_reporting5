@@ -130,6 +130,7 @@ DO NOT include:
   return `
 Create a high-converting advertisement image.
 
+${capitalDirective}
 ${stylePrompt || ''}
 ${productContext}
 ${offerContext}
