@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getCapitalCreativeDirective } from './capital-creative-style.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,11 +40,15 @@ function getImageDimensions(aspectRatio: string): { width: number; height: numbe
 }
 
 function buildAdPrompt(params: GenerateAdRequest): string {
-  const { prompt, stylePrompt, productDescription, productUrl, brandColors, brandFonts, aspectRatio, offerDescription, referenceImages, primaryReferenceImage, includeDisclaimer, disclaimerText, strictBrandAdherence } = params;
+  const { prompt, stylePrompt, styleName, productDescription, productUrl, brandColors, brandFonts, aspectRatio, offerDescription, referenceImages, primaryReferenceImage, includeDisclaimer, disclaimerText, strictBrandAdherence } = params;
   
   const dimensions = getImageDimensions(aspectRatio);
   const hasReferenceImages = referenceImages && referenceImages.length > 0;
   const hasBrandColors = brandColors && brandColors.length > 0;
+
+  // Auto-inject Capital Creative design system when using capital raising style
+  const isCapitalStyle = styleName?.toLowerCase().includes('capital') || false;
+  const capitalDirective = isCapitalStyle ? getCapitalCreativeDirective() : '';
 
   const colorInstruction = hasBrandColors
     ? strictBrandAdherence
@@ -103,7 +108,9 @@ DESIGN REQUIREMENTS:
     : '';
 
   if (prompt && !stylePrompt) {
-    return `${prompt}
+    return `${capitalDirective}
+
+${prompt}
 
 ${productContext}
 ${offerContext}
@@ -123,6 +130,7 @@ DO NOT include:
   return `
 Create a high-converting advertisement image.
 
+${capitalDirective}
 ${stylePrompt || ''}
 ${productContext}
 ${offerContext}
