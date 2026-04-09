@@ -427,6 +427,9 @@ function ClientOnboardingCard({
                 <Eye className="h-4 w-4 mr-1" /> Full Review
               </Button>
             )}
+            <Button variant="outline" size="sm" onClick={() => exportToGoogleDoc(client, primaryOffer)}>
+              <FileDown className="h-4 w-4 mr-1" /> Export to Google Doc
+            </Button>
           </div>
         </div>
         {latestRun && (
