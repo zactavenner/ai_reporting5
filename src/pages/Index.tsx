@@ -423,14 +423,32 @@ const Index = () => {
               </SectionErrorBoundary>
             )}
 
-            {/* Creatives */}
-            {activeTab === 'creatives' && (
-              <SectionErrorBoundary sectionName="Creatives">
+            {/* Static Ads */}
+            {activeTab === 'static-ads' && (
+              <SectionErrorBoundary sectionName="Static Ads">
+                <StaticCreativesInline />
+              </SectionErrorBoundary>
+            )}
+
+            {/* Video Ads (Avatar Ad Gen) */}
+            {activeTab === 'avatar-ad-gen' && (
+              <SectionErrorBoundary sectionName="Video Ads">
                 <div className="mb-4">
-                  <h2 className="text-lg font-bold">Creatives</h2>
-                  <p className="text-sm text-muted-foreground">Manage all creative assets, briefs, and tools</p>
+                  <h2 className="text-lg font-bold">Video Ads</h2>
+                  <p className="text-sm text-muted-foreground">Generate AI-powered video ads with avatars</p>
                 </div>
-                <CreativesTab />
+                <AvatarAdGenInline />
+              </SectionErrorBoundary>
+            )}
+
+            {/* Top Performers */}
+            {activeTab === 'top-performers' && (
+              <SectionErrorBoundary sectionName="Top Performers">
+                <div className="mb-4">
+                  <h2 className="text-lg font-bold">Top Performers</h2>
+                  <p className="text-sm text-muted-foreground">Best performing creatives across all clients</p>
+                </div>
+                <TopPerformersInline clients={clients} />
               </SectionErrorBoundary>
             )}
 
