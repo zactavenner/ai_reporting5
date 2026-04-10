@@ -3,20 +3,23 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { GlobalClientSearch } from '@/components/search/GlobalClientSearch';
+import { NotificationBell } from '@/components/layout/NotificationBell';
 
 interface AppHeaderProps {
   onSettings?: () => void;
   currentMemberName?: string;
   onLogout?: () => void;
+  onTaskClick?: (taskId: string) => void;
 }
 
-export function AppHeader({ onSettings, currentMemberName, onLogout }: AppHeaderProps) {
+export function AppHeader({ onSettings, currentMemberName, onLogout, onTaskClick }: AppHeaderProps) {
   return (
     <header className="border-b border-border bg-card/80 apple-blur sticky top-0 z-30 h-12 flex items-center px-4 gap-2">
       <SidebarTrigger className="mr-2" />
       <GlobalClientSearch />
       <div className="flex-1" />
       <div className="flex items-center gap-1.5">
+        <NotificationBell onTaskClick={onTaskClick} />
         {onSettings && (
           <Button variant="ghost" size="icon" onClick={onSettings} title="Settings">
             <Settings2 className="h-4 w-4" />
