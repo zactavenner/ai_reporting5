@@ -243,6 +243,12 @@ const Index = () => {
             onSettings={() => setAgencySettingsOpen(true)}
             currentMemberName={currentMember?.name}
             onLogout={currentMember ? logout : undefined}
+            onTaskClick={(taskId) => {
+              setActiveTab('tasks');
+              const params = new URLSearchParams(window.location.search);
+              params.set('task', taskId);
+              window.history.replaceState({}, '', `?${params.toString()}`);
+            }}
           />
 
           <main className="flex-1 p-6 space-y-6 overflow-auto">
