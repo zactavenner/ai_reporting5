@@ -28,6 +28,7 @@ import {
   Plug,
   Cpu,
   TrendingUp,
+  ExternalLink,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -96,8 +97,7 @@ const navStructure = [
     value: 'creatives-group',
     icon: Palette,
     children: [
-      { title: 'Static Ads', value: 'static-ads', icon: Palette },
-      { title: 'Video Ads', value: 'avatar-ad-gen', icon: Video },
+      { title: 'Ads Generator', value: 'ads-generator-ext', icon: ExternalLink, externalUrl: 'https://id-preview--b57a79c0-3e59-4a78-be94-340c58fe824e.lovable.app' },
       { title: 'Top Performers', value: 'top-performers', icon: TrendingUp },
     ],
   },
@@ -219,7 +219,13 @@ export function AppSidebar({
                               <SidebarMenuSubItem key={child.value}>
                                 <SidebarMenuSubButton
                                   isActive={activeTab === child.value}
-                                  onClick={() => onTabChange(child.value)}
+                                  onClick={() => {
+                                    if ('externalUrl' in child && (child as any).externalUrl) {
+                                      window.open((child as any).externalUrl, '_blank');
+                                    } else {
+                                      onTabChange(child.value);
+                                    }
+                                  }}
                                 >
                                   <child.icon className="h-3.5 w-3.5" />
                                   <span>{child.title}</span>
