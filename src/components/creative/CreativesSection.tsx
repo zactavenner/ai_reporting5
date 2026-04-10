@@ -1,17 +1,38 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CreativeApproval } from './CreativeApproval';
-import { StaticGenTab } from './StaticGenTab';
-import { VideoGenTab } from './VideoGenTab';
-import { BriefGeneratorTab } from './BriefGeneratorTab';
-import { Upload, Image, Video, Target } from 'lucide-react';
-import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { Upload, Image, Video, Target, ExternalLink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+
+const ADS_GENERATOR_URL = 'https://id-preview--b57a79c0-3e59-4a78-be94-340c58fe824e.lovable.app';
 
 interface CreativesSectionProps {
   clientId: string;
   clientName: string;
   isPublicView?: boolean;
 }
+
+const generatorLinks = [
+  {
+    title: 'Static Ads Generator',
+    description: 'Generate branded static ad creatives with AI styles',
+    icon: Image,
+    path: '/static-ads',
+  },
+  {
+    title: 'Video Ads Generator',
+    description: 'Create AI avatar video ads with scripts and compositing',
+    icon: Video,
+    path: '/batch-video',
+  },
+  {
+    title: 'AI Briefs & Flowboard',
+    description: 'Generate creative briefs and plan ad workflows',
+    icon: Target,
+    path: '/briefs',
+  },
+];
 
 export function CreativesSection({ clientId, clientName, isPublicView = false }: CreativesSectionProps) {
   const [activeSubTab, setActiveSubTab] = useState('approval');
@@ -34,17 +55,9 @@ export function CreativesSection({ clientId, clientName, isPublicView = false }:
             <Upload className="h-4 w-4" />
             Creative Approval
           </TabsTrigger>
-          <TabsTrigger value="static" className="gap-2">
+          <TabsTrigger value="generators" className="gap-2">
             <Image className="h-4 w-4" />
-            Static Gen
-          </TabsTrigger>
-          <TabsTrigger value="video" className="gap-2">
-            <Video className="h-4 w-4" />
-            Video Gen
-          </TabsTrigger>
-          <TabsTrigger value="briefs" className="gap-2">
-            <Target className="h-4 w-4" />
-            AI Briefs
+            Generators
           </TabsTrigger>
         </TabsList>
 
@@ -56,31 +69,27 @@ export function CreativesSection({ clientId, clientName, isPublicView = false }:
           />
         </TabsContent>
 
-        <TabsContent value="static" className="mt-4">
-          <StaticGenTab 
-            clientId={clientId} 
-            clientName={clientName}
-          />
-        </TabsContent>
-
-        <TabsContent value="video" className="mt-4">
-          <VideoGenTab
-            clientId={clientId}
-            clientName={clientName}
-          />
-        </TabsContent>
-
-        <TabsContent value="briefs" className="mt-4">
-          <ErrorBoundary fallback={
-            <div className="p-6 text-center text-muted-foreground">
-              <p>Failed to load AI Briefs. Try refreshing the page.</p>
-            </div>
-          }>
-            <BriefGeneratorTab
-              clientId={clientId}
-              clientName={clientName}
-            />
-          </ErrorBoundary>
+        <TabsContent value="generators" className="mt-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {generatorLinks.map((link) => (
+              <Card key={link.path} className="p-4 flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <link.icon className="h-5 w-5 text-primary" />
+                  <h3 className="font-medium text-sm">{link.title}</h3>
+                </div>
+                <p className="text-xs text-muted-foreground flex-1">{link.description}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 w-full"
+                  onClick={() => window.open(`${ADS_GENERATOR_URL}${link.path}`, '_blank')}
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open in Ads Generator
+                </Button>
+              </Card>
+            ))}
+          </div>
         </TabsContent>
       </Tabs>
     </div>

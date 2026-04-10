@@ -96,8 +96,6 @@ const navStructure = [
     value: 'creatives-group',
     icon: Palette,
     children: [
-      { title: 'Static Ads', value: 'static-ads', icon: Palette },
-      { title: 'Video Ads', value: 'avatar-ad-gen', icon: Video },
       { title: 'Top Performers', value: 'top-performers', icon: TrendingUp },
     ],
   },
