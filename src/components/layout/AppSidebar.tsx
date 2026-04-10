@@ -97,6 +97,7 @@ const navStructure = [
     value: 'creatives-group',
     icon: Palette,
     children: [
+      { title: 'Ads Generator', value: 'ads-generator-ext', icon: ExternalLink, externalUrl: 'https://id-preview--b57a79c0-3e59-4a78-be94-340c58fe824e.lovable.app' },
       { title: 'Top Performers', value: 'top-performers', icon: TrendingUp },
     ],
   },
