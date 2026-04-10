@@ -42,7 +42,9 @@ export function useClientSourceMetrics(startDate?: string, endDate?: string) {
 }
 
 /**
- * Converts RPC results + daily_metrics into per-client SourceAggregatedMetrics
+ * Converts RPC results + daily_metrics into per-client SourceAggregatedMetrics.
+ * Ensures every client with daily_metrics data gets ad spend shown even if the
+ * RPC returns no rows (e.g. network error, timeout, or 0 leads/calls).
  */
 export function buildClientMetricsFromRPC(
   rpcData: ClientSourceMetricsRow[],
@@ -58,9 +60,10 @@ export function buildClientMetricsFromRPC(
     dailyByClient[m.client_id].push(m);
   }
 
-  for (const row of rpcData) {
-    const clientDailyMetrics = dailyByClient[row.client_id] || [];
-    const dailyTotals = clientDailyMetrics.reduce(
+  // Helper to compute daily totals for a client
+  function computeDailyTotals(clientId: string) {
+    const clientDailyMetrics = dailyByClient[clientId] || [];
+    return clientDailyMetrics.reduce(
       (acc, day) => ({
         totalAdSpend: acc.totalAdSpend + Number(day.ad_spend || 0),
         totalClicks: acc.totalClicks + (day.clicks || 0),
@@ -70,6 +73,14 @@ export function buildClientMetricsFromRPC(
       }),
       { totalAdSpend: 0, totalClicks: 0, totalImpressions: 0, totalCommitments: 0, commitmentDollars: 0 }
     );
+  }
+
+  // Build a set of client IDs already covered by the RPC
+  const rpcClientIds = new Set<string>();
+
+  for (const row of rpcData) {
+    rpcClientIds.add(row.client_id);
+    const dailyTotals = computeDailyTotals(row.client_id);
 
     const totalAdSpend = dailyTotals.totalAdSpend;
     const totalLeads = Number(row.total_leads);
@@ -110,6 +121,47 @@ export function buildClientMetricsFromRPC(
       pipelineValue,
       costPerReconnectCall: reconnectCalls > 0 ? totalAdSpend / reconnectCalls : 0,
       costPerReconnectShowed: reconnectShowed > 0 ? totalAdSpend / reconnectShowed : 0,
+    };
+  }
+
+  // Fallback: ensure clients with daily_metrics (ad spend) but missing from RPC
+  // still get their ad spend displayed. This covers RPC failures, new clients
+  // not yet in source tables, or clients with only Meta data and no CRM yet.
+  for (const clientId of Object.keys(dailyByClient)) {
+    if (rpcClientIds.has(clientId)) continue;
+
+    const dailyTotals = computeDailyTotals(clientId);
+    if (dailyTotals.totalAdSpend === 0 && dailyTotals.totalImpressions === 0) continue;
+
+    const defaultPipelineValue = clientFullSettings[clientId]?.default_lead_pipeline_value || 0;
+
+    result[clientId] = {
+      totalAdSpend: dailyTotals.totalAdSpend,
+      totalLeads: 0,
+      spamLeads: 0,
+      crmLeads: 0,
+      totalCalls: 0,
+      showedCalls: 0,
+      reconnectCalls: 0,
+      reconnectShowed: 0,
+      totalCommitments: dailyTotals.totalCommitments,
+      commitmentDollars: dailyTotals.commitmentDollars,
+      fundedInvestors: 0,
+      fundedDollars: 0,
+      ctr: dailyTotals.totalImpressions > 0 ? (dailyTotals.totalClicks / dailyTotals.totalImpressions) * 100 : 0,
+      costPerLead: 0,
+      costPerCall: 0,
+      showedPercent: 0,
+      costPerShow: 0,
+      costPerInvestor: 0,
+      costOfCapital: 0,
+      avgTimeToFund: 0,
+      avgCallsToFund: 0,
+      leadToBookedPercent: 0,
+      closeRate: 0,
+      pipelineValue: 0,
+      costPerReconnectCall: 0,
+      costPerReconnectShowed: 0,
     };
   }
 

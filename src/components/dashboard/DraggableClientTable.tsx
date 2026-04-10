@@ -580,12 +580,27 @@ export function DraggableClientTable({
                       (() => {
                         const crmTotal = m.crmLeads || 0;
                         const metaLeads = m.totalLeads || 0;
+                        const hasAdSpend = (m.totalAdSpend || 0) > 0;
+                        // Flag: client has ad spend but 0 CRM leads → GHL integration issue
+                        if (hasAdSpend && crmTotal === 0) return 'text-destructive font-semibold';
                         if (crmTotal === 0 && metaLeads === 0) return 'text-muted-foreground';
                         if (crmTotal >= metaLeads) return 'text-chart-2';
                         return 'text-destructive font-semibold';
                       })()
                     )}>
-                      {m.crmLeads || 0}
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.crmLeads || 0}
+                        {(m.totalAdSpend || 0) > 0 && (m.crmLeads || 0) === 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-2.5 w-2.5 text-destructive shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-xs">
+                              <strong>GHL Integration Issue:</strong> This client has {formatCurrency(m.totalAdSpend)} ad spend but 0 CRM leads synced. Check GHL API key, location ID, and contact sync.
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                     </TableCell>
 
                     {/* CPL */}
@@ -598,7 +613,19 @@ export function DraggableClientTable({
 
                     {/* Booked Calls */}
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {m.totalCalls || 0}
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.totalCalls || 0}
+                        {(m.crmLeads || 0) > 0 && (m.totalCalls || 0) === 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-2.5 w-2.5 text-yellow-500 shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-xs">
+                              <strong>Calendar Sync:</strong> {m.crmLeads} CRM leads but 0 booked calls. Check that tracked calendar IDs are configured in client settings.
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                     </TableCell>
 
                     {/* Cost per Call */}

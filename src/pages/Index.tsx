@@ -121,8 +121,45 @@ const Index = () => {
   const { filteredLeads, filteredCalls, filteredFundedInvestors, isFiltered: hasSourceFilter } = useSourceFilteredMetrics(allLeads, allCalls, fundedInvestors, true);
 
   const clientMetrics = useMemo(() => {
-    return buildClientMetricsFromRPC(rpcMetrics, dailyMetrics, clientFullSettings);
-  }, [rpcMetrics, dailyMetrics, clientFullSettings]);
+    const rpcResult = buildClientMetricsFromRPC(rpcMetrics, dailyMetrics, clientFullSettings);
+
+    // Fallback: if RPC returned no data but we have source data (leads, calls),
+    // build per-client metrics directly from the source tables to ensure
+    // CRM leads, booked calls, and show calls are always displayed.
+    if (rpcMetrics.length === 0 && (allLeads.length > 0 || allCalls.length > 0 || fundedInvestors.length > 0)) {
+      // Group source data by client
+      const leadsByClient: Record<string, typeof allLeads> = {};
+      const callsByClient: Record<string, typeof allCalls> = {};
+      const fundedByClient: Record<string, typeof fundedInvestors> = {};
+      const dailyByClient: Record<string, typeof dailyMetrics> = {};
+
+      for (const l of allLeads) { (leadsByClient[l.client_id] ??= []).push(l); }
+      for (const c of allCalls) { (callsByClient[c.client_id] ??= []).push(c); }
+      for (const f of fundedInvestors) { (fundedByClient[f.client_id] ??= []).push(f); }
+      for (const d of dailyMetrics) { (dailyByClient[d.client_id] ??= []).push(d); }
+
+      const allClientIds = new Set([
+        ...Object.keys(leadsByClient),
+        ...Object.keys(callsByClient),
+        ...Object.keys(fundedByClient),
+        ...Object.keys(dailyByClient),
+      ]);
+
+      for (const clientId of allClientIds) {
+        if (rpcResult[clientId]) continue; // Already covered by daily_metrics fallback
+        const m = aggregateFromSourceData(
+          leadsByClient[clientId] || [],
+          callsByClient[clientId] || [],
+          fundedByClient[clientId] || [],
+          dailyByClient[clientId] || [],
+          clientFullSettings[clientId]?.default_lead_pipeline_value || 0
+        );
+        rpcResult[clientId] = m;
+      }
+    }
+
+    return rpcResult;
+  }, [rpcMetrics, dailyMetrics, clientFullSettings, allLeads, allCalls, fundedInvestors]);
 
   const aggregatedMetrics = useMemo(() => {
     const allClientMetrics = Object.values(clientMetrics);

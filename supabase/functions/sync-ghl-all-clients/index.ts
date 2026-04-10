@@ -121,12 +121,19 @@ Deno.serve(async (req) => {
     console.log(`[sync-ghl-all-clients] Complete: ${successCount}/${results.length} clients fully synced`);
 
     // Trigger daily metrics recalculation for all clients after sync
-    console.log(`[sync-ghl-all-clients] Triggering daily metrics recalculation...`);
+    // Pass proper startDate/endDate so recalculate covers the full sync window
+    const recalcDays = sinceDateDays || 7;
+    const recalcEnd = new Date();
+    const recalcStart = new Date();
+    recalcStart.setUTCDate(recalcStart.getUTCDate() - recalcDays);
+    const recalcStartStr = recalcStart.toISOString().split("T")[0];
+    const recalcEndStr = recalcEnd.toISOString().split("T")[0];
+    console.log(`[sync-ghl-all-clients] Triggering daily metrics recalculation (${recalcStartStr} to ${recalcEndStr})...`);
     try {
       const res = await fetch(`${supabaseUrl}/functions/v1/recalculate-daily-metrics`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseKey}` },
-        body: JSON.stringify({ days: sinceDateDays || 7 }),
+        body: JSON.stringify({ startDate: recalcStartStr, endDate: recalcEndStr }),
       });
       const data = await res.json();
       console.log(`[sync-ghl-all-clients] Metrics recalculation result:`, JSON.stringify(data));
