@@ -223,6 +223,11 @@ const Index = () => {
 
   // Handle sidebar navigation for utility pages
   const handleTabChange = (tab: string) => {
+    // Navigate to Creatives Hub page
+    if (tab === 'creatives-hub') {
+      navigate('/creatives-hub');
+      return;
+    }
     setActiveTab(tab);
   };
 
