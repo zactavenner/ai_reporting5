@@ -28,6 +28,7 @@ import {
   Plug,
   Cpu,
   TrendingUp,
+  ExternalLink,
 } from 'lucide-react';
 import {
   Sidebar,
