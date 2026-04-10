@@ -6,73 +6,79 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+
+async function callAI(apiKey: string, prompt: string, options?: { temperature?: number; maxTokens?: number; model?: string }) {
+  const response = await fetch(AI_GATEWAY_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: options?.model || "google/gemini-2.5-flash",
+      messages: [{ role: "user", content: prompt }],
+      temperature: options?.temperature ?? 0.3,
+      max_tokens: options?.maxTokens ?? 4096,
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error("AI Gateway error:", response.status, errText);
+    if (response.status === 429) {
+      return { error: "Rate limited, please try again later", status: 429 };
+    }
+    if (response.status === 402) {
+      return { error: "Payment required", status: 402 };
+    }
+    return { error: `AI request failed (${response.status})`, status: response.status };
+  }
+
+  const data = await response.json();
+  const text = data.choices?.[0]?.message?.content || "";
+  return { text };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { action, creative, videoUrl, transcript } = await req.json();
+    const body = await req.json();
+    const { action, creative, videoUrl, transcript, imageUrl, editPrompt } = body;
 
-    // Fetch API key from agency_settings first, fallback to env var
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { data: settings } = await supabase
-      .from('agency_settings')
-      .select('gemini_api_key')
-      .limit(1)
-      .maybeSingle();
-
-    const GEMINI_API_KEY = settings?.gemini_api_key || Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY is not configured. Please add it in Agency Settings.");
-    }
-
-    // New action: Spelling and grammar check for ad copy (text, images, and videos)
+    // === SPELLING CHECK ===
     if (action === "spelling_check") {
-      // Build text content from all available sources
       let textContent = `
 Headline: ${creative?.headline || '(none)'}
 Body Copy: ${creative?.body_copy || '(none)'}
 CTA: ${creative?.cta_text || '(none)'}
       `.trim();
 
-      // Add transcript for video content if provided
       if (transcript) {
         textContent += `\n\nVideo Transcript/Spoken Content:\n${transcript}`;
       }
 
-      // Skip if no text content at all
       const hasTextFields = creative?.headline || creative?.body_copy || creative?.cta_text;
-      const hasTranscript = !!transcript;
-      
-      if (!hasTextFields && !hasTranscript) {
+      if (!hasTextFields && !transcript) {
         return new Response(
-          JSON.stringify({ 
-            hasErrors: false, 
-            severity: "none", 
-            errors: [], 
-            summary: "No text content to review" 
-          }),
+          JSON.stringify({ hasErrors: false, severity: "none", errors: [], summary: "No text content to review" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `You are a professional proofreader for advertising copy. Analyze this ad copy for spelling, grammar, and number formatting errors.
+      const prompt = `You are a professional proofreader for advertising copy. Analyze this ad copy for spelling, grammar, and number formatting errors.
 
 ${textContent}
 
@@ -85,13 +91,10 @@ Respond ONLY with valid JSON in this exact format, no other text:
 }
 
 IMPORTANT RULES:
-1. **Number Formatting (CRITICAL)**: Numbers should use "#" symbol, not written out. 
+1. **Number Formatting (CRITICAL)**: Numbers should use "#" symbol, not written out.
    - WRONG: "number one market", "number 1 market"
    - CORRECT: "#1 market"
-   - This applies to rankings, positions, and similar numeric references in marketing
-
 2. **Spelling & Grammar**: Check for typos, misspellings, subject-verb agreement, etc.
-
 3. **Video/Audio Transcripts**: If transcript is provided, check spoken content for the same issues.
 
 Severity guide:
@@ -99,62 +102,35 @@ Severity guide:
 - "minor" = Minor punctuation issues, spacing problems, capitalization inconsistencies
 - "none" = Clean copy with no errors
 
-Focus ONLY on objective errors, not style preferences. Marketing abbreviations and intentional stylization are acceptable.`
-                  }
-                ]
-              }
-            ],
-            generationConfig: {
-              temperature: 0.1,
-              maxOutputTokens: 1024,
-            },
-          }),
-        }
-      );
+Focus ONLY on objective errors, not style preferences. Marketing abbreviations and intentional stylization are acceptable.`;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Spelling check error:", response.status, errorText);
-        throw new Error("Spelling check failed");
+      const result = await callAI(LOVABLE_API_KEY, prompt, { temperature: 0.1, maxTokens: 1024 });
+      if (result.error) {
+        return new Response(JSON.stringify({ error: result.error }), {
+          status: result.status || 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
-      const result = await response.json();
-      const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      
-      // Parse the JSON response
       try {
-        // Clean up the response - remove markdown code blocks if present
-        let cleanedText = rawText.trim();
-        if (cleanedText.startsWith("```json")) {
-          cleanedText = cleanedText.slice(7);
-        } else if (cleanedText.startsWith("```")) {
-          cleanedText = cleanedText.slice(3);
-        }
-        if (cleanedText.endsWith("```")) {
-          cleanedText = cleanedText.slice(0, -3);
-        }
+        let cleanedText = (result.text || "").trim();
+        if (cleanedText.startsWith("```json")) cleanedText = cleanedText.slice(7);
+        else if (cleanedText.startsWith("```")) cleanedText = cleanedText.slice(3);
+        if (cleanedText.endsWith("```")) cleanedText = cleanedText.slice(0, -3);
         cleanedText = cleanedText.trim();
-        
+
         const parsed = JSON.parse(cleanedText);
+        return new Response(JSON.stringify(parsed), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch {
         return new Response(
-          JSON.stringify(parsed),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      } catch (parseError) {
-        console.error("Failed to parse AI response:", rawText);
-        // Return a safe default if parsing fails
-        return new Response(
-          JSON.stringify({ 
-            hasErrors: false, 
-            severity: "none", 
-            errors: [], 
-            summary: "Unable to analyze copy" 
-          }),
+          JSON.stringify({ hasErrors: false, severity: "none", errors: [], summary: "Unable to analyze copy" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     }
 
+    // === TRANSCRIBE ===
     if (action === "transcribe") {
       if (!videoUrl) {
         return new Response(
@@ -163,19 +139,7 @@ Focus ONLY on objective errors, not style preferences. Marketing abbreviations a
         );
       }
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `You are a video transcription and analysis expert. Analyze this video URL and provide:
+      const prompt = `You are a video transcription and analysis expert. Analyze this video URL and provide:
 1. Describe what's happening in the video in detail
 2. Transcribe any spoken words, text overlays, or captions
 3. Note any background music or sound effects
@@ -194,59 +158,35 @@ Format your response as:
 **Key Messaging:**
 [Main marketing message and CTAs]
 
-Video URL: ${videoUrl}`
-                  }
-                ]
-              }
-            ],
-            generationConfig: {
-              temperature: 0.3,
-              maxOutputTokens: 4096,
-            },
-          }),
-        }
-      );
+Video URL: ${videoUrl}`;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Transcription error:", response.status, errorText);
-        throw new Error("Transcription failed");
+      const result = await callAI(LOVABLE_API_KEY, prompt, { temperature: 0.3, maxTokens: 4096 });
+      if (result.error) {
+        return new Response(JSON.stringify({ error: result.error, fallback: true }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
-      const result = await response.json();
-      const transcription = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
       return new Response(
-        JSON.stringify({ transcript: transcription }),
+        JSON.stringify({ transcript: result.text }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    // === AUDIT ===
     if (action === "audit") {
       const creativeDetails = `
-Title: ${creative.title || 'N/A'}
-Type: ${creative.type || 'N/A'}
-Platform: ${creative.platform || 'N/A'}
-Headline: ${creative.headline || 'N/A'}
-Body Copy: ${creative.body_copy || 'N/A'}
-CTA: ${creative.cta_text || 'N/A'}
+Title: ${creative?.title || 'N/A'}
+Type: ${creative?.type || 'N/A'}
+Platform: ${creative?.platform || 'N/A'}
+Headline: ${creative?.headline || 'N/A'}
+Body Copy: ${creative?.body_copy || 'N/A'}
+CTA: ${creative?.cta_text || 'N/A'}
 ${transcript ? `Video Transcript: ${transcript}` : ''}
-${creative.file_url ? `File URL: ${creative.file_url}` : ''}
+${creative?.file_url ? `File URL: ${creative.file_url}` : ''}
       `.trim();
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `You are an expert digital advertising strategist and creative director with 15+ years of experience in paid social advertising. Analyze this ad creative and provide actionable feedback.
+      const prompt = `You are an expert digital advertising strategist and creative director with 15+ years of experience in paid social advertising. Analyze this ad creative and provide actionable feedback.
 
 Your audit should cover:
 1. **Overall Score (1-10)**: Rate the creative's effectiveness
@@ -261,45 +201,23 @@ Your audit should cover:
 Format with clear sections and be specific with recommendations.
 
 Ad Creative Details:
-${creativeDetails}`
-                  }
-                ]
-              }
-            ],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 4096,
-            },
-          }),
-        }
-      );
+${creativeDetails}`;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Audit error:", response.status, errorText);
-        
-        if (response.status === 429) {
-          return new Response(
-            JSON.stringify({ error: "Rate limited, please try again later" }),
-            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        
-        throw new Error("Audit failed");
+      const result = await callAI(LOVABLE_API_KEY, prompt, { temperature: 0.7, maxTokens: 4096 });
+      if (result.error) {
+        return new Response(JSON.stringify({ error: result.error }), {
+          status: result.status || 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
-      const result = await response.json();
-      const audit = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
       return new Response(
-        JSON.stringify({ audit }),
+        JSON.stringify({ audit: result.text }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // AI Edit: Image-to-image editing using Lovable AI Gateway
+    // === AI EDIT ===
     if (action === "ai_edit") {
-      const { imageUrl, editPrompt } = await req.json().catch(() => ({ imageUrl: undefined, editPrompt: undefined }));
       const actualImageUrl = imageUrl || creative?.file_url;
       const actualEditPrompt = editPrompt || "";
 
@@ -310,10 +228,7 @@ ${creativeDetails}`
         );
       }
 
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-
-      const editResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const editResponse = await fetch(AI_GATEWAY_URL, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -321,15 +236,13 @@ ${creativeDetails}`
         },
         body: JSON.stringify({
           model: "google/gemini-3.1-flash-image-preview",
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "text", text: actualEditPrompt || "Enhance this image for advertising" },
-                { type: "image_url", image_url: { url: actualImageUrl } },
-              ],
-            },
-          ],
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: actualEditPrompt || "Enhance this image for advertising" },
+              { type: "image_url", image_url: { url: actualImageUrl } },
+            ],
+          }],
           modalities: ["image", "text"],
         }),
       });
@@ -354,11 +267,8 @@ ${creativeDetails}`
       const editedImage = editData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
       const editText = editData.choices?.[0]?.message?.content || "";
 
-      if (!editedImage) {
-        throw new Error("No image returned from AI");
-      }
+      if (!editedImage) throw new Error("No image returned from AI");
 
-      // Upload the edited image to storage
       const base64Data = editedImage.replace(/^data:image\/\w+;base64,/, "");
       const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
       const fileName = `ai-edit-${Date.now()}.png`;
@@ -368,10 +278,7 @@ ${creativeDetails}`
         .from("creatives")
         .upload(filePath, imageBytes, { contentType: "image/png", upsert: true });
 
-      if (uploadError) {
-        console.error("Upload error:", uploadError);
-        throw new Error("Failed to save edited image");
-      }
+      if (uploadError) throw new Error("Failed to save edited image");
 
       const { data: publicUrl } = supabase.storage.from("creatives").getPublicUrl(filePath);
 
@@ -381,10 +288,9 @@ ${creativeDetails}`
       );
     }
 
-    // AI Variations: Generate 3 variations with different headlines/backgrounds/colors
+    // === AI VARIATIONS ===
     if (action === "ai_variations") {
-      const { imageUrl: varImageUrl } = await req.json().catch(() => ({ imageUrl: undefined }));
-      const actualVarImageUrl = varImageUrl || creative?.file_url;
+      const actualVarImageUrl = imageUrl || creative?.file_url;
 
       if (!actualVarImageUrl) {
         return new Response(
@@ -393,20 +299,17 @@ ${creativeDetails}`
         );
       }
 
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-
       const variationPrompts = [
-        "Create a variation of this ad image with a completely different color palette (warmer tones). Keep the same composition and messaging but change the background, overlay colors, and accent colors to feel warm and inviting. Maintain the same text content but style it differently.",
-        "Create a variation of this ad image with a cool, modern blue/teal color scheme. Adjust the background and visual elements to feel sleek and professional. Keep the same core message but present the headline in a different typographic style.",
-        "Create a variation of this ad image with a bold, high-contrast dark theme. Use deep blacks and bright accent colors. Keep the same layout but make the text larger and more impactful. Add a subtle gradient overlay for depth.",
+        "Create a variation of this ad image with a completely different color palette (warmer tones). Keep the same composition and messaging but change the background, overlay colors, and accent colors to feel warm and inviting.",
+        "Create a variation of this ad image with a cool, modern blue/teal color scheme. Adjust the background and visual elements to feel sleek and professional.",
+        "Create a variation of this ad image with a bold, high-contrast dark theme. Use deep blacks and bright accent colors. Make the text larger and more impactful.",
       ];
 
       const variations: { url: string; description: string }[] = [];
 
       for (let i = 0; i < 3; i++) {
         try {
-          const varResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          const varResponse = await fetch(AI_GATEWAY_URL, {
             method: "POST",
             headers: {
               Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -414,15 +317,13 @@ ${creativeDetails}`
             },
             body: JSON.stringify({
               model: "google/gemini-3.1-flash-image-preview",
-              messages: [
-                {
-                  role: "user",
-                  content: [
-                    { type: "text", text: variationPrompts[i] },
-                    { type: "image_url", image_url: { url: actualVarImageUrl } },
-                  ],
-                },
-              ],
+              messages: [{
+                role: "user",
+                content: [
+                  { type: "text", text: variationPrompts[i] },
+                  { type: "image_url", image_url: { url: actualVarImageUrl } },
+                ],
+              }],
               modalities: ["image", "text"],
             }),
           });
@@ -443,7 +344,6 @@ ${creativeDetails}`
           const varText = varData.choices?.[0]?.message?.content || `Variation ${i + 1}`;
 
           if (varImage) {
-            // Upload to storage
             const b64 = varImage.replace(/^data:image\/\w+;base64,/, "");
             const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
             const fName = `ai-variation-${Date.now()}-${i + 1}.png`;
@@ -477,8 +377,8 @@ ${creativeDetails}`
   } catch (error) {
     console.error("Creative AI error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error", fallback: true }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
