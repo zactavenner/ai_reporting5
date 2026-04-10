@@ -16,9 +16,9 @@ Deno.serve(async (req) => {
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // Compute yesterday's date
+  // Compute yesterday's date (UTC to avoid off-by-one timezone issues)
   const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
   const yesterdayStr = yesterday.toISOString().split("T")[0];
 
   console.log(`[sync-meta-ads-daily] Starting daily sync for ${yesterdayStr}`);
@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
         const backfilledDays: string[] = [];
         try {
           const fourteenDaysAgo = new Date();
-          fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+          fourteenDaysAgo.setUTCDate(fourteenDaysAgo.getUTCDate() - 14);
           const fourteenDaysAgoStr = fourteenDaysAgo.toISOString().split("T")[0];
 
           // Query existing daily_metrics for this client in the last 14 days
@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
             if (!existingDates.has(dateStr)) {
               missingDays.push(dateStr);
             }
-            checkDate.setDate(checkDate.getDate() + 1);
+            checkDate.setUTCDate(checkDate.getUTCDate() + 1);
           }
 
           if (missingDays.length > 0) {
