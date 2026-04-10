@@ -78,16 +78,14 @@ export function useCreateNotification() {
       triggeredBy: string;
       message: string;
     }) => {
-      const { data, error } = await supabase
-        .from('task_notifications')
-        .insert({
-          task_id: taskId || null,
-          member_id: memberId,
-          triggered_by: triggeredBy,
+      const { data, error } = await supabase.functions.invoke('notify-task-member', {
+        body: {
+          taskId: taskId || null,
+          memberId,
+          triggeredBy,
           message,
-        })
-        .select()
-        .single();
+        },
+      });
       if (error) throw error;
       return data;
     },
