@@ -219,7 +219,13 @@ export function AppSidebar({
                               <SidebarMenuSubItem key={child.value}>
                                 <SidebarMenuSubButton
                                   isActive={activeTab === child.value}
-                                  onClick={() => onTabChange(child.value)}
+                                  onClick={() => {
+                                    if ('externalUrl' in child && (child as any).externalUrl) {
+                                      window.open((child as any).externalUrl, '_blank');
+                                    } else {
+                                      onTabChange(child.value);
+                                    }
+                                  }}
                                 >
                                   <child.icon className="h-3.5 w-3.5" />
                                   <span>{child.title}</span>
