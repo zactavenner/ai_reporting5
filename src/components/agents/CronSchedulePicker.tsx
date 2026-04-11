@@ -43,10 +43,14 @@ export function CronSchedulePicker({ value, onChange }: CronSchedulePickerProps)
   }, [value]);
 
   const handlePresetChange = (preset: string) => {
-    setMode(preset);
-    if (preset === '__custom__') {
+    if (preset === '__none__') {
+      setMode('');
+      onChange('');
+    } else if (preset === '__custom__') {
+      setMode('__custom__');
       onChange(customValue || '0 * * * *');
     } else {
+      setMode(preset);
       onChange(preset);
     }
   };
