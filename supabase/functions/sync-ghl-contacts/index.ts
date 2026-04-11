@@ -598,13 +598,24 @@ function extractUtmFromQuestions(questions: any[]): {
   };
 }
 
-function extractCampaignAttribution(contact: GHLContact, customFields: Record<string, any>): {
+function extractCampaignAttribution(contact: GHLContact, customFields: Record<string, any>, fieldNameMap?: Record<string, string>): {
   campaign_name: string | null;
   ad_set_name: string | null;
   ad_id: string | null;
 } {
-  // GHL Page Details field names (from screenshot) + common variations
-  // Priority order: GHL page details fields first, then common field names
+  // Build a resolved custom fields map: translate GHL internal IDs to human-readable names
+  const resolved: Record<string, any> = {};
+  for (const [key, value] of Object.entries(customFields)) {
+    if (value === null || value === undefined || value === '') continue;
+    // Store with original key
+    resolved[key] = value;
+    // Also store with resolved human-readable name from fieldNameMap
+    if (fieldNameMap && fieldNameMap[key]) {
+      resolved[fieldNameMap[key]] = value;
+    }
+  }
+
+  // GHL Page Details field names + common variations
   const campaignFields = [
     'Utm Campaign',      // GHL Page Details
     'utm_campaign',      // Standard
@@ -612,10 +623,12 @@ function extractCampaignAttribution(contact: GHLContact, customFields: Record<st
     'campaign_name',
     'campaign',
     'Campaign Id',       // GHL Page Details (ID, can use as fallback)
+    'contact.utm_campaign', // GHL fieldKey format
   ];
   
   const adSetFields = [
     'Utm Medium',        // GHL stores Ad Set name in Utm Medium often
+    'utm_medium',        // Standard
     'Adset Id',          // GHL Page Details
     'ad_set_name',
     'Ad Set',
@@ -623,42 +636,45 @@ function extractCampaignAttribution(contact: GHLContact, customFields: Record<st
     'adset_name',
     'adGroupName',
     'Ad Set Name',
+    'contact.utm_medium', // GHL fieldKey format
   ];
   
   const adIdFields = [
     'Utm Content',       // GHL stores Ad name in Utm Content often
+    'utm_content',       // Standard
     'Ad Id',             // GHL Page Details
     'ad_id',
     'Ad ID',
     'adId',
+    'contact.utm_content', // GHL fieldKey format
   ];
   
   let campaign_name: string | null = null;
   let ad_set_name: string | null = null;
   let ad_id: string | null = null;
   
-  // Check custom fields for campaign name
+  // Check resolved custom fields for campaign name
   for (const field of campaignFields) {
-    if (customFields[field]) {
-      campaign_name = String(customFields[field]);
+    if (resolved[field]) {
+      campaign_name = String(resolved[field]);
       console.log(`Found campaign_name in field "${field}": ${campaign_name}`);
       break;
     }
   }
   
-  // Check custom fields for ad set name  
+  // Check resolved custom fields for ad set name  
   for (const field of adSetFields) {
-    if (customFields[field]) {
-      ad_set_name = String(customFields[field]);
+    if (resolved[field]) {
+      ad_set_name = String(resolved[field]);
       console.log(`Found ad_set_name in field "${field}": ${ad_set_name}`);
       break;
     }
   }
   
-  // Check custom fields for ad ID/name
+  // Check resolved custom fields for ad ID/name
   for (const field of adIdFields) {
-    if (customFields[field]) {
-      ad_id = String(customFields[field]);
+    if (resolved[field]) {
+      ad_id = String(resolved[field]);
       console.log(`Found ad_id in field "${field}": ${ad_id}`);
       break;
     }
