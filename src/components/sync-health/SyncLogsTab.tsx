@@ -6,8 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ScrollText, CheckCircle, XCircle, Clock, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
+import { ScrollText, CheckCircle, XCircle, Clock, Loader2, RefreshCw, AlertTriangle, Inbox } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 const STATUS_ICONS: Record<string, React.ReactNode> = {
   success: <CheckCircle className="h-4 w-4 text-chart-2" />,
@@ -31,7 +31,7 @@ export function SyncLogsTab() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const { data: logs = [], isLoading, refetch } = useQuery({
+  const { data: logs = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['sync-logs', typeFilter, statusFilter],
     queryFn: async () => {
       let query = supabase
@@ -50,7 +50,6 @@ export function SyncLogsTab() {
     refetchInterval: 30000,
   });
 
-  // Get client names
   const { data: clientMap = {} } = useQuery({
     queryKey: ['sync-logs-client-names'],
     queryFn: async () => {
@@ -62,7 +61,6 @@ export function SyncLogsTab() {
     },
   });
 
-  // Recent errors
   const { data: recentErrors = [] } = useQuery({
     queryKey: ['sync-recent-errors'],
     queryFn: async () => {
@@ -79,7 +77,6 @@ export function SyncLogsTab() {
     },
   });
 
-  // Summary counts
   const successCount = logs.filter(l => l.status === 'success').length;
   const failedCount = logs.filter(l => l.status === 'failed').length;
   const runningCount = logs.filter(l => l.status === 'running').length;
@@ -89,7 +86,7 @@ export function SyncLogsTab() {
     <div className="space-y-4">
       {/* Error Alert */}
       {recentErrors.length > 0 && (
-        <Card className="border-destructive/40 bg-destructive/5">
+        <Card className="border-destructive/40 bg-destructive/5 animate-fade-in">
           <CardHeader className="pb-2 pt-3">
             <CardTitle className="text-sm flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-4 w-4" />
@@ -113,18 +110,32 @@ export function SyncLogsTab() {
       )}
 
       {/* Summary Stats */}
-      <div className="flex items-center gap-4 text-sm">
-        <span className="flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5 text-chart-2" /> {successCount} success</span>
-        <span className="flex items-center gap-1"><XCircle className="h-3.5 w-3.5 text-destructive" /> {failedCount} failed</span>
-        <span className="flex items-center gap-1"><Loader2 className="h-3.5 w-3.5 text-primary" /> {runningCount} running</span>
-        <span className="text-muted-foreground">· {totalRecords.toLocaleString()} records</span>
+      <div className="flex items-center gap-3 text-sm flex-wrap">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-chart-2/10">
+          <CheckCircle className="h-3.5 w-3.5 text-chart-2" /> 
+          <span className="font-medium">{successCount}</span>
+          <span className="text-muted-foreground">success</span>
+        </div>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-destructive/10">
+          <XCircle className="h-3.5 w-3.5 text-destructive" /> 
+          <span className="font-medium">{failedCount}</span>
+          <span className="text-muted-foreground">failed</span>
+        </div>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10">
+          <Loader2 className="h-3.5 w-3.5 text-primary" /> 
+          <span className="font-medium">{runningCount}</span>
+          <span className="text-muted-foreground">running</span>
+        </div>
+        <span className="text-muted-foreground text-xs">· {totalRecords.toLocaleString()} records synced</span>
       </div>
 
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <ScrollText className="h-4 w-4 text-primary" />
+              <div className="p-1.5 rounded-lg bg-primary/10">
+                <ScrollText className="h-4 w-4 text-primary" />
+              </div>
               <CardTitle className="text-base">Sync Logs</CardTitle>
             </div>
             <div className="flex items-center gap-2">
@@ -151,8 +162,8 @@ export function SyncLogsTab() {
                   <SelectItem value="partial">Partial</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="sm" className="h-8" onClick={() => refetch()}>
-                <RefreshCw className="h-3.5 w-3.5" />
+              <Button variant="outline" size="sm" className="h-8" onClick={() => refetch()} disabled={isFetching}>
+                <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
               </Button>
             </div>
           </div>
@@ -173,16 +184,30 @@ export function SyncLogsTab() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Loading logs...</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-12">
+                      <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Loading logs...
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ) : logs.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No sync logs found</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <Inbox className="h-8 w-8 text-muted-foreground/30" />
+                        <span>No sync logs found</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ) : logs.map(log => {
                   const duration = log.started_at && log.completed_at
                     ? Math.round((new Date(log.completed_at).getTime() - new Date(log.started_at).getTime()) / 1000)
                     : null;
 
                   return (
-                    <TableRow key={log.id} className="text-sm">
+                    <TableRow key={log.id} className="text-sm hover:bg-muted/50 transition-colors">
                       <TableCell>{STATUS_ICONS[log.status] || <Clock className="h-4 w-4 text-muted-foreground" />}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-[10px]">
@@ -192,7 +217,7 @@ export function SyncLogsTab() {
                       <TableCell className="text-xs truncate max-w-[140px]">
                         {clientMap[log.client_id] || log.client_id?.slice(0, 8) || '—'}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums text-xs">
+                      <TableCell className="text-right tabular-nums text-xs font-medium">
                         {log.records_synced != null ? log.records_synced.toLocaleString() : '—'}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
