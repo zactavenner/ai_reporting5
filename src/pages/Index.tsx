@@ -600,6 +600,18 @@ const Index = () => {
       <FundedInvestorsDrillDownModal open={drillDownModal === 'fundedInvestors'} onOpenChange={(open) => !open && setDrillDownModal(null)} />
       <AdSpendDrillDownModal open={drillDownModal === 'totalAdSpend'} onOpenChange={(open) => !open && setDrillDownModal(null)} />
       <PendingTasksReview tasks={pendingTasks} clients={clients} open={pendingTasksOpen} onOpenChange={setPendingTasksOpen} />
+      
+      {/* Global task detail panel for notification clicks */}
+      <TaskDetailPanel
+        task={globalTask}
+        open={globalTaskOpen}
+        onOpenChange={(open) => {
+          setGlobalTaskOpen(open);
+          if (!open) setGlobalTask(null);
+        }}
+        clientName={clients.find(c => c.id === globalTask?.client_id)?.name}
+        clientId={globalTask?.client_id}
+      />
     </SidebarProvider>
   );
 };
