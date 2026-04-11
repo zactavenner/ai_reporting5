@@ -172,6 +172,54 @@ export function AgentsTab({ clients }: Props) {
         ))}
       </div>
 
+      {/* Active Agents Grid */}
+      {activeAgents.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Circle className="h-2 w-2 fill-primary text-primary animate-pulse" />
+            Live Agents ({activeAgents.length})
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {activeAgents.map((agent) => {
+              const statusCfg = STATUS_CONFIG[agent.last_run_status || ''];
+              const StatusIcon = statusCfg?.icon || Clock;
+              const statusColor = statusCfg?.color || 'text-muted-foreground';
+              return (
+                <Card
+                  key={agent.id}
+                  className="cursor-pointer hover:border-primary/50 transition-all"
+                  onClick={() => { setSelectedId(agent.id); setEditMode(false); }}
+                >
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{agent.icon || '🤖'}</span>
+                        <span className="font-semibold text-xs truncate">{agent.name.replace(/\s*\(.*\)/, '')}</span>
+                      </div>
+                      <Switch
+                        checked={true}
+                        onCheckedChange={(enabled) => updateAgent.mutate({ id: agent.id, enabled } as any)}
+                        className="scale-75"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px]">
+                      <StatusIcon className={`h-3 w-3 ${statusColor}`} />
+                      <span className={statusColor}>{statusCfg?.label || 'Idle'}</span>
+                      <span className="text-muted-foreground ml-auto">{agent.schedule_cron || 'Manual'}</span>
+                    </div>
+                    {agent.last_run_at && (
+                      <p className="text-[10px] text-muted-foreground mt-1 truncate">
+                        Last: {new Date(agent.last_run_at).toLocaleString()}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">Loading agents...</div>
       ) : agents.length === 0 ? (
