@@ -151,26 +151,32 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Ad set matching
-      if (lead.ad_set_name) {
-        if (adSetByName.has(lead.ad_set_name)) {
-          addStats(adSetStats, lead.ad_set_name, lead.id, isSpam);
+      // Ad set matching: ad_set_name or utm_medium
+      const adSetName = lead.ad_set_name || lead.utm_medium;
+      if (adSetName) {
+        if (adSetByName.has(adSetName)) {
+          addStats(adSetStats, adSetName, lead.id, isSpam);
           attributed = true;
         } else {
-          const match = (metaAdSets || []).find((as: any) => as.meta_adset_id === lead.ad_set_name);
+          const match = (metaAdSets || []).find((as: any) => as.meta_adset_id === adSetName);
           if (match) { addStats(adSetStats, match.name, lead.id, isSpam); attributed = true; }
         }
       }
 
-      // Ad matching
+      // Ad matching: ad_id or utm_content
       let matchedAdId: string | null = null;
       const adIdToMatch = lead.ad_id || lead.utm_content;
       if (adIdToMatch) {
         const directAd = metaAdByMetaId.get(adIdToMatch);
         if (directAd) matchedAdId = directAd.id;
+        // Also try matching by ad name
+        if (!matchedAdId) {
+          const adByName = (metaAds || []).find((a: any) => a.name === adIdToMatch);
+          if (adByName) matchedAdId = adByName.id;
+        }
       }
-      if (!matchedAdId && lead.ad_set_name) {
-        const matchedAdSet = adSetByName.get(lead.ad_set_name) || (metaAdSets || []).find((as: any) => as.meta_adset_id === lead.ad_set_name);
+      if (!matchedAdId && adSetName) {
+        const matchedAdSet = adSetByName.get(adSetName) || (metaAdSets || []).find((as: any) => as.meta_adset_id === adSetName);
         if (matchedAdSet) {
           const adsInSet = adsByAdSetId.get(matchedAdSet.id) || [];
           if (adsInSet.length === 1) matchedAdId = adsInSet[0].id;
