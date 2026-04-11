@@ -1,0 +1,1 @@
+UPDATE agent_runs SET status = 'failed', error = 'Timed out', completed_at = NOW() WHERE status = 'running' AND started_at < NOW() - INTERVAL '10 minutes'
