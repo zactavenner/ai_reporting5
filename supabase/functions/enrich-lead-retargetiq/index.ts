@@ -728,6 +728,47 @@ Deno.serve(async (req) => {
             const errText = await noteRes.text();
             console.error(`[RetargetIQ] Failed to push GHL note (${noteRes.status}):`, errText);
           }
+
+          // Add "enriched" tag to GHL contact
+          try {
+            // First fetch existing tags
+            const contactRes = await fetch(`https://services.leadconnectorhq.com/contacts/${ghlContactId}`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${clientData.ghl_api_key}`,
+                'Version': '2021-07-28',
+                'Accept': 'application/json',
+              },
+            });
+            let existingTags: string[] = [];
+            if (contactRes.ok) {
+              const contactData = await contactRes.json();
+              existingTags = contactData?.contact?.tags || [];
+            }
+
+            if (!existingTags.includes('enriched')) {
+              const tagRes = await fetch(`https://services.leadconnectorhq.com/contacts/${ghlContactId}`, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${clientData.ghl_api_key}`,
+                  'Version': '2021-07-28',
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                },
+                body: JSON.stringify({ tags: [...existingTags, 'enriched'] }),
+              });
+              if (tagRes.ok) {
+                console.log(`[RetargetIQ] ✓ Added 'enriched' tag to GHL contact ${ghlContactId}`);
+              } else {
+                const errText = await tagRes.text();
+                console.error(`[RetargetIQ] Failed to add tag (${tagRes.status}):`, errText);
+              }
+            } else {
+              console.log(`[RetargetIQ] Contact ${ghlContactId} already has 'enriched' tag`);
+            }
+          } catch (tagErr) {
+            console.error('[RetargetIQ] GHL tag add error (non-fatal):', tagErr);
+          }
         }
       }
     } catch (ghlErr) {
