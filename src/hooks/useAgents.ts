@@ -15,6 +15,11 @@ export interface Agent {
   connectors: any;
   enabled: boolean | null;
   template_key: string | null;
+  consecutive_failures: number | null;
+  last_run_at: string | null;
+  last_run_status: string | null;
+  max_tokens: number | null;
+  temperature: number | null;
   created_at: string;
   updated_at: string;
   client?: { id: string; name: string } | null;
@@ -32,7 +37,40 @@ export interface AgentRun {
   actions_taken: any;
   error: string | null;
   tokens_used: number | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  cost_usd: number | null;
+  duration_ms: number | null;
   client?: { id: string; name: string } | null;
+}
+
+export interface AgentEscalation {
+  id: string;
+  agent_name: string;
+  severity: string;
+  category: string | null;
+  title: string;
+  description: string;
+  context: any;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolution_notes: string | null;
+  created_at: string;
+}
+
+export interface AgentTask {
+  id: string;
+  created_by_agent: string;
+  assigned_to_agent: string;
+  priority: string;
+  status: string;
+  task_type: string;
+  payload: any;
+  result: any;
+  due_at: string | null;
+  completed_at: string | null;
+  attempts: number;
+  created_at: string;
 }
 
 async function enrichWithClientNames<T extends { client_id?: string | null }>(records: T[]): Promise<(T & { client?: { id: string; name: string } | null })[]> {
@@ -64,6 +102,28 @@ export function useAgentRuns(agentId: string | null) {
       return enrichWithClientNames(data || []) as Promise<AgentRun[]>;
     },
     enabled: !!agentId,
+  });
+}
+
+export function useAgentEscalations() {
+  return useQuery({
+    queryKey: ['agent-escalations'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('agent_escalations').select('*').order('created_at', { ascending: false }).limit(50);
+      if (error) throw error;
+      return (data || []) as AgentEscalation[];
+    },
+  });
+}
+
+export function useAgentTasks() {
+  return useQuery({
+    queryKey: ['agent-tasks'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('agent_tasks').select('*').order('created_at', { ascending: false }).limit(50);
+      if (error) throw error;
+      return (data || []) as AgentTask[];
+    },
   });
 }
 
@@ -140,6 +200,66 @@ export const AVAILABLE_CONNECTORS = [
 
 export const AGENT_TEMPLATES = [
   {
+    key: 'ai_coo',
+    name: 'AI COO (JARVIS)',
+    icon: '🧠',
+    description: 'Oversees all agents, routes work, tracks KPIs, resolves conflicts, and generates unified status reports.',
+    connectors: ['database', 'slack'],
+    schedule_cron: '5,35 * * * *',
+    model: 'google/gemini-2.5-pro',
+    prompt_template: 'You are JARVIS, the AI Chief Operating Officer. Review all agent runs, check task queues, resolve conflicts, and generate a unified status report. Output JSON with actions, summary, escalations, and next_priorities.',
+  },
+  {
+    key: 'operations',
+    name: 'Operations Agent (OPS)',
+    icon: '⚙️',
+    description: 'Data accuracy checks, token health monitoring, sync verification. Runs every 15 min.',
+    connectors: ['database', 'meta_ads'],
+    schedule_cron: '*/15 * * * *',
+    model: 'google/gemini-2.5-flash',
+    prompt_template: 'You are OPS, the Operations Agent. Check daily_metrics accuracy vs source data, verify Meta token health, monitor sync latency, and generate a data quality scorecard.',
+  },
+  {
+    key: 'sales',
+    name: 'Sales Agent (HUNTER)',
+    icon: '🎯',
+    description: 'Lead enrichment, scoring, pipeline monitoring, pre-call briefs.',
+    connectors: ['database', 'ghl_crm'],
+    schedule_cron: '*/30 * * * *',
+    model: 'google/gemini-2.5-pro',
+    prompt_template: 'You are HUNTER, the Sales Agent. Enrich new leads, score them (0-100), monitor pipeline for stuck opportunities, and generate pre-call briefs.',
+  },
+  {
+    key: 'call_analysis',
+    name: 'Call Analysis Agent (ANALYST)',
+    icon: '📞',
+    description: 'Scores investor calls on rapport, qualification, objection handling. Identifies compliance issues.',
+    connectors: ['database', 'slack'],
+    schedule_cron: '0 5 * * *',
+    model: 'google/gemini-2.5-pro',
+    prompt_template: 'You are ANALYST, the Call Analysis Agent. Score investor calls on rapport, qualification depth, and objection handling (1-10 each). Flag compliance issues and generate action items.',
+  },
+  {
+    key: 'client_success',
+    name: 'Client Success Agent (KEEPER)',
+    icon: '🤝',
+    description: 'Client health scoring, churn detection, QBR prep.',
+    connectors: ['database', 'slack'],
+    schedule_cron: '0 * * * *',
+    model: 'google/gemini-2.5-pro',
+    prompt_template: 'You are KEEPER, the Client Success Agent. Calculate client health scores, detect churn signals, prepare QBR summaries, and recommend engagement actions.',
+  },
+  {
+    key: 'marketing',
+    name: 'Marketing Agent (BROOKLYN)',
+    icon: '🎬',
+    description: 'Content generation, ad copy, compliance checking, performance analysis.',
+    connectors: ['database', 'meta_ads', 'slack'],
+    schedule_cron: '10 * * * *',
+    model: 'google/gemini-2.5-flash',
+    prompt_template: 'You are BROOKLYN, the Marketing Agent. Generate ad copy variations, check compliance, analyze creative performance, and recommend winning angles.',
+  },
+  {
     key: 'data_qa',
     name: 'Data QA Agent',
     icon: '🔍',
@@ -150,23 +270,13 @@ export const AGENT_TEMPLATES = [
     prompt_template: 'You are a Data QA Agent. Check data consistency and report discrepancies.',
   },
   {
-    key: 'creatives_performance',
-    name: 'Creatives Performance Agent',
-    icon: '🎨',
-    description: 'Analyzes last 7 days of CPL from Meta. Identifies top/bottom performing ads.',
-    connectors: ['database', 'meta_ads'],
-    schedule_cron: '0 9 * * 1',
+    key: 'finance',
+    name: 'Finance Agent (LEDGER)',
+    icon: '💰',
+    description: 'P&L tracking, margin alerts, cost optimization recommendations.',
+    connectors: ['database'],
+    schedule_cron: '0 13 * * *',
     model: 'google/gemini-2.5-flash',
-    prompt_template: 'You are a Creatives Performance Agent. Analyze ad performance data.',
-  },
-  {
-    key: 'onboarding_qa',
-    name: 'Client Onboarding QA Agent',
-    icon: '✅',
-    description: 'Validates all required fields are populated when a new client is added.',
-    connectors: ['database', 'slack'],
-    schedule_cron: '0 8 * * *',
-    model: 'google/gemini-2.5-flash',
-    prompt_template: 'You are a Client Onboarding QA Agent. Check required configuration fields.',
+    prompt_template: 'You are LEDGER, the Finance Agent. Track P&L per client, alert on margin changes, recommend cost optimizations, and generate weekly financial summaries.',
   },
 ];
