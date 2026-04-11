@@ -278,15 +278,16 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
       }
     }
 
-    // Ad set level — match by ad_set_name
-    if (lead.ad_set_name) {
-      if (adSetByName.has(lead.ad_set_name)) {
-        addStats(adSetStats, lead.ad_set_name, lead.id, isSpam);
+    // Ad set level — match by ad_set_name or utm_medium
+    const adSetName = lead.ad_set_name || lead.utm_medium;
+    if (adSetName) {
+      if (adSetByName.has(adSetName)) {
+        addStats(adSetStats, adSetName, lead.id, isSpam);
         attributed = true;
       }
       // Fallback: ad_set_name might be a numeric meta_adset_id
       else {
-        const matchedAdSet = (metaAdSets || []).find((as: any) => as.meta_adset_id === lead.ad_set_name);
+        const matchedAdSet = (metaAdSets || []).find((as: any) => as.meta_adset_id === adSetName);
         if (matchedAdSet) {
           addStats(adSetStats, matchedAdSet.name, lead.id, isSpam);
           attributed = true;
@@ -302,12 +303,17 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
     if (adIdToMatch) {
       const directAd = metaAdByMetaId.get(adIdToMatch);
       if (directAd) matchedAdId = directAd.id;
+      // Also try matching by ad name
+      if (!matchedAdId) {
+        const adByName = (metaAds || []).find((a: any) => a.name === adIdToMatch);
+        if (adByName) matchedAdId = adByName.id;
+      }
     }
 
     // Pass 2: Single-ad-per-set fallback — ONLY when exactly one active ad in the set
-    if (!matchedAdId && lead.ad_set_name) {
-      const matchedAdSet = adSetByName.get(lead.ad_set_name) || 
-        (metaAdSets || []).find((as: any) => as.meta_adset_id === lead.ad_set_name);
+    if (!matchedAdId && adSetName) {
+      const matchedAdSet = adSetByName.get(adSetName) || 
+        (metaAdSets || []).find((as: any) => as.meta_adset_id === adSetName);
       if (matchedAdSet) {
         const adsInSet = adsByAdSetId.get(matchedAdSet.id) || [];
         if (adsInSet.length === 1) {
