@@ -98,6 +98,7 @@ export function AgentsTab({ clients }: Props) {
       model: selectedAgent.model,
       icon: selectedAgent.icon,
       connectors: selectedAgent.connectors,
+      client_id: selectedAgent.client_id,
     });
     setEditMode(true);
   };
@@ -378,11 +379,16 @@ export function AgentsTab({ clients }: Props) {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div>
-                              <label className="text-xs text-muted-foreground">Schedule (Cron)</label>
-                              <Input value={editData.schedule_cron || ''} onChange={e => setEditData(p => ({ ...p, schedule_cron: e.target.value }))} placeholder="0 6 * * *" />
-                            </div>
+                            <CronSchedulePicker
+                              value={editData.schedule_cron || ''}
+                              onChange={v => setEditData(p => ({ ...p, schedule_cron: v }))}
+                            />
                           </div>
+                          <ClientScopePicker
+                            clientId={editData.client_id ?? selectedAgent?.client_id ?? null}
+                            onChange={v => setEditData(p => ({ ...p, client_id: v }))}
+                            clients={clients}
+                          />
                           <div>
                             <label className="text-xs text-muted-foreground">Connectors</label>
                             <div className="flex flex-wrap gap-2 mt-1">
