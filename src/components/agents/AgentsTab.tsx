@@ -51,6 +51,11 @@ export function AgentsTab({ clients }: Props) {
   }, [agents, runs, escalations]);
 
   const handleCreateFromTemplate = (template: typeof AGENT_TEMPLATES[0]) => {
+    const exists = agents.some(a => a.template_key === template.key);
+    if (exists) {
+      toast.warning(`${template.name} already exists in your workforce`);
+      return;
+    }
     createAgent.mutate({
       name: template.name,
       icon: template.icon,
@@ -60,9 +65,12 @@ export function AgentsTab({ clients }: Props) {
       model: template.model,
       connectors: template.connectors as any,
       enabled: false,
+      template_key: template.key,
     } as any);
     setShowTemplates(false);
   };
+
+  const activeAgents = useMemo(() => agents.filter(a => a.enabled), [agents]);
 
   const handleCreateBlank = () => {
     createAgent.mutate({
