@@ -764,7 +764,7 @@ async function syncContactToDatabase(
   const utmFromQuestions = extractUtmFromQuestions(rawQuestions);
   const questions = utmFromQuestions.filteredQuestions;
   
-  const campaignAttribution = extractCampaignAttribution(contact, customFields);
+  const campaignAttribution = extractCampaignAttribution(contact, customFields, fieldNameMap);
   
   const attribution = contact.attributionSource || {};
   
