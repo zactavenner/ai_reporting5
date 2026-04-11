@@ -151,31 +151,33 @@ export function DirectResponseToolkit() {
   return (
     <div className="space-y-8">
       {/* Apple-Style Hero Header */}
-      <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-[#1d1d1f] via-[#2a2a2e] to-[#1d1d1f] p-8 md:p-10">
+      <div className="relative overflow-hidden rounded-[24px] bg-[#0a0a0a] p-8 md:p-10">
+        <div className="absolute inset-0">
+          <div className="absolute top-[-30%] right-[-5%] w-[500px] h-[500px] bg-gradient-to-br from-rose-600/20 via-pink-500/10 to-transparent rounded-full blur-[80px]" />
+          <div className="absolute bottom-[-40%] left-[10%] w-[400px] h-[400px] bg-gradient-to-tr from-red-500/10 to-transparent rounded-full blur-[80px]" />
+        </div>
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-4">
-            <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-lg shadow-rose-500/20">
+            <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-lg shadow-rose-500/25">
               <Target className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-white">Direct Response Toolkit</h2>
-              <p className="text-sm text-white/40">AI-powered tools for hooks, headlines, CTAs, body copy, and full funnel copywriting</p>
+              <h2 className="text-2xl font-bold tracking-[-0.02em] text-white">Direct Response Toolkit</h2>
+              <p className="text-[13px] text-white/35">Hooks, headlines, CTAs, body copy & full funnel copywriting — 8 DR frameworks</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 mt-5">
-            <Badge className="bg-white/[0.07] text-white/80 border-white/[0.08] backdrop-blur-sm gap-1.5 px-3 py-1 rounded-full text-xs font-medium">
+          <div className="flex items-center gap-2.5 mt-6 flex-wrap">
+            <Badge className="bg-white/[0.05] text-white/70 border-white/[0.06] backdrop-blur-xl gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium">
               <Flame className="h-3 w-3 text-red-400" />Scroll-Stopping Hooks
             </Badge>
-            <Badge className="bg-white/[0.07] text-white/80 border-white/[0.08] backdrop-blur-sm gap-1.5 px-3 py-1 rounded-full text-xs font-medium">
+            <Badge className="bg-white/[0.05] text-white/70 border-white/[0.06] backdrop-blur-xl gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium">
               <TrendingUp className="h-3 w-3 text-green-400" />A/B Test Ready
             </Badge>
-            <Badge className="bg-white/[0.07] text-white/80 border-white/[0.08] backdrop-blur-sm gap-1.5 px-3 py-1 rounded-full text-xs font-medium">
+            <Badge className="bg-white/[0.05] text-white/70 border-white/[0.06] backdrop-blur-xl gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium">
               <BarChart3 className="h-3 w-3 text-blue-400" />Performance Scored
             </Badge>
           </div>
         </div>
-        <div className="absolute top-0 right-0 w-80 h-80 bg-rose-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-1/4 w-60 h-60 bg-pink-500/8 rounded-full blur-3xl" />
       </div>
 
       {/* Tool Selection Grid */}

@@ -27,8 +27,6 @@ import {
   FileText,
   Plug,
   Cpu,
-  TrendingUp,
-  ExternalLink,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -93,13 +91,9 @@ const navStructure = [
     icon: Megaphone,
   },
   {
-    title: 'Creatives',
-    value: 'creatives-group',
+    title: 'Creative Studio',
+    value: 'creative-studio',
     icon: Palette,
-    children: [
-      { title: 'Ads Generator', value: 'ads-generator-ext', icon: ExternalLink, externalUrl: 'https://id-preview--b57a79c0-3e59-4a78-be94-340c58fe824e.lovable.app' },
-      { title: 'Top Performers', value: 'top-performers', icon: TrendingUp },
-    ],
   },
   {
     title: 'Offers',

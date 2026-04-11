@@ -139,42 +139,44 @@ export function HyperRealisticAds() {
   return (
     <div className="space-y-8">
       {/* Apple-Style Hero Header */}
-      <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-[#1d1d1f] via-[#2a2a2e] to-[#1d1d1f] p-8 md:p-10">
+      <div className="relative overflow-hidden rounded-[24px] bg-[#0a0a0a] p-8 md:p-10">
+        <div className="absolute inset-0">
+          <div className="absolute top-[-30%] right-[-5%] w-[500px] h-[500px] bg-gradient-to-br from-cyan-600/20 via-blue-500/10 to-transparent rounded-full blur-[80px]" />
+          <div className="absolute bottom-[-40%] left-[10%] w-[400px] h-[400px] bg-gradient-to-tr from-teal-500/10 to-transparent rounded-full blur-[80px]" />
+        </div>
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-4">
-            <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+            <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/25">
               <Camera className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-white">Hyper-Realistic Ad Generator</h2>
-              <p className="text-sm text-white/40">Create photorealistic AI visuals for ads — product shots, lifestyle scenes, and cinematic content</p>
+              <h2 className="text-2xl font-bold tracking-[-0.02em] text-white">Hyper-Realistic Visuals</h2>
+              <p className="text-[13px] text-white/35">Photorealistic AI imagery — product shots, lifestyle scenes & cinematic content</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 mt-5">
-            <Badge className="bg-white/[0.07] text-white/80 border-white/[0.08] backdrop-blur-sm gap-1.5 px-3 py-1 rounded-full text-xs font-medium">
-              <Eye className="h-3 w-3 text-cyan-400" />Photorealistic Quality
+          <div className="flex items-center gap-2.5 mt-6 flex-wrap">
+            <Badge className="bg-white/[0.05] text-white/70 border-white/[0.06] backdrop-blur-xl gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium">
+              <Eye className="h-3 w-3 text-cyan-400" />Photorealistic
             </Badge>
-            <Badge className="bg-white/[0.07] text-white/80 border-white/[0.08] backdrop-blur-sm gap-1.5 px-3 py-1 rounded-full text-xs font-medium">
+            <Badge className="bg-white/[0.05] text-white/70 border-white/[0.06] backdrop-blur-xl gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium">
               <Layers className="h-3 w-3 text-blue-400" />Multi-Scene Batch
             </Badge>
-            <Badge className="bg-white/[0.07] text-white/80 border-white/[0.08] backdrop-blur-sm gap-1.5 px-3 py-1 rounded-full text-xs font-medium">
-              <Film className="h-3 w-3 text-violet-400" />Video-Ready Frames
+            <Badge className="bg-white/[0.05] text-white/70 border-white/[0.06] backdrop-blur-xl gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium">
+              <Film className="h-3 w-3 text-violet-400" />Video-Ready
             </Badge>
           </div>
 
           {/* Style-specific tip */}
           {selectedStyleData && (
-            <div className="mt-5 flex items-start gap-2.5 px-4 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] backdrop-blur-sm">
+            <div className="mt-6 flex items-start gap-2.5 px-4 py-3 rounded-2xl bg-white/[0.05] border border-white/[0.06] backdrop-blur-xl">
               <Lightbulb className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs font-semibold text-white/70">{selectedStyleData.label} Style</p>
-                <p className="text-sm text-white/50 mt-0.5">{selectedStyleData.tip}</p>
+                <p className="text-[11px] font-semibold text-white/60 uppercase tracking-wider">{selectedStyleData.label} Style</p>
+                <p className="text-[13px] text-white/45 mt-0.5">{selectedStyleData.tip}</p>
               </div>
             </div>
           )}
         </div>
-        <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-1/4 w-60 h-60 bg-blue-500/8 rounded-full blur-3xl" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">

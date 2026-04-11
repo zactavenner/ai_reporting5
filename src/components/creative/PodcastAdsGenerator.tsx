@@ -147,31 +147,33 @@ export function PodcastAdsGenerator() {
   return (
     <div className="space-y-8">
       {/* Apple-Style Hero Header */}
-      <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-[#1d1d1f] via-[#2a2a2e] to-[#1d1d1f] p-8 md:p-10">
+      <div className="relative overflow-hidden rounded-[24px] bg-[#0a0a0a] p-8 md:p-10">
+        <div className="absolute inset-0">
+          <div className="absolute top-[-30%] right-[-5%] w-[500px] h-[500px] bg-gradient-to-br from-orange-600/20 via-amber-500/10 to-transparent rounded-full blur-[80px]" />
+          <div className="absolute bottom-[-40%] left-[10%] w-[400px] h-[400px] bg-gradient-to-tr from-rose-500/10 to-transparent rounded-full blur-[80px]" />
+        </div>
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-4">
-            <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
+            <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-500/25">
               <Headphones className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-white">Podcast Ad Generator</h2>
-              <p className="text-sm text-white/40">Create compelling podcast ads — host-reads, interview clips, video podcasts & audiograms</p>
+              <h2 className="text-2xl font-bold tracking-[-0.02em] text-white">Podcast Ad Generator</h2>
+              <p className="text-[13px] text-white/35">Host-reads, interview clips, video podcasts & audiograms — 6 ad styles</p>
             </div>
           </div>
 
           {/* Platform tip */}
           {selectedStyle && PLATFORM_TIPS[selectedStyle] && (
-            <div className="mt-5 flex items-start gap-2.5 px-4 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] backdrop-blur-sm">
+            <div className="mt-6 flex items-start gap-2.5 px-4 py-3 rounded-2xl bg-white/[0.05] border border-white/[0.06] backdrop-blur-xl">
               <Lightbulb className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs font-semibold text-white/70">Pro Tip</p>
-                <p className="text-sm text-white/50 mt-0.5">{PLATFORM_TIPS[selectedStyle]}</p>
+                <p className="text-[11px] font-semibold text-white/60 uppercase tracking-wider">Pro Tip</p>
+                <p className="text-[13px] text-white/45 mt-0.5">{PLATFORM_TIPS[selectedStyle]}</p>
               </div>
             </div>
           )}
         </div>
-        <div className="absolute top-0 right-0 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-1/4 w-60 h-60 bg-amber-500/8 rounded-full blur-3xl" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

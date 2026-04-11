@@ -67,6 +67,7 @@ import { AvatarAdWizard } from '@/components/avatar-ad/AvatarAdWizard';
 
 const StaticCreativesInline = lazy(() => import('@/pages/StaticCreativesPage'));
 const AvatarAdGenInline = lazy(() => Promise.resolve({ default: () => <AvatarAdProvider><AvatarAdWizard /></AvatarAdProvider> }));
+const CreativesTabLazy = lazy(() => import('@/components/creative/CreativesTab').then(m => ({ default: m.CreativesTab })));
 import { TopPerformersSection } from '@/components/creative/TopPerformersSection';
 
 const Index = () => {
@@ -451,6 +452,15 @@ const Index = () => {
                 </div>
                 <Suspense fallback={<div className="animate-pulse h-64 bg-muted/30 rounded-lg" />}>
                   <AvatarAdGenInline />
+                </Suspense>
+              </SectionErrorBoundary>
+            )}
+
+            {/* Creative Studio */}
+            {activeTab === 'creative-studio' && (
+              <SectionErrorBoundary sectionName="Creative Studio">
+                <Suspense fallback={<div className="animate-pulse h-64 bg-muted/30 rounded-lg" />}>
+                  <CreativesTabLazy />
                 </Suspense>
               </SectionErrorBoundary>
             )}

@@ -102,7 +102,7 @@ const NAV_SECTIONS = [
   {
     title: '',
     items: [
-      { id: 'command-center', label: 'Command Center', icon: LayoutDashboard },
+      { id: 'command-center', label: 'Studio Home', icon: LayoutDashboard },
     ],
   },
   {
@@ -117,13 +117,13 @@ const NAV_SECTIONS = [
   {
     title: 'Create',
     items: [
-      { id: 'approvals', label: 'Approvals', icon: Upload, showBadge: true },
+      { id: 'approvals', label: 'Review & Approve', icon: Upload, showBadge: true },
       { id: 'briefs', label: 'Briefs & Scripts', icon: FileText },
       { id: 'static-ads', label: 'Static Ads', icon: Image },
       { id: 'batch-video', label: 'Batch Video', icon: Film },
-      { id: 'ad-variations', label: 'Ad Variations', icon: Wand2 },
-      { id: 'avatars', label: 'Avatars', icon: User },
-      { id: 'broll', label: 'B-Roll', icon: Film },
+      { id: 'ad-variations', label: 'A/B Variations', icon: Wand2 },
+      { id: 'avatars', label: 'AI Avatars', icon: User },
+      { id: 'broll', label: 'B-Roll Library', icon: Film },
       { id: 'video-editor', label: 'Video Editor', icon: Scissors },
     ],
   },
@@ -131,7 +131,7 @@ const NAV_SECTIONS = [
     title: 'Research',
     items: [
       { id: 'platform-intel', label: 'Platform Intel', icon: Globe, isNew: true },
-      { id: 'ad-scraping', label: 'Ad Scraping', icon: Radar },
+      { id: 'ad-scraping', label: 'Ad Intelligence', icon: Radar },
       { id: 'instagram-intel', label: 'IG Intel', icon: Instagram },
       { id: 'winning-ads', label: 'Winning Ads', icon: Trophy },
     ],
@@ -139,10 +139,10 @@ const NAV_SECTIONS = [
   {
     title: 'Manage',
     items: [
-      { id: 'manage-styles', label: 'Styles', icon: Palette },
-      { id: 'calendar', label: 'Calendar', icon: Calendar },
+      { id: 'manage-styles', label: 'Brand Styles', icon: Palette },
+      { id: 'calendar', label: 'Content Calendar', icon: Calendar },
       { id: 'history', label: 'History', icon: History },
-      { id: 'export', label: 'Export', icon: Download },
+      { id: 'export', label: 'Export Hub', icon: Download },
       { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     ],
   },
@@ -343,33 +343,46 @@ export function CreativesTab() {
 
   const renderApprovalsSection = () => (
     <div className="space-y-6">
-      {/* Agency Review Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Review & Approve</h2>
-          <p className="text-sm text-muted-foreground/60 mt-0.5">Manage creative approvals for your clients</p>
+      {/* Agency Review Header — Apple-style */}
+      <div className="relative overflow-hidden rounded-[24px] bg-[#0a0a0a] p-8">
+        <div className="absolute inset-0">
+          <div className="absolute top-[-30%] right-[-5%] w-[400px] h-[400px] bg-gradient-to-br from-amber-600/15 via-orange-500/8 to-transparent rounded-full blur-[80px]" />
+          <div className="absolute bottom-[-30%] left-[10%] w-[300px] h-[300px] bg-gradient-to-tr from-emerald-500/8 to-transparent rounded-full blur-[60px]" />
         </div>
-        {statusCounts.pending > 0 && (
-          <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-full">
-            <Clock className="h-3.5 w-3.5" />
-            {statusCounts.pending} awaiting review
-          </Badge>
-        )}
+        <div className="relative z-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/25">
+                <Upload className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold tracking-[-0.02em] text-white">Review & Approve</h2>
+                <p className="text-[13px] text-white/35">Manage creative approvals across all clients</p>
+              </div>
+            </div>
+            {statusCounts.pending > 0 && (
+              <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-white/[0.06] border border-white/[0.06] backdrop-blur-xl">
+                <div className="h-2.5 w-2.5 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-[13px] font-semibold text-white/90">{statusCounts.pending} awaiting review</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Search and Filters — Apple-style bar */}
-      <div className="flex flex-wrap gap-3 p-3 bg-muted/30 rounded-2xl border border-border/30">
+      <div className="flex flex-wrap gap-3 p-3 bg-muted/20 rounded-2xl border border-border/20">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
           <Input
             placeholder="Search creatives..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 h-10 rounded-xl bg-background border-border/50"
+            className="pl-10 h-10 rounded-xl bg-background border-border/30 focus:border-primary/40"
           />
         </div>
         <Select value={clientFilter} onValueChange={setClientFilter}>
-          <SelectTrigger className="w-[200px] h-10 rounded-xl bg-background border-border/50">
+          <SelectTrigger className="w-[200px] h-10 rounded-xl bg-background border-border/30">
             <SelectValue placeholder="Filter by client" />
           </SelectTrigger>
           <SelectContent>
@@ -382,7 +395,7 @@ export function CreativesTab() {
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px] h-10 rounded-xl bg-background border-border/50">
+          <SelectTrigger className="w-[180px] h-10 rounded-xl bg-background border-border/30">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
@@ -758,62 +771,98 @@ export function CreativesTab() {
 
   return (
     <div className="flex gap-0 -mx-2 -mt-2">
-      {/* Apple-style Sidebar Navigation — frosted glass aesthetic */}
-      <div className={`flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-16' : 'w-56'}`}>
+      {/* Apple-style Sidebar Navigation */}
+      <div className={`flex-shrink-0 transition-all duration-300 ease-out ${sidebarCollapsed ? 'w-[52px]' : 'w-[220px]'}`}>
         <div className="sticky top-0 h-[calc(100vh-120px)]">
           <ScrollArea className="h-full">
-            <div className={`py-4 ${sidebarCollapsed ? 'px-2' : 'px-2.5'} space-y-5`}>
-              {NAV_SECTIONS.map((section, sectionIdx) => (
-                <div key={sectionIdx}>
-                  {section.title && !sidebarCollapsed && (
-                    <p className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-[0.12em] px-3 mb-2">
-                      {section.title}
-                    </p>
-                  )}
-                  <div className="space-y-0.5">
-                    {section.items.map(item => {
-                      const isActive = activeSection === item.id;
-                      const Icon = item.icon;
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => setActiveSection(item.id)}
-                          className={`w-full flex items-center gap-2.5 px-3 py-[7px] rounded-lg text-[13px] transition-all duration-200 ${
-                            isActive
-                              ? 'bg-primary/10 text-primary font-semibold'
-                              : 'text-muted-foreground/80 hover:bg-muted/40 hover:text-foreground'
-                          } ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
-                          title={sidebarCollapsed ? item.label : undefined}
-                        >
-                          <Icon className={`h-[15px] w-[15px] flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground/60'}`} />
-                          {!sidebarCollapsed && (
-                            <>
-                              <span className="truncate">{item.label}</span>
-                              {'isNew' in item && item.isNew && (
-                                <span className="ml-auto inline-flex items-center justify-center text-[9px] font-bold px-1.5 py-px rounded-full bg-gradient-to-r from-violet-500 to-blue-500 text-white leading-none">
-                                  NEW
-                                </span>
-                              )}
-                              {'showBadge' in item && item.showBadge && pendingCount > 0 && (
-                                <span className="ml-auto inline-flex items-center justify-center text-[10px] font-bold min-w-[20px] h-5 px-1.5 rounded-full bg-amber-500 text-white leading-none">
-                                  {pendingCount}
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </button>
-                      );
-                    })}
+            <div className={`py-3 ${sidebarCollapsed ? 'px-1.5' : 'px-2'}`}>
+              {/* Collapse toggle */}
+              {!sidebarCollapsed && (
+                <button
+                  onClick={() => setSidebarCollapsed(true)}
+                  className="w-full flex items-center gap-2 px-3 py-2 mb-3 rounded-xl text-[11px] font-medium text-muted-foreground/40 hover:text-muted-foreground/60 hover:bg-muted/30 transition-all"
+                >
+                  <ChevronRight className="h-3 w-3 rotate-180" />
+                  <span>Collapse</span>
+                </button>
+              )}
+              {sidebarCollapsed && (
+                <button
+                  onClick={() => setSidebarCollapsed(false)}
+                  className="w-full flex items-center justify-center py-2 mb-3 rounded-xl text-muted-foreground/40 hover:text-muted-foreground/60 hover:bg-muted/30 transition-all"
+                  title="Expand sidebar"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              )}
+
+              <div className="space-y-5">
+                {NAV_SECTIONS.map((section, sectionIdx) => (
+                  <div key={sectionIdx}>
+                    {section.title && !sidebarCollapsed && (
+                      <p className="text-[10px] font-bold text-muted-foreground/30 uppercase tracking-[0.14em] px-3 mb-1.5">
+                        {section.title}
+                      </p>
+                    )}
+                    {section.title && sidebarCollapsed && (
+                      <div className="w-6 h-px bg-border/30 mx-auto mb-2" />
+                    )}
+                    <div className="space-y-px">
+                      {section.items.map(item => {
+                        const isActive = activeSection === item.id;
+                        const Icon = item.icon;
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => setActiveSection(item.id)}
+                            className={`w-full flex items-center gap-2.5 rounded-xl text-[13px] transition-all duration-200 relative ${
+                              sidebarCollapsed ? 'justify-center p-2' : 'px-3 py-[8px]'
+                            } ${
+                              isActive
+                                ? 'bg-foreground/[0.06] text-foreground font-semibold'
+                                : 'text-muted-foreground/70 hover:bg-muted/40 hover:text-foreground/90'
+                            }`}
+                            title={sidebarCollapsed ? item.label : undefined}
+                          >
+                            {/* Active indicator bar */}
+                            {isActive && !sidebarCollapsed && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-primary" />
+                            )}
+                            <Icon className={`h-[15px] w-[15px] flex-shrink-0 transition-colors duration-200 ${
+                              isActive ? 'text-primary' : 'text-muted-foreground/50'
+                            }`} />
+                            {!sidebarCollapsed && (
+                              <>
+                                <span className="truncate">{item.label}</span>
+                                {'isNew' in item && item.isNew && (
+                                  <span className="ml-auto inline-flex items-center justify-center text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-violet-500 to-blue-500 text-white leading-none tracking-wide">
+                                    NEW
+                                  </span>
+                                )}
+                                {'showBadge' in item && item.showBadge && pendingCount > 0 && (
+                                  <span className="ml-auto inline-flex items-center justify-center text-[10px] font-bold min-w-[22px] h-[22px] px-1.5 rounded-full bg-amber-500 text-white leading-none shadow-sm shadow-amber-500/20">
+                                    {pendingCount}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                            {sidebarCollapsed && isActive && (
+                              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </ScrollArea>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 min-w-0 border-l border-border/50 pl-6 pr-2">
+      <div className="flex-1 min-w-0 border-l border-border/30 pl-6 pr-2">
         {renderContent()}
       </div>
     </div>
