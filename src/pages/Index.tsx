@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
+import { useState, useMemo, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
@@ -16,6 +16,7 @@ import { DeleteClientDialog } from '@/components/settings/DeleteClientDialog';
 import { AgencyAIChat } from '@/components/ai/AgencyAIChat';
 import { AIHubTab } from '@/components/ai/AIHubTab';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
+import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel';
 import { MetricsCustomizeModal } from '@/components/dashboard/MetricsCustomizeModal';
 import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal';
 import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
@@ -53,6 +54,8 @@ import { exportToCSV } from '@/lib/exportUtils';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUpdateClientOrder } from '@/hooks/useClientOrder';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
+import { Task } from '@/hooks/useTasks';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 // Inline page components for Database, Spam (rendered inside sidebar layout)
