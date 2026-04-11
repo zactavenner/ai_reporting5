@@ -2732,21 +2732,8 @@ async function recalculateHistoricalMetrics(
     const earliestDate = new Date(Math.min(...dates.map(d => d.getTime())));
     const today = new Date();
     
-    // CRITICAL FIX: Delete existing daily_metrics for this client
-    // This ensures we don't have stale data conflicting with new calculations
-    console.log(`Clearing existing daily_metrics for client ${clientId}...`);
-    const { error: deleteError } = await supabase
-      .from('daily_metrics')
-      .delete()
-      .eq('client_id', clientId);
-    
-    if (deleteError) {
-      console.error('Error clearing daily_metrics:', deleteError);
-      result.errors.push(`Failed to clear existing metrics: ${deleteError.message}`);
-      // Continue anyway - upsert should still work
-    }
-    
     // Iterate through each day from earliest to today
+    // Uses UPSERT to preserve ad_spend/impressions/clicks/ctr columns
     const currentDate = new Date(earliestDate);
     currentDate.setUTCHours(0, 0, 0, 0);
     
@@ -2844,24 +2831,22 @@ async function recalculateHistoricalMetrics(
         const commitmentDollars = (fundedData || []).reduce((sum: number, f: any) => sum + (f.commitment_amount || 0), 0);
         const commitmentCount = (fundedData || []).filter((f: any) => f.commitment_amount && f.commitment_amount > 0).length;
         
-        // Add row if there's any activity at all
-        if (totalValidLeads > 0 || (spamCount || 0) > 0 || (callsCount || 0) > 0 || (reconnectCount || 0) > 0 || (fundedCount || 0) > 0) {
-          metricsToInsert.push({
-            client_id: clientId,
-            date: dateStr,
-            leads: totalValidLeads,
-            spam_leads: spamCount || 0,
-            calls: callsCount || 0,
-            showed_calls: showedCount || 0,
-            reconnect_calls: reconnectCount || 0,
-            reconnect_showed: reconnectShowedCount || 0,
-            funded_investors: fundedCount || 0,
-            funded_dollars: fundedDollars,
-            commitments: commitmentCount,
-            commitment_dollars: commitmentDollars,
-            updated_at: new Date().toISOString(),
-          });
-        }
+        // Always upsert CRM columns — never skip days that may have ad_spend data
+        metricsToInsert.push({
+          client_id: clientId,
+          date: dateStr,
+          leads: totalValidLeads,
+          spam_leads: spamCount || 0,
+          calls: callsCount || 0,
+          showed_calls: showedCount || 0,
+          reconnect_calls: reconnectCount || 0,
+          reconnect_showed: reconnectShowedCount || 0,
+          funded_investors: fundedCount || 0,
+          funded_dollars: fundedDollars,
+          commitments: commitmentCount,
+          commitment_dollars: commitmentDollars,
+          updated_at: new Date().toISOString(),
+        });
       } catch (err) {
         result.errors.push(`Date ${dateStr}: ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
@@ -2869,26 +2854,29 @@ async function recalculateHistoricalMetrics(
       currentDate.setUTCDate(currentDate.getUTCDate() + 1);
     }
     
-    // Insert in batches (since we deleted first, just insert - no conflict)
+    // Upsert in batches — only CRM columns, preserving ad_spend/impressions/clicks/ctr
     if (metricsToInsert.length > 0) {
-      console.log(`Inserting ${metricsToInsert.length} daily_metrics records...`);
+      console.log(`Upserting ${metricsToInsert.length} daily_metrics records...`);
       const batchSize = 50;
       for (let i = 0; i < metricsToInsert.length; i += batchSize) {
         const batch = metricsToInsert.slice(i, i + batchSize);
-        const { error: insertError } = await supabase
+        const { error: upsertError } = await supabase
           .from('daily_metrics')
-          .insert(batch);
-        
-        if (insertError) {
-          result.errors.push(`Batch insert error: ${insertError.message}`);
-          console.error('Batch insert error:', insertError);
+          .upsert(batch, {
+            onConflict: 'client_id,date',
+            ignoreDuplicates: false,
+          });
+
+        if (upsertError) {
+          result.errors.push(`Batch upsert error: ${upsertError.message}`);
+          console.error('Batch upsert error:', upsertError);
         } else {
           result.daysUpdated += batch.length;
         }
       }
     }
-    
-    console.log(`Historical metrics recalculation complete: ${result.daysUpdated} days created`);
+
+    console.log(`Historical metrics recalculation complete: ${result.daysUpdated} days upserted`);
   } catch (err) {
     result.errors.push(`Metrics recalculation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     console.error('Error in recalculateHistoricalMetrics:', err);

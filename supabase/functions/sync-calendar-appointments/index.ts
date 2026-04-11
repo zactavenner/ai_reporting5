@@ -48,11 +48,11 @@ async function fetchCalendarAppointments(
   const appointments: any[] = [];
   
   try {
-    // Use date range: last 365 days to future 30 days
+    // Use date range: last 365 days to future 30 days (UTC to avoid timezone drift)
     const startTime = new Date();
-    startTime.setDate(startTime.getDate() - 365);
+    startTime.setUTCDate(startTime.getUTCDate() - 365);
     const endTime = new Date();
-    endTime.setDate(endTime.getDate() + 30);
+    endTime.setUTCDate(endTime.getUTCDate() + 30);
     
     // Use the correct GHL API endpoint: /calendars/events
     const url = `${GHL_BASE_URL}/calendars/events?locationId=${locationId}&calendarId=${calendarId}&startTime=${startTime.getTime()}&endTime=${endTime.getTime()}`;
