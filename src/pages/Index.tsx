@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
+import { useState, useMemo, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
@@ -16,6 +16,7 @@ import { DeleteClientDialog } from '@/components/settings/DeleteClientDialog';
 import { AgencyAIChat } from '@/components/ai/AgencyAIChat';
 import { AIHubTab } from '@/components/ai/AIHubTab';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
+import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel';
 import { MetricsCustomizeModal } from '@/components/dashboard/MetricsCustomizeModal';
 import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal';
 import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
@@ -53,6 +54,8 @@ import { exportToCSV } from '@/lib/exportUtils';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUpdateClientOrder } from '@/hooks/useClientOrder';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
+import { Task } from '@/hooks/useTasks';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 // Inline page components for Database, Spam (rendered inside sidebar layout)
@@ -83,7 +86,28 @@ const Index = () => {
   const [pendingTasksOpen, setPendingTasksOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedFunnelClientId, setSelectedFunnelClientId] = useState<string | null>(null);
+  const [globalTask, setGlobalTask] = useState<Task | null>(null);
+  const [globalTaskOpen, setGlobalTaskOpen] = useState(false);
   const queryClient = useQueryClient();
+
+  // Handle notification task click: fetch task by ID and open panel instantly
+  const handleNotificationTaskClick = useCallback(async (taskId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .single();
+      if (error || !data) {
+        toast.error('Task not found');
+        return;
+      }
+      setGlobalTask(data as Task);
+      setGlobalTaskOpen(true);
+    } catch {
+      toast.error('Failed to load task');
+    }
+  }, []);
 
   // Deep-link: if ?tab= or ?task= is present, auto-switch
   useEffect(() => {
@@ -242,12 +266,7 @@ const Index = () => {
             onSettings={() => setAgencySettingsOpen(true)}
             currentMemberName={currentMember?.name}
             onLogout={currentMember ? logout : undefined}
-            onTaskClick={(taskId) => {
-              setActiveTab('tasks');
-              const params = new URLSearchParams(window.location.search);
-              params.set('task', taskId);
-              window.history.replaceState({}, '', `?${params.toString()}`);
-            }}
+            onTaskClick={handleNotificationTaskClick}
           />
 
           <main className="flex-1 p-6 space-y-6 overflow-auto">
@@ -580,6 +599,18 @@ const Index = () => {
       <FundedInvestorsDrillDownModal open={drillDownModal === 'fundedInvestors'} onOpenChange={(open) => !open && setDrillDownModal(null)} />
       <AdSpendDrillDownModal open={drillDownModal === 'totalAdSpend'} onOpenChange={(open) => !open && setDrillDownModal(null)} />
       <PendingTasksReview tasks={pendingTasks} clients={clients} open={pendingTasksOpen} onOpenChange={setPendingTasksOpen} />
+      
+      {/* Global task detail panel for notification clicks */}
+      <TaskDetailPanel
+        task={globalTask}
+        open={globalTaskOpen}
+        onOpenChange={(open) => {
+          setGlobalTaskOpen(open);
+          if (!open) setGlobalTask(null);
+        }}
+        clientName={clients.find(c => c.id === globalTask?.client_id)?.name}
+        clientId={globalTask?.client_id}
+      />
     </SidebarProvider>
   );
 };
