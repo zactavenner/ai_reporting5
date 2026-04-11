@@ -313,7 +313,7 @@ export function AgentsTab({ clients }: Props) {
                     </TabsList>
 
                     <TabsContent value="overview" className="space-y-4 mt-4">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                         <div className="bg-muted/50 rounded-lg p-3">
                           <p className="text-xs text-muted-foreground">Model</p>
                           <p className="text-sm font-medium truncate">{AVAILABLE_MODELS.find(m => m.value === selectedAgent.model)?.label || selectedAgent.model || 'Not set'}</p>
@@ -321,6 +321,22 @@ export function AgentsTab({ clients }: Props) {
                         <div className="bg-muted/50 rounded-lg p-3">
                           <p className="text-xs text-muted-foreground">Schedule</p>
                           <p className="text-sm font-medium">{selectedAgent.schedule_cron || 'Manual'}</p>
+                        </div>
+                        <div className="bg-muted/50 rounded-lg p-3">
+                          <p className="text-xs text-muted-foreground">Scope</p>
+                          <div className="flex items-center gap-1.5">
+                            {selectedAgent.client_id ? (
+                              <>
+                                <User className="h-3 w-3 text-muted-foreground" />
+                                <p className="text-sm font-medium truncate">{clients.find(c => c.id === selectedAgent.client_id)?.name || 'Client'}</p>
+                              </>
+                            ) : (
+                              <>
+                                <Building2 className="h-3 w-3 text-primary" />
+                                <p className="text-sm font-medium">Agency-wide</p>
+                              </>
+                            )}
+                          </div>
                         </div>
                         <div className="bg-muted/50 rounded-lg p-3">
                           <p className="text-xs text-muted-foreground">Last Run</p>
