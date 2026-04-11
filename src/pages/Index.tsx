@@ -86,7 +86,28 @@ const Index = () => {
   const [pendingTasksOpen, setPendingTasksOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedFunnelClientId, setSelectedFunnelClientId] = useState<string | null>(null);
+  const [globalTask, setGlobalTask] = useState<Task | null>(null);
+  const [globalTaskOpen, setGlobalTaskOpen] = useState(false);
   const queryClient = useQueryClient();
+
+  // Handle notification task click: fetch task by ID and open panel instantly
+  const handleNotificationTaskClick = useCallback(async (taskId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .single();
+      if (error || !data) {
+        toast.error('Task not found');
+        return;
+      }
+      setGlobalTask(data as Task);
+      setGlobalTaskOpen(true);
+    } catch {
+      toast.error('Failed to load task');
+    }
+  }, []);
 
   // Deep-link: if ?tab= or ?task= is present, auto-switch
   useEffect(() => {
