@@ -537,16 +537,68 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_escalations: {
+        Row: {
+          agent_name: string
+          category: string | null
+          context: Json | null
+          created_at: string | null
+          description: string
+          id: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          slack_channel: string | null
+          slack_message_ts: string | null
+          title: string
+        }
+        Insert: {
+          agent_name: string
+          category?: string | null
+          context?: Json | null
+          created_at?: string | null
+          description: string
+          id?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          slack_channel?: string | null
+          slack_message_ts?: string | null
+          title: string
+        }
+        Update: {
+          agent_name?: string
+          category?: string | null
+          context?: Json | null
+          created_at?: string | null
+          description?: string
+          id?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          slack_channel?: string | null
+          slack_message_ts?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       agent_runs: {
         Row: {
           actions_taken: Json | null
           agent_id: string
           client_id: string | null
           completed_at: string | null
+          cost_usd: number | null
+          duration_ms: number | null
           error: string | null
           id: string
           input_summary: string | null
+          input_tokens: number | null
           output_summary: string | null
+          output_tokens: number | null
           started_at: string | null
           status: string
           tokens_used: number | null
@@ -556,10 +608,14 @@ export type Database = {
           agent_id: string
           client_id?: string | null
           completed_at?: string | null
+          cost_usd?: number | null
+          duration_ms?: number | null
           error?: string | null
           id?: string
           input_summary?: string | null
+          input_tokens?: number | null
           output_summary?: string | null
+          output_tokens?: number | null
           started_at?: string | null
           status?: string
           tokens_used?: number | null
@@ -569,10 +625,14 @@ export type Database = {
           agent_id?: string
           client_id?: string | null
           completed_at?: string | null
+          cost_usd?: number | null
+          duration_ms?: number | null
           error?: string | null
           id?: string
           input_summary?: string | null
+          input_tokens?: number | null
           output_summary?: string | null
+          output_tokens?: number | null
           started_at?: string | null
           status?: string
           tokens_used?: number | null
@@ -594,52 +654,118 @@ export type Database = {
           },
         ]
       }
+      agent_tasks: {
+        Row: {
+          assigned_to_agent: string
+          attempts: number | null
+          completed_at: string | null
+          created_at: string | null
+          created_by_agent: string
+          due_at: string | null
+          id: string
+          max_attempts: number | null
+          payload: Json
+          priority: string | null
+          result: Json | null
+          started_at: string | null
+          status: string | null
+          task_type: string
+        }
+        Insert: {
+          assigned_to_agent: string
+          attempts?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by_agent: string
+          due_at?: string | null
+          id?: string
+          max_attempts?: number | null
+          payload?: Json
+          priority?: string | null
+          result?: Json | null
+          started_at?: string | null
+          status?: string | null
+          task_type: string
+        }
+        Update: {
+          assigned_to_agent?: string
+          attempts?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by_agent?: string
+          due_at?: string | null
+          id?: string
+          max_attempts?: number | null
+          payload?: Json
+          priority?: string | null
+          result?: Json | null
+          started_at?: string | null
+          status?: string | null
+          task_type?: string
+        }
+        Relationships: []
+      }
       agents: {
         Row: {
           client_id: string | null
           connectors: Json | null
+          consecutive_failures: number | null
           created_at: string
           description: string | null
           enabled: boolean | null
           icon: string | null
           id: string
+          last_run_at: string | null
+          last_run_status: string | null
+          max_tokens: number | null
           model: string | null
           name: string
           prompt_template: string
           schedule_cron: string | null
           schedule_timezone: string | null
+          temperature: number | null
           template_key: string | null
           updated_at: string
         }
         Insert: {
           client_id?: string | null
           connectors?: Json | null
+          consecutive_failures?: number | null
           created_at?: string
           description?: string | null
           enabled?: boolean | null
           icon?: string | null
           id?: string
+          last_run_at?: string | null
+          last_run_status?: string | null
+          max_tokens?: number | null
           model?: string | null
           name: string
           prompt_template?: string
           schedule_cron?: string | null
           schedule_timezone?: string | null
+          temperature?: number | null
           template_key?: string | null
           updated_at?: string
         }
         Update: {
           client_id?: string | null
           connectors?: Json | null
+          consecutive_failures?: number | null
           created_at?: string
           description?: string | null
           enabled?: boolean | null
           icon?: string | null
           id?: string
+          last_run_at?: string | null
+          last_run_status?: string | null
+          max_tokens?: number | null
           model?: string | null
           name?: string
           prompt_template?: string
           schedule_cron?: string | null
           schedule_timezone?: string | null
+          temperature?: number | null
           template_key?: string | null
           updated_at?: string
         }
@@ -1260,6 +1386,83 @@ export type Database = {
             columns: ["funnel_id"]
             isOneToOne: false
             referencedRelation: "funnels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      call_analysis: {
+        Row: {
+          action_items: Json | null
+          analyzed_at: string | null
+          call_date: string | null
+          call_id: string
+          call_type: string | null
+          client_id: string | null
+          close_attempted: boolean | null
+          compliance_flags: Json | null
+          contact_name: string | null
+          created_at: string | null
+          duration_seconds: number | null
+          id: string
+          next_step: string | null
+          objections_identified: Json | null
+          score_objection_handling: number | null
+          score_qualification: number | null
+          score_rapport: number | null
+          sentiment: string | null
+          summary: string | null
+          transcript: string | null
+        }
+        Insert: {
+          action_items?: Json | null
+          analyzed_at?: string | null
+          call_date?: string | null
+          call_id: string
+          call_type?: string | null
+          client_id?: string | null
+          close_attempted?: boolean | null
+          compliance_flags?: Json | null
+          contact_name?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string
+          next_step?: string | null
+          objections_identified?: Json | null
+          score_objection_handling?: number | null
+          score_qualification?: number | null
+          score_rapport?: number | null
+          sentiment?: string | null
+          summary?: string | null
+          transcript?: string | null
+        }
+        Update: {
+          action_items?: Json | null
+          analyzed_at?: string | null
+          call_date?: string | null
+          call_id?: string
+          call_type?: string | null
+          client_id?: string | null
+          close_attempted?: boolean | null
+          compliance_flags?: Json | null
+          contact_name?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string
+          next_step?: string | null
+          objections_identified?: Json | null
+          score_objection_handling?: number | null
+          score_qualification?: number | null
+          score_rapport?: number | null
+          sentiment?: string | null
+          summary?: string | null
+          transcript?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_analysis_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
@@ -2454,6 +2657,74 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_queue: {
+        Row: {
+          angle: string | null
+          approved_at: string | null
+          approved_by: string | null
+          client_id: string | null
+          compliance_flags: Json | null
+          compliance_score: number | null
+          content_type: string
+          created_at: string | null
+          draft: string
+          final_version: string | null
+          id: string
+          metadata: Json | null
+          performance_data: Json | null
+          published_at: string | null
+          rejected_reason: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          angle?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          client_id?: string | null
+          compliance_flags?: Json | null
+          compliance_score?: number | null
+          content_type: string
+          created_at?: string | null
+          draft: string
+          final_version?: string | null
+          id?: string
+          metadata?: Json | null
+          performance_data?: Json | null
+          published_at?: string | null
+          rejected_reason?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          angle?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          client_id?: string | null
+          compliance_flags?: Json | null
+          compliance_score?: number | null
+          content_type?: string
+          created_at?: string | null
+          draft?: string
+          final_version?: string | null
+          id?: string
+          metadata?: Json | null
+          performance_data?: Json | null
+          published_at?: string | null
+          rejected_reason?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
