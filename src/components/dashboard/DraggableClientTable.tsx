@@ -73,8 +73,14 @@ function getClientSyncStatus(client: Client): {
     const lastHubspotSyncAt = client.last_hubspot_sync_at;
     const hubspotSyncError = client.hubspot_sync_error;
     if (hubspotSyncStatus) {
+      // Override "healthy" to "stale" if last sync was >24 hours ago
+      let effectiveStatus = hubspotSyncStatus as 'healthy' | 'stale' | 'error' | 'not_configured';
+      if (effectiveStatus === 'healthy' && lastHubspotSyncAt) {
+        const hoursSince = (Date.now() - new Date(lastHubspotSyncAt).getTime()) / (1000 * 60 * 60);
+        if (hoursSince > 24) effectiveStatus = 'stale';
+      }
       return {
-        status: hubspotSyncStatus as 'healthy' | 'stale' | 'error' | 'not_configured',
+        status: effectiveStatus,
         lastSyncAt: lastHubspotSyncAt,
         error: hubspotSyncError,
         source: 'hubspot',
@@ -88,8 +94,14 @@ function getClientSyncStatus(client: Client): {
     const lastGhlSyncAt = client.last_ghl_sync_at;
     const ghlSyncError = client.ghl_sync_error;
     if (ghlSyncStatus) {
+      // Override "healthy" to "stale" if last sync was >24 hours ago
+      let effectiveStatus = ghlSyncStatus as 'healthy' | 'stale' | 'error' | 'not_configured';
+      if (effectiveStatus === 'healthy' && lastGhlSyncAt) {
+        const hoursSince = (Date.now() - new Date(lastGhlSyncAt).getTime()) / (1000 * 60 * 60);
+        if (hoursSince > 24) effectiveStatus = 'stale';
+      }
       return {
-        status: ghlSyncStatus as 'healthy' | 'stale' | 'error' | 'not_configured',
+        status: effectiveStatus,
         lastSyncAt: lastGhlSyncAt,
         error: ghlSyncError,
         source: 'ghl',
@@ -580,12 +592,27 @@ export function DraggableClientTable({
                       (() => {
                         const crmTotal = m.crmLeads || 0;
                         const metaLeads = m.totalLeads || 0;
+                        const hasAdSpend = (m.totalAdSpend || 0) > 0;
+                        // Flag: has ad spend but 0 CRM leads = GHL sync problem
+                        if (crmTotal === 0 && hasAdSpend) return 'text-destructive font-semibold';
                         if (crmTotal === 0 && metaLeads === 0) return 'text-muted-foreground';
                         if (crmTotal >= metaLeads) return 'text-chart-2';
                         return 'text-destructive font-semibold';
                       })()
                     )}>
-                      {m.crmLeads || 0}
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.crmLeads || 0}
+                        {(m.crmLeads || 0) === 0 && (m.totalAdSpend || 0) > 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-2.5 w-2.5 text-destructive shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-[200px]">
+                              {formatCurrency(m.totalAdSpend)} ad spend but 0 CRM leads — check GHL sync
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                     </TableCell>
 
                     {/* CPL */}
@@ -597,7 +624,12 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* Booked Calls */}
-                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
+                    <TableCell className={cn(
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
+                      (m.totalCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && syncInfo.status !== 'healthy'
+                        ? 'text-yellow-600 dark:text-yellow-500'
+                        : ''
+                    )}>
                       {m.totalCalls || 0}
                     </TableCell>
 
@@ -610,7 +642,12 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* Shows */}
-                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
+                    <TableCell className={cn(
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
+                      (m.showedCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && syncInfo.status !== 'healthy'
+                        ? 'text-yellow-600 dark:text-yellow-500'
+                        : ''
+                    )}>
                       {m.showedCalls || 0}
                     </TableCell>
 

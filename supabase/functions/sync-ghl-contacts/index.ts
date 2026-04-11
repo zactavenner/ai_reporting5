@@ -173,6 +173,27 @@ function hasBadLeadTag(contact: GHLContact): boolean {
   );
 }
 
+// Retry helper for GHL API calls — handles 429 rate limiting with exponential backoff
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries: number = 3
+): Promise<Response> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, options);
+    if (response.status === 429 && attempt < maxRetries) {
+      const retryAfter = parseInt(response.headers.get('retry-after') || '0', 10);
+      const delayMs = retryAfter > 0 ? retryAfter * 1000 : Math.min(2000 * Math.pow(2, attempt), 30000);
+      console.warn(`[sync-ghl] 429 rate limited on ${url.split('?')[0]}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+      await new Promise(r => setTimeout(r, delayMs));
+      continue;
+    }
+    return response;
+  }
+  // Should not reach here, but return last attempt
+  return fetch(url, options);
+}
+
 async function fetchGHLContacts(
   apiKey: string,
   locationId: string,
@@ -194,12 +215,12 @@ async function fetchGHLContacts(
       page: page || 1,
     };
 
-    const response = await fetch(`${GHL_BASE_URL}/contacts/search`, {
+    const response = await fetchWithRetry(`${GHL_BASE_URL}/contacts/search`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
     });
-    
+
     if (response.ok) {
       const data = await response.json();
       const contacts = data.contacts || [];
@@ -209,7 +230,7 @@ async function fetchGHLContacts(
       return { contacts, nextPage, total };
     }
 
-    // If POST /contacts/search returns 400, fall back to GET /contacts/
+    // If POST /contacts/search returns non-429 error, fall back to GET /contacts/
     const errorText = await response.text();
     console.warn(`POST /contacts/search failed (${response.status}), falling back to GET /contacts/: ${errorText.substring(0, 200)}`);
   } catch (err) {
@@ -222,8 +243,8 @@ async function fetchGHLContacts(
     url += `&startAfterId=${startAfterId}`;
   }
 
-  const fallbackResponse = await fetch(url, { method: 'GET', headers });
-  
+  const fallbackResponse = await fetchWithRetry(url, { method: 'GET', headers });
+
   if (!fallbackResponse.ok) {
     const error = await fallbackResponse.text();
     throw new Error(`GHL API error (both endpoints failed): ${fallbackResponse.status} - ${error}`);
@@ -265,7 +286,7 @@ async function fetchGHLOpportunities(
         url += `&startAfterId=${startAfterId}`;
       }
 
-      const response = await fetch(url, { method: 'GET', headers });
+      const response = await fetchWithRetry(url, { method: 'GET', headers });
 
       if (!response.ok) {
         console.error(`GHL Opportunities API error: ${response.status}`);
@@ -1476,11 +1497,11 @@ async function fetchSingleGHLContact(
   };
 
   try {
-    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}`, { 
-      method: 'GET', 
-      headers 
+    const response = await fetchWithRetry(`${GHL_BASE_URL}/contacts/${contactId}`, {
+      method: 'GET',
+      headers
     });
-    
+
     if (!response.ok) {
       console.error(`GHL single contact fetch error: ${response.status}`);
       return null;
@@ -1506,9 +1527,9 @@ async function fetchGHLNotes(
   };
 
   try {
-    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}/notes`, { 
-      method: 'GET', 
-      headers 
+    const response = await fetchWithRetry(`${GHL_BASE_URL}/contacts/${contactId}/notes`, {
+      method: 'GET',
+      headers
     });
     
     if (!response.ok) {
@@ -1536,11 +1557,11 @@ async function fetchGHLTasks(
   };
 
   try {
-    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}/tasks`, { 
-      method: 'GET', 
-      headers 
+    const response = await fetchWithRetry(`${GHL_BASE_URL}/contacts/${contactId}/tasks`, {
+      method: 'GET',
+      headers
     });
-    
+
     if (!response.ok) {
       console.error(`GHL tasks fetch error: ${response.status}`);
       return [];
@@ -1566,9 +1587,9 @@ async function fetchGHLAppointments(
   };
 
   try {
-    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}/appointments`, { 
-      method: 'GET', 
-      headers 
+    const response = await fetchWithRetry(`${GHL_BASE_URL}/contacts/${contactId}/appointments`, {
+      method: 'GET',
+      headers
     });
     
     if (!response.ok) {

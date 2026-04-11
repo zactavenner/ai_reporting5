@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
         clientResult.errors.push(`contacts: ${err instanceof Error ? err.message : "Unknown"}`);
       }
 
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise(resolve => setTimeout(resolve, 10000));
 
       // 2. Sync calendar appointments
       try {
@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
         clientResult.errors.push(`calendar: ${err instanceof Error ? err.message : "Unknown"}`);
       }
 
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise(resolve => setTimeout(resolve, 10000));
 
       // 3. Sync pipelines (committed + funded from pipeline stages)
       try {
@@ -110,10 +110,12 @@ Deno.serve(async (req) => {
 
       results.push(clientResult);
 
-      // 15-second delay between clients
+      // 30-second delay between clients to avoid GHL 429 rate limits
       if (i < ghlClients.length - 1) {
-        console.log(`[sync-ghl-all-clients] Waiting 15s before next client...`);
-        await new Promise(resolve => setTimeout(resolve, 15000));
+        const hasErrors = clientResult.errors.length > 0;
+        const delay = hasErrors ? 45000 : 30000; // Extra delay after errors (rate limit cooldown)
+        console.log(`[sync-ghl-all-clients] Waiting ${delay / 1000}s before next client...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
 

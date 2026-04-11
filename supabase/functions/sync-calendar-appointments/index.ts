@@ -8,6 +8,26 @@ const corsHeaders = {
 
 const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
 
+// Retry helper for GHL API calls — handles 429 rate limiting with exponential backoff
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries: number = 3
+): Promise<Response> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, options);
+    if (response.status === 429 && attempt < maxRetries) {
+      const retryAfter = parseInt(response.headers.get('retry-after') || '0', 10);
+      const delayMs = retryAfter > 0 ? retryAfter * 1000 : Math.min(2000 * Math.pow(2, attempt), 30000);
+      console.warn(`[sync-calendar] 429 rate limited, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+      await new Promise(r => setTimeout(r, delayMs));
+      continue;
+    }
+    return response;
+  }
+  return fetch(url, options);
+}
+
 // Fix 4: Configurable GHL status mapping — normalized to lowercase, trimmed
 const GHL_STATUS_MAP: Record<string, { outcome: string; showed: boolean }> = {
   'showed': { outcome: 'showed', showed: true },
@@ -58,7 +78,7 @@ async function fetchCalendarAppointments(
     const url = `${GHL_BASE_URL}/calendars/events?locationId=${locationId}&calendarId=${calendarId}&startTime=${startTime.getTime()}&endTime=${endTime.getTime()}`;
     
     console.log(`Fetching appointments from calendar ${calendarId} (${startTime.toISOString()} to ${endTime.toISOString()})`);
-    const response = await fetch(url, { method: 'GET', headers });
+    const response = await fetchWithRetry(url, { method: 'GET', headers });
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -89,7 +109,7 @@ async function fetchCalendarAppointments(
 // Fetch contact details from GHL
 async function fetchGHLContact(apiKey: string, contactId: string): Promise<{ name: string | null; email: string | null; phone: string | null } | null> {
   try {
-    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}`, {
+    const response = await fetchWithRetry(`${GHL_BASE_URL}/contacts/${contactId}`, {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
