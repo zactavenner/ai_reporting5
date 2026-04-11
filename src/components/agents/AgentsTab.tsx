@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, Play, Power, Trash2, AlertTriangle, CheckCircle, XCircle, Clock, Zap, Activity, Bot, Settings2, ChevronRight, Circle } from 'lucide-react';
+import { Plus, Play, Power, Trash2, AlertTriangle, CheckCircle, XCircle, Clock, Zap, Activity, Bot, Settings2, ChevronRight, Circle, Building2, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,6 +11,8 @@ import { Switch } from '@/components/ui/switch';
 import { useAgents, useAgentRuns, useCreateAgent, useUpdateAgent, useDeleteAgent, useRunAgent, useAgentEscalations, useAgentTasks, AVAILABLE_MODELS, AVAILABLE_CONNECTORS, AGENT_TEMPLATES, type Agent } from '@/hooks/useAgents';
 import type { Client } from '@/hooks/useClients';
 import { toast } from 'sonner';
+import { CronSchedulePicker } from './CronSchedulePicker';
+import { ClientScopePicker } from './ClientScopePicker';
 
 interface Props { clients: Client[]; }
 
@@ -96,6 +98,7 @@ export function AgentsTab({ clients }: Props) {
       model: selectedAgent.model,
       icon: selectedAgent.icon,
       connectors: selectedAgent.connectors,
+      client_id: selectedAgent.client_id,
     });
     setEditMode(true);
   };
@@ -310,7 +313,7 @@ export function AgentsTab({ clients }: Props) {
                     </TabsList>
 
                     <TabsContent value="overview" className="space-y-4 mt-4">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                         <div className="bg-muted/50 rounded-lg p-3">
                           <p className="text-xs text-muted-foreground">Model</p>
                           <p className="text-sm font-medium truncate">{AVAILABLE_MODELS.find(m => m.value === selectedAgent.model)?.label || selectedAgent.model || 'Not set'}</p>
@@ -318,6 +321,22 @@ export function AgentsTab({ clients }: Props) {
                         <div className="bg-muted/50 rounded-lg p-3">
                           <p className="text-xs text-muted-foreground">Schedule</p>
                           <p className="text-sm font-medium">{selectedAgent.schedule_cron || 'Manual'}</p>
+                        </div>
+                        <div className="bg-muted/50 rounded-lg p-3">
+                          <p className="text-xs text-muted-foreground">Scope</p>
+                          <div className="flex items-center gap-1.5">
+                            {selectedAgent.client_id ? (
+                              <>
+                                <User className="h-3 w-3 text-muted-foreground" />
+                                <p className="text-sm font-medium truncate">{clients.find(c => c.id === selectedAgent.client_id)?.name || 'Client'}</p>
+                              </>
+                            ) : (
+                              <>
+                                <Building2 className="h-3 w-3 text-primary" />
+                                <p className="text-sm font-medium">Agency-wide</p>
+                              </>
+                            )}
+                          </div>
                         </div>
                         <div className="bg-muted/50 rounded-lg p-3">
                           <p className="text-xs text-muted-foreground">Last Run</p>
@@ -376,11 +395,16 @@ export function AgentsTab({ clients }: Props) {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div>
-                              <label className="text-xs text-muted-foreground">Schedule (Cron)</label>
-                              <Input value={editData.schedule_cron || ''} onChange={e => setEditData(p => ({ ...p, schedule_cron: e.target.value }))} placeholder="0 6 * * *" />
-                            </div>
+                            <CronSchedulePicker
+                              value={editData.schedule_cron || ''}
+                              onChange={v => setEditData(p => ({ ...p, schedule_cron: v }))}
+                            />
                           </div>
+                          <ClientScopePicker
+                            clientId={editData.client_id ?? selectedAgent?.client_id ?? null}
+                            onChange={v => setEditData(p => ({ ...p, client_id: v }))}
+                            clients={clients}
+                          />
                           <div>
                             <label className="text-xs text-muted-foreground">Connectors</label>
                             <div className="flex flex-wrap gap-2 mt-1">
