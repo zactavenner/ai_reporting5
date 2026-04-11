@@ -1,99 +1,443 @@
-import { useState } from 'react';
-import { Plus, Terminal } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, Play, Power, Trash2, AlertTriangle, CheckCircle, XCircle, Clock, Zap, Activity, Bot, Settings2, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useAgents, useAgentRuns, useCreateAgent, useUpdateAgent, useDeleteAgent, useRunAgent, AGENT_TEMPLATES, type Agent } from '@/hooks/useAgents';
+import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { useAgents, useAgentRuns, useCreateAgent, useUpdateAgent, useDeleteAgent, useRunAgent, useAgentEscalations, useAgentTasks, AVAILABLE_MODELS, AVAILABLE_CONNECTORS, AGENT_TEMPLATES, type Agent } from '@/hooks/useAgents';
 import type { Client } from '@/hooks/useClients';
 
 interface Props { clients: Client[]; }
+
+const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle; color: string; label: string }> = {
+  completed: { icon: CheckCircle, color: 'text-primary', label: 'Completed' },
+  running: { icon: Activity, color: 'text-warning', label: 'Running' },
+  failed: { icon: XCircle, color: 'text-destructive', label: 'Failed' },
+  skipped: { icon: Clock, color: 'text-muted-foreground', label: 'Skipped' },
+};
 
 export function AgentsTab({ clients }: Props) {
   const { data: agents = [], isLoading } = useAgents();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedAgent = agents.find(a => a.id === selectedId) || null;
   const { data: runs = [] } = useAgentRuns(selectedId);
+  const { data: escalations = [] } = useAgentEscalations();
+  const { data: tasks = [] } = useAgentTasks();
   const createAgent = useCreateAgent();
   const updateAgent = useUpdateAgent();
   const deleteAgent = useDeleteAgent();
   const runAgent = useRunAgent();
+  const [editMode, setEditMode] = useState(false);
+  const [editData, setEditData] = useState<Partial<Agent>>({});
+  const [tab, setTab] = useState('overview');
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  // Computed stats
+  const stats = useMemo(() => {
+    const total = agents.length;
+    const active = agents.filter(a => a.enabled).length;
+    const recentRuns = runs.filter(r => {
+      const started = r.started_at ? new Date(r.started_at).getTime() : 0;
+      return Date.now() - started < 24 * 60 * 60 * 1000;
+    });
+    const failedRuns = recentRuns.filter(r => r.status === 'failed').length;
+    const totalTokens = recentRuns.reduce((sum, r) => sum + (r.tokens_used || 0), 0);
+    const openEscalations = escalations.filter(e => !e.resolved_at).length;
+    return { total, active, failedRuns, totalTokens, openEscalations };
+  }, [agents, runs, escalations]);
+
+  const handleCreateFromTemplate = (template: typeof AGENT_TEMPLATES[0]) => {
+    createAgent.mutate({
+      name: template.name,
+      icon: template.icon,
+      description: template.description,
+      prompt_template: template.prompt_template,
+      schedule_cron: template.schedule_cron,
+      model: template.model,
+      connectors: template.connectors as any,
+      enabled: false,
+    } as any);
+    setShowTemplates(false);
+  };
 
   const handleCreateBlank = () => {
-    createAgent.mutate({ name: 'New Agent', icon: '🤖', description: '', prompt_template: '', schedule_cron: '0 6 * * *', model: 'google/gemini-2.5-pro', connectors: ['database'] as any, enabled: false } as any);
+    createAgent.mutate({
+      name: 'New Agent',
+      icon: '🤖',
+      description: '',
+      prompt_template: '',
+      schedule_cron: '0 6 * * *',
+      model: 'google/gemini-2.5-pro',
+      connectors: ['database'] as any,
+      enabled: false,
+    } as any);
+  };
+
+  const startEditing = () => {
+    if (!selectedAgent) return;
+    setEditData({
+      name: selectedAgent.name,
+      description: selectedAgent.description,
+      prompt_template: selectedAgent.prompt_template,
+      schedule_cron: selectedAgent.schedule_cron,
+      model: selectedAgent.model,
+      icon: selectedAgent.icon,
+      connectors: selectedAgent.connectors,
+    });
+    setEditMode(true);
+  };
+
+  const saveEdit = () => {
+    if (!selectedAgent) return;
+    updateAgent.mutate({ id: selectedAgent.id, ...editData } as any);
+    setEditMode(false);
   };
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold">AI Agents</h2>
-          <p className="text-sm text-muted-foreground">Autonomous workers that run on schedule with full data access</p>
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Bot className="h-5 w-5 text-primary" />
+            Agent Workforce
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {stats.active}/{stats.total} active · {stats.openEscalations} open escalations
+          </p>
         </div>
-        <Button size="sm" onClick={handleCreateBlank} disabled={createAgent.isPending}>
-          <Plus className="h-4 w-4 mr-1" /> New Agent
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowTemplates(!showTemplates)}>
+            <Zap className="h-4 w-4 mr-1" /> Templates
+          </Button>
+          <Button size="sm" onClick={handleCreateBlank} disabled={createAgent.isPending}>
+            <Plus className="h-4 w-4 mr-1" /> New Agent
+          </Button>
+        </div>
+      </div>
+
+      {/* Template picker */}
+      {showTemplates && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {AGENT_TEMPLATES.map((t) => (
+            <Card key={t.key} className="cursor-pointer hover:border-primary transition-colors" onClick={() => handleCreateFromTemplate(t)}>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xl">{t.icon}</span>
+                  <span className="font-semibold text-sm">{t.name}</span>
+                </div>
+                <p className="text-xs text-muted-foreground line-clamp-2">{t.description}</p>
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {t.connectors.map(c => (
+                    <Badge key={c} variant="secondary" className="text-[10px]">{c}</Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Stats cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {[
+          { label: 'Total Agents', value: stats.total, icon: Bot },
+          { label: 'Active', value: stats.active, icon: Power },
+          { label: 'Failed (24h)', value: stats.failedRuns, icon: AlertTriangle },
+          { label: 'Tokens (24h)', value: stats.totalTokens.toLocaleString(), icon: Zap },
+          { label: 'Escalations', value: stats.openEscalations, icon: AlertTriangle },
+        ].map((s, i) => (
+          <Card key={i}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <s.icon className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-lg font-bold">{s.value}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{s.label}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">Loading agents...</div>
       ) : agents.length === 0 ? (
-        <div className="border-2 border-dashed border-border rounded-lg p-12 text-center">
-          <span className="text-4xl mb-4 block">🤖</span>
-          <h3 className="font-semibold mb-2">No agents yet</h3>
-          <p className="text-sm text-muted-foreground mb-4">Create your first agent to get started.</p>
-          <Button onClick={handleCreateBlank}>Create Agent</Button>
-        </div>
+        <Card className="border-dashed">
+          <CardContent className="p-12 text-center">
+            <span className="text-4xl mb-4 block">🤖</span>
+            <h3 className="font-semibold mb-2">No agents yet</h3>
+            <p className="text-sm text-muted-foreground mb-4">Create your first agent or pick a template.</p>
+            <Button onClick={handleCreateBlank}>Create Agent</Button>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="space-y-3 lg:col-span-1">
-            {agents.map((agent) => (
-              <div key={agent.id} onClick={() => setSelectedId(agent.id)}
-                className={`border rounded-lg p-4 cursor-pointer transition-colors hover:bg-muted/50 ${selectedId === agent.id ? 'border-primary bg-primary/5' : ''}`}>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{agent.icon || '🤖'}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate">{agent.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{agent.description || 'No description'}</p>
-                  </div>
-                  <span className={`w-2 h-2 rounded-full ${agent.enabled ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
-                </div>
-              </div>
-            ))}
+          {/* Agent list */}
+          <div className="space-y-2 lg:col-span-1">
+            {agents.map((agent) => {
+              const lastStatus = agent.last_run_status || 'unknown';
+              const statusCfg = STATUS_CONFIG[lastStatus];
+              return (
+                <Card
+                  key={agent.id}
+                  onClick={() => { setSelectedId(agent.id); setEditMode(false); }}
+                  className={`cursor-pointer transition-all ${selectedId === agent.id ? 'border-primary ring-1 ring-primary/20' : 'hover:border-muted-foreground/30'}`}
+                >
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <span className="text-2xl">{agent.icon || '🤖'}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm truncate">{agent.name}</p>
+                        {agent.enabled ? (
+                          <Badge variant="default" className="text-[10px] h-4">Active</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px] h-4">Off</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">{agent.description || 'No description'}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-muted-foreground">{agent.schedule_cron || 'Manual'}</span>
+                        {statusCfg && (
+                          <span className={`text-[10px] ${statusCfg.color}`}>{statusCfg.label}</span>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
+
+          {/* Agent detail */}
           <div className="lg:col-span-2">
             {selectedAgent ? (
-              <div className="border rounded-lg p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-bold">{selectedAgent.icon} {selectedAgent.name}</h3>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => runAgent.mutate({ agentId: selectedAgent.id, clientId: selectedAgent.client_id || undefined })}>Run Now</Button>
-                    <Button variant="outline" size="sm" onClick={() => { updateAgent.mutate({ id: selectedAgent.id, enabled: !selectedAgent.enabled } as any); }}>
-                      {selectedAgent.enabled ? 'Disable' : 'Enable'}
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => { setSelectedId(null); deleteAgent.mutate(selectedAgent.id); }}>Delete</Button>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground">{selectedAgent.description}</p>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p>Model: {selectedAgent.model || 'Not set'}</p>
-                  <p>Schedule: {selectedAgent.schedule_cron || 'Manual'}</p>
-                </div>
-                {runs.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-semibold">Recent Runs</h4>
-                    {runs.slice(0, 5).map(run => (
-                      <div key={run.id} className="border rounded p-3 text-xs space-y-1">
-                        <div className="flex justify-between"><span className="font-medium capitalize">{run.status}</span><span className="text-muted-foreground">{run.started_at ? new Date(run.started_at).toLocaleString() : ''}</span></div>
-                        {run.output_summary && <p className="text-muted-foreground line-clamp-2">{run.output_summary}</p>}
-                        {run.error && <p className="text-destructive">{run.error}</p>}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl">{selectedAgent.icon}</span>
+                      <div>
+                        <CardTitle>{selectedAgent.name}</CardTitle>
+                        <p className="text-sm text-muted-foreground">{selectedAgent.description}</p>
                       </div>
-                    ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={selectedAgent.enabled || false}
+                        onCheckedChange={(enabled) => updateAgent.mutate({ id: selectedAgent.id, enabled } as any)}
+                      />
+                      <Button variant="outline" size="sm" onClick={() => runAgent.mutate({ agentId: selectedAgent.id, clientId: selectedAgent.client_id || undefined })} disabled={runAgent.isPending}>
+                        <Play className="h-3.5 w-3.5 mr-1" /> Run
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={editMode ? saveEdit : startEditing}>
+                        <Settings2 className="h-3.5 w-3.5 mr-1" /> {editMode ? 'Save' : 'Edit'}
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => { setSelectedId(null); deleteAgent.mutate(selectedAgent.id); }}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                )}
-              </div>
+                </CardHeader>
+                <CardContent>
+                  <Tabs value={tab} onValueChange={setTab}>
+                    <TabsList>
+                      <TabsTrigger value="overview">Overview</TabsTrigger>
+                      <TabsTrigger value="config">Config</TabsTrigger>
+                      <TabsTrigger value="runs">Runs ({runs.length})</TabsTrigger>
+                      <TabsTrigger value="escalations">Escalations</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="overview" className="space-y-4 mt-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="bg-muted/50 rounded-lg p-3">
+                          <p className="text-xs text-muted-foreground">Model</p>
+                          <p className="text-sm font-medium truncate">{AVAILABLE_MODELS.find(m => m.value === selectedAgent.model)?.label || selectedAgent.model || 'Not set'}</p>
+                        </div>
+                        <div className="bg-muted/50 rounded-lg p-3">
+                          <p className="text-xs text-muted-foreground">Schedule</p>
+                          <p className="text-sm font-medium">{selectedAgent.schedule_cron || 'Manual'}</p>
+                        </div>
+                        <div className="bg-muted/50 rounded-lg p-3">
+                          <p className="text-xs text-muted-foreground">Last Run</p>
+                          <p className="text-sm font-medium">{selectedAgent.last_run_at ? new Date(selectedAgent.last_run_at).toLocaleString() : 'Never'}</p>
+                        </div>
+                        <div className="bg-muted/50 rounded-lg p-3">
+                          <p className="text-xs text-muted-foreground">Failures</p>
+                          <p className="text-sm font-medium">{(selectedAgent as any).consecutive_failures || 0}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">Connectors</p>
+                        <div className="flex flex-wrap gap-1">
+                          {(selectedAgent.connectors || []).map((c: string) => {
+                            const cfg = AVAILABLE_CONNECTORS.find(ac => ac.key === c);
+                            return <Badge key={c} variant="outline" className="text-xs">{cfg?.label || c}</Badge>;
+                          })}
+                        </div>
+                      </div>
+                      {selectedAgent.prompt_template && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-2">Prompt Template</p>
+                          <pre className="bg-muted/50 rounded-lg p-3 text-xs whitespace-pre-wrap max-h-48 overflow-y-auto">
+                            {selectedAgent.prompt_template}
+                          </pre>
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="config" className="space-y-4 mt-4">
+                      {editMode ? (
+                        <>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-xs text-muted-foreground">Name</label>
+                              <Input value={editData.name || ''} onChange={e => setEditData(p => ({ ...p, name: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground">Icon</label>
+                              <Input value={editData.icon || ''} onChange={e => setEditData(p => ({ ...p, icon: e.target.value }))} />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Description</label>
+                            <Input value={editData.description || ''} onChange={e => setEditData(p => ({ ...p, description: e.target.value }))} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-xs text-muted-foreground">Model</label>
+                              <Select value={editData.model || ''} onValueChange={v => setEditData(p => ({ ...p, model: v }))}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {AVAILABLE_MODELS.map(m => (
+                                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground">Schedule (Cron)</label>
+                              <Input value={editData.schedule_cron || ''} onChange={e => setEditData(p => ({ ...p, schedule_cron: e.target.value }))} placeholder="0 6 * * *" />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Connectors</label>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {AVAILABLE_CONNECTORS.map(c => {
+                                const active = (editData.connectors || []).includes(c.key);
+                                return (
+                                  <Badge
+                                    key={c.key}
+                                    variant={active ? 'default' : 'outline'}
+                                    className="cursor-pointer"
+                                    onClick={() => {
+                                      const current = editData.connectors || [];
+                                      setEditData(p => ({
+                                        ...p,
+                                        connectors: active ? current.filter((x: string) => x !== c.key) : [...current, c.key],
+                                      }));
+                                    }}
+                                  >
+                                    {c.label}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">System Prompt</label>
+                            <Textarea
+                              className="min-h-[200px] font-mono text-xs"
+                              value={editData.prompt_template || ''}
+                              onChange={e => setEditData(p => ({ ...p, prompt_template: e.target.value }))}
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={saveEdit}>Save Changes</Button>
+                            <Button size="sm" variant="outline" onClick={() => setEditMode(false)}>Cancel</Button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-center text-muted-foreground py-8">
+                          <Settings2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">Click "Edit" to modify agent configuration</p>
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="runs" className="space-y-3 mt-4">
+                      {runs.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">No runs yet</p>
+                      ) : (
+                        runs.slice(0, 20).map(run => {
+                          const cfg = STATUS_CONFIG[run.status] || STATUS_CONFIG.completed;
+                          const Icon = cfg.icon;
+                          return (
+                            <div key={run.id} className="border rounded-lg p-3 space-y-1">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Icon className={`h-4 w-4 ${cfg.color}`} />
+                                  <span className="text-sm font-medium capitalize">{run.status}</span>
+                                  {run.client && (
+                                    <Badge variant="outline" className="text-[10px]">{run.client.name}</Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                  {run.tokens_used ? <span>{run.tokens_used.toLocaleString()} tokens</span> : null}
+                                  {(run as any).duration_ms ? <span>{(run as any).duration_ms}ms</span> : null}
+                                  {(run as any).cost_usd ? <span>${Number((run as any).cost_usd).toFixed(4)}</span> : null}
+                                  <span>{run.started_at ? new Date(run.started_at).toLocaleString() : ''}</span>
+                                </div>
+                              </div>
+                              {run.output_summary && (
+                                <p className="text-xs text-muted-foreground line-clamp-3">{run.output_summary}</p>
+                              )}
+                              {run.error && (
+                                <p className="text-xs text-destructive">{run.error}</p>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="escalations" className="space-y-3 mt-4">
+                      {escalations.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">No escalations</p>
+                      ) : (
+                        escalations.slice(0, 15).map(esc => (
+                          <div key={esc.id} className="border rounded-lg p-3 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Badge variant={esc.severity === 'critical' ? 'destructive' : esc.severity === 'high' ? 'destructive' : 'secondary'} className="text-[10px]">
+                                  {esc.severity}
+                                </Badge>
+                                <span className="text-sm font-medium">{esc.title}</span>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {esc.resolved_at ? '✅ Resolved' : '⏳ Open'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{esc.description}</p>
+                            <p className="text-[10px] text-muted-foreground">from {esc.agent_name} · {new Date(esc.created_at).toLocaleString()}</p>
+                          </div>
+                        ))
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
             ) : (
-              <div className="border-2 border-dashed border-border rounded-lg p-12 text-center">
-                <p className="text-muted-foreground">Select an agent to view details</p>
-              </div>
+              <Card className="border-dashed">
+                <CardContent className="p-12 text-center">
+                  <Bot className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+                  <p className="text-muted-foreground">Select an agent to view details</p>
+                </CardContent>
+              </Card>
             )}
           </div>
         </div>
