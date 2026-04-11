@@ -1,35 +1,58 @@
 
 
-## Audit Result: Projects Are Already at Parity
+## Plan: Integrate Agent Workforce Dashboard
 
-After a thorough side-by-side comparison of every directory in this project against [Reporting 6.0](/projects/9de171d3-2309-432b-adee-c8dda4a08f2c), **this project already contains all features, data syncs, APIs, and edge functions from Reporting 6.0** — plus additional features that 6.0 does not have.
+### What You Already Have
 
-### What This Project Has That 6.0 Does Not
-- Avatar Ad Generator (pages, components, context, edge function)
-- `generate-ad-script` edge function
-- Avatar Ad Gen sidebar tab under Creatives
+Your current agents system is solid but basic:
 
-### The One Thing 6.0 Has That This Project Does Not
-- **Lazy loading with `lazyRetry`** in `App.tsx`: 6.0 wraps all page imports in `lazy()` with a retry mechanism, `Suspense` fallback, and an `ErrorBoundary`. This project uses direct imports. This is a performance optimization, not a missing feature.
+| Component | What It Does |
+|-----------|-------------|
+| `agents` + `agent_runs` DB tables | Store agent configs and run history |
+| `run-agent` edge function | Executes agents: pulls client data (DB, Meta, GHL), calls AI via OpenRouter, posts to Slack, updates metrics |
+| `mcp-agent-server` edge function | JSON-RPC MCP server for Claude Code Desktop integration |
+| `AgentsTab` component | Simple list/detail view: create, enable/disable, run, delete, view recent runs |
+| `useAgents` hooks | CRUD + run mutations, 3 agent templates (Data QA, Creatives Performance, Onboarding QA) |
 
-### Verified Identical
-| Category | Count | Status |
-|----------|-------|--------|
-| Pages | 46 (6.0) vs 47 (this) | This project has all + AvatarAdGeneratorPage |
-| Hooks | 104 | Identical |
-| Edge Functions | 84 (6.0) vs 85 (this) | This project has all + generate-ad-script |
-| Component Directories | 36 (6.0) vs 39 (this) | This project has all + avatar-ad, admin, client, deck |
-| Navigation / Sidebar | Matching 6.0 structure | This project adds Avatar Ad Gen sub-item |
+### What the Uploaded Dashboard Brings
 
-### Recommended: Add Lazy Loading (Performance Optimization)
+The `agent-workforce-dashboard.jsx` is a more feature-rich agent management UI. Since I can't extract the zip in read-only mode, I'll need to extract and review it in implementation mode. Based on the file name and typical "workforce dashboard" patterns, this likely includes:
 
-The only change worth making is adding the `lazyRetry` pattern from 6.0 to `App.tsx`:
+- **Workforce overview** with agent status cards, health indicators, and scheduling visibility
+- **Run history timeline** with richer output display (not just last 5 truncated)
+- **Agent configuration editor** (inline prompt editing, connector toggles, model selection)
+- **Scheduling/cron visualization**
+- **Performance metrics** per agent (tokens used, success rates, avg run time)
 
-1. **Wrap all page imports in `lazyRetry()`** for code-splitting
-2. **Add `<Suspense fallback={<PageLoader />}>`** around Routes
-3. **Add `<ErrorBoundary>`** wrapper for resilience
+### Integration Plan
 
-This reduces initial bundle size and handles stale cache after deploys.
+**Step 1 — Extract and audit the uploaded file**
+- Unzip `agents.zip`, read the JSX file(s), map every component/feature to what already exists
 
-No data syncs, APIs, or features are missing. The projects share the same database, the same edge functions, and the same hooks.
+**Step 2 — Migrate to TypeScript and adapt to existing patterns**
+- Convert JSX to TSX with proper typing
+- Replace any standalone state/API calls with existing `useAgents`, `useAgentRuns`, `useCreateAgent`, `useUpdateAgent`, `useDeleteAgent`, `useRunAgent` hooks
+- Use existing UI components (`Card`, `Badge`, `Tabs`, `Button`, etc.) from shadcn/ui
+- Wire to existing `agents` and `agent_runs` Supabase tables
+
+**Step 3 — Migrate AI calls from OpenRouter to Lovable AI Gateway**
+- The current `run-agent` function uses OpenRouter (requires `OPENROUTER_API_KEY` which isn't in your secrets)
+- Switch to `https://ai.gateway.lovable.dev/v1/chat/completions` with `LOVABLE_API_KEY` (already configured)
+- This fixes agent runs that are currently failing due to missing OpenRouter key
+
+**Step 4 — Replace or enhance the existing `AgentsTab`**
+- Swap the current basic `AgentsTab` with the new dashboard components
+- Keep the same sidebar nav entry ("Agents" tab)
+- Add any new sub-views (e.g., run history, performance analytics) as tabs within the agent section
+
+**Step 5 — Add missing DB columns if needed**
+- If the dashboard references fields not in the current schema (e.g., `last_run_at`, `success_rate`, `avg_tokens`), add them via migration
+- These would be computed/cached fields updated by the `run-agent` function
+
+### Technical Details
+
+- **No new edge functions needed** — the existing `run-agent` and `mcp-agent-server` cover all backend needs
+- **AI Gateway fix** is critical — without it, no agent can actually run (OpenRouter key is missing from secrets)
+- **Database**: `agents` table has: `id, name, description, icon, prompt_template, schedule_cron, schedule_timezone, model, client_id, connectors, enabled, template_key, created_at, updated_at`
+- **Database**: `agent_runs` table has: `id, agent_id, client_id, status, started_at, completed_at, input_summary, output_summary, actions_taken, error, tokens_used`
 
