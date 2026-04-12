@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
   let clientsQuery = supabase
     .from("clients")
     .select("id, name")
-    .in("status", ["active", "onboarding"]);
+    .in("status", ["active", "onboarding", "paused"]);
 
   if (clientId) {
     clientsQuery = clientsQuery.eq("id", clientId);

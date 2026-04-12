@@ -23,12 +23,12 @@ Deno.serve(async (req) => {
 
   console.log(`[sync-meta-ads-daily] Starting daily sync for ${yesterdayStr}`);
 
-  // Get all active clients with a meta_ad_account_id
+  // Get all active/onboarding/paused clients with a meta_ad_account_id
   const { data: clients, error } = await supabase
     .from("clients")
     .select("id, name, meta_ad_account_id")
     .not("meta_ad_account_id", "is", null)
-    .in("status", ["active", "onboarding"]);
+    .in("status", ["active", "onboarding", "paused"]);
 
   if (error || !clients) {
     console.error("Failed to fetch clients:", error);

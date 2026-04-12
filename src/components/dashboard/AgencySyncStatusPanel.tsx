@@ -155,7 +155,7 @@ export function AgencySyncStatusPanel({ clients, clientFullSettings, clientMetri
   }
 
   const clientSyncData: ClientSyncInfo[] = clients
-    .filter(c => c.status === 'active' || c.status === 'onboarding')
+    .filter(c => c.status === 'active' || c.status === 'onboarding' || c.status === 'paused')
     .map(c => {
       const settings = clientFullSettings[c.id] || {};
       return {

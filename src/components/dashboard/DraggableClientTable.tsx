@@ -37,7 +37,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, AlertCircle, CheckCircle, Clock, XCircle, AlertTriangle, Pencil } from 'lucide-react';
+import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, AlertCircle, CheckCircle, Clock, XCircle, AlertTriangle, Pencil, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -271,6 +271,8 @@ export function DraggableClientTable({
         case 'crmLeads': aVal = a.metrics.crmLeads || 0; bVal = b.metrics.crmLeads || 0; break;
         case 'calls': aVal = a.metrics.totalCalls || 0; bVal = b.metrics.totalCalls || 0; break;
         case 'showed': aVal = a.metrics.showedCalls || 0; bVal = b.metrics.showedCalls || 0; break;
+        case 'showRate': aVal = a.metrics.showedPercent || 0; bVal = b.metrics.showedPercent || 0; break;
+        case 'costPerShow': aVal = a.metrics.costPerShow || 0; bVal = b.metrics.costPerShow || 0; break;
         case 'funded': aVal = a.metrics.fundedInvestors || 0; bVal = b.metrics.fundedInvestors || 0; break;
         case 'ltb': aVal = a.computed.leadToBooked; bVal = b.computed.leadToBooked; break;
         case 'bts': aVal = a.computed.bookedToShowed; bVal = b.computed.bookedToShowed; break;
@@ -384,7 +386,7 @@ export function DraggableClientTable({
         </div>
       )}
       <div className="border border-border bg-card overflow-x-auto scrollbar-thin">
-        <Table className="min-w-[1600px]">
+        <Table className="min-w-[1800px]">
           <TableHeader>
             <TableRow className="border-b h-7">
               <TableHead className="w-7 sticky left-0 bg-card z-10 py-0 px-1"></TableHead>
@@ -400,6 +402,8 @@ export function DraggableClientTable({
               <SortableHeader column="calls" label="Booked" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="costPerCall" label="$/Call" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="showed" label="Shows" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="showRate" label="Show%" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="costPerShow" label="$/Show" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="funded" label="Funded" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="costOfCapital" label="CoC%" sortConfig={sortConfig} onSort={handleSort} />
               <TableHead className="font-bold text-[11px] text-center py-0 px-1">BN</TableHead>
@@ -607,8 +611,11 @@ export function DraggableClientTable({
                             <TooltipTrigger asChild>
                               <AlertTriangle className="h-2.5 w-2.5 text-destructive shrink-0" />
                             </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs max-w-[200px]">
-                              {formatCurrency(m.totalAdSpend)} ad spend but 0 CRM leads — check GHL sync
+                            <TooltipContent side="top" className="text-xs max-w-[250px]">
+                              {!client.ghl_api_key || !client.ghl_location_id
+                                ? `${formatCurrency(m.totalAdSpend)} ad spend but no GHL credentials configured — add GHL API key & location ID in settings`
+                                : `${formatCurrency(m.totalAdSpend)} ad spend but 0 CRM leads — GHL integration problem, run master sync or check API key`
+                              }
                             </TooltipContent>
                           </Tooltip>
                         )}
@@ -626,11 +633,29 @@ export function DraggableClientTable({
                     {/* Booked Calls */}
                     <TableCell className={cn(
                       "text-right font-mono tabular-nums text-[11px] py-0 px-1",
-                      (m.totalCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && syncInfo.status !== 'healthy'
-                        ? 'text-yellow-600 dark:text-yellow-500'
-                        : ''
+                      (() => {
+                        const hasAdSpend = (m.totalAdSpend || 0) > 0;
+                        const hasCalls = (m.totalCalls || 0) > 0;
+                        const hasGHL = !!(client.ghl_api_key && client.ghl_location_id);
+                        const hasCalendars = (fullSettings[client.id]?.tracked_calendar_ids || []).length > 0;
+                        if (!hasCalls && hasAdSpend && hasGHL && !hasCalendars) return 'text-destructive font-semibold';
+                        if (!hasCalls && hasAdSpend && syncInfo.status !== 'healthy') return 'text-yellow-600 dark:text-yellow-500';
+                        return '';
+                      })()
                     )}>
-                      {m.totalCalls || 0}
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.totalCalls || 0}
+                        {(m.totalCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && !!(client.ghl_api_key && client.ghl_location_id) && (fullSettings[client.id]?.tracked_calendar_ids || []).length === 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Calendar className="h-2.5 w-2.5 text-destructive shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-[220px]">
+                              No tracked calendars configured — add calendar IDs in client settings to sync booked/show calls
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                     </TableCell>
 
                     {/* Cost per Call */}
@@ -649,6 +674,24 @@ export function DraggableClientTable({
                         : ''
                     )}>
                       {m.showedCalls || 0}
+                    </TableCell>
+
+                    {/* Show Rate */}
+                    <TableCell className={cn(
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
+                      (m.showedPercent || 0) >= 50 ? 'text-chart-2' :
+                      (m.showedPercent || 0) >= 25 ? '' :
+                      (m.totalCalls || 0) > 0 ? 'text-destructive' : 'text-muted-foreground'
+                    )}>
+                      {(m.totalCalls || 0) > 0 ? formatPercent(m.showedPercent || 0) : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+
+                    {/* Cost Per Show */}
+                    <TableCell className={cn(
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
+                      getThresholdColor(m.costPerShow || 0, t.costPerShow)
+                    )}>
+                      {(m.costPerShow || 0) > 0 ? formatCurrency(m.costPerShow) : <span className="text-muted-foreground">-</span>}
                     </TableCell>
 
                     {/* Funded */}
