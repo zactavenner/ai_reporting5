@@ -42,7 +42,73 @@ export function useClientSourceMetrics(startDate?: string, endDate?: string) {
 }
 
 /**
- * Converts RPC results + daily_metrics into per-client SourceAggregatedMetrics
+ * Aggregates daily metrics into totals for a single client
+ */
+function aggregateDailyTotals(dailyMetrics: DailyMetric[]) {
+  return dailyMetrics.reduce(
+    (acc, day) => ({
+      totalAdSpend: acc.totalAdSpend + Number(day.ad_spend || 0),
+      totalClicks: acc.totalClicks + (day.clicks || 0),
+      totalImpressions: acc.totalImpressions + (day.impressions || 0),
+      totalCommitments: acc.totalCommitments + (day.commitments || 0),
+      commitmentDollars: acc.commitmentDollars + Number(day.commitment_dollars || 0),
+    }),
+    { totalAdSpend: 0, totalClicks: 0, totalImpressions: 0, totalCommitments: 0, commitmentDollars: 0 }
+  );
+}
+
+/**
+ * Builds a SourceAggregatedMetrics entry for a single client
+ */
+function buildSingleClientMetrics(
+  dailyTotals: ReturnType<typeof aggregateDailyTotals>,
+  row: ClientSourceMetricsRow | null,
+  defaultPipelineValue: number
+): SourceAggregatedMetrics {
+  const totalAdSpend = dailyTotals.totalAdSpend;
+  const totalLeads = row ? Number(row.total_leads) : 0;
+  const totalCalls = row ? Number(row.total_calls) : 0;
+  const showedCalls = row ? Number(row.showed_calls) : 0;
+  const reconnectCalls = row ? Number(row.reconnect_calls) : 0;
+  const reconnectShowed = row ? Number(row.reconnect_showed) : 0;
+  const fundedCount = row ? Number(row.funded_count) : 0;
+  const fundedDollars = row ? Number(row.funded_dollars) : 0;
+  const pipelineValue = defaultPipelineValue > 0 ? totalLeads * defaultPipelineValue : 0;
+
+  return {
+    totalAdSpend,
+    totalLeads,
+    spamLeads: row ? Number(row.spam_leads) : 0,
+    crmLeads: row ? Number(row.crm_leads || 0) : 0,
+    totalCalls,
+    showedCalls,
+    reconnectCalls,
+    reconnectShowed,
+    totalCommitments: dailyTotals.totalCommitments,
+    commitmentDollars: dailyTotals.commitmentDollars,
+    fundedInvestors: fundedCount,
+    fundedDollars,
+    ctr: dailyTotals.totalImpressions > 0 ? (dailyTotals.totalClicks / dailyTotals.totalImpressions) * 100 : 0,
+    costPerLead: totalLeads > 0 ? totalAdSpend / totalLeads : 0,
+    costPerCall: totalCalls > 0 ? totalAdSpend / totalCalls : 0,
+    showedPercent: totalCalls > 0 ? (showedCalls / totalCalls) * 100 : 0,
+    costPerShow: showedCalls > 0 ? totalAdSpend / showedCalls : 0,
+    costPerInvestor: fundedCount > 0 ? totalAdSpend / fundedCount : 0,
+    costOfCapital: fundedDollars > 0 ? (totalAdSpend / fundedDollars) * 100 : 0,
+    avgTimeToFund: row ? Number(row.avg_time_to_fund) : 0,
+    avgCallsToFund: row ? Number(row.avg_calls_to_fund) : 0,
+    leadToBookedPercent: totalLeads > 0 ? (totalCalls / totalLeads) * 100 : 0,
+    closeRate: showedCalls > 0 ? (fundedCount / showedCalls) * 100 : 0,
+    pipelineValue,
+    costPerReconnectCall: reconnectCalls > 0 ? totalAdSpend / reconnectCalls : 0,
+    costPerReconnectShowed: reconnectShowed > 0 ? totalAdSpend / reconnectShowed : 0,
+  };
+}
+
+/**
+ * Converts RPC results + daily_metrics into per-client SourceAggregatedMetrics.
+ * Ensures every client with ad spend in daily_metrics gets an entry, even if the
+ * RPC returned no lead/call data for them (e.g. GHL not configured).
  */
 export function buildClientMetricsFromRPC(
   rpcData: ClientSourceMetricsRow[],
@@ -58,59 +124,28 @@ export function buildClientMetricsFromRPC(
     dailyByClient[m.client_id].push(m);
   }
 
+  // Index RPC rows by client_id for fast lookup
+  const rpcByClient: Record<string, ClientSourceMetricsRow> = {};
+  for (const row of rpcData) {
+    rpcByClient[row.client_id] = row;
+  }
+
+  // Process all clients from RPC data (should include every client)
   for (const row of rpcData) {
     const clientDailyMetrics = dailyByClient[row.client_id] || [];
-    const dailyTotals = clientDailyMetrics.reduce(
-      (acc, day) => ({
-        totalAdSpend: acc.totalAdSpend + Number(day.ad_spend || 0),
-        totalClicks: acc.totalClicks + (day.clicks || 0),
-        totalImpressions: acc.totalImpressions + (day.impressions || 0),
-        totalCommitments: acc.totalCommitments + (day.commitments || 0),
-        commitmentDollars: acc.commitmentDollars + Number(day.commitment_dollars || 0),
-      }),
-      { totalAdSpend: 0, totalClicks: 0, totalImpressions: 0, totalCommitments: 0, commitmentDollars: 0 }
-    );
-
-    const totalAdSpend = dailyTotals.totalAdSpend;
-    const totalLeads = Number(row.total_leads);
-    const totalCalls = Number(row.total_calls);
-    const showedCalls = Number(row.showed_calls);
-    const reconnectCalls = Number(row.reconnect_calls);
-    const reconnectShowed = Number(row.reconnect_showed);
-    const fundedCount = Number(row.funded_count);
-    const fundedDollars = Number(row.funded_dollars);
-
+    const dailyTotals = aggregateDailyTotals(clientDailyMetrics);
     const defaultPipelineValue = clientFullSettings[row.client_id]?.default_lead_pipeline_value || 0;
-    const pipelineValue = defaultPipelineValue > 0 ? totalLeads * defaultPipelineValue : 0;
+    result[row.client_id] = buildSingleClientMetrics(dailyTotals, row, defaultPipelineValue);
+  }
 
-    result[row.client_id] = {
-      totalAdSpend,
-      totalLeads,
-      spamLeads: Number(row.spam_leads),
-      crmLeads: Number(row.crm_leads || 0),
-      totalCalls,
-      showedCalls,
-      reconnectCalls,
-      reconnectShowed,
-      totalCommitments: dailyTotals.totalCommitments,
-      commitmentDollars: dailyTotals.commitmentDollars,
-      fundedInvestors: fundedCount,
-      fundedDollars,
-      ctr: dailyTotals.totalImpressions > 0 ? (dailyTotals.totalClicks / dailyTotals.totalImpressions) * 100 : 0,
-      costPerLead: totalLeads > 0 ? totalAdSpend / totalLeads : 0,
-      costPerCall: totalCalls > 0 ? totalAdSpend / totalCalls : 0,
-      showedPercent: totalCalls > 0 ? (showedCalls / totalCalls) * 100 : 0,
-      costPerShow: showedCalls > 0 ? totalAdSpend / showedCalls : 0,
-      costPerInvestor: fundedCount > 0 ? totalAdSpend / fundedCount : 0,
-      costOfCapital: fundedDollars > 0 ? (totalAdSpend / fundedDollars) * 100 : 0,
-      avgTimeToFund: Number(row.avg_time_to_fund),
-      avgCallsToFund: Number(row.avg_calls_to_fund),
-      leadToBookedPercent: totalLeads > 0 ? (totalCalls / totalLeads) * 100 : 0,
-      closeRate: showedCalls > 0 ? (fundedCount / showedCalls) * 100 : 0,
-      pipelineValue,
-      costPerReconnectCall: reconnectCalls > 0 ? totalAdSpend / reconnectCalls : 0,
-      costPerReconnectShowed: reconnectShowed > 0 ? totalAdSpend / reconnectShowed : 0,
-    };
+  // Defensive: include any clients that have daily_metrics (ad spend) but were
+  // missing from the RPC results — ensures ad spend always shows on the dashboard
+  for (const clientId of Object.keys(dailyByClient)) {
+    if (!result[clientId]) {
+      const dailyTotals = aggregateDailyTotals(dailyByClient[clientId]);
+      const defaultPipelineValue = clientFullSettings[clientId]?.default_lead_pipeline_value || 0;
+      result[clientId] = buildSingleClientMetrics(dailyTotals, null, defaultPipelineValue);
+    }
   }
 
   return result;

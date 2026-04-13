@@ -54,7 +54,9 @@ Deno.serve(async (req) => {
 
   console.log(`[recalculate-daily-metrics] Range: ${startDate} to ${endDate}, client: ${clientId || "all"}`);
 
-  // Get active clients
+  // Get clients that should have their CRM metrics recalculated.
+  // Include paused clients so their leads/calls data stays current in daily_metrics.
+  // Note: ad_spend is never touched here — it's owned by sync-meta-ads.
   let clientsQuery = supabase
     .from("clients")
     .select("id, name")

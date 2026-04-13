@@ -203,8 +203,16 @@ export function DraggableClientTable({
         set.add(m.client_id);
       }
     });
+    // Un-mark clients as inactive if the RPC-based metrics show they have data
+    // (daily_metrics.leads may be stale if recalculate hasn't run yet)
+    for (const clientId of set) {
+      const m = metrics[clientId];
+      if (m && ((m.totalAdSpend || 0) > 0 || (m.crmLeads || 0) > 0 || (m.totalCalls || 0) > 0)) {
+        set.delete(clientId);
+      }
+    }
     return set;
-  }, [yesterdayMetrics, clients]);
+  }, [yesterdayMetrics, clients, metrics]);
   const duplicateMetaAccounts = useMemo(() => {
     const counts: Record<string, number> = {};
     clients.forEach(c => {
@@ -597,8 +605,8 @@ export function DraggableClientTable({
                         const crmTotal = m.crmLeads || 0;
                         const metaLeads = m.totalLeads || 0;
                         const hasAdSpend = (m.totalAdSpend || 0) > 0;
-                        // Flag: has ad spend but 0 CRM leads = GHL sync problem
-                        if (crmTotal === 0 && hasAdSpend) return 'text-destructive font-semibold';
+                        // Flag: client has ad spend but 0 CRM leads = GHL integration issue
+                        if (hasAdSpend && crmTotal === 0) return 'text-destructive font-semibold';
                         if (crmTotal === 0 && metaLeads === 0) return 'text-muted-foreground';
                         if (crmTotal >= metaLeads) return 'text-chart-2';
                         return 'text-destructive font-semibold';
@@ -606,7 +614,7 @@ export function DraggableClientTable({
                     )}>
                       <span className="flex items-center justify-end gap-0.5">
                         {m.crmLeads || 0}
-                        {(m.crmLeads || 0) === 0 && (m.totalAdSpend || 0) > 0 && (
+                        {(m.totalAdSpend || 0) > 0 && (m.crmLeads || 0) === 0 && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <AlertTriangle className="h-2.5 w-2.5 text-destructive shrink-0" />
@@ -640,6 +648,7 @@ export function DraggableClientTable({
                         const hasCalendars = (fullSettings[client.id]?.tracked_calendar_ids || []).length > 0;
                         if (!hasCalls && hasAdSpend && hasGHL && !hasCalendars) return 'text-destructive font-semibold';
                         if (!hasCalls && hasAdSpend && syncInfo.status !== 'healthy') return 'text-yellow-600 dark:text-yellow-500';
+                        if (!hasCalls && (m.crmLeads || 0) > 0) return 'text-yellow-600 dark:text-yellow-500';
                         return '';
                       })()
                     )}>
@@ -669,9 +678,7 @@ export function DraggableClientTable({
                     {/* Shows */}
                     <TableCell className={cn(
                       "text-right font-mono tabular-nums text-[11px] py-0 px-1",
-                      (m.showedCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && syncInfo.status !== 'healthy'
-                        ? 'text-yellow-600 dark:text-yellow-500'
-                        : ''
+                      (m.totalCalls || 0) > 0 && (m.showedCalls || 0) === 0 && 'text-yellow-600 dark:text-yellow-500'
                     )}>
                       {m.showedCalls || 0}
                     </TableCell>
