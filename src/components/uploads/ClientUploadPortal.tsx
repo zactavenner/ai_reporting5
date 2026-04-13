@@ -42,12 +42,13 @@ export function ClientUploadPortal({ clientId, clientName, isPublicView }: Clien
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewType, setPreviewType] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
+  const [sessionUploadIds, setSessionUploadIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const isProcessing = useRef(false);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
-  const { data: uploads = [], isLoading } = useQuery({
+  const { data: allUploads = [], isLoading } = useQuery({
     queryKey: ['client-file-uploads', clientId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -59,6 +60,11 @@ export function ClientUploadPortal({ clientId, clientName, isPublicView }: Clien
       return data as FileUpload[];
     },
   });
+
+  // Public users only see their own session uploads; agency sees all
+  const uploads = isPublicView
+    ? allUploads.filter(u => sessionUploadIds.includes(u.id))
+    : allUploads;
 
   const deleteMutation = useMutation({
     mutationFn: async (upload: FileUpload) => {
@@ -100,7 +106,7 @@ export function ClientUploadPortal({ clientId, clientName, isPublicView }: Clien
           }
         );
 
-        await supabase.from('client_file_uploads').insert({
+        const { data: insertedRow } = await supabase.from('client_file_uploads').insert({
           client_id: clientId,
           file_name: item.file.name,
           file_url: publicUrl,
@@ -108,7 +114,11 @@ export function ClientUploadPortal({ clientId, clientName, isPublicView }: Clien
           file_size_bytes: item.file.size,
           storage_path: storagePath,
           uploaded_by_name: uploaderName || (isPublicView ? 'Client' : 'Agency'),
-        });
+        }).select('id').single();
+
+        if (insertedRow) {
+          setSessionUploadIds(prev => [...prev, insertedRow.id]);
+        }
 
         setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'done' as const, progress: 100 } : q));
         successCount++;
@@ -314,7 +324,7 @@ export function ClientUploadPortal({ clientId, clientName, isPublicView }: Clien
       {/* File List */}
       <div className="space-y-3">
         <h3 className="text-lg font-semibold">
-          Uploaded Files ({uploads.length})
+          {isPublicView ? `Your Uploads (${uploads.length})` : `Uploaded Files (${uploads.length})`}
         </h3>
 
         {isLoading ? (
