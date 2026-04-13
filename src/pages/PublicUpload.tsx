@@ -8,7 +8,7 @@ import { CashBagLoader } from '@/components/ui/CashBagLoader';
 function PublicUploadContent() {
   const { token } = useParams<{ token: string }>();
   const { data: client, isLoading } = useClientByToken(token);
-  const { settings } = useClientSettings(client?.id || '');
+  const { data: settings } = useClientSettings(client?.id);
 
   if (isLoading) {
     return (
@@ -42,9 +42,14 @@ function PublicUploadContent() {
     </div>
   );
 
-  if (settings?.password_enabled && settings?.password_hash) {
+  const publicLinkPassword = settings?.public_link_password;
+  if (publicLinkPassword) {
     return (
-      <PublicLinkPasswordGate clientId={client.id} passwordHash={settings.password_hash}>
+      <PublicLinkPasswordGate
+        clientId={client.id}
+        clientName={client.name}
+        requiredPassword={publicLinkPassword}
+      >
         {content}
       </PublicLinkPasswordGate>
     );
