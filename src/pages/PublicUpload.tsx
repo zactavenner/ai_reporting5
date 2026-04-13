@@ -1,14 +1,11 @@
 import { useParams } from 'react-router-dom';
 import { useClientByToken } from '@/hooks/useClients';
-import { useClientSettings } from '@/hooks/useClientSettings';
-import { PublicLinkPasswordGate } from '@/components/auth/PublicLinkPasswordGate';
 import { ClientUploadPortal } from '@/components/uploads/ClientUploadPortal';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
 
 function PublicUploadContent() {
   const { token } = useParams<{ token: string }>();
   const { data: client, isLoading } = useClientByToken(token);
-  const { data: settings } = useClientSettings(client?.id);
 
   if (isLoading) {
     return (
@@ -26,7 +23,7 @@ function PublicUploadContent() {
     );
   }
 
-  const content = (
+  return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
         <div className="text-center mb-8">
@@ -41,21 +38,6 @@ function PublicUploadContent() {
       </div>
     </div>
   );
-
-  const publicLinkPassword = settings?.public_link_password;
-  if (publicLinkPassword) {
-    return (
-      <PublicLinkPasswordGate
-        clientId={client.id}
-        clientName={client.name}
-        requiredPassword={publicLinkPassword}
-      >
-        {content}
-      </PublicLinkPasswordGate>
-    );
-  }
-
-  return content;
 }
 
 export default function PublicUpload() {
