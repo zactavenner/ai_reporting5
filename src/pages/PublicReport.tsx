@@ -298,6 +298,14 @@ function PublicReportContent() {
             <Palette className="h-4 w-4 mr-1" />
             Creatives
           </Button>
+          <Button 
+            variant={activeSection === 'uploads' ? 'default' : 'outline'} 
+            size="sm"
+            onClick={() => setActiveSection('uploads')}
+          >
+            <Upload className="h-4 w-4 mr-1" />
+            Upload Files
+          </Button>
           {customTabs.map((tab) => (
             <Button 
               key={tab.id}
