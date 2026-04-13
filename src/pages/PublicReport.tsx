@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useClientByToken } from '@/hooks/useClients';
 import { TeamMemberProvider } from '@/contexts/TeamMemberContext';
@@ -29,7 +30,8 @@ import { SectionErrorBoundary } from '@/components/ui/SectionErrorBoundary';
 import { Button } from '@/components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
-import { ExternalLink, ClipboardList, Smartphone, Layers, AlertCircle, Palette } from 'lucide-react';
+import { ExternalLink, ClipboardList, Smartphone, Layers, AlertCircle, Palette, Upload } from 'lucide-react';
+import { ClientUploadPortal } from '@/components/uploads/ClientUploadPortal';
 import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
 import { VoiceRecordButton } from '@/components/voice/VoiceRecordButton';
 import { PipelineTab } from '@/components/pipeline/PipelineTab';
@@ -296,6 +298,14 @@ function PublicReportContent() {
             <Palette className="h-4 w-4 mr-1" />
             Creatives
           </Button>
+          <Button 
+            variant={activeSection === 'uploads' ? 'default' : 'outline'} 
+            size="sm"
+            onClick={() => setActiveSection('uploads')}
+          >
+            <Upload className="h-4 w-4 mr-1" />
+            Upload Files
+          </Button>
           {customTabs.map((tab) => (
             <Button 
               key={tab.id}
@@ -387,6 +397,17 @@ function PublicReportContent() {
         {activeSection === 'pipeline' && client && (
           <SectionErrorBoundary sectionName="Pipeline">
             <PipelineTab clientId={client.id} isPublicView={true} />
+          </SectionErrorBoundary>
+        )}
+
+        {/* Uploads Section */}
+        {activeSection === 'uploads' && client && (
+          <SectionErrorBoundary sectionName="File Uploads">
+            <ClientUploadPortal 
+              clientId={client.id} 
+              clientName={client.name} 
+              isPublicView={true}
+            />
           </SectionErrorBoundary>
         )}
 
