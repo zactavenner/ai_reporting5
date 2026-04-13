@@ -13,6 +13,7 @@ interface KanbanColumnProps {
   clientMap: Record<string, string>;
   memberMap: Record<string, AgencyMember>;
   taskAssigneeMap: Record<string, { members: AgencyMember[]; podName: string | null; podColor: string | null }>;
+  subtaskCounts?: Record<string, { total: number; done: number }>;
   onAddTask: () => void;
   onTaskClick: (task: Task) => void;
   isPublicView?: boolean;
@@ -26,6 +27,7 @@ export function KanbanColumn({
   clientMap, 
   memberMap,
   taskAssigneeMap,
+  subtaskCounts = {},
   onAddTask, 
   onTaskClick,
   isPublicView = false,
@@ -75,6 +77,7 @@ export function KanbanColumn({
                   clientName={task.client_id ? clientMap[task.client_id] : undefined}
                   assignee={task.assigned_to ? memberMap[task.assigned_to] : undefined}
                   taskAssignees={taskAssigneeMap[task.id]}
+                  subtaskInfo={subtaskCounts[task.id]}
                   onClick={() => onTaskClick(task)}
                   isPublicView={isPublicView}
                    isSelected={selectedTaskIds?.has(task.id) || false}

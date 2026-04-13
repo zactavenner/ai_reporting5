@@ -375,6 +375,28 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
 
 
 
+  // Bulk fetch subtask counts for all visible tasks
+  const { data: subtaskCounts = {} } = useQuery({
+    queryKey: ['subtask-counts', taskIds],
+    queryFn: async () => {
+      if (taskIds.length === 0) return {};
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('parent_task_id, stage')
+        .in('parent_task_id', taskIds);
+      if (error) throw error;
+      const map: Record<string, { total: number; done: number }> = {};
+      (data || []).forEach((row: any) => {
+        if (!row.parent_task_id) return;
+        if (!map[row.parent_task_id]) map[row.parent_task_id] = { total: 0, done: 0 };
+        map[row.parent_task_id].total++;
+        if (row.stage === 'done') map[row.parent_task_id].done++;
+      });
+      return map;
+    },
+    enabled: taskIds.length > 0,
+  });
+
   // Build a map: taskId → { assignee: AgencyMember | null, podName: string | null }
   const taskAssigneeMap = useMemo(() => {
     const map: Record<string, { members: AgencyMember[]; podName: string | null; podColor: string | null }> = {};
@@ -608,6 +630,7 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
                 clientMap={clientMap}
                 memberMap={memberMap}
                 taskAssigneeMap={taskAssigneeMap}
+                subtaskCounts={subtaskCounts}
                 onAddTask={() => handleAddTask(stage.id)}
                 onTaskClick={setSelectedTask}
                 isPublicView={isPublicView}
