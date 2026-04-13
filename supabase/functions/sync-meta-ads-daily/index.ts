@@ -23,6 +23,15 @@ Deno.serve(async (req) => {
 
   console.log(`[sync-meta-ads-daily] Starting daily sync for ${yesterdayStr}`);
 
+  // ── Create a sync_run for the orchestrator ──
+  const { data: orchestratorRun } = await supabase.from("sync_runs").insert({
+    function_name: "sync-meta-ads-daily",
+    started_at: new Date().toISOString(),
+    status: "running",
+    metadata: { date: yesterdayStr },
+  }).select("id").single();
+  const orchestratorRunId = orchestratorRun?.id;
+
   // Get all active clients with a meta_ad_account_id
   const { data: clients, error } = await supabase
     .from("clients")
@@ -32,6 +41,13 @@ Deno.serve(async (req) => {
 
   if (error || !clients) {
     console.error("Failed to fetch clients:", error);
+    if (orchestratorRunId) {
+      await supabase.from("sync_runs").update({
+        finished_at: new Date().toISOString(),
+        status: "failed",
+        error_message: "Failed to fetch clients",
+      }).eq("id", orchestratorRunId);
+    }
     return new Response(JSON.stringify({ success: false, error: "Failed to fetch clients" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -41,20 +57,20 @@ Deno.serve(async (req) => {
 
   const doSync = async () => {
     const results: Array<{ clientId: string; name: string; success: boolean; error?: string; backfilledDays?: string[] }> = [];
+    let totalRowsWritten = 0;
 
     for (let i = 0; i < clients.length; i++) {
       const client = clients[i];
       console.log(`[sync-meta-ads-daily] (${i + 1}/${clients.length}) Processing ${client.name}...`);
 
       try {
-        // ── Fix 1: Gap detection & backfill for last 14 days ──
+        // ── Gap detection & backfill for last 14 days ──
         const backfilledDays: string[] = [];
         try {
           const fourteenDaysAgo = new Date();
           fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
           const fourteenDaysAgoStr = fourteenDaysAgo.toISOString().split("T")[0];
 
-          // Query existing daily_metrics for this client in the last 14 days
           const { data: existingMetrics } = await supabase
             .from("daily_metrics")
             .select("date, ad_spend")
@@ -68,7 +84,6 @@ Deno.serve(async (req) => {
               .map((m: any) => m.date)
           );
 
-          // Find missing days
           const missingDays: string[] = [];
           const checkDate = new Date(fourteenDaysAgo);
           const yesterdayDate = new Date(yesterday);
@@ -83,7 +98,6 @@ Deno.serve(async (req) => {
           if (missingDays.length > 0) {
             console.log(`[sync-meta-ads-daily] ${client.name}: Found ${missingDays.length} missing days to backfill: ${missingDays.join(", ")}`);
 
-            // Group consecutive missing days into ranges for efficient API calls
             const ranges: Array<{ start: string; end: string }> = [];
             let rangeStart = missingDays[0];
             let rangeEnd = missingDays[0];
@@ -103,7 +117,6 @@ Deno.serve(async (req) => {
             }
             ranges.push({ start: rangeStart, end: rangeEnd });
 
-            // Backfill each range
             for (const range of ranges) {
               try {
                 console.log(`[sync-meta-ads-daily] ${client.name}: Backfilling ${range.start} to ${range.end}`);
@@ -124,6 +137,7 @@ Deno.serve(async (req) => {
                 if (data.success) {
                   console.log(`[sync-meta-ads-daily] ✓ ${client.name}: Backfilled ${range.start}-${range.end}`);
                   backfilledDays.push(`${range.start}-${range.end}`);
+                  totalRowsWritten += (data.dailyMetrics || 0);
                 } else {
                   console.error(`[sync-meta-ads-daily] ✗ ${client.name}: Backfill failed ${range.start}-${range.end}: ${data.error}`);
                 }
@@ -131,7 +145,6 @@ Deno.serve(async (req) => {
                 console.error(`[sync-meta-ads-daily] ✗ ${client.name}: Backfill error ${range.start}-${range.end}:`, backfillErr);
               }
 
-              // Small delay between backfill calls
               await new Promise(resolve => setTimeout(resolve, 5000));
             }
           } else {
@@ -158,19 +171,19 @@ Deno.serve(async (req) => {
         const data = await response.json();
         if (data.success) {
           console.log(`[sync-meta-ads-daily] ✓ ${client.name}: ${data.campaigns} campaigns, ${data.adSets} ad sets, ${data.ads} ads`);
+          totalRowsWritten += (data.dailyMetrics || 0);
           results.push({ clientId: client.id, name: client.name, success: true, backfilledDays });
         } else {
           console.error(`[sync-meta-ads-daily] ✗ ${client.name}: ${data.error}`);
           results.push({ clientId: client.id, name: client.name, success: false, error: data.error, backfilledDays });
         }
       } catch (err) {
-        // Fix 1: If one client fails, log error and continue to next
         const errMsg = err instanceof Error ? err.message : "Unknown error";
         console.error(`[sync-meta-ads-daily] ✗ ${client.name}: ${errMsg}`);
         results.push({ clientId: client.id, name: client.name, success: false, error: errMsg });
       }
 
-      // 30-second delay between clients to respect rate limits
+      // 30-second delay between clients
       if (i < clients.length - 1) {
         console.log(`[sync-meta-ads-daily] Waiting 30s before next client...`);
         await new Promise(resolve => setTimeout(resolve, 30000));
@@ -181,6 +194,18 @@ Deno.serve(async (req) => {
     const failed = results.filter(r => !r.success).length;
     const totalBackfilled = results.reduce((s, r) => s + (r.backfilledDays?.length || 0), 0);
     console.log(`[sync-meta-ads-daily] Complete: ${succeeded} succeeded, ${failed} failed, ${totalBackfilled} backfill ranges processed`);
+
+    // ── Update orchestrator sync_run ──
+    if (orchestratorRunId) {
+      await supabase.from("sync_runs").update({
+        finished_at: new Date().toISOString(),
+        status: failed > 0 ? "partial" : "completed",
+        rows_written: totalRowsWritten,
+        metadata: { date: yesterdayStr, succeeded, failed, totalBackfilled, clients: results.length },
+        error_message: failed > 0 ? `${failed} client(s) failed` : null,
+      }).eq("id", orchestratorRunId);
+    }
+
     return results;
   };
 
