@@ -1,8 +1,10 @@
 import { Client } from '@/hooks/useClients';
 import { ClientMRRSettings, calculateClientRevenue } from '@/hooks/useClientMRR';
 import { ClientSettings, getEffectiveMonthlyTarget } from '@/hooks/useClientSettings';
+import { useAgencyCostOfCapital } from '@/hooks/useAgencyPerformance';
+import { Sparkline } from './Sparkline';
 import { Card, CardContent } from '@/components/ui/card';
-import { Users, UserCheck, Pause, DollarSign, TrendingUp, Target } from 'lucide-react';
+import { Users, UserCheck, Pause, DollarSign, TrendingUp, Target, Percent } from 'lucide-react';
 
 interface AgencyStatsBarProps {
   clients: Client[];
@@ -23,8 +25,9 @@ export function AgencyStatsBar({
   const onboardingClients = clients.filter(c => c.status === 'onboarding').length;
   const pausedClients = clients.filter(c => c.status === 'paused' || c.status === 'on_hold').length;
   
+  const { costOfCapital, sparkline, isLoading: cocLoading } = useAgencyCostOfCapital();
+
   // Calculate total MRR with actual ad spend fees (current performance)
-  // Only include ACTIVE clients in revenue calculations (exclude paused, on_hold, inactive)
   const activeClientsForRevenue = clients.filter(c => c.status === 'active');
   
   let totalMRR = 0;
@@ -44,7 +47,6 @@ export function AgencyStatsBar({
   }
   
   // Calculate estimated monthly revenue based on targets
-  // Only include ACTIVE clients in revenue calculations
   let estimatedMonthlyRevenue = 0;
   for (const client of activeClientsForRevenue) {
     const fullSettings = clientFullSettings[client.id];
@@ -68,21 +70,21 @@ export function AgencyStatsBar({
   const baseStats = [
     {
       label: 'Active Clients',
-      value: activeClients,
+      value: activeClients.toString(),
       icon: UserCheck,
-      color: 'text-chart-2',
+      color: 'text-chart-2' as const,
     },
     {
       label: 'Onboarding',
-      value: onboardingClients,
+      value: onboardingClients.toString(),
       icon: Users,
-      color: 'text-primary',
+      color: 'text-primary' as const,
     },
     {
       label: 'On Hold / Paused',
-      value: pausedClients,
+      value: pausedClients.toString(),
       icon: Pause,
-      color: 'text-muted-foreground',
+      color: 'text-muted-foreground' as const,
     },
   ];
 
@@ -92,27 +94,26 @@ export function AgencyStatsBar({
       label: 'Current MRR',
       value: formatCurrency(totalMRR),
       icon: DollarSign,
-      color: 'text-chart-2',
+      color: 'text-chart-2' as const,
     },
     {
       label: 'Est. Monthly Rev',
       value: formatCurrency(estimatedMonthlyRevenue),
       icon: Target,
-      color: 'text-primary',
+      color: 'text-primary' as const,
     },
     {
       label: 'Projected Annual',
       value: formatCurrency(projectedAnnual),
       icon: TrendingUp,
-      color: 'text-chart-2',
+      color: 'text-chart-2' as const,
     },
   ];
 
   const stats = isAdmin ? [...baseStats, ...revenueStats] : baseStats;
-  const gridCols = isAdmin ? 'grid-cols-6' : 'grid-cols-3';
 
   return (
-    <div className={`grid ${gridCols} gap-4 mb-4`}>
+    <div className="grid grid-cols-3 lg:grid-cols-6 xl:grid-cols-7 gap-4 mb-4">
       {stats.map((stat) => (
         <Card key={stat.label} className="border-2">
           <CardContent className="p-4 flex items-center gap-3">
@@ -124,6 +125,26 @@ export function AgencyStatsBar({
           </CardContent>
         </Card>
       ))}
+
+      {/* Cost of Capital card with sparkline — admin only */}
+      {isAdmin && (
+        <Card className="border-2">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Percent className="h-5 w-5 text-chart-2 flex-shrink-0" />
+              <p className="text-2xl font-bold tabular-nums">
+                {cocLoading ? '—' : `${costOfCapital.toFixed(2)}%`}
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground mb-1.5">Cost of Capital</p>
+            {sparkline.length >= 2 && (
+              <div className="h-6">
+                <Sparkline data={sparkline} height={24} invertTrend />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

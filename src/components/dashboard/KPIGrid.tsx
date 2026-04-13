@@ -157,6 +157,22 @@ export function KPIGrid({
     for (const [kpiKey, col] of Object.entries(keyToColumn)) {
       map[kpiKey] = dailySnapshots.map(d => Number((d as any)[col]) || 0);
     }
+
+    // Compute derived sparklines from raw columns
+    // Cost of Capital % = ad_spend / funded_dollars * 100 (rolling weekly buckets)
+    if (map.totalAdSpend && map.fundedDollars) {
+      const bucketSize = 7;
+      const cocWeekly: number[] = [];
+      for (let i = 0; i < map.totalAdSpend.length; i += bucketSize) {
+        const spendSlice = map.totalAdSpend.slice(i, i + bucketSize);
+        const fundedSlice = map.fundedDollars.slice(i, i + bucketSize);
+        const spend = spendSlice.reduce((a, b) => a + b, 0);
+        const funded = fundedSlice.reduce((a, b) => a + b, 0);
+        cocWeekly.push(funded > 0 ? (spend / funded) * 100 : 0);
+      }
+      map['costOfCapital'] = cocWeekly;
+    }
+
     return map;
   }, [dailySnapshots]);
 
