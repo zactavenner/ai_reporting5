@@ -233,6 +233,16 @@ export default function ClientDetail() {
             </div>
           </div>
           <div className="flex items-center gap-1.5">
+            {(client.slug || client.public_token) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(`${window.location.origin}/public/${client.slug || client.public_token}`, '_blank')}
+              >
+                <ExternalLink className="h-4 w-4 mr-1.5" />
+                View Public Link
+              </Button>
+            )}
             <VoiceRecordButton clientId={client.id} clientName={client.name} isPublicView={false} />
             <ThemeToggle />
           </div>
