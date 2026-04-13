@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -13,6 +14,7 @@ interface KanbanColumnProps {
   clientMap: Record<string, string>;
   memberMap: Record<string, AgencyMember>;
   taskAssigneeMap: Record<string, { members: AgencyMember[]; podName: string | null; podColor: string | null }>;
+  subtaskCounts?: Record<string, { total: number; done: number }>;
   onAddTask: () => void;
   onTaskClick: (task: Task) => void;
   isPublicView?: boolean;
@@ -26,6 +28,7 @@ export function KanbanColumn({
   clientMap, 
   memberMap,
   taskAssigneeMap,
+  subtaskCounts = {},
   onAddTask, 
   onTaskClick,
   isPublicView = false,
@@ -35,6 +38,20 @@ export function KanbanColumn({
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
   });
+
+  // Compute total subtask stats for column header
+  const columnSubtaskStats = useMemo(() => {
+    let total = 0;
+    let done = 0;
+    tasks.forEach(t => {
+      const info = subtaskCounts[t.id];
+      if (info) {
+        total += info.total;
+        done += info.done;
+      }
+    });
+    return { total, done };
+  }, [tasks, subtaskCounts]);
 
   return (
     <div
@@ -52,6 +69,11 @@ export function KanbanColumn({
             <span className="bg-background text-foreground text-xs font-medium px-2 py-0.5 rounded-full">
               {tasks.length}
             </span>
+            {columnSubtaskStats.total > 0 && (
+              <span className="text-[10px] text-muted-foreground">
+                ({columnSubtaskStats.done}/{columnSubtaskStats.total} subtasks)
+              </span>
+            )}
           </div>
           <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onAddTask}>
             <Plus className="h-4 w-4" />
@@ -75,6 +97,7 @@ export function KanbanColumn({
                   clientName={task.client_id ? clientMap[task.client_id] : undefined}
                   assignee={task.assigned_to ? memberMap[task.assigned_to] : undefined}
                   taskAssignees={taskAssigneeMap[task.id]}
+                  subtaskInfo={subtaskCounts[task.id]}
                   onClick={() => onTaskClick(task)}
                   isPublicView={isPublicView}
                    isSelected={selectedTaskIds?.has(task.id) || false}

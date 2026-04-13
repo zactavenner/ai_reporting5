@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Repeat,
   EyeOff,
+  ListChecks,
 } from 'lucide-react';
 import { Task, AgencyMember, useUpdateTask, useTaskFiles, useCompleteRecurringTask } from '@/hooks/useTasks';
 import { format, isToday, isPast, parseISO, startOfDay } from 'date-fns';
@@ -26,6 +27,7 @@ interface KanbanTaskCardProps {
   clientName?: string;
   assignee?: AgencyMember;
   taskAssignees?: { members: AgencyMember[]; podName: string | null; podColor: string | null };
+  subtaskInfo?: { total: number; done: number };
   onClick?: () => void;
   isDragging?: boolean;
   isPublicView?: boolean;
@@ -38,6 +40,7 @@ export function KanbanTaskCard({
   clientName, 
   assignee,
   taskAssignees,
+  subtaskInfo,
   onClick,
   isDragging,
   isPublicView = false,
@@ -230,6 +233,25 @@ export function KanbanTaskCard({
           style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
             {task.description}
           </p>
+        )}
+
+        {/* Subtask Progress */}
+        {subtaskInfo && subtaskInfo.total > 0 && (
+          <div className="flex items-center gap-2 mb-2">
+            <ListChecks className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary rounded-full transition-all" 
+                style={{ width: `${Math.round((subtaskInfo.done / subtaskInfo.total) * 100)}%` }}
+              />
+            </div>
+            <span className={cn(
+              'text-[10px] font-medium flex-shrink-0',
+              subtaskInfo.done === subtaskInfo.total ? 'text-primary' : 'text-muted-foreground'
+            )}>
+              {subtaskInfo.done}/{subtaskInfo.total} ({Math.round((subtaskInfo.done / subtaskInfo.total) * 100)}%)
+            </span>
+          </div>
         )}
 
         {/* Footer */}
