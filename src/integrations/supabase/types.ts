@@ -7304,6 +7304,37 @@ export type Database = {
       }
     }
     Views: {
+      v_agency_performance_monthly: {
+        Row: {
+          ad_spend: number | null
+          calls: number | null
+          client_count: number | null
+          commitment_dollars: number | null
+          commitments: number | null
+          cost_of_capital_pct: number | null
+          cpa: number | null
+          cpl: number | null
+          dollar_per_call: number | null
+          dollar_per_show: number | null
+          funded_count: number | null
+          funded_dollars: number | null
+          leads: number | null
+          month_start: string | null
+          show_pct: number | null
+          showed_calls: number | null
+        }
+        Relationships: []
+      }
+      v_agency_performance_weekly: {
+        Row: {
+          ad_spend: number | null
+          client_count: number | null
+          cost_of_capital_pct: number | null
+          funded_dollars: number | null
+          week_start: string | null
+        }
+        Relationships: []
+      }
       v_client_performance_daily: {
         Row: {
           ad_spend: number | null
