@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Repeat,
   EyeOff,
+  ListChecks,
 } from 'lucide-react';
 import { Task, AgencyMember, useUpdateTask, useTaskFiles, useCompleteRecurringTask } from '@/hooks/useTasks';
 import { format, isToday, isPast, parseISO, startOfDay } from 'date-fns';
@@ -26,6 +27,7 @@ interface KanbanTaskCardProps {
   clientName?: string;
   assignee?: AgencyMember;
   taskAssignees?: { members: AgencyMember[]; podName: string | null; podColor: string | null };
+  subtaskInfo?: { total: number; done: number };
   onClick?: () => void;
   isDragging?: boolean;
   isPublicView?: boolean;
@@ -38,6 +40,7 @@ export function KanbanTaskCard({
   clientName, 
   assignee,
   taskAssignees,
+  subtaskInfo,
   onClick,
   isDragging,
   isPublicView = false,
