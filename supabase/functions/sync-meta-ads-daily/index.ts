@@ -7,6 +7,36 @@ const corsHeaders = {
 
 declare const EdgeRuntime: { waitUntil: (promise: Promise<any>) => void } | undefined;
 
+// ── Timezone-aware date helper ──
+// Returns a date string (YYYY-MM-DD) for "today" or "N days ago" in a given timezone.
+function getDateInTimezone(tz: string, daysOffset = 0): string {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(now);
+  const y = parts.find(p => p.type === "year")!.value;
+  const m = parts.find(p => p.type === "month")!.value;
+  const d = parts.find(p => p.type === "day")!.value;
+  const localDate = new Date(`${y}-${m}-${d}T12:00:00`);
+  localDate.setDate(localDate.getDate() + daysOffset);
+  return localDate.toISOString().split("T")[0];
+}
+
+// Get the ad account's cached timezone, falling back to America/New_York
+async function getCachedTimezone(supabase: any, adAccountId: string): Promise<string> {
+  const normalizedId = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
+  const { data } = await supabase
+    .from("meta_ad_accounts")
+    .select("timezone_name")
+    .eq("ad_account_id", normalizedId)
+    .maybeSingle();
+  return data?.timezone_name || "America/New_York";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -16,12 +46,12 @@ Deno.serve(async (req) => {
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // Compute yesterday's date (UTC to avoid off-by-one timezone issues)
-  const yesterday = new Date();
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split("T")[0];
+  // Fallback: compute yesterday in UTC (used only if no per-account timezone)
+  const yesterdayUTC = new Date();
+  yesterdayUTC.setUTCDate(yesterdayUTC.getUTCDate() - 1);
+  const yesterdayUTCStr = yesterdayUTC.toISOString().split("T")[0];
 
-  console.log(`[sync-meta-ads-daily] Starting daily sync for ${yesterdayStr}`);
+  console.log(`[sync-meta-ads-daily] Starting daily sync (UTC fallback date: ${yesterdayUTCStr})`);
 
   // Get all active/onboarding/paused clients with a meta_ad_account_id
   const { data: clients, error } = await supabase
@@ -40,19 +70,22 @@ Deno.serve(async (req) => {
   console.log(`[sync-meta-ads-daily] Found ${clients.length} clients with ad accounts`);
 
   const doSync = async () => {
-    const results: Array<{ clientId: string; name: string; success: boolean; error?: string; backfilledDays?: string[] }> = [];
+    const results: Array<{ clientId: string; name: string; success: boolean; error?: string; backfilledDays?: string[]; timezone?: string }> = [];
 
     for (let i = 0; i < clients.length; i++) {
       const client = clients[i];
       console.log(`[sync-meta-ads-daily] (${i + 1}/${clients.length}) Processing ${client.name}...`);
 
       try {
-        // ── Fix 1: Gap detection & backfill for last 14 days ──
+        // Use the ad account's timezone for "yesterday" calculation
+        const accountTz = await getCachedTimezone(supabase, client.meta_ad_account_id);
+        const yesterdayStr = getDateInTimezone(accountTz, -1);
+        console.log(`[sync-meta-ads-daily] ${client.name}: using timezone ${accountTz}, yesterday = ${yesterdayStr}`);
+
+        // ── Gap detection & backfill for last 14 days (in account timezone) ──
         const backfilledDays: string[] = [];
         try {
-          const fourteenDaysAgo = new Date();
-          fourteenDaysAgo.setUTCDate(fourteenDaysAgo.getUTCDate() - 14);
-          const fourteenDaysAgoStr = fourteenDaysAgo.toISOString().split("T")[0];
+          const fourteenDaysAgoStr = getDateInTimezone(accountTz, -14);
 
           // Query existing daily_metrics for this client in the last 14 days
           const { data: existingMetrics } = await supabase
@@ -70,14 +103,14 @@ Deno.serve(async (req) => {
 
           // Find missing days
           const missingDays: string[] = [];
-          const checkDate = new Date(fourteenDaysAgo);
-          const yesterdayDate = new Date(yesterday);
+          const checkDate = new Date(`${fourteenDaysAgoStr}T12:00:00`);
+          const yesterdayDate = new Date(`${yesterdayStr}T12:00:00`);
           while (checkDate <= yesterdayDate) {
             const dateStr = checkDate.toISOString().split("T")[0];
             if (!existingDates.has(dateStr)) {
               missingDays.push(dateStr);
             }
-            checkDate.setUTCDate(checkDate.getUTCDate() + 1);
+            checkDate.setDate(checkDate.getDate() + 1);
           }
 
           if (missingDays.length > 0) {
@@ -157,11 +190,11 @@ Deno.serve(async (req) => {
 
         const data = await response.json();
         if (data.success) {
-          console.log(`[sync-meta-ads-daily] ✓ ${client.name}: ${data.campaigns} campaigns, ${data.adSets} ad sets, ${data.ads} ads`);
-          results.push({ clientId: client.id, name: client.name, success: true, backfilledDays });
+          console.log(`[sync-meta-ads-daily] ✓ ${client.name}: ${data.campaigns} campaigns, ${data.adSets} ad sets, ${data.ads} ads (tz: ${accountTz})`);
+          results.push({ clientId: client.id, name: client.name, success: true, backfilledDays, timezone: accountTz });
         } else {
           console.error(`[sync-meta-ads-daily] ✗ ${client.name}: ${data.error}`);
-          results.push({ clientId: client.id, name: client.name, success: false, error: data.error, backfilledDays });
+          results.push({ clientId: client.id, name: client.name, success: false, error: data.error, backfilledDays, timezone: accountTz });
         }
       } catch (err) {
         // Fix 1: If one client fails, log error and continue to next
@@ -190,13 +223,13 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       message: `Daily Meta Ads sync started for ${clients.length} clients (background, with gap detection)`,
-      date: yesterdayStr,
+      date: yesterdayUTCStr,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } else {
     const results = await doSync();
     return new Response(JSON.stringify({
       success: true,
-      date: yesterdayStr,
+      date: yesterdayUTCStr,
       results,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
