@@ -3145,6 +3145,7 @@ export type Database = {
           created_at: string
           ctr: number | null
           date: string
+          date_account_tz: string | null
           funded_dollars: number | null
           funded_investors: number | null
           funded_on_day: number | null
@@ -3172,6 +3173,7 @@ export type Database = {
           created_at?: string
           ctr?: number | null
           date: string
+          date_account_tz?: string | null
           funded_dollars?: number | null
           funded_investors?: number | null
           funded_on_day?: number | null
@@ -3199,6 +3201,7 @@ export type Database = {
           created_at?: string
           ctr?: number | null
           date?: string
+          date_account_tz?: string | null
           funded_dollars?: number | null
           funded_investors?: number | null
           funded_on_day?: number | null
@@ -5021,6 +5024,24 @@ export type Database = {
           },
         ]
       }
+      meta_ad_accounts: {
+        Row: {
+          ad_account_id: string
+          last_seen_at: string
+          timezone_name: string
+        }
+        Insert: {
+          ad_account_id: string
+          last_seen_at?: string
+          timezone_name?: string
+        }
+        Update: {
+          ad_account_id?: string
+          last_seen_at?: string
+          timezone_name?: string
+        }
+        Relationships: []
+      }
       meta_ad_sets: {
         Row: {
           attributed_calls: number | null
@@ -5299,6 +5320,53 @@ export type Database = {
           },
           {
             foreignKeyName: "meta_ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meta_api_calls: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          duration_ms: number | null
+          endpoint: string
+          error: string | null
+          id: string
+          params: Json | null
+          response_summary: Json | null
+          started_at: string
+          status_code: number | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          endpoint: string
+          error?: string | null
+          id?: string
+          params?: Json | null
+          response_summary?: Json | null
+          started_at?: string
+          status_code?: number | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          endpoint?: string
+          error?: string | null
+          id?: string
+          params?: Json | null
+          response_summary?: Json | null
+          started_at?: string
+          status_code?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_api_calls_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
@@ -6568,6 +6636,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sync_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_runs: {
+        Row: {
+          client_id: string | null
+          error_message: string | null
+          finished_at: string | null
+          function_name: string
+          id: string
+          metadata: Json | null
+          rows_written: number | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          client_id?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          function_name: string
+          id?: string
+          metadata?: Json | null
+          rows_written?: number | null
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          client_id?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          function_name?: string
+          id?: string
+          metadata?: Json | null
+          rows_written?: number | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_runs_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
