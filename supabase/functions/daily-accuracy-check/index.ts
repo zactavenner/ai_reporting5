@@ -207,6 +207,18 @@ Deno.serve(async (req) => {
     `[daily-accuracy-check] Complete: ${discrepancies.length} discrepancies across ${clientsNeedingFix.size} clients, ${autoFixedClients} auto-fixed`
   );
 
+  // Log sync run for observability
+  await supabase.from("sync_runs").insert({
+    client_id: null,
+    source: "reconciliation",
+    function_name: "daily-accuracy-check",
+    finished_at: new Date().toISOString(),
+    status: discrepancies.length > 0 ? "partial" : "success",
+    rows_written: autoFixedClients,
+    error_message: discrepancies.length > 0 ? `${discrepancies.length} discrepancies found` : null,
+    metadata: { mode, startDate, endDate, discrepanciesFound: discrepancies.length, clientsWithIssues: clientsNeedingFix.size, autoFixedClients },
+  }).then(() => {});
+
   return new Response(
     JSON.stringify({
       success: true,

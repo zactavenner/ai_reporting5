@@ -226,6 +226,19 @@ Deno.serve(async (req) => {
     const totalUpdated = summary.reduce((s, c) => s + c.daysUpdated, 0);
     const totalErrors = summary.reduce((s, c) => s + c.errors.length, 0);
     console.log(`[recalculate-daily-metrics] Complete: ${totalUpdated} days across ${clients.length} clients, ${totalErrors} errors`);
+
+    // Log sync run for observability
+    await supabase.from("sync_runs").insert({
+      client_id: clientId || null,
+      source: "ghl",
+      function_name: "recalculate-daily-metrics",
+      finished_at: new Date().toISOString(),
+      status: totalErrors > 0 ? "partial" : "success",
+      rows_written: totalUpdated,
+      error_message: totalErrors > 0 ? `${totalErrors} errors across clients` : null,
+      metadata: { clients: clients.length, totalUpdated, totalErrors, dateRange: { startDate, endDate } },
+    }).then(() => {});
+
     return { success: true, summary, totalUpdated, totalErrors };
   };
 
