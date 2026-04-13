@@ -1,0 +1,76 @@
+diff --git a/src/components/dashboard/DataAccuracyAuditPanel.tsx b/src/components/dashboard/DataAccuracyAuditPanel.tsx
+index 38c1456..1202ca7 100644
+--- a/src/components/dashboard/DataAccuracyAuditPanel.tsx
++++ b/src/components/dashboard/DataAccuracyAuditPanel.tsx
+@@ -1,4 +1,6 @@
+ import { useState } from 'react';
++import { useQuery, useQueryClient } from '@tanstack/react-query';
++import { supabase } from '@/integrations/supabase/client';
+ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+ import { Badge } from '@/components/ui/badge';
+ import { Button } from '@/components/ui/button';
+@@ -189,6 +191,29 @@ function SourceBadge({ source }: { source: string }) {
+ export function DataAccuracyAuditPanel() {
+   const [activeTab, setActiveTab] = useState<'overview' | 'ghl' | 'meta' | 'history'>('overview');
+   const [isRefreshing, setIsRefreshing] = useState(false);
++  const queryClient = useQueryClient();
++
++  // Fetch live accuracy log data from sync_accuracy_log table
++  const { data: liveAccuracyData } = useQuery({
++    queryKey: ['accuracy-audit-live'],
++    queryFn: async () => {
++      const thirtyDaysAgo = new Date();
++      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
++      const { data, error } = await supabase
++        .from('sync_accuracy_log')
++        .select('*, clients!inner(name)')
++        .gte('created_at', thirtyDaysAgo.toISOString())
++        .order('created_at', { ascending: false })
++        .limit(500);
++      if (error) throw error;
++      return data || [];
++    },
++    staleTime: 5 * 60 * 1000,
++  });
++
++  // Compute live stats from sync_accuracy_log if available
++  const liveDiscrepancies = liveAccuracyData?.filter((d: any) => d.discrepancy !== 0) || [];
++  const liveFixedCount = liveAccuracyData?.filter((d: any) => d.auto_fixed) || [];
+ 
+   const totalChecks = GHL_CHECKS.length + META_CHECKS.length;
+   const allChecks = [...GHL_CHECKS, ...META_CHECKS];
+@@ -196,9 +221,20 @@ export function DataAccuracyAuditPanel() {
+   const failed = allChecks.filter(c => c.status === 'FAIL').length;
+   const passRate = totalChecks > 0 ? (passed / totalChecks) * 100 : 0;
+ 
+-  const handleRefresh = () => {
++  const handleRefresh = async () => {
+     setIsRefreshing(true);
+-    setTimeout(() => setIsRefreshing(false), 1500);
++    try {
++      // Actually trigger the daily-accuracy-check edge function
++      await supabase.functions.invoke('daily-accuracy-check', {
++        body: { manual: true },
++      });
++      // Invalidate the live accuracy data query
++      queryClient.invalidateQueries({ queryKey: ['accuracy-audit-live'] });
++    } catch (err) {
++      console.error('Accuracy check failed:', err);
++    } finally {
++      setIsRefreshing(false);
++    }
+   };
+ 
+   const tabs = [
+@@ -222,6 +258,11 @@ export function DataAccuracyAuditPanel() {
+             <h2 className="text-base font-semibold">Data Accuracy Audit</h2>
+             <p className="text-xs text-muted-foreground">
+               Last run: {AUDIT_TIMESTAMP.replace('T', ' ').replace('Z', ' UTC')} &bull; Period: {PERIOD}
++              {liveAccuracyData && liveAccuracyData.length > 0 && (
++                <span className="ml-2 text-blue-400">
++                  &bull; Live: {liveDiscrepancies.length} discrepancies found, {liveFixedCount.length} auto-fixed
++                </span>
++              )}
+             </p>
+           </div>
+         </div>

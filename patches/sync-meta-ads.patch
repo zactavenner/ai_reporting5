@@ -1,0 +1,307 @@
+diff --git a/supabase/functions/sync-meta-ads/index.ts b/supabase/functions/sync-meta-ads/index.ts
+index f14348d..f6295b8 100644
+--- a/supabase/functions/sync-meta-ads/index.ts
++++ b/supabase/functions/sync-meta-ads/index.ts
+@@ -8,15 +8,26 @@ const corsHeaders = {
+ const META_GRAPH_API_VERSION = "v21.0";
+ const META_GRAPH_API_URL = `https://graph.facebook.com/${META_GRAPH_API_VERSION}`;
+ 
++// Attribution windows — always explicit to prevent drift from Meta defaults
++const ATTRIBUTION_WINDOWS = '["7d_click","1d_view"]';
++
+ interface MetaApiResponse {
+   data?: any[];
+   paging?: { next?: string };
+   error?: { message: string; type: string; code: number };
++  // For non-insights endpoints (e.g. ad account info)
++  timezone_name?: string;
++  name?: string;
++  currency?: string;
++  [key: string]: any;
+ }
+ 
+ // ── Strict Meta API call budget ──
+ const META_API_CALL_LIMIT = 190;
+ let metaApiCallCount = 0;
++// Supabase client ref for API call logging (set in handler)
++let _supabaseForLogging: any = null;
++let _clientIdForLogging: string | null = null;
+ 
+ function checkCallBudget(label: string) {
+   if (metaApiCallCount >= META_API_CALL_LIMIT) {
+@@ -29,12 +40,109 @@ async function fetchMeta(url: string, accessToken: string, label = "unknown"): P
+   metaApiCallCount++;
+   console.log(`Meta API call #${metaApiCallCount}/${META_API_CALL_LIMIT}: ${label}`);
+   const separator = url.includes("?") ? "&" : "?";
++  const startTime = Date.now();
+   const res = await fetch(`${url}${separator}access_token=${accessToken}`);
++  const durationMs = Date.now() - startTime;
+   if (!res.ok) {
+     const errBody = await res.text();
++    // Log failed API calls
++    if (_supabaseForLogging) {
++      await _supabaseForLogging.from("meta_api_calls").insert({
++        client_id: _clientIdForLogging,
++        endpoint: label,
++        params: { url: url.replace(/access_token=[^&]+/, 'access_token=REDACTED') },
++        started_at: new Date(startTime).toISOString(),
++        duration_ms: durationMs,
++        status_code: res.status,
++        error: errBody.substring(0, 1000),
++      }).then(() => {});
++    }
+     throw new Error(`Meta API ${res.status}: ${errBody.substring(0, 500)}`);
+   }
+-  return res.json();
++  const json = await res.json();
++  // Log successful API calls (fire-and-forget)
++  if (_supabaseForLogging) {
++    _supabaseForLogging.from("meta_api_calls").insert({
++      client_id: _clientIdForLogging,
++      endpoint: label,
++      params: { url: url.replace(/access_token=[^&]+/, 'access_token=REDACTED') },
++      started_at: new Date(startTime).toISOString(),
++      duration_ms: durationMs,
++      status_code: res.status,
++      response_summary: { rows: json.data?.length || 0 },
++    }).then(() => {});
++  }
++  return json;
++}
++
++// ── Ad Account Timezone Helper ──
++// Fetches and caches the ad account's timezone_name from Meta Graph API.
++// Cache lives in meta_ad_accounts table, refreshed every 24 hours.
++async function getAdAccountTimezone(
++  adAccountId: string,
++  accessToken: string,
++  supabase: any,
++  clientId: string
++): Promise<string> {
++  // Check cache first
++  const { data: cached } = await supabase
++    .from("meta_ad_accounts")
++    .select("timezone_name, last_seen_at")
++    .eq("ad_account_id", adAccountId)
++    .maybeSingle();
++
++  if (cached) {
++    const cacheAge = Date.now() - new Date(cached.last_seen_at).getTime();
++    const twentyFourHours = 24 * 60 * 60 * 1000;
++    if (cacheAge < twentyFourHours) {
++      console.log(`Using cached timezone for ${adAccountId}: ${cached.timezone_name}`);
++      return cached.timezone_name;
++    }
++  }
++
++  // Fetch from Meta Graph API
++  try {
++    const url = `${META_GRAPH_API_URL}/${adAccountId}?fields=timezone_name,name,currency`;
++    const res = await fetchMeta(url, accessToken, "ad-account-timezone");
++    const timezoneName = res.timezone_name || "America/New_York";
++    console.log(`Fetched timezone for ${adAccountId}: ${timezoneName}`);
++
++    // Upsert to cache
++    await supabase.from("meta_ad_accounts").upsert({
++      ad_account_id: adAccountId,
++      client_id: clientId,
++      timezone_name: timezoneName,
++      name: res.name || null,
++      currency: res.currency || "USD",
++      last_seen_at: new Date().toISOString(),
++    }, { onConflict: "ad_account_id" });
++
++    return timezoneName;
++  } catch (err) {
++    console.warn(`Failed to fetch timezone for ${adAccountId}, using fallback:`, err);
++    return cached?.timezone_name || "America/New_York";
++  }
++}
++
++// ── Timezone-aware date helpers ──
++// Compute "yesterday" in the ad account's timezone, not UTC.
++function getDateInTimezone(tz: string, daysOffset = 0): string {
++  // Use Intl.DateTimeFormat to get the current date in the target timezone
++  const now = new Date();
++  const formatter = new Intl.DateTimeFormat("en-CA", {
++    timeZone: tz,
++    year: "numeric",
++    month: "2-digit",
++    day: "2-digit",
++  });
++  // Parse the formatted date
++  const parts = formatter.formatToParts(now);
++  const y = parts.find(p => p.type === "year")!.value;
++  const m = parts.find(p => p.type === "month")!.value;
++  const d = parts.find(p => p.type === "day")!.value;
++  const localDate = new Date(`${y}-${m}-${d}T12:00:00`); // noon to avoid DST edge
++  localDate.setDate(localDate.getDate() + daysOffset);
++  return localDate.toISOString().split("T")[0];
+ }
+ 
+ async function fetchAllPages(url: string, accessToken: string, limit = 100, label = "unknown"): Promise<any[]> {
+@@ -458,6 +566,14 @@ Deno.serve(async (req) => {
+ 
+     console.log(`Syncing Meta Ads for ${client.name} (${adAccountId})`);
+ 
++    // Set up API call logging context
++    _supabaseForLogging = supabase;
++    _clientIdForLogging = clientId;
++
++    // ── 0. Fetch ad account timezone ──
++    const accountTimezone = await getAdAccountTimezone(adAccountId, accessToken, supabase, clientId);
++    console.log(`Ad account timezone: ${accountTimezone}`);
++
+     // ── 1. Fetch Campaigns ──
+     const campaignFields = "id,name,status,objective,buying_type,daily_budget,lifetime_budget,budget_remaining,start_time,stop_time,created_time,updated_time";
+     const campaigns = await fetchAllPages(
+@@ -494,12 +610,13 @@ Deno.serve(async (req) => {
+     const campaignIdMap = new Map((dbCampaigns || []).map((c: any) => [c.meta_campaign_id, c.id]));
+ 
+     // ── 2. Fetch Daily Breakdown (highest priority for dashboard) ──
++    // Now includes attribution windows, reach, frequency, and actions
+     let dailyRows = 0;
+     try {
+-      const dailyFields = "spend,impressions,clicks,inline_link_click_ctr";
++      const dailyFields = "spend,impressions,clicks,inline_link_click_ctr,reach,frequency,actions,action_values";
+       checkCallBudget("daily-insights");
+       const dailyInsights = await fetchAllPages(
+-        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=${dailyFields}&${getTimeRange(startDate, endDate)}&time_increment=1&level=account`,
++        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=${dailyFields}&${getTimeRange(startDate, endDate)}&time_increment=1&level=account&action_attribution_windows=${ATTRIBUTION_WINDOWS}`,
+         accessToken, 100, "daily-insights"
+       );
+       console.log(`Fetched ${dailyInsights.length} daily insight rows`);
+@@ -508,6 +625,9 @@ Deno.serve(async (req) => {
+         const dateStr = day.date_start;
+         if (!dateStr) continue;
+ 
++        // Use the date as-is from Meta — it's in the ad account's timezone
++        const dateAccountTz = dateStr;
++
+         const { data: existing } = await supabase
+           .from("daily_metrics")
+           .select("id")
+@@ -515,21 +635,23 @@ Deno.serve(async (req) => {
+           .eq("date", dateStr)
+           .maybeSingle();
+ 
++        const metricsPayload = {
++          ad_spend: Number(day.spend) || 0,
++          impressions: Number(day.impressions) || 0,
++          clicks: Number(day.clicks) || 0,
++          ctr: Number(day.inline_link_click_ctr) || 0,
++          reach: Number(day.reach) || 0,
++          frequency: Number(day.frequency) || 0,
++          date_account_tz: dateAccountTz,
++        };
++
+         if (existing) {
+-          await supabase.from("daily_metrics").update({
+-            ad_spend: Number(day.spend) || 0,
+-            impressions: Number(day.impressions) || 0,
+-            clicks: Number(day.clicks) || 0,
+-            ctr: Number(day.inline_link_click_ctr) || 0,
+-          }).eq("id", existing.id);
++          await supabase.from("daily_metrics").update(metricsPayload).eq("id", existing.id);
+         } else {
+           await supabase.from("daily_metrics").insert({
+             client_id: clientId,
+             date: dateStr,
+-            ad_spend: Number(day.spend) || 0,
+-            impressions: Number(day.impressions) || 0,
+-            clicks: Number(day.clicks) || 0,
+-            ctr: Number(day.inline_link_click_ctr) || 0,
++            ...metricsPayload,
+           });
+         }
+         dailyRows++;
+@@ -659,12 +781,12 @@ Deno.serve(async (req) => {
+     }
+     console.log(`Fetched ${hdVideosFetched} HD video source URLs`);
+ 
+-    // ── 5. Fetch Per-Entity Insights ──
++    // ── 5. Fetch Per-Entity Insights (with attribution windows) ──
+     try {
+-      const insightsFields = "campaign_id,impressions,clicks,spend,ctr,cpc,cpm";
++      const insightsFields = "campaign_id,impressions,clicks,spend,ctr,cpc,cpm,actions,action_values";
+       checkCallBudget("campaign-insights");
+       const insights = await fetchAllPages(
+-        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=${insightsFields}&level=campaign&${getTimeRange(startDate, endDate)}&time_increment=all_days`,
++        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=${insightsFields}&level=campaign&${getTimeRange(startDate, endDate)}&time_increment=all_days&action_attribution_windows=${ATTRIBUTION_WINDOWS}`,
+         accessToken, 50, "campaign-insights"
+       );
+       for (const ins of insights) {
+@@ -680,7 +802,7 @@ Deno.serve(async (req) => {
+ 
+       checkCallBudget("adset-insights");
+       const adSetInsights = await fetchAllPages(
+-        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=adset_id,impressions,clicks,spend,ctr,cpc,cpm,reach,frequency&level=adset&${getTimeRange(startDate, endDate)}&time_increment=all_days&filtering=[{"field":"spend","operator":"GREATER_THAN","value":"0"}]`,
++        `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=adset_id,impressions,clicks,spend,ctr,cpc,cpm,reach,frequency,actions&level=adset&${getTimeRange(startDate, endDate)}&time_increment=all_days&action_attribution_windows=${ATTRIBUTION_WINDOWS}&filtering=[{"field":"spend","operator":"GREATER_THAN","value":"0"}]`,
+         accessToken, 50, "adset-insights"
+       );
+       for (const ins of adSetInsights) {
+@@ -705,7 +827,7 @@ Deno.serve(async (req) => {
+         const chunkTimeRange = `time_range={"since":"${chunk.since}","until":"${chunk.until}"}`;
+         try {
+           const adInsights = await fetchAllPages(
+-            `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,ctr,cpc,cpm,reach&level=ad&${chunkTimeRange}&time_increment=all_days&filtering=[{"field":"spend","operator":"GREATER_THAN","value":"0"}]`,
++            `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,ctr,cpc,cpm,reach,actions&level=ad&${chunkTimeRange}&time_increment=all_days&action_attribution_windows=${ATTRIBUTION_WINDOWS}&filtering=[{"field":"spend","operator":"GREATER_THAN","value":"0"}]`,
+             accessToken, 50, `ad-insights ${chunk.since}-${chunk.until}`
+           );
+           for (const ins of adInsights) {
+@@ -780,6 +902,27 @@ Deno.serve(async (req) => {
+     }, { onConflict: "client_id" });
+ 
+     console.log(`Sync complete. Total Meta API calls: ${metaApiCallCount}/${META_API_CALL_LIMIT}`);
++
++    // Log sync run for observability
++    await supabase.from("sync_runs").insert({
++      client_id: clientId,
++      source: "meta",
++      function_name: "sync-meta-ads",
++      started_at: new Date(Date.now() - metaApiCallCount * 200).toISOString(), // approx start
++      finished_at: new Date().toISOString(),
++      status: "success",
++      rows_written: dailyRows,
++      metadata: {
++        campaigns: campaigns.length,
++        adSets: adSets.length,
++        ads: ads.length,
++        dailyMetrics: dailyRows,
++        metaApiCalls: metaApiCallCount,
++        timezone: accountTimezone,
++        attributionWindows: ATTRIBUTION_WINDOWS,
++      },
++    }).then(() => {});
++
+     return new Response(JSON.stringify({
+       success: true,
+       campaigns: campaigns.length,
+@@ -787,9 +930,27 @@ Deno.serve(async (req) => {
+       ads: ads.length,
+       dailyMetrics: dailyRows,
+       metaApiCalls: metaApiCallCount,
++      timezone: accountTimezone,
+     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+   } catch (error) {
+     console.error("sync-meta-ads error:", error);
++
++    // Log failed sync run
++    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
++    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
++    try {
++      const sb = createClient(supabaseUrl, supabaseKey);
++      await sb.from("sync_runs").insert({
++        client_id: _clientIdForLogging,
++        source: "meta",
++        function_name: "sync-meta-ads",
++        finished_at: new Date().toISOString(),
++        status: "failed",
++        rows_written: 0,
++        error_message: error instanceof Error ? error.message : "Unknown error",
++      });
++    } catch (_) { /* best effort */ }
++
+     return new Response(JSON.stringify({
+       success: false,
+       error: error instanceof Error ? error.message : "Unknown error",
