@@ -497,6 +497,62 @@ export default function ClientDetail() {
               </div>
             </div>
 
+            {/* Public Links */}
+            <div className="space-y-3">
+              <h2 className="text-lg font-bold">Public Links</h2>
+              <div className="border border-border rounded-lg p-4 bg-card space-y-3">
+                {(client.slug || client.public_token) ? (
+                  <>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Client Dashboard</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const url = `${window.location.origin}/public/${client.slug || client.public_token}`;
+                            navigator.clipboard.writeText(url);
+                            toast.success('Dashboard link copied!');
+                          }}
+                        >
+                          <Copy className="h-3.5 w-3.5 mr-1.5" />
+                          Copy Link
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded truncate">
+                        {window.location.origin}/public/{client.slug || client.public_token}
+                      </p>
+                    </div>
+                    <div className="border-t border-border pt-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium">Upload Portal</span>
+                          <p className="text-xs text-muted-foreground">No password required — anyone with this link can upload files</p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const url = `${window.location.origin}/upload/${client.slug || client.public_token}`;
+                            navigator.clipboard.writeText(url);
+                            toast.success('Upload link copied!');
+                          }}
+                        >
+                          <Copy className="h-3.5 w-3.5 mr-1.5" />
+                          Copy Link
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded truncate mt-2">
+                        {window.location.origin}/upload/{client.slug || client.public_token}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No public link available. Generate one in Client Settings.</p>
+                )}
+              </div>
+            </div>
+
             {/* Slack Integration */}
             <SectionErrorBoundary sectionName="Slack Integration">
               <h2 className="text-lg font-bold mb-3">Slack Integration</h2>
