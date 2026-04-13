@@ -39,6 +39,20 @@ export function KanbanColumn({
     id: stage.id,
   });
 
+  // Compute total subtask stats for column header
+  const columnSubtaskStats = useMemo(() => {
+    let total = 0;
+    let done = 0;
+    tasks.forEach(t => {
+      const info = subtaskCounts[t.id];
+      if (info) {
+        total += info.total;
+        done += info.done;
+      }
+    });
+    return { total, done };
+  }, [tasks, subtaskCounts]);
+
   return (
     <div
       ref={setNodeRef}
@@ -55,6 +69,11 @@ export function KanbanColumn({
             <span className="bg-background text-foreground text-xs font-medium px-2 py-0.5 rounded-full">
               {tasks.length}
             </span>
+            {columnSubtaskStats.total > 0 && (
+              <span className="text-[10px] text-muted-foreground">
+                ({columnSubtaskStats.done}/{columnSubtaskStats.total} subtasks)
+              </span>
+            )}
           </div>
           <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onAddTask}>
             <Plus className="h-4 w-4" />
