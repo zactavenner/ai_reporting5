@@ -400,6 +400,17 @@ function PublicReportContent() {
           </SectionErrorBoundary>
         )}
 
+        {/* Uploads Section */}
+        {activeSection === 'uploads' && client && (
+          <SectionErrorBoundary sectionName="File Uploads">
+            <ClientUploadPortal 
+              clientId={client.id} 
+              clientName={client.name} 
+              isPublicView={true}
+            />
+          </SectionErrorBoundary>
+        )}
+
         {/* Custom Embed Tabs */}
         {customTabs.map((tab) => (
           activeSection === `custom-${tab.id}` && (
