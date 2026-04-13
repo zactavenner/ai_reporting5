@@ -324,7 +324,7 @@ export function ClientUploadPortal({ clientId, clientName, isPublicView }: Clien
       {/* File List */}
       <div className="space-y-3">
         <h3 className="text-lg font-semibold">
-          Uploaded Files ({uploads.length})
+          {isPublicView ? `Your Uploads (${uploads.length})` : `Uploaded Files (${uploads.length})`}
         </h3>
 
         {isLoading ? (
