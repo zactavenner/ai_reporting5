@@ -6652,6 +6652,7 @@ export type Database = {
           id: string
           metadata: Json | null
           rows_written: number | null
+          source: string | null
           started_at: string
           status: string
         }
@@ -6663,6 +6664,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           rows_written?: number | null
+          source?: string | null
           started_at?: string
           status?: string
         }
@@ -6674,6 +6676,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           rows_written?: number | null
+          source?: string | null
           started_at?: string
           status?: string
         }
@@ -7301,7 +7304,116 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_client_performance_daily: {
+        Row: {
+          ad_spend: number | null
+          calls: number | null
+          clicks: number | null
+          client_id: string | null
+          client_name: string | null
+          commitment_dollars: number | null
+          commitments: number | null
+          cost_of_capital_pct: number | null
+          cpa: number | null
+          cpl: number | null
+          ctr: number | null
+          date: string | null
+          date_account_tz: string | null
+          dollar_per_call: number | null
+          dollar_per_show: number | null
+          funded_count: number | null
+          funded_dollars: number | null
+          id: string | null
+          impressions: number | null
+          leads: number | null
+          reconnect_calls: number | null
+          reconnect_showed: number | null
+          show_pct: number | null
+          showed_calls: number | null
+          spam_leads: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_metrics_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_client_performance_monthly: {
+        Row: {
+          ad_spend: number | null
+          calls: number | null
+          clicks: number | null
+          client_id: string | null
+          client_name: string | null
+          commitment_dollars: number | null
+          commitments: number | null
+          cost_of_capital_pct: number | null
+          cpa: number | null
+          cpl: number | null
+          ctr: number | null
+          dollar_per_call: number | null
+          dollar_per_show: number | null
+          funded_count: number | null
+          funded_dollars: number | null
+          impressions: number | null
+          leads: number | null
+          month_start: string | null
+          reconnect_calls: number | null
+          reconnect_showed: number | null
+          show_pct: number | null
+          showed_calls: number | null
+          spam_leads: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_metrics_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_client_performance_weekly: {
+        Row: {
+          ad_spend: number | null
+          calls: number | null
+          clicks: number | null
+          client_id: string | null
+          client_name: string | null
+          commitment_dollars: number | null
+          commitments: number | null
+          cost_of_capital_pct: number | null
+          cpa: number | null
+          cpl: number | null
+          ctr: number | null
+          dollar_per_call: number | null
+          dollar_per_show: number | null
+          funded_count: number | null
+          funded_dollars: number | null
+          impressions: number | null
+          leads: number | null
+          reconnect_calls: number | null
+          reconnect_showed: number | null
+          show_pct: number | null
+          showed_calls: number | null
+          spam_leads: number | null
+          week_start: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_metrics_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       generate_client_slug: { Args: { client_name: string }; Returns: string }
