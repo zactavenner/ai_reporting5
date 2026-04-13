@@ -36,8 +36,10 @@ import {
   Star,
   Info,
   Lightbulb,
+  PenTool,
 } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
+import { useClientOffers } from '@/hooks/useClientOffers';
 import { toast } from 'sonner';
 
 const MARKETING_ANGLES = [
@@ -64,7 +66,7 @@ const AD_FORMATS = [
 
 const PLATFORMS = [
   { id: 'meta', label: 'Meta (FB/IG)', guide: 'Hook in 3s. UGC-style. 15-60s vertical.' },
-  { id: 'youtube', label: 'YouTube', guide: 'Hook in 5s. Problem→Solution→CTA. 30-90s.' },
+  { id: 'youtube', label: 'YouTube', guide: 'Hook in 5s. Problem\u2192Solution\u2192CTA. 30-90s.' },
   { id: 'tiktok', label: 'TikTok', guide: 'Native feel. Text overlays. Trending sounds.' },
   { id: 'linkedin', label: 'LinkedIn', guide: 'Professional tone. Value-first. Educational.' },
   { id: 'google', label: 'Google Ads', guide: 'Intent-driven. Benefit headlines. 30 chars.' },
@@ -86,6 +88,7 @@ interface GeneratedScript {
 export function AIScriptWriter() {
   const { data: clients = [] } = useClients();
   const [clientId, setClientId] = useState<string>('');
+  const [selectedOfferId, setSelectedOfferId] = useState<string>('');
   const [offerDescription, setOfferDescription] = useState('');
   const [targetAudience, setTargetAudience] = useState('');
   const [selectedAngles, setSelectedAngles] = useState<string[]>([]);
@@ -96,6 +99,32 @@ export function AIScriptWriter() {
   const [generatedScripts, setGeneratedScripts] = useState<GeneratedScript[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expandedScript, setExpandedScript] = useState<string | null>(null);
+
+  const { data: offers = [] } = useClientOffers(clientId || undefined);
+
+  const handleOfferSelect = (offerId: string) => {
+    setSelectedOfferId(offerId);
+    const offer = offers.find((o: any) => o.id === offerId);
+    if (offer) {
+      const parts = [
+        offer.title,
+        (offer as any).description,
+        (offer as any).fund_type && `Fund Type: ${(offer as any).fund_type}`,
+        (offer as any).raise_amount && `Raise Amount: ${(offer as any).raise_amount}`,
+        (offer as any).targeted_returns && `Targeted Returns: ${(offer as any).targeted_returns}`,
+        (offer as any).min_investment && `Min Investment: ${(offer as any).min_investment}`,
+        (offer as any).tax_advantages && `Tax Advantages: ${(offer as any).tax_advantages}`,
+        (offer as any).credibility && `Credibility: ${(offer as any).credibility}`,
+      ].filter(Boolean).join('\n');
+      setOfferDescription(parts);
+      toast.success(`Loaded offer: ${offer.title}`);
+    }
+  };
+
+  const handleClientChange = (newClientId: string) => {
+    setClientId(newClientId);
+    setSelectedOfferId('');
+  };
 
   const toggleAngle = (angleId: string) => {
     setSelectedAngles(prev =>
@@ -167,7 +196,6 @@ export function AIScriptWriter() {
               <p className="text-[13px] text-white/35">Generate direct response scripts from offers & marketing angles</p>
             </div>
           </div>
-          {/* Platform-specific tips */}
           {selectedPlatformData && (
             <div className="mt-6 flex items-start gap-2.5 px-4 py-3 rounded-2xl bg-white/[0.05] border border-white/[0.06] backdrop-blur-xl">
               <Lightbulb className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
@@ -181,13 +209,11 @@ export function AIScriptWriter() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-        {/* Left: Configuration */}
         <div className="lg:col-span-2 space-y-5">
-          {/* Client Selection */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Client</label>
-            <Select value={clientId} onValueChange={setClientId}>
-              <SelectTrigger className="h-11 rounded-xl bg-muted/30 border-border/50 focus:border-primary/50">
+            <label className="studio-label">Client</label>
+            <Select value={clientId} onValueChange={handleClientChange}>
+              <SelectTrigger className="studio-input">
                 <SelectValue placeholder="Select a client" />
               </SelectTrigger>
               <SelectContent>
@@ -198,9 +224,30 @@ export function AIScriptWriter() {
             </Select>
           </div>
 
-          {/* Offer Description */}
+          {clientId && offers.length > 0 && (
+            <div className="space-y-1.5">
+              <label className="studio-label">
+                Offer
+                <span className="text-muted-foreground/40 normal-case font-normal ml-1">\u2014 auto-fills description</span>
+              </label>
+              <Select value={selectedOfferId} onValueChange={handleOfferSelect}>
+                <SelectTrigger className="studio-input">
+                  <SelectValue placeholder={`${offers.length} offer${offers.length !== 1 ? 's' : ''} available`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {offers.map((o: any) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.title}
+                      {o.offer_type && ` \u00b7 ${o.offer_type}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Offer / Product</label>
+            <label className="studio-label">Offer / Product</label>
             <Textarea
               placeholder="Describe your offer, product, or service. Include key benefits, pricing, and what makes it unique..."
               value={offerDescription}
@@ -209,20 +256,18 @@ export function AIScriptWriter() {
             />
           </div>
 
-          {/* Target Audience */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Target Audience</label>
+            <label className="studio-label">Target Audience</label>
             <Input
               placeholder="e.g., Accredited investors aged 35-65 looking for passive income"
               value={targetAudience}
               onChange={(e) => setTargetAudience(e.target.value)}
-              className="h-11 rounded-xl bg-muted/30 border-border/50 focus:border-primary/50"
+              className="studio-input"
             />
           </div>
 
-          {/* Platform */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Platform</label>
+            <label className="studio-label">Platform</label>
             <div className="grid grid-cols-3 gap-1.5">
               {PLATFORMS.map(platform => (
                 <button
@@ -240,9 +285,8 @@ export function AIScriptWriter() {
             </div>
           </div>
 
-          {/* Ad Format */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Ad Format</label>
+            <label className="studio-label">Ad Format</label>
             <div className="grid grid-cols-2 gap-1.5">
               {AD_FORMATS.map(format => (
                 <button
@@ -261,18 +305,15 @@ export function AIScriptWriter() {
             </div>
           </div>
 
-          {/* Tone */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Tone</label>
+            <label className="studio-label">Tone</label>
             <div className="flex gap-1.5 flex-wrap">
               {['conversational', 'professional', 'urgent', 'educational', 'provocative'].map(t => (
                 <button
                   key={t}
                   onClick={() => setTone(t)}
-                  className={`px-3.5 py-1.5 text-xs font-semibold rounded-full border transition-all duration-200 capitalize ${
-                    tone === t
-                      ? 'bg-foreground text-background border-foreground'
-                      : 'bg-muted/30 hover:bg-muted/50 border-border/50 text-muted-foreground'
+                  className={`studio-chip capitalize ${
+                    tone === t ? 'studio-chip-active' : 'studio-chip-inactive'
                   }`}
                 >
                   {t}
@@ -282,12 +323,10 @@ export function AIScriptWriter() {
           </div>
         </div>
 
-        {/* Right: Angles & Output */}
         <div className="lg:col-span-3 space-y-6">
-          {/* Marketing Angles */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Marketing Angles <span className="text-muted-foreground/40 normal-case">(up to 3)</span></label>
+              <label className="studio-label">Marketing Angles <span className="text-muted-foreground/40 normal-case">(up to 3)</span></label>
               <span className="text-xs font-bold text-muted-foreground/50">{selectedAngles.length}/3</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -324,26 +363,18 @@ export function AIScriptWriter() {
             </div>
           </div>
 
-          {/* Generate Button */}
           <Button
             onClick={handleGenerate}
             disabled={isGenerating || !offerDescription || selectedAngles.length === 0 || !selectedFormat}
             className="w-full h-13 rounded-2xl text-base font-semibold gap-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 shadow-lg shadow-violet-500/20 transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/30"
           >
             {isGenerating ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Generating Scripts...
-              </>
+              <><Loader2 className="h-5 w-5 animate-spin" />Generating Scripts...</>
             ) : (
-              <>
-                <Sparkles className="h-5 w-5" />
-                Generate {selectedAngles.length} Script{selectedAngles.length !== 1 ? 's' : ''}
-              </>
+              <><Sparkles className="h-5 w-5" />Generate {selectedAngles.length} Script{selectedAngles.length !== 1 ? 's' : ''}</>
             )}
           </Button>
 
-          {/* Generated Scripts */}
           {generatedScripts.length > 0 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -361,7 +392,6 @@ export function AIScriptWriter() {
                 return (
                   <Card key={script.id} className="overflow-hidden rounded-2xl border-border/50 hover:shadow-lg transition-all duration-300">
                     <CardContent className="p-0">
-                      {/* Script Header */}
                       <button
                         onClick={() => setExpandedScript(isExpanded ? null : script.id)}
                         className="w-full flex items-center justify-between p-4 border-b bg-muted/20 hover:bg-muted/30 transition-colors text-left"
@@ -380,7 +410,6 @@ export function AIScriptWriter() {
                           )}
                         </div>
                         <div className="flex items-center gap-3">
-                          {/* Performance Score */}
                           <div className={`text-xs font-bold px-2.5 py-1 rounded-full ${
                             script.performanceScore >= 90 ? 'bg-green-500/10 text-green-600' :
                             script.performanceScore >= 80 ? 'bg-blue-500/10 text-blue-600' :
@@ -393,7 +422,6 @@ export function AIScriptWriter() {
                         </div>
                       </button>
 
-                      {/* Script Content - Expandable */}
                       {isExpanded && (
                         <div className="p-5 space-y-5">
                           <div>
@@ -418,14 +446,8 @@ export function AIScriptWriter() {
                             <p className="text-sm leading-relaxed font-medium pl-4 border-l-2 border-green-500/20">{script.cta}</p>
                           </div>
 
-                          {/* Action Bar */}
                           <div className="flex items-center gap-2 pt-3 border-t">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleCopy(script)}
-                              className="gap-1.5 rounded-lg"
-                            >
+                            <Button variant="outline" size="sm" onClick={() => handleCopy(script)} className="gap-1.5 rounded-lg">
                               {copiedId === script.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                               {copiedId === script.id ? 'Copied' : 'Copy Script'}
                             </Button>
@@ -452,23 +474,22 @@ export function AIScriptWriter() {
   );
 }
 
-// Helper functions for demo script generation
 function generateHook(angleId: string, offer: string): string {
   const hooks: Record<string, string> = {
-    'pain-agitate-solve': `"Most people are leaving money on the table and don't even know it..." — If you've been watching your savings sit idle while inflation eats away at your purchasing power, you're not alone.`,
-    'social-proof': `"I was skeptical at first, but the numbers don't lie..." — Over 2,400 investors have already seen returns that traditional investments simply can't match.`,
-    'urgency-scarcity': `"This window is closing fast..." — We're only accepting 15 more investors this quarter, and here's why you need to act now.`,
-    'authority': `"After managing $500M+ in assets, here's what I've learned..." — The smartest money in the room isn't chasing trends. It's doing this instead.`,
-    'roi-logic': `"Let me show you the math..." — A $50K investment returning 18% annually means $9,000/year in passive income. Here's exactly how.`,
-    'story-hook': `"A year ago, I was working 80-hour weeks with nothing to show for it..." — Then I discovered an investment vehicle that changed everything.`,
-    'contrarian': `"Everything your financial advisor told you is wrong..." — The traditional 60/40 portfolio is dead. Here's what's replacing it.`,
-    'curiosity-gap': `"There's a reason the ultra-wealthy are pouring money into this asset class..." — And it has nothing to do with stocks, crypto, or real estate flipping.`,
+    'pain-agitate-solve': `"Most people are leaving money on the table and don't even know it..." \u2014 If you've been watching your savings sit idle while inflation eats away at your purchasing power, you're not alone.`,
+    'social-proof': `"I was skeptical at first, but the numbers don't lie..." \u2014 Over 2,400 investors have already seen returns that traditional investments simply can't match.`,
+    'urgency-scarcity': `"This window is closing fast..." \u2014 We're only accepting 15 more investors this quarter, and here's why you need to act now.`,
+    'authority': `"After managing $500M+ in assets, here's what I've learned..." \u2014 The smartest money in the room isn't chasing trends. It's doing this instead.`,
+    'roi-logic': `"Let me show you the math..." \u2014 A $50K investment returning 18% annually means $9,000/year in passive income. Here's exactly how.`,
+    'story-hook': `"A year ago, I was working 80-hour weeks with nothing to show for it..." \u2014 Then I discovered an investment vehicle that changed everything.`,
+    'contrarian': `"Everything your financial advisor told you is wrong..." \u2014 The traditional 60/40 portfolio is dead. Here's what's replacing it.`,
+    'curiosity-gap': `"There's a reason the ultra-wealthy are pouring money into this asset class..." \u2014 And it has nothing to do with stocks, crypto, or real estate flipping.`,
   };
   return hooks[angleId] || `Stop scrolling. This changes everything about how you think about ${offer}.`;
 }
 
 function generateBody(angleId: string, offer: string, audience: string): string {
-  return `Here's what makes this different from everything else you've seen:\n\n1. Institutional-grade deal flow that was previously only available to family offices and hedge funds\n2. Hands-off management — you invest, we handle everything from acquisition to operations\n3. Tax-advantaged structure that lets you keep more of what you earn\n\n${audience ? `This is specifically designed for ${audience} who want to build real wealth without the complexity.` : 'This is designed for serious investors who are ready to take the next step.'}\n\nOur track record speaks for itself — consistent returns through every market cycle, with full transparency at every stage.`;
+  return `Here's what makes this different from everything else you've seen:\n\n1. Institutional-grade deal flow that was previously only available to family offices and hedge funds\n2. Hands-off management \u2014 you invest, we handle everything from acquisition to operations\n3. Tax-advantaged structure that lets you keep more of what you earn\n\n${audience ? `This is specifically designed for ${audience} who want to build real wealth without the complexity.` : 'This is designed for serious investors who are ready to take the next step.'}\n\nOur track record speaks for itself \u2014 consistent returns through every market cycle, with full transparency at every stage.`;
 }
 
 function generateCTA(angleId: string): string {
@@ -477,7 +498,7 @@ function generateCTA(angleId: string): string {
     'social-proof': 'Join 2,400+ investors who already made the smart move. Schedule your consultation now.',
     'urgency-scarcity': 'Only 15 spots remaining this quarter. Reserve yours before they\'re gone.',
     'authority': 'Get the same playbook our top investors use. Book your private briefing.',
-    'roi-logic': 'See the full financial breakdown — no obligation. Click below to get the numbers.',
+    'roi-logic': 'See the full financial breakdown \u2014 no obligation. Click below to get the numbers.',
     'story-hook': 'Your story starts here. Book a 15-minute intro call and see what\'s possible.',
     'contrarian': 'Ready to think differently about your money? Let\'s talk. Free consultation below.',
     'curiosity-gap': 'See what the ultra-wealthy already know. Click below for exclusive access.',
