@@ -106,7 +106,7 @@ export function ClientUploadPortal({ clientId, clientName, isPublicView }: Clien
           }
         );
 
-        await supabase.from('client_file_uploads').insert({
+        const { data: insertedRow } = await supabase.from('client_file_uploads').insert({
           client_id: clientId,
           file_name: item.file.name,
           file_url: publicUrl,
@@ -114,7 +114,11 @@ export function ClientUploadPortal({ clientId, clientName, isPublicView }: Clien
           file_size_bytes: item.file.size,
           storage_path: storagePath,
           uploaded_by_name: uploaderName || (isPublicView ? 'Client' : 'Agency'),
-        });
+        }).select('id').single();
+
+        if (insertedRow) {
+          setSessionUploadIds(prev => [...prev, insertedRow.id]);
+        }
 
         setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'done' as const, progress: 100 } : q));
         successCount++;
