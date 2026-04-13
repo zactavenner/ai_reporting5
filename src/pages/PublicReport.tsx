@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useClientByToken } from '@/hooks/useClients';
 import { TeamMemberProvider } from '@/contexts/TeamMemberContext';
