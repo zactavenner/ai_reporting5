@@ -219,7 +219,7 @@ export function ClientUploadPortal({ clientId, clientName, isPublicView }: Clien
           {isDragging ? 'Drop files here!' : 'Upload Your Files'}
         </h3>
         <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-          Drag & drop files here, or tap below to select. Photos, videos, creatives — up to 10GB per file. Select as many as you want.
+          Drag & drop files here, or tap below to select. Photos, videos, creatives — up to 20GB per file. Full 4K+ quality preserved.
         </p>
 
         {isPublicView && (
@@ -239,7 +239,7 @@ export function ClientUploadPortal({ clientId, clientName, isPublicView }: Clien
           type="file"
           className="hidden"
           multiple
-          accept="image/*,video/*,.pdf,.psd,.ai,.eps,.svg,.mov,.mp4,.avi,.wmv,.mkv,.webm,.heic,.heif"
+          accept="image/*,video/*,.pdf,.psd,.ai,.eps,.svg,.mov,.mp4,.avi,.wmv,.mkv,.webm,.heic,.heif,.mxf,.prores,.r3d,.braw,.ari,.dpx,.exr,.tiff,.tif,.raw,.cr2,.nef,.arw"
           onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }}
         />
         {/* Separate camera input for mobile */}
