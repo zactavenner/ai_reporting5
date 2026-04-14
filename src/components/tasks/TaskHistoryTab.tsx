@@ -68,6 +68,8 @@ interface UnifiedEvent {
   type: EventType;
   title: string;
   timestamp: Date;
+  taskId?: string;
+  dueDate?: string | null;
   changedBy?: string;
   oldValue?: string;
   newValue?: string;
