@@ -39,6 +39,7 @@ export function AgentsTab({ clients }: Props) {
   const [editData, setEditData] = useState<Partial<Agent>>({});
   const [tab, setTab] = useState('overview');
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
 
   // Computed stats
   const stats = useMemo(() => {
