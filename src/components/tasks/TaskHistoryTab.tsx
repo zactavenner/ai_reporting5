@@ -525,6 +525,19 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
                           {event.clientName}
                         </Badge>
                       )}
+                      {dueDateInfo && event.taskId && (
+                        <Badge 
+                          variant="outline" 
+                          className={cn(
+                            "text-xs h-5 gap-1",
+                            dueDateInfo.today && "bg-amber-500/15 text-amber-600 border-amber-500/30 font-semibold",
+                            dueDateInfo.overdue && "bg-destructive/15 text-destructive border-destructive/30 font-semibold"
+                          )}
+                        >
+                          <Calendar className="h-3 w-3" />
+                          {dueDateInfo.today ? 'Due Today' : dueDateInfo.overdue ? `Overdue · ${dueDateInfo.formatted}` : `Due ${dueDateInfo.formatted}`}
+                        </Badge>
+                      )}
                       {event.platform && (
                         <Badge variant="outline" className="text-xs h-5">
                           {event.platform}
