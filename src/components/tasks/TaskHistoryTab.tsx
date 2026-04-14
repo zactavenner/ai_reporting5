@@ -501,10 +501,16 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
               const config = EVENT_CONFIG[event.type];
               const Icon = config.icon;
 
+              const dueDateInfo = getDueDateInfo(event.dueDate);
+
               return (
                 <div
                   key={event.id}
-                  className="flex items-start gap-3 py-3 border-b border-border last:border-0 hover:bg-muted/50 rounded-lg px-2 -mx-2 transition-colors"
+                  className={cn(
+                    "flex items-start gap-3 py-3 border-b border-border last:border-0 hover:bg-muted/50 rounded-lg px-2 -mx-2 transition-colors",
+                    event.taskId && "cursor-pointer"
+                  )}
+                  onClick={() => handleEventClick(event)}
                 >
                   <div className={cn('mt-0.5 flex-shrink-0', config.color)}>
                     <Icon className="h-5 w-5" />
