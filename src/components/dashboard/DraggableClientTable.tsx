@@ -391,6 +391,7 @@ export function DraggableClientTable({
               <SortableHeader column="showed" label="Shows" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="showRate" label="Show%" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="funded" label="Funded" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="fundedDollars" label="Funded $" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="costOfCapital" label="CoC%" sortConfig={sortConfig} onSort={handleSort} />
               <TableHead className="font-bold text-[11px] text-center py-0 px-1">BM</TableHead>
               <TableHead className="font-bold text-[11px] text-center py-0 px-1">Meta</TableHead>
@@ -630,6 +631,14 @@ export function DraggableClientTable({
                       (m.fundedInvestors || 0) > 0 && 'text-chart-2 font-semibold'
                     )}>
                       {m.fundedInvestors || 0}
+                    </TableCell>
+
+                    {/* Funded $ */}
+                    <TableCell className={cn(
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
+                      (m.fundedDollars || 0) > 0 && 'text-chart-2 font-semibold'
+                    )}>
+                      {(m.fundedDollars || 0) > 0 ? `$${Math.round(m.fundedDollars).toLocaleString()}` : <span className="text-muted-foreground">-</span>}
                     </TableCell>
 
                     {/* Cost of Capital % */}
