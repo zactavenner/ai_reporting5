@@ -639,6 +639,17 @@ export function DraggableClientTable({
                       {(m.costOfCapital || 0) > 0 ? `${m.costOfCapital.toFixed(1)}%` : <span className="text-muted-foreground">-</span>}
                     </TableCell>
 
+                    {/* BM URL */}
+                    <TableCell className="text-center py-0 px-1" onClick={(e) => e.stopPropagation()}>
+                      {client.business_manager_url ? (
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => openAdsManager(e, client.business_manager_url)} title="Business Manager">
+                          <BarChart3 className="h-3 w-3 text-chart-2" />
+                        </Button>
+                      ) : (
+                        <span className="text-muted-foreground text-[9px]">—</span>
+                      )}
+                    </TableCell>
+
                     {/* Meta Sync Status */}
                     <TableCell className="text-center py-0 px-1" onClick={(e) => e.stopPropagation()}>
                       <MetaStatusCell
