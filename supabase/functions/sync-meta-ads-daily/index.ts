@@ -7,6 +7,42 @@ const corsHeaders = {
 
 declare const EdgeRuntime: { waitUntil: (promise: Promise<any>) => void } | undefined;
 
+// ── Retry helper with exponential backoff ──
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  label: string,
+  maxRetries = 3,
+  baseDelayMs = 5000,
+): Promise<{ data: any; ok: boolean }> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      const data = await res.json();
+      
+      if (res.status === 429 || res.status >= 500) {
+        if (attempt < maxRetries) {
+          const delay = baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * 2000;
+          console.warn(`[sync-meta-ads-daily] ${label}: ${res.status} error, retry ${attempt}/${maxRetries} in ${Math.round(delay / 1000)}s`);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+      }
+      
+      return { data, ok: data.success !== false && res.ok };
+    } catch (err) {
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt - 1);
+        console.warn(`[sync-meta-ads-daily] ${label}: Network error, retry ${attempt}/${maxRetries}:`, err);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      return { data: { error: err instanceof Error ? err.message : "Unknown" }, ok: false };
+    }
+  }
+  return { data: { error: "Max retries exceeded" }, ok: false };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -96,8 +132,9 @@ Deno.serve(async (req) => {
           }
 
           if (missingDays.length > 0) {
-            console.log(`[sync-meta-ads-daily] ${client.name}: Found ${missingDays.length} missing days to backfill: ${missingDays.join(", ")}`);
+            console.log(`[sync-meta-ads-daily] ${client.name}: Found ${missingDays.length} missing days to backfill`);
 
+            // Consolidate consecutive days into ranges
             const ranges: Array<{ start: string; end: string }> = [];
             let rangeStart = missingDays[0];
             let rangeEnd = missingDays[0];
@@ -118,33 +155,26 @@ Deno.serve(async (req) => {
             ranges.push({ start: rangeStart, end: rangeEnd });
 
             for (const range of ranges) {
-              try {
-                console.log(`[sync-meta-ads-daily] ${client.name}: Backfilling ${range.start} to ${range.end}`);
-                const response = await fetch(`${supabaseUrl}/functions/v1/sync-meta-ads`, {
+              console.log(`[sync-meta-ads-daily] ${client.name}: Backfilling ${range.start} to ${range.end}`);
+              const backfillResult = await fetchWithRetry(
+                `${supabaseUrl}/functions/v1/sync-meta-ads`,
+                {
                   method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${supabaseKey}`,
-                  },
-                  body: JSON.stringify({
-                    clientId: client.id,
-                    startDate: range.start,
-                    endDate: range.end,
-                  }),
-                });
+                  headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseKey}` },
+                  body: JSON.stringify({ clientId: client.id, startDate: range.start, endDate: range.end }),
+                },
+                `${client.name}/backfill/${range.start}`,
+              );
 
-                const data = await response.json();
-                if (data.success) {
-                  console.log(`[sync-meta-ads-daily] ✓ ${client.name}: Backfilled ${range.start}-${range.end}`);
-                  backfilledDays.push(`${range.start}-${range.end}`);
-                  totalRowsWritten += (data.dailyMetrics || 0);
-                } else {
-                  console.error(`[sync-meta-ads-daily] ✗ ${client.name}: Backfill failed ${range.start}-${range.end}: ${data.error}`);
-                }
-              } catch (backfillErr) {
-                console.error(`[sync-meta-ads-daily] ✗ ${client.name}: Backfill error ${range.start}-${range.end}:`, backfillErr);
+              if (backfillResult.ok) {
+                console.log(`[sync-meta-ads-daily] ✓ ${client.name}: Backfilled ${range.start}-${range.end}`);
+                backfilledDays.push(`${range.start}-${range.end}`);
+                totalRowsWritten += (backfillResult.data.dailyMetrics || 0);
+              } else {
+                console.error(`[sync-meta-ads-daily] ✗ ${client.name}: Backfill failed ${range.start}-${range.end}: ${backfillResult.data?.error}`);
               }
 
+              // 5s between backfill ranges
               await new Promise(resolve => setTimeout(resolve, 5000));
             }
           } else {
@@ -154,28 +184,24 @@ Deno.serve(async (req) => {
           console.error(`[sync-meta-ads-daily] ${client.name}: Gap detection error (non-fatal):`, gapErr);
         }
 
-        // ── Standard yesterday sync ──
-        const response = await fetch(`${supabaseUrl}/functions/v1/sync-meta-ads`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${supabaseKey}`,
+        // ── Standard yesterday sync with retry ──
+        const syncResult = await fetchWithRetry(
+          `${supabaseUrl}/functions/v1/sync-meta-ads`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseKey}` },
+            body: JSON.stringify({ clientId: client.id, startDate: yesterdayStr, endDate: yesterdayStr }),
           },
-          body: JSON.stringify({
-            clientId: client.id,
-            startDate: yesterdayStr,
-            endDate: yesterdayStr,
-          }),
-        });
+          `${client.name}/yesterday`,
+        );
 
-        const data = await response.json();
-        if (data.success) {
-          console.log(`[sync-meta-ads-daily] ✓ ${client.name}: ${data.campaigns} campaigns, ${data.adSets} ad sets, ${data.ads} ads`);
-          totalRowsWritten += (data.dailyMetrics || 0);
+        if (syncResult.ok) {
+          console.log(`[sync-meta-ads-daily] ✓ ${client.name}: ${syncResult.data.campaigns} campaigns, ${syncResult.data.adSets} ad sets, ${syncResult.data.ads} ads`);
+          totalRowsWritten += (syncResult.data.dailyMetrics || 0);
           results.push({ clientId: client.id, name: client.name, success: true, backfilledDays });
         } else {
-          console.error(`[sync-meta-ads-daily] ✗ ${client.name}: ${data.error}`);
-          results.push({ clientId: client.id, name: client.name, success: false, error: data.error, backfilledDays });
+          console.error(`[sync-meta-ads-daily] ✗ ${client.name}: ${syncResult.data?.error}`);
+          results.push({ clientId: client.id, name: client.name, success: false, error: syncResult.data?.error, backfilledDays });
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : "Unknown error";
@@ -183,7 +209,7 @@ Deno.serve(async (req) => {
         results.push({ clientId: client.id, name: client.name, success: false, error: errMsg });
       }
 
-      // 30-second delay between clients
+      // 30-second delay between clients (respect Meta rate limits)
       if (i < clients.length - 1) {
         console.log(`[sync-meta-ads-daily] Waiting 30s before next client...`);
         await new Promise(resolve => setTimeout(resolve, 30000));

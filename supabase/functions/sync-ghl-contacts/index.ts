@@ -13,6 +13,52 @@ const corsHeaders = {
 
 const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
 
+// ── Rate-limit-aware fetch wrapper with exponential backoff ──
+let ghlApiCallCount = 0;
+const GHL_API_CALL_LIMIT = 500; // Safety budget per invocation
+
+async function fetchGHL(
+  url: string,
+  options: RequestInit,
+  label = "unknown",
+  maxRetries = 3,
+): Promise<Response> {
+  ghlApiCallCount++;
+  if (ghlApiCallCount > GHL_API_CALL_LIMIT) {
+    throw new Error(`GHL API call budget exhausted (${GHL_API_CALL_LIMIT} calls). Stopped at: ${label}`);
+  }
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url, options);
+    
+    if (res.status === 429) {
+      // Parse Retry-After header or use exponential backoff
+      const retryAfter = res.headers.get("Retry-After");
+      const delay = retryAfter 
+        ? parseInt(retryAfter) * 1000 
+        : 5000 * Math.pow(2, attempt - 1) + Math.random() * 2000;
+      console.warn(`[sync-ghl-contacts] ${label}: Rate limited (429), retry ${attempt}/${maxRetries} in ${Math.round(delay / 1000)}s`);
+      
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+    }
+    
+    if (res.status >= 500 && attempt < maxRetries) {
+      const delay = 3000 * Math.pow(2, attempt - 1) + Math.random() * 1000;
+      console.warn(`[sync-ghl-contacts] ${label}: Server error (${res.status}), retry ${attempt}/${maxRetries} in ${Math.round(delay / 1000)}s`);
+      await new Promise(r => setTimeout(r, delay));
+      continue;
+    }
+    
+    return res;
+  }
+  
+  // Should not reach here, but fallback
+  return fetch(url, options);
+}
+
 // --- SOURCE NORMALIZATION FUNCTION ---
 // Normalize raw UTM source to standardized platform names
 function normalizeSourceValue(rawSource: string | null | undefined, campaignName: string | null | undefined): string {
@@ -194,11 +240,11 @@ async function fetchGHLContacts(
       page: page || 1,
     };
 
-    const response = await fetch(`${GHL_BASE_URL}/contacts/search`, {
+    const response = await fetchGHL(`${GHL_BASE_URL}/contacts/search`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-    });
+    }, `contacts/search page ${page || 1}`);
     
     if (response.ok) {
       const data = await response.json();
@@ -222,7 +268,7 @@ async function fetchGHLContacts(
     url += `&startAfterId=${startAfterId}`;
   }
 
-  const fallbackResponse = await fetch(url, { method: 'GET', headers });
+  const fallbackResponse = await fetchGHL(url, { method: 'GET', headers }, `contacts/get fallback`);
   
   if (!fallbackResponse.ok) {
     const error = await fallbackResponse.text();
@@ -265,7 +311,7 @@ async function fetchGHLOpportunities(
         url += `&startAfterId=${startAfterId}`;
       }
 
-      const response = await fetch(url, { method: 'GET', headers });
+      const response = await fetchGHL(url, { method: 'GET', headers }, `opportunities page ${pageCount + 1}`);
 
       if (!response.ok) {
         console.error(`GHL Opportunities API error: ${response.status}`);
@@ -295,7 +341,7 @@ async function fetchGHLOpportunities(
       if (!startAfterId) hasMore = false;
 
       pageCount++;
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     console.log(`Fetched total ${allOpportunities.length} opportunities across ${pageCount} pages`);
@@ -330,7 +376,7 @@ async function fetchGHLConversations(
         url += `&startAfterId=${lastMessageId}`;
       }
 
-      const response = await fetch(url, { method: 'GET', headers });
+      const response = await fetchGHL(url, { method: 'GET', headers }, `conversations page ${pageCount + 1}`);
       
       if (!response.ok) {
         console.error(`GHL Conversations API error: ${response.status}`);
@@ -366,7 +412,7 @@ async function fetchGHLConversations(
       }
 
       pageCount++;
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
   } catch (err) {
     console.error('Error fetching GHL conversations:', err);
@@ -482,13 +528,13 @@ async function fetchGHLCustomFieldDefinitions(apiKey: string, locationId: string
     return fieldNameMap;
   }
   try {
-    const response = await fetch(`${GHL_BASE_URL}/locations/${locationId}/customFields`, {
+    const response = await fetchGHL(`${GHL_BASE_URL}/locations/${locationId}/customFields`, {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Version': '2021-07-28',
         'Accept': 'application/json',
       },
-    });
+    }, `customFields/${locationId}`);
     if (response.ok) {
       const data = await response.json();
       const fields = data.customFields || [];
@@ -1492,10 +1538,10 @@ async function fetchSingleGHLContact(
   };
 
   try {
-    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}`, { 
+    const response = await fetchGHL(`${GHL_BASE_URL}/contacts/${contactId}`, { 
       method: 'GET', 
       headers 
-    });
+    }, `single-contact/${contactId}`);
     
     if (!response.ok) {
       console.error(`GHL single contact fetch error: ${response.status}`);
@@ -1522,10 +1568,10 @@ async function fetchGHLNotes(
   };
 
   try {
-    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}/notes`, { 
+    const response = await fetchGHL(`${GHL_BASE_URL}/contacts/${contactId}/notes`, { 
       method: 'GET', 
       headers 
-    });
+    }, `notes/${contactId}`);
     
     if (!response.ok) {
       console.error(`GHL notes fetch error: ${response.status}`);
@@ -1552,10 +1598,10 @@ async function fetchGHLTasks(
   };
 
   try {
-    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}/tasks`, { 
+    const response = await fetchGHL(`${GHL_BASE_URL}/contacts/${contactId}/tasks`, { 
       method: 'GET', 
       headers 
-    });
+    }, `tasks/${contactId}`);
     
     if (!response.ok) {
       console.error(`GHL tasks fetch error: ${response.status}`);
@@ -1582,10 +1628,10 @@ async function fetchGHLAppointments(
   };
 
   try {
-    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}/appointments`, { 
+    const response = await fetchGHL(`${GHL_BASE_URL}/contacts/${contactId}/appointments`, { 
       method: 'GET', 
       headers 
-    });
+    }, `appointments/${contactId}`);
     
     if (!response.ok) {
       console.error(`GHL appointments fetch error: ${response.status}`);
@@ -1616,9 +1662,10 @@ async function fetchGHLConversationMessages(
 
   try {
     // Search for conversations with this contact
-    const searchResponse = await fetch(
+    const searchResponse = await fetchGHL(
       `${GHL_BASE_URL}/conversations/search?locationId=${locationId}&contactId=${contactId}`, 
-      { method: 'GET', headers }
+      { method: 'GET', headers },
+      `conversations/search/${contactId}`
     );
     
     if (!searchResponse.ok) {
@@ -1632,9 +1679,10 @@ async function fetchGHLConversationMessages(
     // For each conversation, get the messages
     for (const conv of conversations.slice(0, 5)) { // Limit to 5 conversations
       try {
-        const messagesResponse = await fetch(
+        const messagesResponse = await fetchGHL(
           `${GHL_BASE_URL}/conversations/${conv.id}/messages?limit=50`,
-          { method: 'GET', headers }
+          { method: 'GET', headers },
+          `conversation-messages/${conv.id}`
         );
 
         if (messagesResponse.ok) {
@@ -1655,7 +1703,7 @@ async function fetchGHLConversationMessages(
       }
       
       // Small delay between requests
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
   } catch (err) {
     console.error('Error fetching GHL conversations:', err);
@@ -3073,6 +3121,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Reset API call counter for each invocation
+  ghlApiCallCount = 0;
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseKey);
