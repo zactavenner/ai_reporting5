@@ -33,6 +33,13 @@ export interface ClientSettings {
   // Ads library settings
   ads_library_url?: string | null;
   ads_library_page_id?: string | null;
+  // Calendar tracking settings
+  tracked_calendar_ids?: string[] | null;
+  reconnect_calendar_ids?: string[] | null;
+  // GHL pipeline settings
+  funded_pipeline_id?: string | null;
+  funded_stage_ids?: string[] | null;
+  committed_stage_ids?: string[] | null;
   // HubSpot sync settings
   hubspot_sync_enabled?: boolean;
   hubspot_funded_pipeline_id?: string | null;
