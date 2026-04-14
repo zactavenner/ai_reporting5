@@ -1569,24 +1569,24 @@ export function InlineRecordsView({
                               <TableCell className={`${CELL_CLASS} font-mono`}>
                                 {investmentRange || '-'}
                               </TableCell>
-                              <TableCell className={`${CELL_CLASS} text-muted-foreground`}>
+                              <TableCell className={`${ENRICHMENT_CELL_CLASS} text-muted-foreground border-l border-emerald-500/10`}>
                                 {enrichment?.state || '-'}
                               </TableCell>
-                              <TableCell className={`${CELL_CLASS} font-mono text-primary`}>
+                              <TableCell className={`${ENRICHMENT_CELL_CLASS} font-mono text-primary`}>
                                 {enrichment?.net_worth || '-'}
                               </TableCell>
-                              <TableCell className={`${CELL_CLASS} font-mono`}>
+                              <TableCell className={`${ENRICHMENT_CELL_CLASS} font-mono border-r border-emerald-500/10`}>
                                 {enrichment?.household_income || '-'}
                               </TableCell>
-                              <TableCell className={CELL_CLASS}>
+                              <TableCell className={`${QA_CELL_CLASS} border-l border-blue-500/10`}>
                                 {lead.questions && Array.isArray(lead.questions) && lead.questions.length > 0 ? (
                                   <span className="text-muted-foreground">{lead.questions.length}</span>
                                 ) : '-'}
                               </TableCell>
-                              {uniqueQuestionNames.map((qName) => {
+                              {uniqueQuestionNames.map((qName, i) => {
                                 const answer = getQuestionAnswer(lead, qName);
                                 return (
-                                  <TableCell key={qName} className={`${CELL_CLASS} max-w-[120px] truncate`} title={answer || ''}>
+                                  <TableCell key={qName} className={`${QA_CELL_CLASS} max-w-[120px] truncate ${i === uniqueQuestionNames.length - 1 ? 'border-r border-blue-500/10' : ''}`} title={answer || ''}>
                                     {answer || '-'}
                                   </TableCell>
                                 );
