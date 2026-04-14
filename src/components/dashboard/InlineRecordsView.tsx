@@ -1334,6 +1334,21 @@ export function InlineRecordsView({
                     Add {getTabLabel()}
                   </Button>
                 )}
+                {clientId && unenrichedCount > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBulkEnrich}
+                    disabled={isEnriching}
+                    className="border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
+                  >
+                    {isEnriching ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Zap className="h-4 w-4 mr-2" />
+                    )}
+                    Enrich ({unenrichedCount})
+                  </Button>
                 {clientId && ghlLocationId && (
                   <Button
                     variant="outline"
