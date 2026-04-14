@@ -159,6 +159,8 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
         type: eventType,
         title: task.title,
         timestamp: new Date(h.created_at),
+        taskId: task.id,
+        dueDate: task.due_date,
         changedBy: h.changed_by || undefined,
         oldValue: h.old_value || undefined,
         newValue: h.new_value || undefined,
