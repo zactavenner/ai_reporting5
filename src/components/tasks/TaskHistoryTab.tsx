@@ -35,6 +35,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
 import { TaskDiscussionVoiceNote, VoiceNotePlayer } from './TaskDiscussionVoiceNote';
+import { TaskDetailPanel } from './TaskDetailPanel';
 import { toast } from 'sonner';
 
 interface TaskHistoryTabProps {
