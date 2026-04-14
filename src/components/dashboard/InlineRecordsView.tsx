@@ -95,6 +95,10 @@ import { formatDistanceToNow } from 'date-fns';
 const ROW_CLASS = "h-7 text-[11px]";
 const CELL_CLASS = "py-0 px-1 text-[11px]";
 const HEAD_CLASS = "py-0 px-1 text-[10px] font-semibold h-7";
+const ENRICHMENT_HEAD_CLASS = "py-0 px-1 text-[10px] font-semibold h-7 bg-emerald-500/10 text-emerald-400";
+const QA_HEAD_CLASS = "py-0 px-1 text-[10px] font-semibold h-7 bg-blue-500/10 text-blue-400";
+const ENRICHMENT_CELL_CLASS = "py-0.5 px-1 text-[10px] h-6 bg-emerald-500/5";
+const QA_CELL_CLASS = "py-0.5 px-1 text-[10px] h-6 bg-blue-500/5";
 
 interface EnrichmentData {
   external_id?: string | null;
@@ -1190,13 +1194,13 @@ export function InlineRecordsView({
         )}
       </TableCell>
       <TableCell className={`${CELL_CLASS} text-muted-foreground max-w-[80px] truncate`}>{call.outcome || '-'}</TableCell>
-      <TableCell className={`${CELL_CLASS} text-muted-foreground`}>
+      <TableCell className={`${ENRICHMENT_CELL_CLASS} text-muted-foreground border-l border-emerald-500/10`}>
         {enrichment?.state || '-'}
       </TableCell>
-      <TableCell className={`${CELL_CLASS} font-mono text-primary`}>
+      <TableCell className={`${ENRICHMENT_CELL_CLASS} font-mono text-primary`}>
         {enrichment?.net_worth || '-'}
       </TableCell>
-      <TableCell className={`${CELL_CLASS} font-mono`}>
+      <TableCell className={`${ENRICHMENT_CELL_CLASS} font-mono border-r border-emerald-500/10`}>
         {enrichment?.household_income || '-'}
       </TableCell>
       {ghlLocationId && (
@@ -1265,7 +1269,7 @@ export function InlineRecordsView({
     <ScrollArea className="h-[500px]">
       <div className="overflow-x-auto">
       <Table>
-        <TableHeader>
+        <TableHeader className="sticky top-0 z-20 bg-background">
           <TableRow className="border-b-2">
             <TableHead className={HEAD_CLASS}>Date</TableHead>
             <TableHead className={HEAD_CLASS}>Name</TableHead>
@@ -1273,9 +1277,9 @@ export function InlineRecordsView({
             <TableHead className={HEAD_CLASS}>Phone</TableHead>
             <TableHead className={HEAD_CLASS}>Status</TableHead>
             <TableHead className={HEAD_CLASS}>Outcome</TableHead>
-            <TableHead className={HEAD_CLASS}>State</TableHead>
-            <TableHead className={HEAD_CLASS}>Net Worth</TableHead>
-            <TableHead className={HEAD_CLASS}>Income</TableHead>
+            <TableHead className={`${ENRICHMENT_HEAD_CLASS} border-l border-emerald-500/20`}>State</TableHead>
+            <TableHead className={ENRICHMENT_HEAD_CLASS}>Net Worth</TableHead>
+            <TableHead className={`${ENRICHMENT_HEAD_CLASS} border-r border-emerald-500/20`}>Income</TableHead>
             {ghlLocationId && <TableHead className={HEAD_CLASS}>GHL</TableHead>}
             {clientId && <TableHead className={`${HEAD_CLASS} text-right`}>Act</TableHead>}
           </TableRow>
@@ -1402,7 +1406,7 @@ export function InlineRecordsView({
               <TabsContent value="adspend" className="mt-0">
                 <ScrollArea className="h-[500px]">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-20 bg-background">
                       <TableRow className="border-b-2">
                         <TableHead className={HEAD_CLASS}>Date</TableHead>
                         <TableHead className={`${HEAD_CLASS} text-right`}>Ad Spend</TableHead>
@@ -1474,7 +1478,7 @@ export function InlineRecordsView({
                 <ScrollArea className="h-[500px]">
                   <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-20 bg-background">
                       <TableRow className="border-b-2">
                         <TableHead className={HEAD_CLASS}>Date</TableHead>
                         <TableHead className={HEAD_CLASS}>Name</TableHead>
@@ -1486,12 +1490,12 @@ export function InlineRecordsView({
                         <TableHead className={HEAD_CLASS}>Status</TableHead>
                         <TableHead className={HEAD_CLASS}>Accredited</TableHead>
                         <TableHead className={HEAD_CLASS}>Investment</TableHead>
-                        <TableHead className={HEAD_CLASS}>State</TableHead>
-                        <TableHead className={HEAD_CLASS}>Net Worth</TableHead>
-                        <TableHead className={HEAD_CLASS}>Income</TableHead>
-                        <TableHead className={HEAD_CLASS}>Q&A</TableHead>
-                        {uniqueQuestionNames.map((qName) => (
-                          <TableHead key={qName} className={`${HEAD_CLASS} max-w-[120px] truncate`} title={qName}>
+                        <TableHead className={`${ENRICHMENT_HEAD_CLASS} border-l border-emerald-500/20`}>State</TableHead>
+                        <TableHead className={ENRICHMENT_HEAD_CLASS}>Net Worth</TableHead>
+                        <TableHead className={`${ENRICHMENT_HEAD_CLASS} border-r border-emerald-500/20`}>Income</TableHead>
+                        <TableHead className={`${QA_HEAD_CLASS} border-l border-blue-500/20`}>Q&A</TableHead>
+                        {uniqueQuestionNames.map((qName, i) => (
+                          <TableHead key={qName} className={`${QA_HEAD_CLASS} max-w-[120px] truncate ${i === uniqueQuestionNames.length - 1 ? 'border-r border-blue-500/20' : ''}`} title={qName}>
                             {qName.length > 15 ? qName.slice(0, 15) + '...' : qName}
                           </TableHead>
                         ))}
@@ -1565,24 +1569,24 @@ export function InlineRecordsView({
                               <TableCell className={`${CELL_CLASS} font-mono`}>
                                 {investmentRange || '-'}
                               </TableCell>
-                              <TableCell className={`${CELL_CLASS} text-muted-foreground`}>
+                              <TableCell className={`${ENRICHMENT_CELL_CLASS} text-muted-foreground border-l border-emerald-500/10`}>
                                 {enrichment?.state || '-'}
                               </TableCell>
-                              <TableCell className={`${CELL_CLASS} font-mono text-primary`}>
+                              <TableCell className={`${ENRICHMENT_CELL_CLASS} font-mono text-primary`}>
                                 {enrichment?.net_worth || '-'}
                               </TableCell>
-                              <TableCell className={`${CELL_CLASS} font-mono`}>
+                              <TableCell className={`${ENRICHMENT_CELL_CLASS} font-mono border-r border-emerald-500/10`}>
                                 {enrichment?.household_income || '-'}
                               </TableCell>
-                              <TableCell className={CELL_CLASS}>
+                              <TableCell className={`${QA_CELL_CLASS} border-l border-blue-500/10`}>
                                 {lead.questions && Array.isArray(lead.questions) && lead.questions.length > 0 ? (
                                   <span className="text-muted-foreground">{lead.questions.length}</span>
                                 ) : '-'}
                               </TableCell>
-                              {uniqueQuestionNames.map((qName) => {
+                              {uniqueQuestionNames.map((qName, i) => {
                                 const answer = getQuestionAnswer(lead, qName);
                                 return (
-                                  <TableCell key={qName} className={`${CELL_CLASS} max-w-[120px] truncate`} title={answer || ''}>
+                                  <TableCell key={qName} className={`${QA_CELL_CLASS} max-w-[120px] truncate ${i === uniqueQuestionNames.length - 1 ? 'border-r border-blue-500/10' : ''}`} title={answer || ''}>
                                     {answer || '-'}
                                   </TableCell>
                                 );
@@ -1689,7 +1693,7 @@ export function InlineRecordsView({
                 <ScrollArea className="h-[500px]">
                   <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-20 bg-background">
                       <TableRow className="border-b-2">
                         <TableHead className={HEAD_CLASS}>Name</TableHead>
                         <TableHead className={`${HEAD_CLASS} text-right`}>Commitment</TableHead>
@@ -1785,7 +1789,7 @@ export function InlineRecordsView({
                 <ScrollArea className="h-[500px]">
                   <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-20 bg-background">
                       <TableRow className="border-b-2">
                         <TableHead className={HEAD_CLASS}>Name</TableHead>
                         <TableHead className={`${HEAD_CLASS} text-right`}>Amount</TableHead>
@@ -1881,7 +1885,7 @@ export function InlineRecordsView({
                 <ScrollArea className="h-[500px]">
                   <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-20 bg-background">
                       <TableRow className="border-b-2">
                         <TableHead className={HEAD_CLASS}>Contact</TableHead>
                         <TableHead className={HEAD_CLASS}>Email</TableHead>
