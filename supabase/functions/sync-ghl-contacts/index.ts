@@ -528,13 +528,13 @@ async function fetchGHLCustomFieldDefinitions(apiKey: string, locationId: string
     return fieldNameMap;
   }
   try {
-    const response = await fetch(`${GHL_BASE_URL}/locations/${locationId}/customFields`, {
+    const response = await fetchGHL(`${GHL_BASE_URL}/locations/${locationId}/customFields`, {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Version': '2021-07-28',
         'Accept': 'application/json',
       },
-    });
+    }, `customFields/${locationId}`);
     if (response.ok) {
       const data = await response.json();
       const fields = data.customFields || [];
