@@ -176,6 +176,8 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
         type: 'created',
         title: task.title,
         timestamp: new Date(task.created_at),
+        taskId: task.id,
+        dueDate: task.due_date,
         changedBy: task.created_by || undefined,
         clientName: task.assigned_client_name || undefined,
       });
@@ -186,6 +188,8 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
           type: 'completed',
           title: task.title,
           timestamp: new Date(task.completed_at),
+          taskId: task.id,
+          dueDate: task.due_date,
           clientName: task.assigned_client_name || undefined,
         });
       }
@@ -196,6 +200,8 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
           type: 'task_review',
           title: task.title,
           timestamp: new Date(task.updated_at),
+          taskId: task.id,
+          dueDate: task.due_date,
           clientName: task.assigned_client_name || undefined,
         });
       }
@@ -206,6 +212,8 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
           type: 'assigned',
           title: task.title,
           timestamp: new Date(task.updated_at),
+          taskId: task.id,
+          dueDate: task.due_date,
           newValue: memberMap.get(task.assigned_to) || task.assigned_to,
           clientName: task.assigned_client_name || undefined,
         });
