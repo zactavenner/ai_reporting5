@@ -1662,9 +1662,10 @@ async function fetchGHLConversationMessages(
 
   try {
     // Search for conversations with this contact
-    const searchResponse = await fetch(
+    const searchResponse = await fetchGHL(
       `${GHL_BASE_URL}/conversations/search?locationId=${locationId}&contactId=${contactId}`, 
-      { method: 'GET', headers }
+      { method: 'GET', headers },
+      `conversations/search/${contactId}`
     );
     
     if (!searchResponse.ok) {
@@ -1678,9 +1679,10 @@ async function fetchGHLConversationMessages(
     // For each conversation, get the messages
     for (const conv of conversations.slice(0, 5)) { // Limit to 5 conversations
       try {
-        const messagesResponse = await fetch(
+        const messagesResponse = await fetchGHL(
           `${GHL_BASE_URL}/conversations/${conv.id}/messages?limit=50`,
-          { method: 'GET', headers }
+          { method: 'GET', headers },
+          `conversation-messages/${conv.id}`
         );
 
         if (messagesResponse.ok) {
@@ -1701,7 +1703,7 @@ async function fetchGHLConversationMessages(
       }
       
       // Small delay between requests
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
   } catch (err) {
     console.error('Error fetching GHL conversations:', err);
