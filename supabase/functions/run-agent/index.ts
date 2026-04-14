@@ -217,6 +217,41 @@ serve(async (req) => {
               .order('created_at', { ascending: false })
               .limit(100);
 
+            // Fetch assignees with member names for multi-owner detection
+            const taskIds = (activeTasks || []).map((t: any) => t.id);
+            let assigneesMap: Record<string, { member_id: string; name: string }[]> = {};
+            if (taskIds.length > 0) {
+              const { data: assignees } = await prodDb
+                .from('task_assignees')
+                .select('task_id, member_id, member:agency_members(id, name, email)')
+                .in('task_id', taskIds.slice(0, 100));
+              for (const a of (assignees || [])) {
+                const tid = a.task_id;
+                if (!assigneesMap[tid]) assigneesMap[tid] = [];
+                assigneesMap[tid].push({
+                  member_id: a.member_id,
+                  name: (a as any).member?.name || a.member_id,
+                });
+              }
+            }
+
+            // Enrich tasks with assignee details
+            const enrichedTasks = (activeTasks || []).map((t: any) => ({
+              ...t,
+              assignees: assigneesMap[t.id] || [],
+              assignee_count: (assigneesMap[t.id] || []).length,
+            }));
+
+            // Identify unassigned tasks (no assigned_to AND no assignees)
+            const unassignedTasks = enrichedTasks.filter(
+              (t: any) => !t.assigned_to && t.assignee_count === 0
+            );
+
+            // Identify multi-owner tasks
+            const multiOwnerTasks = enrichedTasks.filter(
+              (t: any) => t.assignee_count > 1
+            );
+
             const { data: recentCompleted } = await prodDb
               .from('tasks')
               .select('id, title, status, stage, priority, due_date, completed_at')
@@ -234,6 +269,24 @@ serve(async (req) => {
               .lt('due_date', todayStr)
               .order('due_date', { ascending: true });
 
+            // Enrich overdue tasks with assignee names
+            const overdueIds = (overdueTasks || []).map((t: any) => t.id);
+            let overdueAssigneesMap: Record<string, { name: string }[]> = {};
+            if (overdueIds.length > 0) {
+              const { data: oAssignees } = await prodDb
+                .from('task_assignees')
+                .select('task_id, member:agency_members(name)')
+                .in('task_id', overdueIds);
+              for (const a of (oAssignees || [])) {
+                if (!overdueAssigneesMap[a.task_id]) overdueAssigneesMap[a.task_id] = [];
+                overdueAssigneesMap[a.task_id].push({ name: (a as any).member?.name || 'Unknown' });
+              }
+            }
+            const enrichedOverdue = (overdueTasks || []).map((t: any) => ({
+              ...t,
+              assignees: overdueAssigneesMap[t.id] || [],
+            }));
+
             const { data: dueTodayTasks } = await prodDb
               .from('tasks')
               .select('id, title, priority, due_date, assigned_to, stage')
@@ -244,29 +297,32 @@ serve(async (req) => {
             const { data: recentHistory } = await prodDb
               .from('task_history')
               .select('id, task_id, action, old_value, new_value, changed_by, created_at')
-              .in('task_id', (activeTasks || []).map((t: any) => t.id).slice(0, 50))
+              .in('task_id', taskIds.slice(0, 50))
               .gte('created_at', weekAgoStr)
               .order('created_at', { ascending: false })
               .limit(100);
 
-            const allTasks = activeTasks || [];
             const stageBreakdown: Record<string, number> = {};
-            allTasks.forEach((t: any) => { stageBreakdown[t.stage || 'unknown'] = (stageBreakdown[t.stage || 'unknown'] || 0) + 1; });
+            enrichedTasks.forEach((t: any) => { stageBreakdown[t.stage || 'unknown'] = (stageBreakdown[t.stage || 'unknown'] || 0) + 1; });
 
             dataContext.tasks = {
-              active_count: allTasks.length,
+              active_count: enrichedTasks.length,
               completed_this_week: recentCompleted?.length || 0,
-              overdue_count: overdueTasks?.length || 0,
+              overdue_count: enrichedOverdue.length,
               due_today_count: dueTodayTasks?.length || 0,
+              unassigned_count: unassignedTasks.length,
+              multi_owner_count: multiOwnerTasks.length,
               stage_breakdown: stageBreakdown,
-              overdue_tasks: (overdueTasks || []).slice(0, 10),
+              unassigned_tasks: unassignedTasks.slice(0, 15).map((t: any) => ({ id: t.id, title: t.title, stage: t.stage, priority: t.priority, due_date: t.due_date })),
+              multi_owner_tasks: multiOwnerTasks.slice(0, 15).map((t: any) => ({ id: t.id, title: t.title, assignees: t.assignees, stage: t.stage })),
+              overdue_tasks: enrichedOverdue.slice(0, 15),
               due_today_tasks: dueTodayTasks || [],
               recent_completions: (recentCompleted || []).slice(0, 10),
               recent_history: (recentHistory || []).slice(0, 20),
               priority_breakdown: {
-                high: allTasks.filter((t: any) => t.priority === 'high').length,
-                medium: allTasks.filter((t: any) => t.priority === 'medium').length,
-                low: allTasks.filter((t: any) => t.priority === 'low').length,
+                high: enrichedTasks.filter((t: any) => t.priority === 'high').length,
+                medium: enrichedTasks.filter((t: any) => t.priority === 'medium').length,
+                low: enrichedTasks.filter((t: any) => t.priority === 'low').length,
               },
             };
           } catch (e) {
@@ -379,6 +435,31 @@ serve(async (req) => {
                 context: { client_id: client.id, client_name: client.name, ...(esc.context || {}) },
               });
               actionsTaken.push({ type: 'escalation', severity: esc.severity, title: esc.title });
+            }
+          }
+
+          // ── Task comment write-back ──
+          if (parsed.task_comments?.length && connectors.includes('tasks')) {
+            for (const tc of parsed.task_comments) {
+              if (!tc.task_id || !tc.comment) continue;
+              try {
+                await prodDb.from('task_comments').insert({
+                  task_id: tc.task_id,
+                  author_name: `🤖 ${agent.name}`,
+                  content: tc.comment,
+                  comment_type: 'text',
+                });
+                // Log in task history
+                await prodDb.from('task_history').insert({
+                  task_id: tc.task_id,
+                  action: 'comment_added',
+                  new_value: tc.comment,
+                  changed_by: `Agent: ${agent.name}`,
+                });
+                actionsTaken.push({ type: 'task_comment', task_id: tc.task_id });
+              } catch (e) {
+                console.error(`Failed to add comment to task ${tc.task_id}:`, e);
+              }
             }
           }
 
