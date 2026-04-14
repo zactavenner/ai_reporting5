@@ -163,6 +163,7 @@ export function InlineRecordsView({
   const [currentPage, setCurrentPage] = useState(1);
   const [repFilter, setRepFilter] = useState<string>('all');
   const [isExportingToGHL, setIsExportingToGHL] = useState(false);
+  const [isEnriching, setIsEnriching] = useState(false);
   const queryClient = useQueryClient();
   const { syncContact, isSyncing } = useSingleContactSync();
   
@@ -201,6 +202,32 @@ export function InlineRecordsView({
     return null;
   }, [enrichmentMap]);
   
+  // Count unenriched leads
+  const unenrichedCount = useMemo(() => {
+    return leads.filter(l => !getEnrichment(l)).length;
+  }, [leads, getEnrichment]);
+
+  // Bulk enrich handler
+  const handleBulkEnrich = async () => {
+    if (!clientId || isEnriching) return;
+    setIsEnriching(true);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const res = await supabase.functions.invoke('bulk-enrich', {
+        body: { client_id: clientId, limit: 50 },
+      });
+      if (res.error) throw res.error;
+      const data = res.data;
+      toast.success(`Enrichment complete: ${data.succeeded || 0} enriched, ${data.already_enriched || 0} already done`);
+      queryClient.invalidateQueries({ queryKey: ['inline-enrichment', clientId] });
+    } catch (err: any) {
+      console.error('[BULK-ENRICH] Error:', err);
+      toast.error(`Enrichment failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsEnriching(false);
+    }
+  };
+
   // State for UniversalRecordPanel
   const [panelOpen, setPanelOpen] = useState(false);
 
@@ -1305,6 +1332,22 @@ export function InlineRecordsView({
                   <Button variant="outline" size="sm" onClick={openAddModal}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add {getTabLabel()}
+                  </Button>
+                )}
+                {clientId && unenrichedCount > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBulkEnrich}
+                    disabled={isEnriching}
+                    className="border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
+                  >
+                    {isEnriching ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Zap className="h-4 w-4 mr-2" />
+                    )}
+                    Enrich ({unenrichedCount})
                   </Button>
                 )}
                 {clientId && ghlLocationId && (
