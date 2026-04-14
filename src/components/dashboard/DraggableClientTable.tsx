@@ -259,6 +259,7 @@ export function DraggableClientTable({
         case 'crmLeads': aVal = (a.metrics.totalLeads || 0) + (a.metrics.spamLeads || 0); bVal = (b.metrics.totalLeads || 0) + (b.metrics.spamLeads || 0); break;
         case 'calls': aVal = a.metrics.totalCalls || 0; bVal = b.metrics.totalCalls || 0; break;
         case 'showed': aVal = a.metrics.showedCalls || 0; bVal = b.metrics.showedCalls || 0; break;
+        case 'showRate': aVal = a.metrics.showedPercent || 0; bVal = b.metrics.showedPercent || 0; break;
         case 'funded': aVal = a.metrics.fundedInvestors || 0; bVal = b.metrics.fundedInvestors || 0; break;
         case 'ltb': aVal = a.computed.leadToBooked; bVal = b.computed.leadToBooked; break;
         case 'bts': aVal = a.computed.bookedToShowed; bVal = b.computed.bookedToShowed; break;
@@ -388,9 +389,10 @@ export function DraggableClientTable({
               <SortableHeader column="calls" label="Booked" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="costPerCall" label="$/Call" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="showed" label="Shows" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="showRate" label="Show%" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="funded" label="Funded" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="costOfCapital" label="CoC%" sortConfig={sortConfig} onSort={handleSort} />
-              <TableHead className="font-bold text-[11px] text-center py-0 px-1">BN</TableHead>
+              <TableHead className="font-bold text-[11px] text-center py-0 px-1">BM</TableHead>
               <TableHead className="font-bold text-[11px] text-center py-0 px-1">Meta</TableHead>
               <TableHead className="font-bold text-[11px] text-center py-0 px-1">CRM</TableHead>
               {isAdmin && <SortableHeader column="mrr" label="MRR" sortConfig={sortConfig} onSort={handleSort} />}
@@ -614,6 +616,14 @@ export function DraggableClientTable({
                       {m.showedCalls || 0}
                     </TableCell>
 
+                    {/* Show Rate % */}
+                    <TableCell className={cn(
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
+                      getConversionColor(m.showedPercent || 0)
+                    )}>
+                      {(m.showedPercent || 0) > 0 ? `${Math.round(m.showedPercent)}%` : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+
                     {/* Funded */}
                     <TableCell className={cn(
                       "text-right font-mono tabular-nums text-[11px] py-0 px-1",
@@ -630,15 +640,14 @@ export function DraggableClientTable({
                       {(m.costOfCapital || 0) > 0 ? `${m.costOfCapital.toFixed(1)}%` : <span className="text-muted-foreground">-</span>}
                     </TableCell>
 
-
-                    {/* Bottleneck */}
-                    <TableCell className="text-center text-[11px] py-0 px-1">
-                      {computed.bottleneck ? (
-                        <span className="text-destructive line-through font-medium">
-                          {computed.bottleneck.label}
-                        </span>
+                    {/* BM URL */}
+                    <TableCell className="text-center py-0 px-1" onClick={(e) => e.stopPropagation()}>
+                      {client.business_manager_url ? (
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => openAdsManager(e, client.business_manager_url)} title="Business Manager">
+                          <BarChart3 className="h-3 w-3 text-chart-2" />
+                        </Button>
                       ) : (
-                        <span className="text-muted-foreground">-</span>
+                        <span className="text-muted-foreground text-[9px]">—</span>
                       )}
                     </TableCell>
 
