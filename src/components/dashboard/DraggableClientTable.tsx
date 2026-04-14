@@ -564,12 +564,12 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* Meta Spend */}
-                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
+                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1 font-semibold">
                       {formatCurrency(m.totalAdSpend || 0)}
                     </TableCell>
 
                     {/* Expected Spend ($/Day × days in range) */}
-                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
+                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1 text-muted-foreground/70">
                       {computed.dailyTarget > 0 ? formatCurrency(computed.dailyTarget * numberOfDays) : <span className="text-muted-foreground">-</span>}
                     </TableCell>
 
