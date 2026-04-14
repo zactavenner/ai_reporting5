@@ -32,7 +32,8 @@ serve(async (req) => {
 
 Available connectors (pick only relevant ones):
 - "database" — Access leads, calls, daily_metrics, funded_investors, ad_spend_reports, call_analysis, client_settings, client_offers, alert_configs
-- "tasks" — Access project tasks, subtasks, assignments, due dates, task history, stage breakdowns
+- "tasks" — Access project tasks with full assignee details (unassigned_tasks, multi_owner_tasks, overdue_tasks with assignee names). Can WRITE BACK comments to tasks via "task_comments" output field.
+- "meta_ads" — Pull live ad spend and campaign data from Meta Ads API
 - "meta_ads" — Pull live ad spend and campaign data from Meta Ads API
 - "ghl_crm" — Access GoHighLevel contacts, pipelines, calendars
 - "slack" — Send messages and reports to Slack channels
