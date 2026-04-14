@@ -1269,7 +1269,7 @@ export function InlineRecordsView({
     <ScrollArea className="h-[500px]">
       <div className="overflow-x-auto">
       <Table>
-        <TableHeader>
+        <TableHeader className="sticky top-0 z-20 bg-background">
           <TableRow className="border-b-2">
             <TableHead className={HEAD_CLASS}>Date</TableHead>
             <TableHead className={HEAD_CLASS}>Name</TableHead>
@@ -1277,9 +1277,9 @@ export function InlineRecordsView({
             <TableHead className={HEAD_CLASS}>Phone</TableHead>
             <TableHead className={HEAD_CLASS}>Status</TableHead>
             <TableHead className={HEAD_CLASS}>Outcome</TableHead>
-            <TableHead className={HEAD_CLASS}>State</TableHead>
-            <TableHead className={HEAD_CLASS}>Net Worth</TableHead>
-            <TableHead className={HEAD_CLASS}>Income</TableHead>
+            <TableHead className={`${ENRICHMENT_HEAD_CLASS} border-l border-emerald-500/20`}>State</TableHead>
+            <TableHead className={ENRICHMENT_HEAD_CLASS}>Net Worth</TableHead>
+            <TableHead className={`${ENRICHMENT_HEAD_CLASS} border-r border-emerald-500/20`}>Income</TableHead>
             {ghlLocationId && <TableHead className={HEAD_CLASS}>GHL</TableHead>}
             {clientId && <TableHead className={`${HEAD_CLASS} text-right`}>Act</TableHead>}
           </TableRow>
