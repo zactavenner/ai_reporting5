@@ -111,6 +111,7 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedTaskForPanel, setSelectedTaskForPanel] = useState<Task | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addHistory = useAddTaskHistory();
   const { currentMember } = useTeamMember();
