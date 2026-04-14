@@ -125,7 +125,10 @@ export function AgentsTab({ clients }: Props) {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowTemplates(!showTemplates)}>
+          <Button variant="outline" size="sm" onClick={() => { setShowAIGenerator(!showAIGenerator); setShowTemplates(false); }}>
+            <Sparkles className="h-4 w-4 mr-1" /> AI Create
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => { setShowTemplates(!showTemplates); setShowAIGenerator(false); }}>
             <Zap className="h-4 w-4 mr-1" /> Templates
           </Button>
           <Button size="sm" onClick={handleCreateBlank} disabled={createAgent.isPending}>
