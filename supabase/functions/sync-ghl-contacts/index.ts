@@ -240,11 +240,11 @@ async function fetchGHLContacts(
       page: page || 1,
     };
 
-    const response = await fetch(`${GHL_BASE_URL}/contacts/search`, {
+    const response = await fetchGHL(`${GHL_BASE_URL}/contacts/search`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-    });
+    }, `contacts/search page ${page || 1}`);
     
     if (response.ok) {
       const data = await response.json();
