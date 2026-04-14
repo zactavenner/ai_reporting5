@@ -259,6 +259,7 @@ export function DraggableClientTable({
         case 'crmLeads': aVal = (a.metrics.totalLeads || 0) + (a.metrics.spamLeads || 0); bVal = (b.metrics.totalLeads || 0) + (b.metrics.spamLeads || 0); break;
         case 'calls': aVal = a.metrics.totalCalls || 0; bVal = b.metrics.totalCalls || 0; break;
         case 'showed': aVal = a.metrics.showedCalls || 0; bVal = b.metrics.showedCalls || 0; break;
+        case 'showRate': aVal = a.metrics.showedPercent || 0; bVal = b.metrics.showedPercent || 0; break;
         case 'funded': aVal = a.metrics.fundedInvestors || 0; bVal = b.metrics.fundedInvestors || 0; break;
         case 'ltb': aVal = a.computed.leadToBooked; bVal = b.computed.leadToBooked; break;
         case 'bts': aVal = a.computed.bookedToShowed; bVal = b.computed.bookedToShowed; break;
