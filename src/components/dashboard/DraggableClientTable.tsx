@@ -615,6 +615,14 @@ export function DraggableClientTable({
                       {m.showedCalls || 0}
                     </TableCell>
 
+                    {/* Show Rate % */}
+                    <TableCell className={cn(
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
+                      getConversionColor(m.showedPercent || 0)
+                    )}>
+                      {(m.showedPercent || 0) > 0 ? `${Math.round(m.showedPercent)}%` : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+
                     {/* Funded */}
                     <TableCell className={cn(
                       "text-right font-mono tabular-nums text-[11px] py-0 px-1",
@@ -629,18 +637,6 @@ export function DraggableClientTable({
                       getThresholdColor(m.costOfCapital || 0, t.costOfCapital)
                     )}>
                       {(m.costOfCapital || 0) > 0 ? `${m.costOfCapital.toFixed(1)}%` : <span className="text-muted-foreground">-</span>}
-                    </TableCell>
-
-
-                    {/* Bottleneck */}
-                    <TableCell className="text-center text-[11px] py-0 px-1">
-                      {computed.bottleneck ? (
-                        <span className="text-destructive line-through font-medium">
-                          {computed.bottleneck.label}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
                     </TableCell>
 
                     {/* Meta Sync Status */}
