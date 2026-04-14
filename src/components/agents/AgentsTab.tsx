@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, Play, Power, Trash2, AlertTriangle, CheckCircle, XCircle, Clock, Zap, Activity, Bot, Settings2, ChevronRight, Circle, Building2, User } from 'lucide-react';
+import { Plus, Play, Power, Trash2, AlertTriangle, CheckCircle, XCircle, Clock, Zap, Activity, Bot, Settings2, ChevronRight, Circle, Building2, User, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,6 +13,7 @@ import type { Client } from '@/hooks/useClients';
 import { toast } from 'sonner';
 import { CronSchedulePicker } from './CronSchedulePicker';
 import { ClientScopePicker } from './ClientScopePicker';
+import { AIAgentGenerator } from './AIAgentGenerator';
 
 interface Props { clients: Client[]; }
 
