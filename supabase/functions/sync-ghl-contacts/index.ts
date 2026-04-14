@@ -13,6 +13,52 @@ const corsHeaders = {
 
 const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
 
+// ── Rate-limit-aware fetch wrapper with exponential backoff ──
+let ghlApiCallCount = 0;
+const GHL_API_CALL_LIMIT = 500; // Safety budget per invocation
+
+async function fetchGHL(
+  url: string,
+  options: RequestInit,
+  label = "unknown",
+  maxRetries = 3,
+): Promise<Response> {
+  ghlApiCallCount++;
+  if (ghlApiCallCount > GHL_API_CALL_LIMIT) {
+    throw new Error(`GHL API call budget exhausted (${GHL_API_CALL_LIMIT} calls). Stopped at: ${label}`);
+  }
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url, options);
+    
+    if (res.status === 429) {
+      // Parse Retry-After header or use exponential backoff
+      const retryAfter = res.headers.get("Retry-After");
+      const delay = retryAfter 
+        ? parseInt(retryAfter) * 1000 
+        : 5000 * Math.pow(2, attempt - 1) + Math.random() * 2000;
+      console.warn(`[sync-ghl-contacts] ${label}: Rate limited (429), retry ${attempt}/${maxRetries} in ${Math.round(delay / 1000)}s`);
+      
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+    }
+    
+    if (res.status >= 500 && attempt < maxRetries) {
+      const delay = 3000 * Math.pow(2, attempt - 1) + Math.random() * 1000;
+      console.warn(`[sync-ghl-contacts] ${label}: Server error (${res.status}), retry ${attempt}/${maxRetries} in ${Math.round(delay / 1000)}s`);
+      await new Promise(r => setTimeout(r, delay));
+      continue;
+    }
+    
+    return res;
+  }
+  
+  // Should not reach here, but fallback
+  return fetch(url, options);
+}
+
 // --- SOURCE NORMALIZATION FUNCTION ---
 // Normalize raw UTM source to standardized platform names
 function normalizeSourceValue(rawSource: string | null | undefined, campaignName: string | null | undefined): string {
