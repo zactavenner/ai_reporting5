@@ -75,11 +75,15 @@ RESPOND ONLY WITH VALID JSON matching this exact schema:
   "prompt_template": "string (detailed prompt with {{variables}})"
 }
 
+When the "tasks" connector is selected, ALWAYS include a "task_comments" field in the output schema:
+- "task_comments": array of { "task_id": "string", "comment": "string" }
+- Use this to write automated comments on tasks (e.g., asking owners for updates on overdue tasks, requesting owner designation on multi-owner tasks)
+
 Make the prompt_template detailed and specific. Include:
 1. A role definition
 2. What data to analyze
 3. What to output (always JSON with specific fields)
-4. Include "escalations" and "slack_message" fields in the output schema`;
+4. Include "escalations", "slack_message", and "task_comments" (when tasks connector is used) fields in the output schema`;
 
     const aiRes = await fetch(AI_GATEWAY_URL, {
       method: 'POST',
