@@ -1538,10 +1538,10 @@ async function fetchSingleGHLContact(
   };
 
   try {
-    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}`, { 
+    const response = await fetchGHL(`${GHL_BASE_URL}/contacts/${contactId}`, { 
       method: 'GET', 
       headers 
-    });
+    }, `single-contact/${contactId}`);
     
     if (!response.ok) {
       console.error(`GHL single contact fetch error: ${response.status}`);
@@ -1568,10 +1568,10 @@ async function fetchGHLNotes(
   };
 
   try {
-    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}/notes`, { 
+    const response = await fetchGHL(`${GHL_BASE_URL}/contacts/${contactId}/notes`, { 
       method: 'GET', 
       headers 
-    });
+    }, `notes/${contactId}`);
     
     if (!response.ok) {
       console.error(`GHL notes fetch error: ${response.status}`);
@@ -1598,10 +1598,10 @@ async function fetchGHLTasks(
   };
 
   try {
-    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}/tasks`, { 
+    const response = await fetchGHL(`${GHL_BASE_URL}/contacts/${contactId}/tasks`, { 
       method: 'GET', 
       headers 
-    });
+    }, `tasks/${contactId}`);
     
     if (!response.ok) {
       console.error(`GHL tasks fetch error: ${response.status}`);
@@ -1628,10 +1628,10 @@ async function fetchGHLAppointments(
   };
 
   try {
-    const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}/appointments`, { 
+    const response = await fetchGHL(`${GHL_BASE_URL}/contacts/${contactId}/appointments`, { 
       method: 'GET', 
       headers 
-    });
+    }, `appointments/${contactId}`);
     
     if (!response.ok) {
       console.error(`GHL appointments fetch error: ${response.status}`);
