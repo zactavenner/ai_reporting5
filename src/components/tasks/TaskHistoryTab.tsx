@@ -300,6 +300,25 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
     return labels[stage] || stage;
   };
 
+  const taskMap = useMemo(() => new Map(tasks.map(t => [t.id, t])), [tasks]);
+
+  const handleEventClick = (event: UnifiedEvent) => {
+    if (event.taskId) {
+      const task = taskMap.get(event.taskId);
+      if (task) {
+        setSelectedTaskForPanel(task);
+      }
+    }
+  };
+
+  const getDueDateInfo = (dueDate?: string | null) => {
+    if (!dueDate) return null;
+    const date = parseISO(dueDate);
+    const today = isToday(date);
+    const overdue = isPast(date) && !today;
+    return { date, today, overdue, formatted: format(date, 'MMM d') };
+  };
+
   const getAuthorName = () => {
     if (isPublicView) return 'Client';
     return currentMember?.name || 'Agency';
