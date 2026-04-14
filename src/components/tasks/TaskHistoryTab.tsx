@@ -648,6 +648,14 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
           </Button>
         </div>
       )}
+
+      <TaskDetailPanel
+        task={selectedTaskForPanel}
+        open={!!selectedTaskForPanel}
+        onOpenChange={(open) => { if (!open) setSelectedTaskForPanel(null); }}
+        clientId={clientId}
+        isPublicView={isPublicView}
+      />
     </div>
   );
 }
