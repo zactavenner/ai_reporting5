@@ -388,9 +388,10 @@ export function DraggableClientTable({
               <SortableHeader column="calls" label="Booked" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="costPerCall" label="$/Call" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="showed" label="Shows" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="showRate" label="Show%" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="funded" label="Funded" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="costOfCapital" label="CoC%" sortConfig={sortConfig} onSort={handleSort} />
-              <TableHead className="font-bold text-[11px] text-center py-0 px-1">BN</TableHead>
+              <TableHead className="font-bold text-[11px] text-center py-0 px-1">BM</TableHead>
               <TableHead className="font-bold text-[11px] text-center py-0 px-1">Meta</TableHead>
               <TableHead className="font-bold text-[11px] text-center py-0 px-1">CRM</TableHead>
               {isAdmin && <SortableHeader column="mrr" label="MRR" sortConfig={sortConfig} onSort={handleSort} />}
