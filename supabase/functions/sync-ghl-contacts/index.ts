@@ -311,7 +311,7 @@ async function fetchGHLOpportunities(
         url += `&startAfterId=${startAfterId}`;
       }
 
-      const response = await fetch(url, { method: 'GET', headers });
+      const response = await fetchGHL(url, { method: 'GET', headers }, `opportunities page ${pageCount + 1}`);
 
       if (!response.ok) {
         console.error(`GHL Opportunities API error: ${response.status}`);
@@ -341,7 +341,7 @@ async function fetchGHLOpportunities(
       if (!startAfterId) hasMore = false;
 
       pageCount++;
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     console.log(`Fetched total ${allOpportunities.length} opportunities across ${pageCount} pages`);
@@ -376,7 +376,7 @@ async function fetchGHLConversations(
         url += `&startAfterId=${lastMessageId}`;
       }
 
-      const response = await fetch(url, { method: 'GET', headers });
+      const response = await fetchGHL(url, { method: 'GET', headers }, `conversations page ${pageCount + 1}`);
       
       if (!response.ok) {
         console.error(`GHL Conversations API error: ${response.status}`);
