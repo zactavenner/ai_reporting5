@@ -1,0 +1,139 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+};
+
+const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  try {
+    const { description } = await req.json();
+    if (!description) {
+      return new Response(JSON.stringify({ error: 'description required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      return new Response(JSON.stringify({ error: 'LOVABLE_API_KEY not configured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const systemPrompt = `You are an AI agent configuration generator for a capital raising agency platform. Given a user's description of what they want an agent to do, generate a complete agent configuration.
+
+Available connectors (pick only relevant ones):
+- "database" — Access leads, calls, daily_metrics, funded_investors, ad_spend_reports, call_analysis, client_settings, client_offers, alert_configs
+- "tasks" — Access project tasks, subtasks, assignments, due dates, task history, stage breakdowns
+- "meta_ads" — Pull live ad spend and campaign data from Meta Ads API
+- "ghl_crm" — Access GoHighLevel contacts, pipelines, calendars
+- "slack" — Send messages and reports to Slack channels
+- "claude_code" — Connect to Claude Code Desktop for automations via MCP
+
+Available models:
+- "google/gemini-2.5-pro" — Best for complex reasoning, analysis, multi-step tasks
+- "google/gemini-2.5-flash" — Good balance of speed and quality
+- "google/gemini-2.5-flash-lite" — Fast, cheap, for simple checks
+- "google/gemini-3-flash-preview" — Latest balanced model
+- "google/gemini-3.1-pro-preview" — Latest premium model
+- "openai/gpt-5" — Strong reasoning, expensive
+- "openai/gpt-5-mini" — Good mid-tier
+
+Common schedule presets (use cron format):
+- Every 15 min: "*/15 * * * *"
+- Every 30 min: "*/30 * * * *"
+- Hourly: "0 * * * *"
+- Every 2 hours: "0 */2 * * *"
+- Daily 6 AM: "0 6 * * *"
+- Daily 9 AM: "0 9 * * *"
+- Weekdays 9 AM: "0 9 * * 1-5"
+- Weekly Monday 9 AM: "0 9 * * 1"
+
+The prompt_template should use these variables:
+- {{client_name}} — replaced with actual client name
+- {{date}} — today's date
+- {{yesterday}} — yesterday's date
+- {{data}} — JSON data from connectors
+
+RESPOND ONLY WITH VALID JSON matching this exact schema:
+{
+  "name": "string (short, memorable name)",
+  "icon": "string (single emoji)",
+  "description": "string (1-2 sentence description)",
+  "model": "string (model ID from list above)",
+  "schedule_cron": "string (cron expression)",
+  "connectors": ["string array of connector keys"],
+  "prompt_template": "string (detailed prompt with {{variables}})"
+}
+
+Make the prompt_template detailed and specific. Include:
+1. A role definition
+2. What data to analyze
+3. What to output (always JSON with specific fields)
+4. Include "escalations" and "slack_message" fields in the output schema`;
+
+    const aiRes = await fetch(AI_GATEWAY_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-3-flash-preview',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: description },
+        ],
+        temperature: 0.4,
+      }),
+    });
+
+    if (!aiRes.ok) {
+      const errText = await aiRes.text();
+      if (aiRes.status === 429) {
+        return new Response(JSON.stringify({ error: 'Rate limited — please try again later' }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (aiRes.status === 402) {
+        return new Response(JSON.stringify({ error: 'AI credits exhausted — please add funds' }), {
+          status: 402,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      throw new Error(`AI Gateway error ${aiRes.status}: ${errText}`);
+    }
+
+    const aiData = await aiRes.json();
+    const content = aiData.choices?.[0]?.message?.content || '';
+    
+    // Parse JSON from AI response
+    const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const config = JSON.parse(cleaned);
+
+    // Validate required fields
+    if (!config.name || !config.prompt_template) {
+      throw new Error('AI generated incomplete config');
+    }
+
+    return new Response(JSON.stringify({ success: true, config }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (err: any) {
+    console.error('generate-agent-config error:', err);
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
