@@ -1349,6 +1349,7 @@ export function InlineRecordsView({
                     )}
                     Enrich ({unenrichedCount})
                   </Button>
+                )}
                 {clientId && ghlLocationId && (
                   <Button
                     variant="outline"
