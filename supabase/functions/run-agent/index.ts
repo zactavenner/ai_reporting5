@@ -206,7 +206,73 @@ serve(async (req) => {
           };
         }
 
-        // ── META ADS connector ──
+        // ── TASKS connector: gather task data ──
+        if (connectors.includes('tasks')) {
+          try {
+            const { data: activeTasks } = await prodDb
+              .from('tasks')
+              .select('id, title, status, stage, priority, due_date, assigned_to, created_at, completed_at, parent_task_id')
+              .eq('client_id', client.id)
+              .in('status', ['pending', 'in_progress'])
+              .order('created_at', { ascending: false })
+              .limit(100);
+
+            const { data: recentCompleted } = await prodDb
+              .from('tasks')
+              .select('id, title, status, stage, priority, due_date, completed_at')
+              .eq('client_id', client.id)
+              .eq('status', 'completed')
+              .gte('completed_at', weekAgoStr)
+              .order('completed_at', { ascending: false })
+              .limit(50);
+
+            const { data: overdueTasks } = await prodDb
+              .from('tasks')
+              .select('id, title, priority, due_date, assigned_to, stage')
+              .eq('client_id', client.id)
+              .in('status', ['pending', 'in_progress'])
+              .lt('due_date', todayStr)
+              .order('due_date', { ascending: true });
+
+            const { data: dueTodayTasks } = await prodDb
+              .from('tasks')
+              .select('id, title, priority, due_date, assigned_to, stage')
+              .eq('client_id', client.id)
+              .in('status', ['pending', 'in_progress'])
+              .eq('due_date', todayStr);
+
+            const { data: recentHistory } = await prodDb
+              .from('task_history')
+              .select('id, task_id, action, old_value, new_value, changed_by, created_at')
+              .in('task_id', (activeTasks || []).map((t: any) => t.id).slice(0, 50))
+              .gte('created_at', weekAgoStr)
+              .order('created_at', { ascending: false })
+              .limit(100);
+
+            const allTasks = activeTasks || [];
+            const stageBreakdown: Record<string, number> = {};
+            allTasks.forEach((t: any) => { stageBreakdown[t.stage || 'unknown'] = (stageBreakdown[t.stage || 'unknown'] || 0) + 1; });
+
+            dataContext.tasks = {
+              active_count: allTasks.length,
+              completed_this_week: recentCompleted?.length || 0,
+              overdue_count: overdueTasks?.length || 0,
+              due_today_count: dueTodayTasks?.length || 0,
+              stage_breakdown: stageBreakdown,
+              overdue_tasks: (overdueTasks || []).slice(0, 10),
+              due_today_tasks: dueTodayTasks || [],
+              recent_completions: (recentCompleted || []).slice(0, 10),
+              recent_history: (recentHistory || []).slice(0, 20),
+              priority_breakdown: {
+                high: allTasks.filter((t: any) => t.priority === 'high').length,
+                medium: allTasks.filter((t: any) => t.priority === 'medium').length,
+                low: allTasks.filter((t: any) => t.priority === 'low').length,
+              },
+            };
+          } catch (e) {
+            dataContext.tasks = { error: 'Failed to fetch task data' };
+          }
+        }
         if (connectors.includes('meta_ads') && client.meta_access_token && client.meta_ad_account_id) {
           try {
             const metaUrl = `https://graph.facebook.com/v19.0/act_${client.meta_ad_account_id}/insights?fields=spend,impressions,clicks,ctr,cpc,cpm,actions&time_range={"since":"${yesterdayStr}","until":"${yesterdayStr}"}&access_token=${client.meta_access_token}`;

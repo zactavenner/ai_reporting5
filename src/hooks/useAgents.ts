@@ -192,6 +192,7 @@ export const AVAILABLE_MODELS = [
 
 export const AVAILABLE_CONNECTORS = [
   { key: 'database', label: 'Database', description: 'Access leads, calls, metrics, funded investors' },
+  { key: 'tasks', label: 'Tasks', description: 'Access project tasks, subtasks, assignments, and history' },
   { key: 'meta_ads', label: 'Meta Ads', description: 'Pull ad spend and campaign data from Meta' },
   { key: 'ghl_crm', label: 'GHL CRM', description: 'Access GoHighLevel contacts, pipelines, calendars' },
   { key: 'slack', label: 'Slack', description: 'Send messages and reports to Slack channels' },

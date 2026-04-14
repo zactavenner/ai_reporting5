@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, Play, Power, Trash2, AlertTriangle, CheckCircle, XCircle, Clock, Zap, Activity, Bot, Settings2, ChevronRight, Circle, Building2, User } from 'lucide-react';
+import { Plus, Play, Power, Trash2, AlertTriangle, CheckCircle, XCircle, Clock, Zap, Activity, Bot, Settings2, ChevronRight, Circle, Building2, User, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,6 +13,7 @@ import type { Client } from '@/hooks/useClients';
 import { toast } from 'sonner';
 import { CronSchedulePicker } from './CronSchedulePicker';
 import { ClientScopePicker } from './ClientScopePicker';
+import { AIAgentGenerator } from './AIAgentGenerator';
 
 interface Props { clients: Client[]; }
 
@@ -38,6 +39,7 @@ export function AgentsTab({ clients }: Props) {
   const [editData, setEditData] = useState<Partial<Agent>>({});
   const [tab, setTab] = useState('overview');
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
 
   // Computed stats
   const stats = useMemo(() => {
@@ -123,7 +125,10 @@ export function AgentsTab({ clients }: Props) {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowTemplates(!showTemplates)}>
+          <Button variant="outline" size="sm" onClick={() => { setShowAIGenerator(!showAIGenerator); setShowTemplates(false); }}>
+            <Sparkles className="h-4 w-4 mr-1" /> AI Create
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => { setShowTemplates(!showTemplates); setShowAIGenerator(false); }}>
             <Zap className="h-4 w-4 mr-1" /> Templates
           </Button>
           <Button size="sm" onClick={handleCreateBlank} disabled={createAgent.isPending}>
@@ -152,6 +157,11 @@ export function AgentsTab({ clients }: Props) {
             </Card>
           ))}
         </div>
+      )}
+
+      {/* AI Agent Generator */}
+      {showAIGenerator && (
+        <AIAgentGenerator clients={clients} onCreated={() => setShowAIGenerator(false)} />
       )}
 
       {/* Stats cards */}
