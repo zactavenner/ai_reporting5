@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef } from 'react';
+import { isToday, isPast, parseISO } from 'date-fns';
 import { format } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTeamMember } from '@/contexts/TeamMemberContext';
 import { TaskDiscussionVoiceNote, VoiceNotePlayer } from './TaskDiscussionVoiceNote';
+import { TaskDetailPanel } from './TaskDetailPanel';
 import { toast } from 'sonner';
 
 interface TaskHistoryTabProps {
@@ -66,6 +68,8 @@ interface UnifiedEvent {
   type: EventType;
   title: string;
   timestamp: Date;
+  taskId?: string;
+  dueDate?: string | null;
   changedBy?: string;
   oldValue?: string;
   newValue?: string;
@@ -107,6 +111,7 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedTaskForPanel, setSelectedTaskForPanel] = useState<Task | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addHistory = useAddTaskHistory();
   const { currentMember } = useTeamMember();
@@ -154,6 +159,8 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
         type: eventType,
         title: task.title,
         timestamp: new Date(h.created_at),
+        taskId: task.id,
+        dueDate: task.due_date,
         changedBy: h.changed_by || undefined,
         oldValue: h.old_value || undefined,
         newValue: h.new_value || undefined,
@@ -169,6 +176,8 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
         type: 'created',
         title: task.title,
         timestamp: new Date(task.created_at),
+        taskId: task.id,
+        dueDate: task.due_date,
         changedBy: task.created_by || undefined,
         clientName: task.assigned_client_name || undefined,
       });
@@ -179,6 +188,8 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
           type: 'completed',
           title: task.title,
           timestamp: new Date(task.completed_at),
+          taskId: task.id,
+          dueDate: task.due_date,
           clientName: task.assigned_client_name || undefined,
         });
       }
@@ -189,6 +200,8 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
           type: 'task_review',
           title: task.title,
           timestamp: new Date(task.updated_at),
+          taskId: task.id,
+          dueDate: task.due_date,
           clientName: task.assigned_client_name || undefined,
         });
       }
@@ -199,6 +212,8 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
           type: 'assigned',
           title: task.title,
           timestamp: new Date(task.updated_at),
+          taskId: task.id,
+          dueDate: task.due_date,
           newValue: memberMap.get(task.assigned_to) || task.assigned_to,
           clientName: task.assigned_client_name || undefined,
         });
@@ -283,6 +298,25 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
       revisions: 'Revisions', completed: 'Completed', done: 'Done', client_tasks: 'Client Tasks',
     };
     return labels[stage] || stage;
+  };
+
+  const taskMap = useMemo(() => new Map(tasks.map(t => [t.id, t])), [tasks]);
+
+  const handleEventClick = (event: UnifiedEvent) => {
+    if (event.taskId) {
+      const task = taskMap.get(event.taskId);
+      if (task) {
+        setSelectedTaskForPanel(task);
+      }
+    }
+  };
+
+  const getDueDateInfo = (dueDate?: string | null) => {
+    if (!dueDate) return null;
+    const date = parseISO(dueDate);
+    const today = isToday(date);
+    const overdue = isPast(date) && !today;
+    return { date, today, overdue, formatted: format(date, 'MMM d') };
   };
 
   const getAuthorName = () => {
@@ -467,10 +501,16 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
               const config = EVENT_CONFIG[event.type];
               const Icon = config.icon;
 
+              const dueDateInfo = getDueDateInfo(event.dueDate);
+
               return (
                 <div
                   key={event.id}
-                  className="flex items-start gap-3 py-3 border-b border-border last:border-0 hover:bg-muted/50 rounded-lg px-2 -mx-2 transition-colors"
+                  className={cn(
+                    "flex items-start gap-3 py-3 border-b border-border last:border-0 hover:bg-muted/50 rounded-lg px-2 -mx-2 transition-colors",
+                    event.taskId && "cursor-pointer"
+                  )}
+                  onClick={() => handleEventClick(event)}
                 >
                   <div className={cn('mt-0.5 flex-shrink-0', config.color)}>
                     <Icon className="h-5 w-5" />
@@ -483,6 +523,19 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
                       {event.clientName && (
                         <Badge variant="secondary" className="text-xs h-5">
                           {event.clientName}
+                        </Badge>
+                      )}
+                      {dueDateInfo && event.taskId && (
+                        <Badge 
+                          variant="outline" 
+                          className={cn(
+                            "text-xs h-5 gap-1",
+                            dueDateInfo.today && "bg-amber-500/15 text-amber-600 border-amber-500/30 font-semibold",
+                            dueDateInfo.overdue && "bg-destructive/15 text-destructive border-destructive/30 font-semibold"
+                          )}
+                        >
+                          <Calendar className="h-3 w-3" />
+                          {dueDateInfo.today ? 'Due Today' : dueDateInfo.overdue ? `Overdue · ${dueDateInfo.formatted}` : `Due ${dueDateInfo.formatted}`}
                         </Badge>
                       )}
                       {event.platform && (
@@ -595,6 +648,14 @@ export function TaskHistoryTab({ tasks, clientId, voiceNotes = [], meetings = []
           </Button>
         </div>
       )}
+
+      <TaskDetailPanel
+        task={selectedTaskForPanel}
+        open={!!selectedTaskForPanel}
+        onOpenChange={(open) => { if (!open) setSelectedTaskForPanel(null); }}
+        clientId={clientId}
+        isPublicView={isPublicView}
+      />
     </div>
   );
 }
