@@ -202,6 +202,32 @@ export function InlineRecordsView({
     return null;
   }, [enrichmentMap]);
   
+  // Count unenriched leads
+  const unenrichedCount = useMemo(() => {
+    return leads.filter(l => !getEnrichment(l)).length;
+  }, [leads, getEnrichment]);
+
+  // Bulk enrich handler
+  const handleBulkEnrich = async () => {
+    if (!clientId || isEnriching) return;
+    setIsEnriching(true);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const res = await supabase.functions.invoke('bulk-enrich', {
+        body: { client_id: clientId, limit: 50 },
+      });
+      if (res.error) throw res.error;
+      const data = res.data;
+      toast.success(`Enrichment complete: ${data.succeeded || 0} enriched, ${data.already_enriched || 0} already done`);
+      queryClient.invalidateQueries({ queryKey: ['inline-enrichment', clientId] });
+    } catch (err: any) {
+      console.error('[BULK-ENRICH] Error:', err);
+      toast.error(`Enrichment failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsEnriching(false);
+    }
+  };
+
   // State for UniversalRecordPanel
   const [panelOpen, setPanelOpen] = useState(false);
 
