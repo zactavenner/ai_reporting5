@@ -76,6 +76,24 @@ Deno.serve(async (req) => {
   console.log(`[daily-master-sync] Starting daily master sync pipeline`);
 
   const doSync = async () => {
+    // ── Step 0: Clean up stale sync runs (older than 2 hours, still "running") ──
+    try {
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      const { data: staleRuns, error: staleErr } = await supabase
+        .from("sync_runs")
+        .update({ status: "timed_out", completed_at: new Date().toISOString() })
+        .eq("status", "running")
+        .lt("started_at", twoHoursAgo)
+        .select("id");
+      
+      const staleCount = staleRuns?.length || 0;
+      if (staleCount > 0) {
+        console.log(`[daily-master-sync] Cleaned up ${staleCount} stale sync runs`);
+      }
+      if (staleErr) console.error(`[daily-master-sync] Stale cleanup error:`, staleErr);
+    } catch (cleanupErr) {
+      console.error(`[daily-master-sync] Stale cleanup failed:`, cleanupErr);
+    }
     const results: StepResult[] = [];
 
     // ── Step 1: Meta Ads Daily (campaigns, ad sets, ads + backfill) ──
@@ -145,17 +163,24 @@ Deno.serve(async (req) => {
       await new Promise(r => setTimeout(r, 5000));
     }
 
-    // ── Step 4: Recalculate Daily Metrics ──
+    // ── Step 4: Recalculate Daily Metrics (3-day lookback safety net) ──
     if (!skipSteps.includes("recalculate")) {
       const start = Date.now();
-      console.log(`[daily-master-sync] Step 4: recalculate-daily-metrics`);
-      const res = await callFunction(supabaseUrl, supabaseKey, "recalculate-daily-metrics");
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setUTCDate(threeDaysAgo.getUTCDate() - 3);
+      const startDate = threeDaysAgo.toISOString().split("T")[0];
+      const endDate = new Date().toISOString().split("T")[0];
+      console.log(`[daily-master-sync] Step 4: recalculate-daily-metrics (${startDate} to ${endDate})`);
+      const res = await callFunction(supabaseUrl, supabaseKey, "recalculate-daily-metrics", {
+        startDate,
+        endDate,
+      });
       const duration = Date.now() - start;
       results.push({
         step: "recalculate-daily-metrics",
         success: res.success,
         duration_ms: duration,
-        details: `${res.data?.totalUpdated || 0} days updated`,
+        details: `3-day lookback: ${res.data?.totalUpdated || 0} days updated`,
         error: res.error,
       });
       await new Promise(r => setTimeout(r, 5000));

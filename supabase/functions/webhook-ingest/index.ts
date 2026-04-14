@@ -174,6 +174,23 @@ serve(async (req) => {
         }).then(async (res) => {
           const result = await res.text();
           console.log(`[AUTO-SYNC] Single contact sync completed for ${contactId}: ${res.status} - ${result.substring(0, 200)}`);
+          
+          // Trigger metric refresh for this client + today so dashboard updates in near real-time
+          const today = new Date().toISOString().split('T')[0];
+          const recalcUrl = `${supabaseUrl}/functions/v1/recalculate-daily-metrics`;
+          try {
+            const recalcRes = await fetch(recalcUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              },
+              body: JSON.stringify({ clientId, startDate: today, endDate: today }),
+            });
+            console.log(`[AUTO-SYNC] Metric refresh for ${clientId} on ${today}: ${recalcRes.status}`);
+          } catch (recalcErr) {
+            console.error(`[AUTO-SYNC] Metric refresh failed for ${clientId}:`, recalcErr);
+          }
         }).catch((err) => {
           console.error(`[AUTO-SYNC] Single contact sync failed for ${contactId}:`, err);
         });
