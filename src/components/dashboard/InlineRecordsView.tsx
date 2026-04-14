@@ -1194,13 +1194,13 @@ export function InlineRecordsView({
         )}
       </TableCell>
       <TableCell className={`${CELL_CLASS} text-muted-foreground max-w-[80px] truncate`}>{call.outcome || '-'}</TableCell>
-      <TableCell className={`${CELL_CLASS} text-muted-foreground`}>
+      <TableCell className={`${ENRICHMENT_CELL_CLASS} text-muted-foreground border-l border-emerald-500/10`}>
         {enrichment?.state || '-'}
       </TableCell>
-      <TableCell className={`${CELL_CLASS} font-mono text-primary`}>
+      <TableCell className={`${ENRICHMENT_CELL_CLASS} font-mono text-primary`}>
         {enrichment?.net_worth || '-'}
       </TableCell>
-      <TableCell className={`${CELL_CLASS} font-mono`}>
+      <TableCell className={`${ENRICHMENT_CELL_CLASS} font-mono border-r border-emerald-500/10`}>
         {enrichment?.household_income || '-'}
       </TableCell>
       {ghlLocationId && (
