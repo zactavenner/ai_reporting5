@@ -1,32 +1,72 @@
 
 
-## Plan: Deploy All Agent Templates and Show Active Agents
+# Meta Leads + CRM Leads: Best Strategy for Accurate Data Pull
 
-### Current State
-- 8 agent templates defined in code (AI COO, Operations, Sales, Call Analysis, Client Success, Marketing, Data QA, Finance)
-- Only 1 agent exists in the database: "New Agent" (enabled, model: openai/gpt-5)
-- The AgentsTab UI already shows active/inactive badges and has full CRUD
-- The `run-agent` edge function is wired to the Lovable AI Gateway and works
+## Current Architecture (What You Have)
 
-### What This Plan Does
+```text
+┌────────────────────────┐     ┌────────────────────────┐
+│   META ADS API         │     │   GHL CRM API          │
+│  (spend, impressions)  │     │  (contacts, calls)     │
+└──────────┬─────────────┘     └──────────┬─────────────┘
+           │                              │
+     ┌─────▼──────┐              ┌────────▼─────────┐
+     │ sync-meta- │              │ sync-ghl-contacts│
+     │ ads (cron) │              │ (cron + webhook) │
+     └─────┬──────┘              └────────┬─────────┘
+           │                              │
+     ┌─────▼──────┐              ┌────────▼─────────┐
+     │daily_metrics│◄────────────│ leads / calls    │
+     │(ad_spend)   │  recalculate│ tables           │
+     └─────────────┘  daily      └──────────────────┘
+                      metrics
+```
 
-**Step 1 -- Create all 8 template agents in the database**
-- Write a migration that inserts all 8 agents from `AGENT_TEMPLATES` (AI COO/JARVIS, OPS, HUNTER, ANALYST, KEEPER, BROOKLYN, Data QA, LEDGER)
-- Each gets its predefined prompt, schedule, model, connectors, and icon
-- All start with `enabled = true` so they're live immediately
-- Use `ON CONFLICT DO NOTHING` on `template_key` to avoid duplicates
+## The Problem I Found
 
-**Step 2 -- Add "Active Agents" summary section to the dashboard**
-- Add a new prominent section at the top of `AgentsTab` showing all currently active/enabled agents as status cards in a grid
-- Each card shows: icon, name, schedule, last run time, last run status (color-coded), and a quick toggle to disable
-- This gives an at-a-glance view of the entire live workforce without clicking into each agent
+Your data is currently flowing through **two separate paths** that aren't always in sync:
 
-**Step 3 -- Prevent duplicate template creation**
-- Update `handleCreateFromTemplate` to check if an agent with the same `template_key` already exists before creating
-- Show a toast warning if the template agent already exists
+1. **Meta Ads sync** → writes `ad_spend` to `daily_metrics` ✅ Working (11 completed today)
+2. **GHL sync** → writes to `leads` table ✅ Working (48 leads today across 5 clients)
+3. **`recalculate-daily-metrics`** → reads from `leads` table and writes `leads` count to `daily_metrics` ⚠️ **Timing gap**: many clients show `leads: 0` but `leads_created: 5` (JJ Dental, LSCRE, Titan)
+
+The recalculation runs but the `leads` column isn't matching `leads_created` — both should be the same value. Also, 89 GHL sync runs are stuck in "running" status.
+
+## Recommended Strategy: Webhooks + API (Hybrid)
+
+**Answer: Yes, use both.** Here's the plan:
+
+### What To Fix
+
+1. **Fix the `leads` vs `leads_created` mismatch** — Both columns currently get the same value in `recalculate-daily-metrics` (line 188 and 198 both set to `totalValidLeads`), but `leads` is showing 0 for clients where `leads_created` shows correct counts. This suggests the upsert is being overwritten by another process or there's a column-ownership conflict.
+
+2. **Add webhook-triggered metric refresh** — When `webhook-ingest` receives a contact webhook and triggers a single-contact sync, it should also trigger a quick `recalculate-daily-metrics` for just that client + today's date. This gives near-real-time lead counts.
+
+3. **Clean up stuck sync runs** — 89 GHL sync runs stuck as "running" from the last 48 hours, plus 2 `sync-ghl-all-clients` and 2 `sync-meta-ads-daily` also stuck.
+
+4. **Add a safety net** — After the daily master sync completes, automatically run `recalculate-daily-metrics` for the last 3 days to catch any stragglers.
+
+### Implementation Steps
+
+**Step 1: Fix webhook-ingest to trigger metric refresh**
+- After the single-contact sync completes in `webhook-ingest`, fire a follow-up call to `recalculate-daily-metrics` for that client + today
+- This ensures every new lead from a webhook immediately updates the dashboard
+
+**Step 2: Debug and fix the leads column overwrite**
+- Investigate if `sync-meta-ads` or another process is zeroing out the `leads` column when it writes `ad_spend`
+- Add explicit column-level guards so Meta sync never touches CRM columns
+
+**Step 3: Auto-close stale sync runs**
+- Add a cleanup step in `daily-master-sync` that marks any sync_run older than 2 hours as "timed_out"
+
+**Step 4: Add retry + error logging to recalculate-daily-metrics**
+- Wrap each client's recalculation in a try/catch with retry
+- Log failures to `sync_errors` table for visibility in the Sync Health dashboard
 
 ### Technical Details
-- Migration: `INSERT INTO agents (name, icon, description, prompt_template, schedule_cron, model, connectors, enabled, template_key)` for all 8 templates
-- UI: New grid section filtered to `agents.filter(a => a.enabled)` rendered above the existing agent list
-- No new edge functions or tables needed
+
+- **Webhook path** (real-time): GHL webhook → `webhook-ingest` → `sync-ghl-contacts` (single) → `recalculate-daily-metrics` (single client, today)
+- **API path** (scheduled): `daily-master-sync` → `sync-ghl-all-clients` → `recalculate-daily-metrics` (all clients, last 3 days)
+- **Meta path** (unchanged): `sync-meta-ads-daily` → writes `ad_spend` directly to `daily_metrics`
+- Column ownership enforced: Meta sync only writes spend columns, CRM sync only writes lead/call columns
 
