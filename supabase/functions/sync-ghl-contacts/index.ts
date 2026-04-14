@@ -268,7 +268,7 @@ async function fetchGHLContacts(
     url += `&startAfterId=${startAfterId}`;
   }
 
-  const fallbackResponse = await fetch(url, { method: 'GET', headers });
+  const fallbackResponse = await fetchGHL(url, { method: 'GET', headers }, `contacts/get fallback`);
   
   if (!fallbackResponse.ok) {
     const error = await fallbackResponse.text();
