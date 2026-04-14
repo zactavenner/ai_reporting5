@@ -1406,7 +1406,7 @@ export function InlineRecordsView({
               <TabsContent value="adspend" className="mt-0">
                 <ScrollArea className="h-[500px]">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-20 bg-background">
                       <TableRow className="border-b-2">
                         <TableHead className={HEAD_CLASS}>Date</TableHead>
                         <TableHead className={`${HEAD_CLASS} text-right`}>Ad Spend</TableHead>
@@ -1693,7 +1693,7 @@ export function InlineRecordsView({
                 <ScrollArea className="h-[500px]">
                   <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-20 bg-background">
                       <TableRow className="border-b-2">
                         <TableHead className={HEAD_CLASS}>Name</TableHead>
                         <TableHead className={`${HEAD_CLASS} text-right`}>Commitment</TableHead>
@@ -1789,7 +1789,7 @@ export function InlineRecordsView({
                 <ScrollArea className="h-[500px]">
                   <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-20 bg-background">
                       <TableRow className="border-b-2">
                         <TableHead className={HEAD_CLASS}>Name</TableHead>
                         <TableHead className={`${HEAD_CLASS} text-right`}>Amount</TableHead>
@@ -1885,7 +1885,7 @@ export function InlineRecordsView({
                 <ScrollArea className="h-[500px]">
                   <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-20 bg-background">
                       <TableRow className="border-b-2">
                         <TableHead className={HEAD_CLASS}>Contact</TableHead>
                         <TableHead className={HEAD_CLASS}>Email</TableHead>
