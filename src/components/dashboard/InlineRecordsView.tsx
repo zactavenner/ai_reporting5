@@ -95,6 +95,10 @@ import { formatDistanceToNow } from 'date-fns';
 const ROW_CLASS = "h-7 text-[11px]";
 const CELL_CLASS = "py-0 px-1 text-[11px]";
 const HEAD_CLASS = "py-0 px-1 text-[10px] font-semibold h-7";
+const ENRICHMENT_HEAD_CLASS = "py-0 px-1 text-[10px] font-semibold h-7 bg-emerald-500/10 text-emerald-400";
+const QA_HEAD_CLASS = "py-0 px-1 text-[10px] font-semibold h-7 bg-blue-500/10 text-blue-400";
+const ENRICHMENT_CELL_CLASS = "py-0.5 px-1 text-[10px] h-6 bg-emerald-500/5";
+const QA_CELL_CLASS = "py-0.5 px-1 text-[10px] h-6 bg-blue-500/5";
 
 interface EnrichmentData {
   external_id?: string | null;
