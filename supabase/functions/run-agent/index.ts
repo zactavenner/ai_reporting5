@@ -438,6 +438,31 @@ serve(async (req) => {
             }
           }
 
+          // ── Task comment write-back ──
+          if (parsed.task_comments?.length && connectors.includes('tasks')) {
+            for (const tc of parsed.task_comments) {
+              if (!tc.task_id || !tc.comment) continue;
+              try {
+                await prodDb.from('task_comments').insert({
+                  task_id: tc.task_id,
+                  author_name: `🤖 ${agent.name}`,
+                  content: tc.comment,
+                  comment_type: 'text',
+                });
+                // Log in task history
+                await prodDb.from('task_history').insert({
+                  task_id: tc.task_id,
+                  action: 'comment_added',
+                  new_value: tc.comment,
+                  changed_by: `Agent: ${agent.name}`,
+                });
+                actionsTaken.push({ type: 'task_comment', task_id: tc.task_id });
+              } catch (e) {
+                console.error(`Failed to add comment to task ${tc.task_id}:`, e);
+              }
+            }
+          }
+
           // Post Slack message to client channel
           if (parsed.slack_message && connectors.includes('slack')) {
             const slackApiKey = Deno.env.get('SLACK_API_KEY');
