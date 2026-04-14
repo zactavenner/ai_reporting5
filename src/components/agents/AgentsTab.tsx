@@ -159,6 +159,11 @@ export function AgentsTab({ clients }: Props) {
         </div>
       )}
 
+      {/* AI Agent Generator */}
+      {showAIGenerator && (
+        <AIAgentGenerator clients={clients} onCreated={() => setShowAIGenerator(false)} />
+      )}
+
       {/* Stats cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[
