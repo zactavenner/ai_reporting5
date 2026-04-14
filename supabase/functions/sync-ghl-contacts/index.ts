@@ -412,7 +412,7 @@ async function fetchGHLConversations(
       }
 
       pageCount++;
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
   } catch (err) {
     console.error('Error fetching GHL conversations:', err);
