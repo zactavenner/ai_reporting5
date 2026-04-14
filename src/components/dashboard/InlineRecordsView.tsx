@@ -1478,7 +1478,7 @@ export function InlineRecordsView({
                 <ScrollArea className="h-[500px]">
                   <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-20 bg-background">
                       <TableRow className="border-b-2">
                         <TableHead className={HEAD_CLASS}>Date</TableHead>
                         <TableHead className={HEAD_CLASS}>Name</TableHead>
@@ -1490,12 +1490,12 @@ export function InlineRecordsView({
                         <TableHead className={HEAD_CLASS}>Status</TableHead>
                         <TableHead className={HEAD_CLASS}>Accredited</TableHead>
                         <TableHead className={HEAD_CLASS}>Investment</TableHead>
-                        <TableHead className={HEAD_CLASS}>State</TableHead>
-                        <TableHead className={HEAD_CLASS}>Net Worth</TableHead>
-                        <TableHead className={HEAD_CLASS}>Income</TableHead>
-                        <TableHead className={HEAD_CLASS}>Q&A</TableHead>
-                        {uniqueQuestionNames.map((qName) => (
-                          <TableHead key={qName} className={`${HEAD_CLASS} max-w-[120px] truncate`} title={qName}>
+                        <TableHead className={`${ENRICHMENT_HEAD_CLASS} border-l border-emerald-500/20`}>State</TableHead>
+                        <TableHead className={ENRICHMENT_HEAD_CLASS}>Net Worth</TableHead>
+                        <TableHead className={`${ENRICHMENT_HEAD_CLASS} border-r border-emerald-500/20`}>Income</TableHead>
+                        <TableHead className={`${QA_HEAD_CLASS} border-l border-blue-500/20`}>Q&A</TableHead>
+                        {uniqueQuestionNames.map((qName, i) => (
+                          <TableHead key={qName} className={`${QA_HEAD_CLASS} max-w-[120px] truncate ${i === uniqueQuestionNames.length - 1 ? 'border-r border-blue-500/20' : ''}`} title={qName}>
                             {qName.length > 15 ? qName.slice(0, 15) + '...' : qName}
                           </TableHead>
                         ))}
