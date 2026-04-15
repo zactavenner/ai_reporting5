@@ -305,6 +305,18 @@ serve(async (req) => {
             const stageBreakdown: Record<string, number> = {};
             enrichedTasks.forEach((t: any) => { stageBreakdown[t.stage || 'unknown'] = (stageBreakdown[t.stage || 'unknown'] || 0) + 1; });
 
+            // Fetch client team assignments for auto-assign context
+            const { data: clientAssignment } = await prodDb
+              .from('client_assignments')
+              .select('account_manager, media_buyer')
+              .eq('client_id', client.id)
+              .maybeSingle();
+
+            // Fetch all agency members for ID lookup
+            const { data: allMembers } = await prodDb
+              .from('agency_members')
+              .select('id, name, email, role');
+
             dataContext.tasks = {
               active_count: enrichedTasks.length,
               completed_this_week: recentCompleted?.length || 0,
@@ -319,6 +331,8 @@ serve(async (req) => {
               due_today_tasks: dueTodayTasks || [],
               recent_completions: (recentCompleted || []).slice(0, 10),
               recent_history: (recentHistory || []).slice(0, 20),
+              team_assignments: clientAssignment || { note: 'No team assignments found' },
+              agency_members: (allMembers || []).map((m: any) => ({ id: m.id, name: m.name })),
               priority_breakdown: {
                 high: enrichedTasks.filter((t: any) => t.priority === 'high').length,
                 medium: enrichedTasks.filter((t: any) => t.priority === 'medium').length,
@@ -463,7 +477,37 @@ serve(async (req) => {
             }
           }
 
-          // Post Slack message to client channel
+          // ── Auto-assign write-back ──
+          if (parsed.auto_assigned?.length && connectors.includes('tasks')) {
+            for (const assignment of parsed.auto_assigned) {
+              if (!assignment.task_id || !assignment.member_id) continue;
+              try {
+                // Check if already assigned to prevent duplicates
+                const { data: existing } = await prodDb
+                  .from('task_assignees')
+                  .select('id')
+                  .eq('task_id', assignment.task_id)
+                  .eq('member_id', assignment.member_id)
+                  .maybeSingle();
+                if (!existing) {
+                  await prodDb.from('task_assignees').insert({
+                    task_id: assignment.task_id,
+                    member_id: assignment.member_id,
+                  });
+                  await prodDb.from('task_history').insert({
+                    task_id: assignment.task_id,
+                    action: 'assignee_added',
+                    new_value: assignment.assigned_to || assignment.member_id,
+                    changed_by: `Agent: ${agent.name}`,
+                  });
+                  actionsTaken.push({ type: 'auto_assign', task_id: assignment.task_id, member: assignment.assigned_to });
+                }
+              } catch (e) {
+                console.error(`Failed to auto-assign task ${assignment.task_id}:`, e);
+              }
+            }
+          }
+
           if (parsed.slack_message && connectors.includes('slack')) {
             const slackApiKey = Deno.env.get('SLACK_API_KEY');
             if (slackApiKey && LOVABLE_API_KEY) {
