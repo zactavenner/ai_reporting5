@@ -477,7 +477,37 @@ serve(async (req) => {
             }
           }
 
-          // Post Slack message to client channel
+          // ── Auto-assign write-back ──
+          if (parsed.auto_assigned?.length && connectors.includes('tasks')) {
+            for (const assignment of parsed.auto_assigned) {
+              if (!assignment.task_id || !assignment.member_id) continue;
+              try {
+                // Check if already assigned to prevent duplicates
+                const { data: existing } = await prodDb
+                  .from('task_assignees')
+                  .select('id')
+                  .eq('task_id', assignment.task_id)
+                  .eq('member_id', assignment.member_id)
+                  .maybeSingle();
+                if (!existing) {
+                  await prodDb.from('task_assignees').insert({
+                    task_id: assignment.task_id,
+                    member_id: assignment.member_id,
+                  });
+                  await prodDb.from('task_history').insert({
+                    task_id: assignment.task_id,
+                    action: 'assignee_added',
+                    new_value: assignment.assigned_to || assignment.member_id,
+                    changed_by: `Agent: ${agent.name}`,
+                  });
+                  actionsTaken.push({ type: 'auto_assign', task_id: assignment.task_id, member: assignment.assigned_to });
+                }
+              } catch (e) {
+                console.error(`Failed to auto-assign task ${assignment.task_id}:`, e);
+              }
+            }
+          }
+
           if (parsed.slack_message && connectors.includes('slack')) {
             const slackApiKey = Deno.env.get('SLACK_API_KEY');
             if (slackApiKey && LOVABLE_API_KEY) {
