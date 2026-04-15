@@ -184,6 +184,31 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── Step 5b: Compute Attribution (Hyros engine) ──
+    // Runs all 5 attribution models for the last 30 days. Writes to attribution_results.
+    if (!skipSteps.includes("attribution")) {
+      const start = Date.now();
+      console.log(`[daily-master-sync] Step 5b: compute-attribution`);
+      const periodEnd = new Date().toISOString().split("T")[0];
+      const periodStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const attrRes = await callFunction(supabaseUrl, supabaseKey, "compute-attribution", {
+        periodStart,
+        periodEnd,
+        // Run all models so RevenueAttributionPanel can switch between them instantly
+        models: ["first_touch", "last_touch", "linear", "time_decay", "position_based"],
+      });
+      const duration = Date.now() - start;
+      const modelCount = (attrRes.data?.results || []).length;
+      results.push({
+        step: "compute-attribution",
+        success: attrRes.success,
+        duration_ms: duration,
+        details: `${modelCount} model/client combinations computed (${periodStart} to ${periodEnd})`,
+        error: attrRes.error,
+      });
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
     // ── Step 6: Meta Token Expiry Check ──
     if (!skipSteps.includes("token_check")) {
       const start = Date.now();
