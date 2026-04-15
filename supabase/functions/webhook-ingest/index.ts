@@ -158,9 +158,9 @@ serve(async (req) => {
         const syncUrl = `${supabaseUrl}/functions/v1/sync-ghl-contacts`;
         
         const syncPayload = {
-          mode: 'single_contact',
+          mode: 'single',
           client_id: clientId,
-          contact_id: contactId,
+          contactId: contactId,
         };
         
         // Use EdgeRuntime.waitUntil for background execution so we respond immediately
