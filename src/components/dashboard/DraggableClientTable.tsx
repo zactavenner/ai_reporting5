@@ -770,6 +770,14 @@ export function DraggableClientTable({
           </TableBody>
         </Table>
       </div>
+      {syncHistoryClient && (
+        <SyncHistoryModal
+          open={!!syncHistoryClient}
+          onOpenChange={(open) => { if (!open) setSyncHistoryClient(null); }}
+          clientId={syncHistoryClient.id}
+          clientName={syncHistoryClient.name}
+        />
+      )}
     </div>
   );
 }
