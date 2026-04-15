@@ -18,105 +18,65 @@ Deno.serve(async (req) => {
 
     const STUCK_THRESHOLD_MINUTES = 15;
     const cutoff = new Date(Date.now() - STUCK_THRESHOLD_MINUTES * 60 * 1000).toISOString();
+    const now = new Date().toISOString();
 
-    // 1) Find and fix stuck sync_logs
-    let fixedLogs = 0;
-    const { count: stuckLogCount } = await supabase
+    // 1) Fix stuck sync_logs
+    const { data: stuckLogs } = await supabase
       .from("sync_logs")
-      .select("*", { count: "exact", head: true })
+      .select("id")
       .eq("status", "running")
       .lt("started_at", cutoff);
 
-    if (stuckLogCount && stuckLogCount > 0) {
-      const { data: stuckLogs } = await supabase
-        .from("sync_logs")
-        .select("id, client_id, sync_type, started_at")
-        .eq("status", "running")
-        .lt("started_at", cutoff);
-
-      if (stuckLogs && stuckLogs.length > 0) {
-        for (const row of stuckLogs) {
-          await supabase
-            .from("sync_logs")
-            .update({
-              status: "failed",
-              error_message: `Watchdog: stuck >${STUCK_THRESHOLD_MINUTES}min`,
-              completed_at: new Date().toISOString(),
-            })
-            .eq("id", row.id);
-        }
-        fixedLogs = stuckLogs.length;
-      }
+    let fixedLogs = 0;
+    for (const row of stuckLogs || []) {
+      await supabase.from("sync_logs").update({
+        status: "failed",
+        error_message: `Watchdog: stuck >${STUCK_THRESHOLD_MINUTES}min`,
+        completed_at: now,
+      }).eq("id", row.id);
+      fixedLogs++;
     }
 
-    // 2) Find stuck sync_queue jobs (status = 'processing' for > 15 min)
-    const { data: stuckJobs, error: jobErr } = await supabase
+    // 2) Fix stuck sync_queue jobs
+    const { data: stuckJobs } = await supabase
       .from("sync_queue")
-      .select("id, client_id, sync_type, started_at")
+      .select("id")
       .eq("status", "processing")
       .lt("started_at", cutoff);
 
-    if (jobErr) throw jobErr;
-
     let fixedJobs = 0;
-    if (stuckJobs && stuckJobs.length > 0) {
-      const ids = stuckJobs.map((r: any) => r.id);
-      const { error: updateErr } = await supabase
-        .from("sync_queue")
-        .update({
-          status: "failed",
-          error_message: `Watchdog: stuck processing for >${STUCK_THRESHOLD_MINUTES}min`,
-          completed_at: new Date().toISOString(),
-        })
-        .in("id", ids);
-      if (updateErr) throw updateErr;
-      fixedJobs = ids.length;
+    for (const row of stuckJobs || []) {
+      await supabase.from("sync_queue").update({
+        status: "failed",
+        error_message: `Watchdog: stuck >${STUCK_THRESHOLD_MINUTES}min`,
+        completed_at: now,
+      }).eq("id", row.id);
+      fixedJobs++;
     }
 
-    // 3) Find stuck ghl_outbound_log entries
-    const { data: stuckOutbound, error: outErr } = await supabase
+    // 3) Fix stuck outbound log entries
+    const { data: stuckOutbound } = await supabase
       .from("ghl_outbound_log")
       .select("id")
       .eq("final_state", "pending")
       .lt("created_at", cutoff);
 
-    if (outErr) throw outErr;
-
     let fixedOutbound = 0;
-    if (stuckOutbound && stuckOutbound.length > 0) {
-      const ids = stuckOutbound.map((r: any) => r.id);
-      const { error: updateErr } = await supabase
-        .from("ghl_outbound_log")
-        .update({
-          final_state: "dead_letter",
-          error_message: `Watchdog: pending for >${STUCK_THRESHOLD_MINUTES}min without completion`,
-          completed_at: new Date().toISOString(),
-        })
-        .in("id", ids);
-      if (updateErr) throw updateErr;
-      fixedOutbound = ids.length;
+    for (const row of stuckOutbound || []) {
+      await supabase.from("ghl_outbound_log").update({
+        final_state: "dead_letter",
+        error_message: `Watchdog: pending >${STUCK_THRESHOLD_MINUTES}min`,
+        completed_at: now,
+      }).eq("id", row.id);
+      fixedOutbound++;
     }
 
     const summary = {
       success: true,
-      timestamp: new Date().toISOString(),
+      timestamp: now,
       stuck_sync_logs_fixed: fixedLogs,
       stuck_queue_jobs_fixed: fixedJobs,
       stuck_outbound_fixed: fixedOutbound,
-      stuck_details: {
-        sync_logs: (stuckLogs || []).map((r: any) => ({
-          id: r.id,
-          client_id: r.client_id,
-          sync_type: r.sync_type,
-          started_at: r.started_at,
-        })),
-        queue_jobs: (stuckJobs || []).map((r: any) => ({
-          id: r.id,
-          client_id: r.client_id,
-          sync_type: r.sync_type,
-          started_at: r.started_at,
-        })),
-      },
     };
 
     console.log("[Watchdog] Completed:", JSON.stringify(summary));
