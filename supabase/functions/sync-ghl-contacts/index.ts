@@ -3139,9 +3139,12 @@ serve(async (req) => {
       const body = await req.json();
       targetClientId = body?.client_id || null;
       syncType = body?.syncType || 'all';
-      singleContactId = body?.contactId || null;
+      singleContactId = body?.contactId || body?.contact_id || null;
       mode = body?.mode || null;
       syncTimeline = body?.syncTimeline === true;
+
+      // Normalize mode aliases for backward compatibility
+      if (mode === 'single_contact') mode = 'single';
 
       // Backward compatibility: accept mode as sync selector for orchestrators
       if (!body?.syncType && typeof mode === 'string') {
