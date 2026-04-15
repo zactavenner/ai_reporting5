@@ -237,6 +237,7 @@ async function fetchGHLContacts(
     const body: Record<string, any> = {
       locationId,
       pageLimit: limit,
+      limit,  // GHL v2 accepts both; send both for compatibility
       page: page || 1,
     };
 
@@ -2321,20 +2322,29 @@ async function syncAllContactsUnlimited(
   const fieldNameMap = await fetchGHLCustomFieldDefinitions(client.ghl_api_key, client.ghl_location_id);
   
   let hasMore = true;
-  let startAfterId: string | undefined;
+  let currentPage = 1;
   let totalProcessed = 0;
   const MAX_CONTACTS = 50000; // High limit for larger accounts
   
   try {
     while (hasMore && totalProcessed < MAX_CONTACTS) {
-      const { contacts, nextPageUrl } = await fetchGHLContacts(
+      const { contacts, nextPage, total } = await fetchGHLContacts(
         client.ghl_api_key,
         client.ghl_location_id,
         100,
-        startAfterId
+        undefined,
+        currentPage
       );
       
-      console.log(`Fetched batch of ${contacts.length} contacts, total processed: ${totalProcessed}`);
+      if (totalProcessed === 0 && total) {
+        console.log(`Total contacts in GHL for ${client.name}: ${total}`);
+      }
+      console.log(`Fetched page ${currentPage}: ${contacts.length} contacts, total processed: ${totalProcessed}`);
+      
+      if (contacts.length === 0) {
+        hasMore = false;
+        break;
+      }
       
       for (const contact of contacts) {
         try {
@@ -2361,8 +2371,8 @@ async function syncAllContactsUnlimited(
         totalProcessed++;
       }
       
-      if (nextPageUrl && contacts.length === 100) {
-        startAfterId = contacts[contacts.length - 1].id;
+      if (nextPage) {
+        currentPage = nextPage;
       } else {
         hasMore = false;
       }
