@@ -305,6 +305,18 @@ serve(async (req) => {
             const stageBreakdown: Record<string, number> = {};
             enrichedTasks.forEach((t: any) => { stageBreakdown[t.stage || 'unknown'] = (stageBreakdown[t.stage || 'unknown'] || 0) + 1; });
 
+            // Fetch client team assignments for auto-assign context
+            const { data: clientAssignment } = await prodDb
+              .from('client_assignments')
+              .select('account_manager, media_buyer')
+              .eq('client_id', client.id)
+              .maybeSingle();
+
+            // Fetch all agency members for ID lookup
+            const { data: allMembers } = await prodDb
+              .from('agency_members')
+              .select('id, name, email, role');
+
             dataContext.tasks = {
               active_count: enrichedTasks.length,
               completed_this_week: recentCompleted?.length || 0,
@@ -319,6 +331,8 @@ serve(async (req) => {
               due_today_tasks: dueTodayTasks || [],
               recent_completions: (recentCompleted || []).slice(0, 10),
               recent_history: (recentHistory || []).slice(0, 20),
+              team_assignments: clientAssignment || { note: 'No team assignments found' },
+              agency_members: (allMembers || []).map((m: any) => ({ id: m.id, name: m.name })),
               priority_breakdown: {
                 high: enrichedTasks.filter((t: any) => t.priority === 'high').length,
                 medium: enrichedTasks.filter((t: any) => t.priority === 'medium').length,
