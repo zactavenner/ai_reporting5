@@ -69,38 +69,29 @@ function getClientSyncStatus(client: Client): {
   const hasGhlCredentials = !!(client.ghl_api_key && client.ghl_location_id);
   const hasHubspotCredentials = !!(client.hubspot_portal_id && client.hubspot_access_token);
 
-  const computeStatus = (lastSync: string | null, savedStatus: string | null, syncError: string | null): 'healthy' | 'stale' | 'error' | 'not_configured' => {
-    // If there's an explicit error status or error message, it's an error
-    if (savedStatus === 'error' || syncError) return 'error';
-    // No sync ever happened — treat as error if credentials exist
+  // Derive status purely from timestamps — never trust stale ghl_sync_status column
+  const computeStatus = (lastSync: string | null): 'healthy' | 'stale' | 'error' | 'not_configured' => {
     if (!lastSync) return 'error';
     const hoursSince = (Date.now() - new Date(lastSync).getTime()) / (1000 * 60 * 60);
     if (hoursSince <= 24) return 'healthy';
     if (hoursSince <= 72) return 'stale';
-    // More than 72h without a sync = broken
     return 'error';
   };
 
   if (hasHubspotCredentials) {
-    const lastHubspotSyncAt = client.last_hubspot_sync_at;
-    const hubspotSyncError = client.hubspot_sync_error;
-    const hubspotSyncStatus = client.hubspot_sync_status;
     return {
-      status: computeStatus(lastHubspotSyncAt, hubspotSyncStatus, hubspotSyncError),
-      lastSyncAt: lastHubspotSyncAt,
-      error: hubspotSyncError,
+      status: computeStatus(client.last_hubspot_sync_at),
+      lastSyncAt: client.last_hubspot_sync_at,
+      error: client.hubspot_sync_error,
       source: 'hubspot',
     };
   }
 
   if (hasGhlCredentials) {
-    const lastGhlSyncAt = client.last_ghl_sync_at;
-    const ghlSyncError = client.ghl_sync_error;
-    const ghlSyncStatus = client.ghl_sync_status;
     return {
-      status: computeStatus(lastGhlSyncAt, ghlSyncStatus, ghlSyncError),
-      lastSyncAt: lastGhlSyncAt,
-      error: ghlSyncError,
+      status: computeStatus(client.last_ghl_sync_at),
+      lastSyncAt: client.last_ghl_sync_at,
+      error: client.ghl_sync_error,
       source: 'ghl',
     };
   }
