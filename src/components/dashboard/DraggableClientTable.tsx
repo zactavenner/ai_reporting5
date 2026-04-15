@@ -68,34 +68,40 @@ function getClientSyncStatus(client: Client): {
   const hasGhlCredentials = !!(client.ghl_api_key && client.ghl_location_id);
   const hasHubspotCredentials = !!(client.hubspot_portal_id && client.hubspot_access_token);
 
+  const computeStatus = (lastSync: string | null, savedStatus: string | null, syncError: string | null): 'healthy' | 'stale' | 'error' | 'not_configured' => {
+    // If there's an explicit error status or error message, it's an error
+    if (savedStatus === 'error' || syncError) return 'error';
+    // No sync ever happened — treat as error if credentials exist
+    if (!lastSync) return 'error';
+    const hoursSince = (Date.now() - new Date(lastSync).getTime()) / (1000 * 60 * 60);
+    if (hoursSince <= 24) return 'healthy';
+    if (hoursSince <= 72) return 'stale';
+    // More than 72h without a sync = broken
+    return 'error';
+  };
+
   if (hasHubspotCredentials) {
-    const hubspotSyncStatus = client.hubspot_sync_status;
     const lastHubspotSyncAt = client.last_hubspot_sync_at;
     const hubspotSyncError = client.hubspot_sync_error;
-    if (hubspotSyncStatus) {
-      return {
-        status: hubspotSyncStatus as 'healthy' | 'stale' | 'error' | 'not_configured',
-        lastSyncAt: lastHubspotSyncAt,
-        error: hubspotSyncError,
-        source: 'hubspot',
-      };
-    }
-    return { status: 'stale', lastSyncAt: null, error: null, source: 'hubspot' };
+    const hubspotSyncStatus = client.hubspot_sync_status;
+    return {
+      status: computeStatus(lastHubspotSyncAt, hubspotSyncStatus, hubspotSyncError),
+      lastSyncAt: lastHubspotSyncAt,
+      error: hubspotSyncError,
+      source: 'hubspot',
+    };
   }
 
   if (hasGhlCredentials) {
-    const ghlSyncStatus = client.ghl_sync_status;
     const lastGhlSyncAt = client.last_ghl_sync_at;
     const ghlSyncError = client.ghl_sync_error;
-    if (ghlSyncStatus) {
-      return {
-        status: ghlSyncStatus as 'healthy' | 'stale' | 'error' | 'not_configured',
-        lastSyncAt: lastGhlSyncAt,
-        error: ghlSyncError,
-        source: 'ghl',
-      };
-    }
-    return { status: 'stale', lastSyncAt: null, error: null, source: 'ghl' };
+    const ghlSyncStatus = client.ghl_sync_status;
+    return {
+      status: computeStatus(lastGhlSyncAt, ghlSyncStatus, ghlSyncError),
+      lastSyncAt: lastGhlSyncAt,
+      error: ghlSyncError,
+      source: 'ghl',
+    };
   }
 
   return { status: 'not_configured', lastSyncAt: null, error: null, source: 'none' };
@@ -673,22 +679,46 @@ export function DraggableClientTable({
 
                     {/* CRM Status */}
                     <TableCell className="text-center py-0 px-1">
-                      {syncInfo.status === 'healthy' && (
-                        <Badge variant="success" className="text-[9px] px-1 py-0 h-4">
-                          {syncInfo.source === 'hubspot' ? 'HS' : 'GHL'}
-                        </Badge>
-                      )}
-                      {syncInfo.status === 'stale' && (
-                        <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
-                          {syncInfo.source === 'hubspot' ? 'HS' : 'GHL'}
-                        </Badge>
-                      )}
-                      {syncInfo.status === 'error' && (
-                        <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4">Err</Badge>
-                      )}
-                      {syncInfo.status === 'not_configured' && (
-                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-muted-foreground">—</Badge>
-                      )}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="inline-flex">
+                              {syncInfo.status === 'healthy' && (
+                                <Badge variant="success" className="text-[9px] px-1 py-0 h-4">
+                                  {syncInfo.source === 'hubspot' ? 'HS' : 'GHL'}
+                                </Badge>
+                              )}
+                              {syncInfo.status === 'stale' && (
+                                <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
+                                  Old
+                                </Badge>
+                              )}
+                              {syncInfo.status === 'error' && (
+                                <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4">
+                                  {syncInfo.source === 'hubspot' ? 'HS' : syncInfo.source === 'ghl' ? 'GHL' : 'ERR'}
+                                </Badge>
+                              )}
+                              {syncInfo.status === 'not_configured' && (
+                                <span className="text-muted-foreground text-[9px]">—</span>
+                              )}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs max-w-[200px]">
+                            {syncInfo.status === 'healthy' && (
+                              <span>✅ {syncInfo.source === 'hubspot' ? 'HubSpot' : 'GHL'} synced {syncInfo.lastSyncAt ? formatDistanceToNow(new Date(syncInfo.lastSyncAt), { addSuffix: true }) : ''}</span>
+                            )}
+                            {syncInfo.status === 'stale' && (
+                              <span>⚠️ Last sync: {syncInfo.lastSyncAt ? formatDistanceToNow(new Date(syncInfo.lastSyncAt), { addSuffix: true }) : 'unknown'}</span>
+                            )}
+                            {syncInfo.status === 'error' && (
+                              <span>🔴 {syncInfo.error || (syncInfo.lastSyncAt ? `Last sync ${formatDistanceToNow(new Date(syncInfo.lastSyncAt), { addSuffix: true })}` : 'Never synced — credentials may be invalid')}</span>
+                            )}
+                            {syncInfo.status === 'not_configured' && (
+                              <span>No CRM configured</span>
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </TableCell>
 
                     {/* MRR - admin only */}
