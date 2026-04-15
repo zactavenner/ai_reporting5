@@ -167,6 +167,7 @@ export function DraggableClientTable({
   const numberOfDays = useMemo(() => differenceInDays(dateRange.to, dateRange.from) + 1, [dateRange]);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ column: '', direction: null });
+  const [syncHistoryClient, setSyncHistoryClient] = useState<{ id: string; name: string } | null>(null);
   const updateClient = useUpdateClient();
   const { data: assignments = {} } = useClientAssignments();
   const updateAssignment = useUpdateClientAssignment();
