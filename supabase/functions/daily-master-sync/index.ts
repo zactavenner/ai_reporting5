@@ -205,14 +205,29 @@ async function syncClient(
 
   result.duration_ms = Date.now() - clientStart;
 
+  // ── Update ghl_sync_status based on actual result ──
+  try {
+    if (client.ghl_api_key && client.ghl_location_id) {
+      if (result.ghl_contacts_ok) {
+        await supabase.from("clients").update({
+          ghl_sync_status: "healthy",
+          ghl_sync_error: null,
+        }).eq("id", client.id);
+      } else {
+        const ghlErrors = result.errors.filter(e => e.startsWith("ghl"));
+        await supabase.from("clients").update({
+          ghl_sync_status: "error",
+          ghl_sync_error: ghlErrors.join("; ").substring(0, 500) || "GHL sync failed",
+        }).eq("id", client.id);
+      }
+    }
+  } catch (err) {
+    console.error(`[daily-master-sync] Failed to update ghl_sync_status for ${client.name}:`, err);
+  }
+
   // ── Update consecutive_failures on the clients table ──
   try {
     if (!result.meta_ok && client.meta_ad_account_id) {
-      await supabase.rpc("increment_column", undefined).catch(() => null); // fallback below
-      await supabase.from("clients").update({
-        consecutive_meta_failures: supabase.rpc ? undefined : 1, // handled below
-      }).eq("id", client.id);
-      // Direct SQL increment via raw update
       const { data: currentClient } = await supabase.from("clients").select("consecutive_meta_failures").eq("id", client.id).single();
       if (currentClient) {
         await supabase.from("clients").update({
