@@ -967,6 +967,28 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="businessManagerUrl">Meta Business / Ads Manager URL</Label>
+                  <Input
+                    id="businessManagerUrl"
+                    value={businessManagerUrl}
+                    onChange={(e) => {
+                      const url = e.target.value;
+                      setBusinessManagerUrl(url);
+                      // Auto-extract ad account ID from URL patterns:
+                      // act=123456789, act/123456789, act_123456789, account_id=123456789
+                      const actMatch = url.match(/(?:act[=\/]|act_|account_id=)(\d+)/);
+                      if (actMatch && actMatch[1]) {
+                        setMetaAdAccountId(actMatch[1]);
+                      }
+                    }}
+                    placeholder="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=123456789"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Paste your Ads Manager or Business Manager URL — the Ad Account ID will be extracted automatically
+                  </p>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="metaAdAccountId">Ad Account ID</Label>
                   <Input
                     id="metaAdAccountId"
@@ -975,7 +997,7 @@ export function ClientSettingsModal({ client, open, onOpenChange }: ClientSettin
                     placeholder="478773718246380"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Found in Meta Business Manager → Ad Accounts (numeric ID, without "act_" prefix)
+                    Auto-filled from URL above, or enter manually (numeric ID, without "act_" prefix)
                   </p>
                 </div>
 
