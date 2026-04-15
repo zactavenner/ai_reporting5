@@ -450,18 +450,26 @@ export function DraggableClientTable({
                         ) : (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <div className={cn(
-                                "ml-0.5",
-                                syncInfo.status === 'healthy' && 'text-chart-2',
-                                syncInfo.status === 'stale' && 'text-yellow-600 dark:text-yellow-500',
-                                syncInfo.status === 'error' && 'text-destructive',
-                                syncInfo.status === 'not_configured' && 'text-muted-foreground'
-                              )}>
+                              <button
+                                className={cn(
+                                  "ml-0.5 cursor-pointer hover:opacity-70",
+                                  syncInfo.status === 'healthy' && 'text-chart-2',
+                                  syncInfo.status === 'stale' && 'text-yellow-600 dark:text-yellow-500',
+                                  syncInfo.status === 'error' && 'text-destructive',
+                                  syncInfo.status === 'not_configured' && 'text-muted-foreground'
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (syncInfo.status !== 'not_configured') {
+                                    setSyncHistoryClient({ id: client.id, name: client.name });
+                                  }
+                                }}
+                              >
                                 {syncInfo.status === 'healthy' && <CheckCircle className="h-2.5 w-2.5" />}
                                 {syncInfo.status === 'stale' && <Clock className="h-2.5 w-2.5" />}
                                 {syncInfo.status === 'error' && <XCircle className="h-2.5 w-2.5" />}
                                 {syncInfo.status === 'not_configured' && <AlertCircle className="h-2.5 w-2.5" />}
-                              </div>
+                              </button>
                             </TooltipTrigger>
                             <TooltipContent side="right" className="max-w-xs">
                               <div className="text-xs">
@@ -474,6 +482,9 @@ export function DraggableClientTable({
                                   <div className="text-[10px] text-muted-foreground mt-0.5">
                                     {formatDistanceToNow(new Date(syncInfo.lastSyncAt), { addSuffix: true })}
                                   </div>
+                                )}
+                                {syncInfo.status !== 'not_configured' && (
+                                  <div className="text-[10px] text-primary mt-0.5">Click for sync history</div>
                                 )}
                               </div>
                             </TooltipContent>
