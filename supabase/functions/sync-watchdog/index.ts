@@ -19,28 +19,34 @@ Deno.serve(async (req) => {
     const STUCK_THRESHOLD_MINUTES = 15;
     const cutoff = new Date(Date.now() - STUCK_THRESHOLD_MINUTES * 60 * 1000).toISOString();
 
-    // 1) Find stuck sync_logs (status = 'running' for > 15 min)
-    const { data: stuckLogs, error: logErr } = await supabase
+    // 1) Find and fix stuck sync_logs
+    let fixedLogs = 0;
+    const { count: stuckLogCount } = await supabase
       .from("sync_logs")
-      .select("id, client_id, sync_type, started_at")
+      .select("*", { count: "exact", head: true })
       .eq("status", "running")
       .lt("started_at", cutoff);
 
-    if (logErr) throw logErr;
-
-    let fixedLogs = 0;
-    if (stuckLogs && stuckLogs.length > 0) {
-      const ids = stuckLogs.map((r: any) => r.id);
-      const { error: updateErr } = await supabase
+    if (stuckLogCount && stuckLogCount > 0) {
+      const { data: stuckLogs } = await supabase
         .from("sync_logs")
-        .update({
-          status: "failed",
-          error_message: `Watchdog: stuck running for >${STUCK_THRESHOLD_MINUTES}min, marked failed at ${new Date().toISOString()}`,
-          completed_at: new Date().toISOString(),
-        })
-        .in("id", ids);
-      if (updateErr) throw updateErr;
-      fixedLogs = ids.length;
+        .select("id, client_id, sync_type, started_at")
+        .eq("status", "running")
+        .lt("started_at", cutoff);
+
+      if (stuckLogs && stuckLogs.length > 0) {
+        for (const row of stuckLogs) {
+          await supabase
+            .from("sync_logs")
+            .update({
+              status: "failed",
+              error_message: `Watchdog: stuck >${STUCK_THRESHOLD_MINUTES}min`,
+              completed_at: new Date().toISOString(),
+            })
+            .eq("id", row.id);
+        }
+        fixedLogs = stuckLogs.length;
+      }
     }
 
     // 2) Find stuck sync_queue jobs (status = 'processing' for > 15 min)
