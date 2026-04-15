@@ -37,7 +37,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, AlertCircle, CheckCircle, Clock, XCircle, AlertTriangle, Pencil, Calendar } from 'lucide-react';
+import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, AlertCircle, CheckCircle, Clock, XCircle, AlertTriangle, Pencil, Calendar, Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -45,6 +45,7 @@ import { SortConfig } from './SortableTableHeader';
 import { formatDistanceToNow } from 'date-fns';
 import { ClientApiStatus } from '@/hooks/useApiConnectionTest';
 import { ApiConnectionStatus } from '@/components/settings/ApiConnectionStatus';
+import { useRepairClientSync } from '@/hooks/useRepairClientSync';
 
 interface DraggableClientTableProps {
   clients: Client[];
@@ -176,6 +177,7 @@ export function DraggableClientTable({
   const { data: assignments = {} } = useClientAssignments();
   const updateAssignment = useUpdateClientAssignment();
   const { data: agencyMembers = [] } = useAgencyMembers();
+  const { runRepair, isBusy: isRepairing, phase: repairPhase } = useRepairClientSync();
 
   // Fetch yesterday's metrics to flag inactive clients
   const yesterday = useMemo(() => format(subDays(new Date(), 1), 'yyyy-MM-dd'), []);
@@ -638,7 +640,7 @@ export function DraggableClientTable({
                       {formatCurrency(m.costPerLead || 0)}
                     </TableCell>
 
-                    {/* Booked Calls */}
+                    {/* Booked Calls — pulled from GHL calendars via sync-calendar-appointments */}
                     <TableCell className={cn(
                       "text-right font-mono tabular-nums text-[11px] py-0 px-1",
                       (() => {
@@ -646,24 +648,49 @@ export function DraggableClientTable({
                         const hasCalls = (m.totalCalls || 0) > 0;
                         const hasGHL = !!(client.ghl_api_key && client.ghl_location_id);
                         const hasCalendars = (fullSettings[client.id]?.tracked_calendar_ids || []).length > 0;
+                        const hasLeads = (m.crmLeads || 0) > 0;
+                        // Hard error: ad spend exists but no calendar wired (or no GHL at all)
                         if (!hasCalls && hasAdSpend && hasGHL && !hasCalendars) return 'text-destructive font-semibold';
+                        if (!hasCalls && hasAdSpend && !hasGHL) return 'text-destructive font-semibold';
+                        // Soft warning: leads landed but no booked calls — calendar sync likely failing
+                        if (!hasCalls && hasLeads && hasCalendars) return 'text-destructive font-semibold';
                         if (!hasCalls && hasAdSpend && syncInfo.status !== 'healthy') return 'text-yellow-600 dark:text-yellow-500';
-                        if (!hasCalls && (m.crmLeads || 0) > 0) return 'text-yellow-600 dark:text-yellow-500';
+                        if (!hasCalls && hasLeads) return 'text-yellow-600 dark:text-yellow-500';
                         return '';
                       })()
                     )}>
                       <span className="flex items-center justify-end gap-0.5">
                         {m.totalCalls || 0}
-                        {(m.totalCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && !!(client.ghl_api_key && client.ghl_location_id) && (fullSettings[client.id]?.tracked_calendar_ids || []).length === 0 && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Calendar className="h-2.5 w-2.5 text-destructive shrink-0" />
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs max-w-[220px]">
-                              No tracked calendars configured — add calendar IDs in client settings to sync booked/show calls
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
+                        {(() => {
+                          const hasCalls = (m.totalCalls || 0) > 0;
+                          const hasAdSpend = (m.totalAdSpend || 0) > 0;
+                          const hasGHL = !!(client.ghl_api_key && client.ghl_location_id);
+                          const hasCalendars = (fullSettings[client.id]?.tracked_calendar_ids || []).length > 0;
+                          const hasLeads = (m.crmLeads || 0) > 0;
+                          if (hasCalls) return null;
+                          if (!hasAdSpend && !hasLeads) return null;
+
+                          let msg: string;
+                          if (!hasGHL) {
+                            msg = 'GHL not configured — add API key & location ID to sync booked/show calls from calendars';
+                          } else if (!hasCalendars) {
+                            msg = 'No tracked calendars configured — open client settings and add calendar IDs to sync booked/show calls';
+                          } else if (hasLeads) {
+                            msg = 'Calendars are configured and CRM leads are syncing, but no booked calls came through — calendar sync may be failing. Click Repair to re-run sync-calendar-appointments.';
+                          } else {
+                            msg = 'No booked calls in range — verify calendar sync ran and that the tracked calendar IDs are correct';
+                          }
+                          return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Calendar className="h-2.5 w-2.5 text-destructive shrink-0" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs max-w-[260px]">
+                                {msg}
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })()}
                       </span>
                     </TableCell>
 
@@ -769,6 +796,54 @@ export function DraggableClientTable({
                     {/* Actions */}
                     <TableCell className="py-0 px-1" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-0">
+                        {(() => {
+                          const hasMeta = !!(client.meta_ad_account_id);
+                          const hasGhl = !!(client.ghl_api_key && client.ghl_location_id);
+                          const hasCalendars = (fullSettings[client.id]?.tracked_calendar_ids || []).length > 0;
+                          const adSpend = m.totalAdSpend || 0;
+                          const crmLeads = m.crmLeads || 0;
+                          const totalCalls = m.totalCalls || 0;
+                          const needsRepair =
+                            (adSpend > 0 && hasGhl && crmLeads === 0) ||
+                            (adSpend > 0 && crmLeads > 0 && totalCalls === 0 && hasCalendars) ||
+                            syncInfo.status === 'error';
+                          const noTargets = !hasMeta && !hasGhl && !hasCalendars;
+                          const repairing = isRepairing(client.id);
+                          let label = 'Re-run Meta + GHL + Calendar sync for this client';
+                          if (needsRepair) {
+                            label = 'Sync issues detected — click to re-run Meta, GHL, and Calendar sync';
+                          }
+                          if (noTargets) {
+                            label = 'No integrations configured — add Meta / GHL / Calendar settings first';
+                          }
+                          if (repairing) {
+                            label = `Repairing… (${repairPhase})`;
+                          }
+                          return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className={cn(
+                                    'h-5 w-5',
+                                    needsRepair && !repairing && 'text-destructive hover:text-destructive'
+                                  )}
+                                  disabled={repairing || noTargets}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    runRepair(client.id, { hasMeta, hasGhl, hasCalendars });
+                                  }}
+                                >
+                                  <Wrench className={cn('h-2.5 w-2.5', repairing && 'animate-pulse')} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs max-w-[240px]">
+                                {label}
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })()}
                         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => openAdsManager(e, client.business_manager_url)} title="Ads Manager">
                           <BarChart3 className="h-2.5 w-2.5" />
                         </Button>
