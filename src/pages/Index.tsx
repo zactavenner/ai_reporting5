@@ -329,6 +329,7 @@ const Index = () => {
                       </div>
                     ) : (
                       <>
+                        <SyncHealthBanner />
                         <AgencyStatsBar
                           clients={clients}
                           clientMRRSettings={clientMRRSettings}
