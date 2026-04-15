@@ -45,6 +45,7 @@ import { SortConfig } from './SortableTableHeader';
 import { formatDistanceToNow } from 'date-fns';
 import { ClientApiStatus } from '@/hooks/useApiConnectionTest';
 import { ApiConnectionStatus } from '@/components/settings/ApiConnectionStatus';
+import { SyncHistoryModal } from '@/components/dashboard/SyncHistoryModal';
 
 interface DraggableClientTableProps {
   clients: Client[];
