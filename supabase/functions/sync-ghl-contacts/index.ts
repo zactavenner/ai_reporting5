@@ -237,6 +237,7 @@ async function fetchGHLContacts(
     const body: Record<string, any> = {
       locationId,
       pageLimit: limit,
+      limit,  // GHL v2 accepts both; send both for compatibility
       page: page || 1,
     };
 
