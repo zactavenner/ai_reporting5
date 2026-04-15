@@ -120,3 +120,9 @@ verify_jwt = false
 
 [functions.weekly-brief-generator]
 verify_jwt = false
+
+[functions.sync-watchdog]
+verify_jwt = false
+
+[functions.ghl-daily-reconciliation]
+verify_jwt = false

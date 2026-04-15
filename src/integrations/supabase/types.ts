@@ -4262,6 +4262,134 @@ export type Database = {
           },
         ]
       }
+      ghl_outbound_log: {
+        Row: {
+          attempt_number: number | null
+          client_id: string | null
+          completed_at: string | null
+          correlation_id: string | null
+          created_at: string
+          duration_ms: number | null
+          endpoint: string
+          error_class: string | null
+          error_message: string | null
+          final_state: string
+          function_name: string
+          ghl_contact_id: string | null
+          http_method: string
+          id: string
+          lead_id: string | null
+          request_payload: Json | null
+          response_body: Json | null
+          response_status_code: number | null
+        }
+        Insert: {
+          attempt_number?: number | null
+          client_id?: string | null
+          completed_at?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          endpoint: string
+          error_class?: string | null
+          error_message?: string | null
+          final_state?: string
+          function_name: string
+          ghl_contact_id?: string | null
+          http_method?: string
+          id?: string
+          lead_id?: string | null
+          request_payload?: Json | null
+          response_body?: Json | null
+          response_status_code?: number | null
+        }
+        Update: {
+          attempt_number?: number | null
+          client_id?: string | null
+          completed_at?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          endpoint?: string
+          error_class?: string | null
+          error_message?: string | null
+          final_state?: string
+          function_name?: string
+          ghl_contact_id?: string | null
+          http_method?: string
+          id?: string
+          lead_id?: string | null
+          request_payload?: Json | null
+          response_body?: Json | null
+          response_status_code?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ghl_outbound_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ghl_outbound_log_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ghl_reconciliation_results: {
+        Row: {
+          client_id: string
+          created_at: string
+          extra_in_ghl: number
+          ghl_contact_count: number
+          id: string
+          local_lead_count: number
+          matched_count: number
+          missing_in_ghl: number
+          notes: string | null
+          reconciliation_date: string
+          sample_missing_lead_ids: string[] | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          extra_in_ghl?: number
+          ghl_contact_count?: number
+          id?: string
+          local_lead_count?: number
+          matched_count?: number
+          missing_in_ghl?: number
+          notes?: string | null
+          reconciliation_date?: string
+          sample_missing_lead_ids?: string[] | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          extra_in_ghl?: number
+          ghl_contact_count?: number
+          id?: string
+          local_lead_count?: number
+          matched_count?: number
+          missing_in_ghl?: number
+          notes?: string | null
+          reconciliation_date?: string
+          sample_missing_lead_ids?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ghl_reconciliation_results_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gpt_files: {
         Row: {
           character_count: number | null
