@@ -9,6 +9,7 @@ import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { DraggableClientTable } from '@/components/dashboard/DraggableClientTable';
 import { AgencyStatsBar } from '@/components/dashboard/AgencyStatsBar';
 import { AgencySyncStatusPanel } from '@/components/dashboard/AgencySyncStatusPanel';
+import { SyncHealthBanner } from '@/components/dashboard/SyncHealthBanner';
 import { ClientSettingsModal } from '@/components/settings/ClientSettingsModal';
 import { AgencySettingsModal } from '@/components/settings/AgencySettingsModal';
 import { AddClientModal } from '@/components/settings/AddClientModal';
@@ -328,6 +329,7 @@ const Index = () => {
                       </div>
                     ) : (
                       <>
+                        <SyncHealthBanner />
                         <AgencyStatsBar
                           clients={clients}
                           clientMRRSettings={clientMRRSettings}

@@ -17,6 +17,8 @@ interface ClientSyncResult {
   errors: string[];
   duration_ms: number;
   rows_written: number;
+  was_retry: boolean;
+  token_warnings: string[];
 }
 
 // ── Retry-aware fetch helper ──
@@ -83,6 +85,183 @@ async function createAlertTask(
   }
 }
 
+// ── Run a single client's full sync pipeline ──
+async function syncClient(
+  client: { id: string; name: string; meta_ad_account_id: string | null; ghl_api_key: string | null; ghl_location_id: string | null },
+  supabaseUrl: string,
+  supabaseKey: string,
+  supabase: any,
+  startStr: string,
+  endStr: string,
+  skipSteps: string[],
+  isRetry: boolean,
+): Promise<ClientSyncResult> {
+  const clientStart = Date.now();
+  const result: ClientSyncResult = {
+    client_id: client.id,
+    client_name: client.name,
+    meta_ok: false,
+    ghl_contacts_ok: false,
+    ghl_pipelines_ok: false,
+    metrics_recalculated: false,
+    errors: [],
+    duration_ms: 0,
+    rows_written: 0,
+    was_retry: isRetry,
+    token_warnings: [],
+  };
+
+  try {
+    console.log(`[daily-master-sync] ${isRetry ? '🔄 RETRY ' : ''}${client.name}`);
+
+    // ── 1. Meta Ads (7-day rolling window) ──
+    if (!skipSteps.includes("meta") && client.meta_ad_account_id) {
+      const label = `${client.name}/meta`;
+      console.log(`[daily-master-sync]   → Meta Ads sync (${startStr}→${endStr})`);
+      const res = await callFunction(supabaseUrl, supabaseKey, "sync-meta-ads", {
+        clientId: client.id,
+        startDate: startStr,
+        endDate: endStr,
+      }, label);
+      result.meta_ok = res.success;
+      if (!res.success) {
+        result.errors.push(`meta: ${res.error}`);
+        console.error(`[daily-master-sync]   ✗ ${label}: ${res.error}`);
+      } else {
+        result.rows_written += (res.data?.dailyMetrics || 0);
+        console.log(`[daily-master-sync]   ✓ ${label}: ${res.data?.campaigns || 0} campaigns, ${res.data?.ads || 0} ads`);
+      }
+      await new Promise(r => setTimeout(r, 5000));
+    } else if (!client.meta_ad_account_id) {
+      result.meta_ok = true;
+    }
+
+    // ── 2. GHL Contacts (7-day rolling window) ──
+    if (!skipSteps.includes("ghl") && client.ghl_api_key && client.ghl_location_id) {
+      const label = `${client.name}/ghl-contacts`;
+      console.log(`[daily-master-sync]   → GHL contacts sync`);
+      const res = await callFunction(supabaseUrl, supabaseKey, "sync-ghl-contacts", {
+        client_id: client.id,
+        syncType: "contacts",
+        sinceDateDays: 7,
+      }, label);
+      result.ghl_contacts_ok = res.success;
+      if (!res.success) {
+        result.errors.push(`ghl-contacts: ${res.error}`);
+        console.error(`[daily-master-sync]   ✗ ${label}: ${res.error}`);
+      } else {
+        console.log(`[daily-master-sync]   ✓ ${label}`);
+      }
+
+      await new Promise(r => setTimeout(r, 10000));
+
+      // ── 3. GHL Pipelines ──
+      const pLabel = `${client.name}/ghl-pipelines`;
+      console.log(`[daily-master-sync]   → GHL pipelines sync`);
+      const pRes = await callFunction(supabaseUrl, supabaseKey, "sync-ghl-pipelines", {
+        client_id: client.id,
+      }, pLabel);
+      result.ghl_pipelines_ok = pRes.success;
+      if (!pRes.success) {
+        result.errors.push(`ghl-pipelines: ${pRes.error}`);
+        console.error(`[daily-master-sync]   ✗ ${pLabel}: ${pRes.error}`);
+      } else {
+        console.log(`[daily-master-sync]   ✓ ${pLabel}`);
+      }
+
+      await new Promise(r => setTimeout(r, 5000));
+    } else if (!client.ghl_api_key || !client.ghl_location_id) {
+      result.ghl_contacts_ok = true;
+      result.ghl_pipelines_ok = true;
+    }
+
+    // ── 4. Recalculate daily metrics ONLY if both Meta AND GHL succeeded ──
+    if (!skipSteps.includes("recalculate")) {
+      if (result.meta_ok && result.ghl_contacts_ok) {
+        const label = `${client.name}/recalculate`;
+        console.log(`[daily-master-sync]   → Recalculating metrics (${startStr}→${endStr})`);
+        const res = await callFunction(supabaseUrl, supabaseKey, "recalculate-daily-metrics", {
+          clientId: client.id,
+          startDate: startStr,
+          endDate: endStr,
+        }, label);
+        result.metrics_recalculated = res.success;
+        if (!res.success) {
+          result.errors.push(`recalculate: ${res.error}`);
+        } else {
+          console.log(`[daily-master-sync]   ✓ ${label}`);
+        }
+      } else {
+        console.warn(`[daily-master-sync]   ⚠ ${client.name}: Skipping recalculate — upstream sync failed (meta=${result.meta_ok}, ghl=${result.ghl_contacts_ok})`);
+        result.errors.push("recalculate: skipped due to upstream failure");
+      }
+    }
+  } catch (err) {
+    // Catch-all: never let a single client crash the orchestrator
+    const errMsg = err instanceof Error ? err.message : "Unknown";
+    result.errors.push(`unhandled: ${errMsg}`);
+    console.error(`[daily-master-sync] ✗ ${client.name} unhandled error:`, err);
+  }
+
+  result.duration_ms = Date.now() - clientStart;
+
+  // ── Update consecutive_failures on the clients table ──
+  try {
+    if (!result.meta_ok && client.meta_ad_account_id) {
+      await supabase.rpc("increment_column", undefined).catch(() => null); // fallback below
+      await supabase.from("clients").update({
+        consecutive_meta_failures: supabase.rpc ? undefined : 1, // handled below
+      }).eq("id", client.id);
+      // Direct SQL increment via raw update
+      const { data: currentClient } = await supabase.from("clients").select("consecutive_meta_failures").eq("id", client.id).single();
+      if (currentClient) {
+        await supabase.from("clients").update({
+          consecutive_meta_failures: (currentClient.consecutive_meta_failures || 0) + 1,
+        }).eq("id", client.id);
+      }
+    } else if (result.meta_ok && client.meta_ad_account_id) {
+      await supabase.from("clients").update({ consecutive_meta_failures: 0 }).eq("id", client.id);
+    }
+
+    if (!result.ghl_contacts_ok && client.ghl_api_key) {
+      const { data: currentClient } = await supabase.from("clients").select("consecutive_ghl_failures").eq("id", client.id).single();
+      if (currentClient) {
+        await supabase.from("clients").update({
+          consecutive_ghl_failures: (currentClient.consecutive_ghl_failures || 0) + 1,
+        }).eq("id", client.id);
+      }
+    } else if (result.ghl_contacts_ok && client.ghl_api_key) {
+      await supabase.from("clients").update({ consecutive_ghl_failures: 0 }).eq("id", client.id);
+    }
+  } catch (err) {
+    console.error(`[daily-master-sync] Failed to update consecutive_failures for ${client.name}:`, err);
+  }
+
+  // ── Log per-client sync_run ──
+  await supabase.from("sync_runs").insert({
+    function_name: "daily-master-sync",
+    started_at: new Date(clientStart).toISOString(),
+    finished_at: new Date().toISOString(),
+    status: result.errors.length === 0 ? "completed" : "failed",
+    rows_written: result.rows_written,
+    client_id: client.id,
+    source: "master",
+    error_message: result.errors.length > 0 ? result.errors.join("; ") : null,
+    metadata: {
+      source: "master",
+      window: `${startStr}→${endStr}`,
+      meta_ok: result.meta_ok,
+      ghl_contacts_ok: result.ghl_contacts_ok,
+      ghl_pipelines_ok: result.ghl_pipelines_ok,
+      metrics_recalculated: result.metrics_recalculated,
+      was_retry: isRetry,
+      token_warnings: result.token_warnings,
+    },
+  });
+
+  return result;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -106,7 +285,7 @@ Deno.serve(async (req) => {
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
       const { data: staleRuns } = await supabase
         .from("sync_runs")
-        .update({ status: "timed_out", completed_at: new Date().toISOString() })
+        .update({ status: "timed_out", finished_at: new Date().toISOString() })
         .eq("status", "running")
         .lt("started_at", twoHoursAgo)
         .select("id");
@@ -121,7 +300,7 @@ Deno.serve(async (req) => {
     const endDate = new Date();
     endDate.setUTCDate(endDate.getUTCDate() - 1);
     const startDate = new Date(endDate);
-    startDate.setUTCDate(startDate.getUTCDate() - 6); // 7 days total
+    startDate.setUTCDate(startDate.getUTCDate() - 6);
     const startStr = startDate.toISOString().split("T")[0];
     const endStr = endDate.toISOString().split("T")[0];
 
@@ -145,6 +324,7 @@ Deno.serve(async (req) => {
       function_name: "daily-master-sync",
       started_at: new Date().toISOString(),
       status: "running",
+      source: "master",
       metadata: { clientCount: clients.length, window: `${startStr}→${endStr}` },
     }).select("id").single();
     const masterRunId = masterRun?.id;
@@ -154,128 +334,10 @@ Deno.serve(async (req) => {
     // ── Per-client sequential pipeline ──
     for (let i = 0; i < clients.length; i++) {
       const client = clients[i];
-      const clientStart = Date.now();
-      const result: ClientSyncResult = {
-        client_id: client.id,
-        client_name: client.name,
-        meta_ok: false,
-        ghl_contacts_ok: false,
-        ghl_pipelines_ok: false,
-        metrics_recalculated: false,
-        errors: [],
-        duration_ms: 0,
-        rows_written: 0,
-      };
-
       console.log(`[daily-master-sync] (${i + 1}/${clients.length}) ${client.name}`);
 
-      // ── 1. Meta Ads (7-day rolling window) ──
-      if (!skipSteps.includes("meta") && client.meta_ad_account_id) {
-        const label = `${client.name}/meta`;
-        console.log(`[daily-master-sync]   → Meta Ads sync (${startStr}→${endStr})`);
-        const res = await callFunction(supabaseUrl, supabaseKey, "sync-meta-ads", {
-          clientId: client.id,
-          startDate: startStr,
-          endDate: endStr,
-        }, label);
-        result.meta_ok = res.success;
-        if (!res.success) {
-          result.errors.push(`meta: ${res.error}`);
-          console.error(`[daily-master-sync]   ✗ ${label}: ${res.error}`);
-        } else {
-          result.rows_written += (res.data?.dailyMetrics || 0);
-          console.log(`[daily-master-sync]   ✓ ${label}: ${res.data?.campaigns || 0} campaigns, ${res.data?.ads || 0} ads`);
-        }
-        // Rate-limit pause between Meta and GHL
-        await new Promise(r => setTimeout(r, 5000));
-      } else if (!client.meta_ad_account_id) {
-        // No Meta account — mark as OK (not applicable)
-        result.meta_ok = true;
-      }
-
-      // ── 2. GHL Contacts (7-day rolling window) ──
-      if (!skipSteps.includes("ghl") && client.ghl_api_key && client.ghl_location_id) {
-        const label = `${client.name}/ghl-contacts`;
-        console.log(`[daily-master-sync]   → GHL contacts sync`);
-        const res = await callFunction(supabaseUrl, supabaseKey, "sync-ghl-contacts", {
-          client_id: client.id,
-          syncType: "contacts",
-          sinceDateDays: 7,
-        }, label);
-        result.ghl_contacts_ok = res.success;
-        if (!res.success) {
-          result.errors.push(`ghl-contacts: ${res.error}`);
-          console.error(`[daily-master-sync]   ✗ ${label}: ${res.error}`);
-        } else {
-          console.log(`[daily-master-sync]   ✓ ${label}`);
-        }
-
-        await new Promise(r => setTimeout(r, 10000));
-
-        // ── 3. GHL Pipelines ──
-        const pLabel = `${client.name}/ghl-pipelines`;
-        console.log(`[daily-master-sync]   → GHL pipelines sync`);
-        const pRes = await callFunction(supabaseUrl, supabaseKey, "sync-ghl-pipelines", {
-          client_id: client.id,
-        }, pLabel);
-        result.ghl_pipelines_ok = pRes.success;
-        if (!pRes.success) {
-          result.errors.push(`ghl-pipelines: ${pRes.error}`);
-          console.error(`[daily-master-sync]   ✗ ${pLabel}: ${pRes.error}`);
-        } else {
-          console.log(`[daily-master-sync]   ✓ ${pLabel}`);
-        }
-
-        await new Promise(r => setTimeout(r, 5000));
-      } else if (!client.ghl_api_key || !client.ghl_location_id) {
-        // No GHL configured — mark as OK (not applicable)
-        result.ghl_contacts_ok = true;
-        result.ghl_pipelines_ok = true;
-      }
-
-      // ── 4. Recalculate daily metrics ONLY if both Meta AND GHL succeeded ──
-      if (!skipSteps.includes("recalculate")) {
-        if (result.meta_ok && result.ghl_contacts_ok) {
-          const label = `${client.name}/recalculate`;
-          console.log(`[daily-master-sync]   → Recalculating metrics (${startStr}→${endStr})`);
-          const res = await callFunction(supabaseUrl, supabaseKey, "recalculate-daily-metrics", {
-            clientId: client.id,
-            startDate: startStr,
-            endDate: endStr,
-          }, label);
-          result.metrics_recalculated = res.success;
-          if (!res.success) {
-            result.errors.push(`recalculate: ${res.error}`);
-          } else {
-            console.log(`[daily-master-sync]   ✓ ${label}`);
-          }
-        } else {
-          console.warn(`[daily-master-sync]   ⚠ ${client.name}: Skipping recalculate — upstream sync failed (meta=${result.meta_ok}, ghl=${result.ghl_contacts_ok})`);
-          result.errors.push("recalculate: skipped due to upstream failure");
-        }
-      }
-
-      result.duration_ms = Date.now() - clientStart;
+      const result = await syncClient(client, supabaseUrl, supabaseKey, supabase, startStr, endStr, skipSteps, false);
       results.push(result);
-
-      // ── Log per-client sync_run ──
-      await supabase.from("sync_runs").insert({
-        function_name: "daily-master-sync",
-        started_at: new Date(clientStart).toISOString(),
-        finished_at: new Date().toISOString(),
-        status: result.errors.length === 0 ? "completed" : "partial",
-        rows_written: result.rows_written,
-        client_id: client.id,
-        error_message: result.errors.length > 0 ? result.errors.join("; ") : null,
-        metadata: {
-          source: "master",
-          window: `${startStr}→${endStr}`,
-          meta_ok: result.meta_ok,
-          ghl_contacts_ok: result.ghl_contacts_ok,
-          ghl_pipelines_ok: result.ghl_pipelines_ok,
-          metrics_recalculated: result.metrics_recalculated,
-        },
-      });
 
       // Inter-client delay (30s) to respect rate limits
       if (i < clients.length - 1) {
@@ -284,8 +346,69 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Meta Token Check ──
+    // ── Auto-retry: failed clients get ONE more attempt with 30s backoff ──
+    const failedClients = results.filter(r => r.errors.length > 0);
+    if (failedClients.length > 0 && failedClients.length <= 10) {
+      console.log(`[daily-master-sync] 🔄 Auto-retrying ${failedClients.length} failed client(s) after 30s backoff...`);
+      await new Promise(r => setTimeout(r, 30000));
+
+      for (const failed of failedClients) {
+        const client = clients.find(c => c.id === failed.client_id);
+        if (!client) continue;
+
+        const retryResult = await syncClient(client, supabaseUrl, supabaseKey, supabase, startStr, endStr, skipSteps, true);
+
+        // Replace the original failed result if retry succeeded
+        if (retryResult.errors.length === 0) {
+          const idx = results.findIndex(r => r.client_id === failed.client_id);
+          if (idx >= 0) results[idx] = retryResult;
+          console.log(`[daily-master-sync] ✓ ${client.name} retry succeeded`);
+        } else {
+          console.log(`[daily-master-sync] ✗ ${client.name} retry also failed`);
+        }
+
+        await new Promise(r => setTimeout(r, 15000));
+      }
+    }
+
+    // ── Per-client GHL token validation ──
     if (!skipSteps.includes("token_check")) {
+      console.log(`[daily-master-sync] Checking per-client GHL token validity...`);
+      for (const client of clients) {
+        if (!client.ghl_api_key || !client.ghl_location_id) continue;
+        try {
+          const ghlRes = await fetch(`https://services.leadconnectorhq.com/locations/${client.ghl_location_id}`, {
+            headers: {
+              Authorization: `Bearer ${client.ghl_api_key}`,
+              Version: "2021-07-28",
+              Accept: "application/json",
+            },
+          });
+          if (ghlRes.status === 401 || ghlRes.status === 403) {
+            console.warn(`[daily-master-sync] ⚠ ${client.name}: GHL token expired/unauthorized (${ghlRes.status})`);
+            await supabase.from("sync_runs").insert({
+              function_name: "daily-master-sync",
+              started_at: new Date().toISOString(),
+              finished_at: new Date().toISOString(),
+              status: "token_expiring",
+              client_id: client.id,
+              source: "master",
+              error_message: `GHL token returned ${ghlRes.status} — reconnect required`,
+              metadata: { source: "token_check", type: "ghl", status_code: ghlRes.status },
+            });
+            await createAlertTask(supabase,
+              `🔑 ${client.name}: GHL token expired`,
+              `GHL API key for ${client.name} returned ${ghlRes.status}. Reconnect the GHL integration for this client.`,
+              "urgent"
+            );
+          }
+        } catch (err) {
+          console.error(`[daily-master-sync] GHL token check error for ${client.name}:`, err);
+        }
+        await new Promise(r => setTimeout(r, 1000)); // gentle rate limit
+      }
+
+      // ── Shared Meta token check ──
       try {
         const metaToken = Deno.env.get("META_SHARED_ACCESS_TOKEN");
         if (metaToken) {
@@ -297,8 +420,17 @@ Deno.serve(async (req) => {
           if (expiresAt && expiresAt > 0) {
             const expiryDate = new Date(expiresAt * 1000);
             const daysLeft = Math.round((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-            console.log(`[daily-master-sync] Meta token expires in ${daysLeft} days`);
+            console.log(`[daily-master-sync] Meta shared token expires in ${daysLeft} days`);
             if (daysLeft <= 7) {
+              await supabase.from("sync_runs").insert({
+                function_name: "daily-master-sync",
+                started_at: new Date().toISOString(),
+                finished_at: new Date().toISOString(),
+                status: "token_expiring",
+                source: "master",
+                error_message: `Meta token expires in ${daysLeft} days (${expiryDate.toISOString().split("T")[0]})`,
+                metadata: { source: "token_check", type: "meta", days_left: daysLeft },
+              });
               await createAlertTask(supabase,
                 `🔑 Meta token expires in ${daysLeft} days`,
                 `META_SHARED_ACCESS_TOKEN expires ${expiryDate.toISOString().split("T")[0]}. Renew immediately.`,
@@ -306,6 +438,15 @@ Deno.serve(async (req) => {
               );
             }
           } else if (debugData?.data?.is_valid === false) {
+            await supabase.from("sync_runs").insert({
+              function_name: "daily-master-sync",
+              started_at: new Date().toISOString(),
+              finished_at: new Date().toISOString(),
+              status: "token_expiring",
+              source: "master",
+              error_message: "Meta shared token is EXPIRED",
+              metadata: { source: "token_check", type: "meta", expired: true },
+            });
             await createAlertTask(supabase,
               "🚨 Meta token is EXPIRED",
               "META_SHARED_ACCESS_TOKEN is invalid. All Meta syncs are broken.",
@@ -314,7 +455,7 @@ Deno.serve(async (req) => {
           }
         }
       } catch (err) {
-        console.error(`[daily-master-sync] Token check error:`, err);
+        console.error(`[daily-master-sync] Meta token check error:`, err);
       }
     }
 
@@ -323,8 +464,9 @@ Deno.serve(async (req) => {
     const failed = results.filter(r => r.errors.length > 0).length;
     const totalDuration = results.reduce((s, r) => s + r.duration_ms, 0);
     const totalRows = results.reduce((s, r) => s + r.rows_written, 0);
+    const retried = results.filter(r => r.was_retry).length;
 
-    console.log(`[daily-master-sync] Pipeline complete: ${succeeded}/${results.length} clients clean, ${failed} with errors, ${Math.round(totalDuration / 1000)}s total`);
+    console.log(`[daily-master-sync] Pipeline complete: ${succeeded}/${results.length} clean, ${failed} failed, ${retried} retried, ${Math.round(totalDuration / 1000)}s total`);
 
     // ── Finalize master sync_run ──
     if (masterRunId) {
@@ -339,34 +481,36 @@ Deno.serve(async (req) => {
           clientCount: results.length,
           succeeded,
           failed,
+          retried,
           clients: results.map(r => ({
             name: r.client_name,
             ok: r.errors.length === 0,
             meta: r.meta_ok,
             ghl: r.ghl_contacts_ok,
             recalc: r.metrics_recalculated,
+            retry: r.was_retry,
             errors: r.errors,
           })),
         },
       }).eq("id", masterRunId);
     }
 
-    // Create alert if any clients failed
+    // Create alert if any clients still failed after retry
     if (failed > 0) {
       const failedNames = results.filter(r => r.errors.length > 0).map(r => r.client_name).join(", ");
       await createAlertTask(supabase,
-        `⚠️ Daily sync: ${failed} client(s) had errors`,
+        `⚠️ Daily sync: ${failed} client(s) failed (after retry)`,
         `Clients with issues: ${failedNames}. Check sync_runs for details.`,
       );
     }
 
-    return { success: failed === 0, clients: results.length, succeeded, failed, totalDuration_ms: totalDuration };
+    return { success: failed === 0, clients: results.length, succeeded, failed, retried, totalDuration_ms: totalDuration };
   };
 
   if (typeof EdgeRuntime !== "undefined") {
     EdgeRuntime.waitUntil(doSync());
     return new Response(
-      JSON.stringify({ success: true, message: "Daily master sync started (background, per-client)" }),
+      JSON.stringify({ success: true, message: "Daily master sync started (background, per-client with retry)" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } else {
