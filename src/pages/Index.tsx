@@ -140,6 +140,7 @@ const Index = () => {
   const { data: pendingTasks = [] } = usePendingMeetingTasks();
   const syncMeetings = useSyncMeetings();
   const { testResults, isTesting, testAllClients, getClientStatus } = useApiConnectionTest();
+  const [syncingYesterday, setSyncingYesterday] = useState(false);
   const { data: allCreatives = [] } = useAllCreatives();
   const pendingCreatives = allCreatives.filter(c => c.status === 'pending');
 
@@ -326,10 +327,10 @@ const Index = () => {
                               });
                               if (error) throw error;
                               const { toast } = await import('@/hooks/use-toast');
-                              toast.toast({ title: 'GHL Sync Started', description: `Syncing yesterday's data for all clients in the background.` });
+                              toast({ title: 'GHL Sync Started', description: `Syncing yesterday's data for all clients in the background.` });
                             } catch (err: any) {
                               const { toast } = await import('@/hooks/use-toast');
-                              toast.toast({ title: 'Sync Failed', description: err.message, variant: 'destructive' });
+                              toast({ title: 'Sync Failed', description: err.message, variant: 'destructive' });
                             } finally {
                               setSyncingYesterday(false);
                             }
