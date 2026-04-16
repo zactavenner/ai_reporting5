@@ -60,6 +60,11 @@ export function useMasterSync(clientId: string | undefined) {
     queryClient.invalidateQueries({ queryKey: ['pipeline-opportunities'] });
     queryClient.invalidateQueries({ queryKey: ['client-pipelines'] });
     queryClient.invalidateQueries({ queryKey: ['clients'] });
+    // Refresh dashboard-critical queries so ad spend, CRM leads, calls update immediately
+    queryClient.invalidateQueries({ queryKey: ['client-source-metrics'] });
+    queryClient.invalidateQueries({ queryKey: ['all-daily-metrics'] });
+    queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });
+    queryClient.invalidateQueries({ queryKey: ['yesterday-metrics'] });
   }, [queryClient, clientId]);
 
   // Poll for sync completion

@@ -77,6 +77,12 @@ export function useSyncMetaAds() {
       queryClient.invalidateQueries({ queryKey: ['meta-campaigns', clientId] });
       queryClient.invalidateQueries({ queryKey: ['meta-ad-sets', clientId] });
       queryClient.invalidateQueries({ queryKey: ['meta-ads', clientId] });
+      // Refresh dashboard-critical queries so ad spend, leads, calls update immediately
+      queryClient.invalidateQueries({ queryKey: ['all-daily-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-metrics', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['client-source-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['yesterday-metrics'] });
       toast.success(`Synced ${data.campaigns} campaigns, ${data.adSets} ad sets, ${data.ads} ads (${data.metaApiCalls} API calls)`);
     },
     onError: (error) => {

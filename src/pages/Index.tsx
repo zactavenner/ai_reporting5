@@ -234,6 +234,7 @@ const Index = () => {
     queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });
     queryClient.invalidateQueries({ queryKey: ['client-source-metrics'] });
     queryClient.invalidateQueries({ queryKey: ['all-client-full-settings'] });
+    queryClient.invalidateQueries({ queryKey: ['yesterday-metrics'] });
     queryClient.invalidateQueries({ queryKey: ['integration-status'] });
     queryClient.invalidateQueries({ queryKey: ['outreach-campaigns'] });
     queryClient.invalidateQueries({ queryKey: ['outreach-messages'] });

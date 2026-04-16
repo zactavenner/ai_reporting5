@@ -28,9 +28,15 @@ export function useSyncClient(clientId: string | undefined) {
   const invalidateQueries = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['leads'] });
     queryClient.invalidateQueries({ queryKey: ['calls'] });
+    queryClient.invalidateQueries({ queryKey: ['funded-investors'] });
     queryClient.invalidateQueries({ queryKey: ['sync-health', clientId] });
     queryClient.invalidateQueries({ queryKey: ['gap-leads'] });
     queryClient.invalidateQueries({ queryKey: ['data-discrepancies'] });
+    // Refresh dashboard-critical queries so CRM leads, booked/show calls update immediately
+    queryClient.invalidateQueries({ queryKey: ['client-source-metrics'] });
+    queryClient.invalidateQueries({ queryKey: ['all-daily-metrics'] });
+    queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });
+    queryClient.invalidateQueries({ queryKey: ['yesterday-metrics'] });
   }, [queryClient, clientId]);
 
   const syncLeads = useCallback(async (): Promise<SyncResult> => {

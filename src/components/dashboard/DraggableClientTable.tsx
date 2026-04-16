@@ -619,10 +619,14 @@ export function DraggableClientTable({
                             <TooltipTrigger asChild>
                               <AlertTriangle className="h-2.5 w-2.5 text-destructive shrink-0" />
                             </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs max-w-[250px]">
+                            <TooltipContent side="top" className="text-xs max-w-[280px]">
                               {!client.ghl_api_key || !client.ghl_location_id
                                 ? `${formatCurrency(m.totalAdSpend)} ad spend but no GHL credentials configured — add GHL API key & location ID in settings`
-                                : `${formatCurrency(m.totalAdSpend)} ad spend but 0 CRM leads — GHL integration problem, run master sync or check API key`
+                                : syncInfo.status === 'error'
+                                  ? `${formatCurrency(m.totalAdSpend)} ad spend but 0 CRM leads — GHL sync error: ${syncInfo.error || 'unknown'}. Check API key and run master sync.`
+                                  : syncInfo.status === 'stale'
+                                    ? `${formatCurrency(m.totalAdSpend)} ad spend but 0 CRM leads — GHL sync is stale (last: ${syncInfo.lastSyncAt ? new Date(syncInfo.lastSyncAt).toLocaleDateString() : 'never'}). Run master sync to pull latest leads.`
+                                    : `${formatCurrency(m.totalAdSpend)} ad spend but 0 CRM leads — GHL integration problem, run master sync or check API key`
                               }
                             </TooltipContent>
                           </Tooltip>
@@ -654,16 +658,36 @@ export function DraggableClientTable({
                     )}>
                       <span className="flex items-center justify-end gap-0.5">
                         {m.totalCalls || 0}
-                        {(m.totalCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && !!(client.ghl_api_key && client.ghl_location_id) && (fullSettings[client.id]?.tracked_calendar_ids || []).length === 0 && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Calendar className="h-2.5 w-2.5 text-destructive shrink-0" />
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs max-w-[220px]">
-                              No tracked calendars configured — add calendar IDs in client settings to sync booked/show calls
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
+                        {(() => {
+                          const noCalls = (m.totalCalls || 0) === 0;
+                          const hasAdSpend = (m.totalAdSpend || 0) > 0;
+                          const hasGHL = !!(client.ghl_api_key && client.ghl_location_id);
+                          const hasCalendars = (fullSettings[client.id]?.tracked_calendar_ids || []).length > 0;
+                          if (!noCalls || !hasAdSpend || !hasGHL) return null;
+                          if (!hasCalendars) {
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Calendar className="h-2.5 w-2.5 text-destructive shrink-0" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs max-w-[220px]">
+                                  No tracked calendars configured — add calendar IDs in client settings to sync booked/show calls
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          }
+                          // Calendars configured but 0 calls — may need sync
+                          return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Calendar className="h-2.5 w-2.5 text-yellow-600 dark:text-yellow-500 shrink-0" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs max-w-[250px]">
+                                {hasCalendars ? `${(fullSettings[client.id]?.tracked_calendar_ids || []).length} calendar(s) configured but 0 calls for this period — run calendar sync or check appointment statuses` : ''}
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })()}
                       </span>
                     </TableCell>
 
