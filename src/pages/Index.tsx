@@ -326,11 +326,9 @@ const Index = () => {
                                 body: { sinceDateDays: 1 },
                               });
                               if (error) throw error;
-                              const { toast } = await import('@/hooks/use-toast');
-                              toast({ title: 'GHL Sync Started', description: `Syncing yesterday's data for all clients in the background.` });
+                              toast.success(`Syncing yesterday's data for all clients in the background.`);
                             } catch (err: any) {
-                              const { toast } = await import('@/hooks/use-toast');
-                              toast({ title: 'Sync Failed', description: err.message, variant: 'destructive' });
+                              toast.error(`Sync failed: ${err.message}`);
                             } finally {
                               setSyncingYesterday(false);
                             }
