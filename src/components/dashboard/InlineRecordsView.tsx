@@ -229,6 +229,29 @@ export function InlineRecordsView({
     }
   };
 
+  // GHL sync handler
+  const handleSyncGHL = async () => {
+    if (!clientId || isSyncingGHL) return;
+    setIsSyncingGHL(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-ghl-contacts', {
+        body: { client_id: clientId },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.success && !data?.results) throw new Error(data?.error || 'Sync failed');
+      const created = data?.results?.[0]?.contacts?.created || 0;
+      const updated = data?.results?.[0]?.contacts?.updated || 0;
+      toast.success(`GHL sync complete: ${created} created, ${updated} updated`);
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['calls'] });
+      queryClient.invalidateQueries({ queryKey: ['inline-enrichment', clientId] });
+    } catch (err: any) {
+      toast.error(`GHL sync failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsSyncingGHL(false);
+    }
+  };
+
   // State for UniversalRecordPanel
   const [panelOpen, setPanelOpen] = useState(false);
 
