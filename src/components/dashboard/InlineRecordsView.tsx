@@ -1352,18 +1352,27 @@ export function InlineRecordsView({
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">Detailed Records</CardTitle>
               <div className="flex items-center gap-2">
-                {clientId && (
-                  <Button variant="outline" size="sm" onClick={openAddModal}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add {getTabLabel()}
+                {clientId && ghlLocationId && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSyncGHL}
+                    disabled={isSyncingGHL}
+                  >
+                    {isSyncingGHL ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Sync GHL
                   </Button>
                 )}
-                {clientId && unenrichedCount > 0 && (
+                {clientId && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleBulkEnrich}
-                    disabled={isEnriching}
+                    disabled={isEnriching || unenrichedCount === 0}
                     className="border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
                   >
                     {isEnriching ? (
@@ -1372,6 +1381,12 @@ export function InlineRecordsView({
                       <Zap className="h-4 w-4 mr-2" />
                     )}
                     Enrich ({unenrichedCount})
+                  </Button>
+                )}
+                {clientId && (
+                  <Button variant="outline" size="sm" onClick={openAddModal}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add {getTabLabel()}
                   </Button>
                 )}
                 {clientId && ghlLocationId && (
