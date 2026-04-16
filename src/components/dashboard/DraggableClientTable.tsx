@@ -796,6 +796,51 @@ export function DraggableClientTable({
                     {/* Actions */}
                     <TableCell className="py-0 px-1" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-0">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              disabled={syncingGhl[client.id] || !client.ghl_api_key}
+                              onClick={(e) => handleSyncGhlClient(e, client.id, client.name)}
+                              title="Sync GHL"
+                            >
+                              <RefreshCw className={cn("h-2.5 w-2.5", syncingGhl[client.id] && "animate-spin")} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-[10px]">Sync GHL Leads</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              disabled={syncingMeta[client.id] || !client.meta_ad_account_id}
+                              onClick={(e) => handleSyncMetaClient(e, client.id, client.name)}
+                              title="Sync Meta"
+                            >
+                              <BarChart className={cn("h-2.5 w-2.5", syncingMeta[client.id] && "animate-pulse")} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-[10px]">Sync Meta Ads</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              disabled={enriching[client.id]}
+                              onClick={(e) => handleEnrichClient(e, client.id, client.name)}
+                              title="Enrich"
+                            >
+                              <Sparkles className={cn("h-2.5 w-2.5", enriching[client.id] && "animate-pulse")} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-[10px]">Enrich Contacts</TooltipContent>
+                        </Tooltip>
                         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => openAdsManager(e, client.business_manager_url)} title="Ads Manager">
                           <BarChart3 className="h-2.5 w-2.5" />
                         </Button>
