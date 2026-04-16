@@ -159,6 +159,7 @@ export function InlineRecordsView({
   isPublicView = false,
   ghlLocationId,
 }: InlineRecordsViewProps) {
+  const { dateRange } = useDateFilter();
   const [activeTab, setActiveTab] = useState<TabType>('adspend');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
