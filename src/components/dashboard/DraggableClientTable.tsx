@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAgencyMembers } from '@/hooks/useTasks';
@@ -37,7 +38,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, AlertCircle, CheckCircle, Clock, XCircle, AlertTriangle, Pencil } from 'lucide-react';
+import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, AlertCircle, CheckCircle, Clock, XCircle, AlertTriangle, Pencil, RefreshCw, Sparkles, BarChart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -154,15 +155,75 @@ export function DraggableClientTable({
   apiTestResults = {},
 }: DraggableClientTableProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { dateRange } = useDateFilter();
   const numberOfDays = useMemo(() => differenceInDays(dateRange.to, dateRange.from) + 1, [dateRange]);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ column: '', direction: null });
   const [syncHistoryClient, setSyncHistoryClient] = useState<{ id: string; name: string } | null>(null);
+  const [syncingGhl, setSyncingGhl] = useState<Record<string, boolean>>({});
+  const [syncingMeta, setSyncingMeta] = useState<Record<string, boolean>>({});
+  const [enriching, setEnriching] = useState<Record<string, boolean>>({});
   const updateClient = useUpdateClient();
   const { data: assignments = {} } = useClientAssignments();
   const updateAssignment = useUpdateClientAssignment();
   const { data: agencyMembers = [] } = useAgencyMembers();
+
+  const handleSyncGhlClient = async (e: React.MouseEvent, clientId: string, clientName: string) => {
+    e.stopPropagation();
+    setSyncingGhl(prev => ({ ...prev, [clientId]: true }));
+    try {
+      const sinceDateDays = Math.max(1, Math.ceil((Date.now() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)));
+      const { data, error } = await supabase.functions.invoke('sync-ghl-contacts', {
+        body: { client_id: clientId, sinceDateDays },
+      });
+      if (error) throw error;
+      const created = data?.created ?? 0;
+      const updated = data?.updated ?? 0;
+      toast.success(`${clientName}: synced ${created} new, ${updated} updated contacts`);
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['calls'] });
+    } catch (err: any) {
+      toast.error(`GHL sync failed for ${clientName}: ${err.message || 'Unknown error'}`);
+    } finally {
+      setSyncingGhl(prev => ({ ...prev, [clientId]: false }));
+    }
+  };
+
+  const handleSyncMetaClient = async (e: React.MouseEvent, clientId: string, clientName: string) => {
+    e.stopPropagation();
+    setSyncingMeta(prev => ({ ...prev, [clientId]: true }));
+    try {
+      const { error } = await supabase.functions.invoke('sync-meta-ads', {
+        body: { client_id: clientId },
+      });
+      if (error) throw error;
+      toast.success(`${clientName}: Meta ads synced`);
+      queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['meta_ads'] });
+    } catch (err: any) {
+      toast.error(`Meta sync failed for ${clientName}: ${err.message || 'Unknown error'}`);
+    } finally {
+      setSyncingMeta(prev => ({ ...prev, [clientId]: false }));
+    }
+  };
+
+  const handleEnrichClient = async (e: React.MouseEvent, clientId: string, clientName: string) => {
+    e.stopPropagation();
+    setEnriching(prev => ({ ...prev, [clientId]: true }));
+    try {
+      const { error } = await supabase.functions.invoke('enrich-leads', {
+        body: { client_id: clientId },
+      });
+      if (error) throw error;
+      toast.success(`${clientName}: enrichment started`);
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    } catch (err: any) {
+      toast.error(`Enrich failed for ${clientName}: ${err.message || 'Unknown error'}`);
+    } finally {
+      setEnriching(prev => ({ ...prev, [clientId]: false }));
+    }
+  };
 
   // Fetch yesterday's metrics to flag inactive clients
   const yesterday = useMemo(() => format(subDays(new Date(), 1), 'yyyy-MM-dd'), []);
@@ -397,7 +458,7 @@ export function DraggableClientTable({
               <TableHead className="font-bold text-[11px] text-center py-0 px-1">Meta</TableHead>
               <TableHead className="font-bold text-[11px] text-center py-0 px-1">CRM</TableHead>
               {isAdmin && <SortableHeader column="mrr" label="MRR" sortConfig={sortConfig} onSort={handleSort} />}
-              <TableHead className="font-bold text-[11px] py-0 px-1 min-w-[70px]">Actions</TableHead>
+              <TableHead className="font-bold text-[11px] py-0 px-1 min-w-[130px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -735,6 +796,51 @@ export function DraggableClientTable({
                     {/* Actions */}
                     <TableCell className="py-0 px-1" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-0">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              disabled={syncingGhl[client.id] || !client.ghl_api_key}
+                              onClick={(e) => handleSyncGhlClient(e, client.id, client.name)}
+                              title="Sync GHL"
+                            >
+                              <RefreshCw className={cn("h-2.5 w-2.5", syncingGhl[client.id] && "animate-spin")} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-[10px]">Sync GHL Leads</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              disabled={syncingMeta[client.id] || !client.meta_ad_account_id}
+                              onClick={(e) => handleSyncMetaClient(e, client.id, client.name)}
+                              title="Sync Meta"
+                            >
+                              <BarChart className={cn("h-2.5 w-2.5", syncingMeta[client.id] && "animate-pulse")} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-[10px]">Sync Meta Ads</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              disabled={enriching[client.id]}
+                              onClick={(e) => handleEnrichClient(e, client.id, client.name)}
+                              title="Enrich"
+                            >
+                              <Sparkles className={cn("h-2.5 w-2.5", enriching[client.id] && "animate-pulse")} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-[10px]">Enrich Contacts</TooltipContent>
+                        </Tooltip>
                         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => openAdsManager(e, client.business_manager_url)} title="Ads Manager">
                           <BarChart3 className="h-2.5 w-2.5" />
                         </Button>
