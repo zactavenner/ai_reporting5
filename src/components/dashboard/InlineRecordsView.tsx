@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useDateFilter } from '@/contexts/DateFilterContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -158,6 +159,7 @@ export function InlineRecordsView({
   isPublicView = false,
   ghlLocationId,
 }: InlineRecordsViewProps) {
+  const { dateRange } = useDateFilter();
   const [activeTab, setActiveTab] = useState<TabType>('adspend');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -234,8 +236,15 @@ export function InlineRecordsView({
     if (!clientId || isSyncingGHL) return;
     setIsSyncingGHL(true);
     try {
+      // Calculate sinceDateDays from the selected date range
+      const now = new Date();
+      const fromDate = dateRange.from;
+      const sinceDateDays = Math.max(1, Math.ceil((now.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)));
+      
+      toast.info(`Syncing GHL contacts for last ${sinceDateDays} day(s)...`);
+      
       const { data, error } = await supabase.functions.invoke('sync-ghl-contacts', {
-        body: { client_id: clientId },
+        body: { client_id: clientId, sinceDateDays },
       });
       if (error) throw new Error(error.message);
       if (!data?.success && !data?.results) throw new Error(data?.error || 'Sync failed');
