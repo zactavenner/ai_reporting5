@@ -140,6 +140,7 @@ const Index = () => {
   const { data: pendingTasks = [] } = usePendingMeetingTasks();
   const syncMeetings = useSyncMeetings();
   const { testResults, isTesting, testAllClients, getClientStatus } = useApiConnectionTest();
+  const [syncingYesterday, setSyncingYesterday] = useState(false);
   const { data: allCreatives = [] } = useAllCreatives();
   const pendingCreatives = allCreatives.filter(c => c.status === 'pending');
 
@@ -310,15 +311,43 @@ const Index = () => {
                         <h2 className="text-lg font-bold">Client Summary</h2>
                         <p className="text-sm text-muted-foreground">Aggregated performance metrics by client</p>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => testAllClients(clientIds)}
-                        disabled={isTesting || clients.length === 0}
-                      >
-                        <Wifi className={`h-4 w-4 mr-2 ${isTesting ? 'animate-pulse' : ''}`} />
-                        {isTesting ? 'Testing...' : 'Test Connections'}
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            setSyncingYesterday(true);
+                            try {
+                              const yesterday = new Date();
+                              yesterday.setDate(yesterday.getDate() - 1);
+                              const startDate = yesterday.toISOString().split('T')[0];
+                              const { supabase } = await import('@/integrations/supabase/client');
+                              const { data, error } = await supabase.functions.invoke('sync-ghl-all-clients', {
+                                body: { sinceDateDays: 1 },
+                              });
+                              if (error) throw error;
+                              toast.success(`Syncing yesterday's data for all clients in the background.`);
+                            } catch (err: any) {
+                              toast.error(`Sync failed: ${err.message}`);
+                            } finally {
+                              setSyncingYesterday(false);
+                            }
+                          }}
+                          disabled={syncingYesterday || clients.length === 0}
+                        >
+                          <RefreshCw className={`h-4 w-4 mr-2 ${syncingYesterday ? 'animate-spin' : ''}`} />
+                          {syncingYesterday ? 'Syncing...' : 'Sync Yesterday'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => testAllClients(clientIds)}
+                          disabled={isTesting || clients.length === 0}
+                        >
+                          <Wifi className={`h-4 w-4 mr-2 ${isTesting ? 'animate-pulse' : ''}`} />
+                          {isTesting ? 'Testing...' : 'Test Connections'}
+                        </Button>
+                      </div>
                     </div>
                     {isLoading ? (
                       <div className="text-center py-8 text-muted-foreground">Loading clients...</div>
