@@ -164,6 +164,7 @@ export function InlineRecordsView({
   const [repFilter, setRepFilter] = useState<string>('all');
   const [isExportingToGHL, setIsExportingToGHL] = useState(false);
   const [isEnriching, setIsEnriching] = useState(false);
+  const [isSyncingGHL, setIsSyncingGHL] = useState(false);
   const queryClient = useQueryClient();
   const { syncContact, isSyncing } = useSingleContactSync();
   
@@ -225,6 +226,29 @@ export function InlineRecordsView({
       toast.error(`Enrichment failed: ${err.message || 'Unknown error'}`);
     } finally {
       setIsEnriching(false);
+    }
+  };
+
+  // GHL sync handler
+  const handleSyncGHL = async () => {
+    if (!clientId || isSyncingGHL) return;
+    setIsSyncingGHL(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-ghl-contacts', {
+        body: { client_id: clientId },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.success && !data?.results) throw new Error(data?.error || 'Sync failed');
+      const created = data?.results?.[0]?.contacts?.created || 0;
+      const updated = data?.results?.[0]?.contacts?.updated || 0;
+      toast.success(`GHL sync complete: ${created} created, ${updated} updated`);
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['calls'] });
+      queryClient.invalidateQueries({ queryKey: ['inline-enrichment', clientId] });
+    } catch (err: any) {
+      toast.error(`GHL sync failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsSyncingGHL(false);
     }
   };
 
@@ -1328,18 +1352,27 @@ export function InlineRecordsView({
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">Detailed Records</CardTitle>
               <div className="flex items-center gap-2">
-                {clientId && (
-                  <Button variant="outline" size="sm" onClick={openAddModal}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add {getTabLabel()}
+                {clientId && ghlLocationId && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSyncGHL}
+                    disabled={isSyncingGHL}
+                  >
+                    {isSyncingGHL ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Sync GHL
                   </Button>
                 )}
-                {clientId && unenrichedCount > 0 && (
+                {clientId && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleBulkEnrich}
-                    disabled={isEnriching}
+                    disabled={isEnriching || unenrichedCount === 0}
                     className="border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
                   >
                     {isEnriching ? (
@@ -1348,6 +1381,12 @@ export function InlineRecordsView({
                       <Zap className="h-4 w-4 mr-2" />
                     )}
                     Enrich ({unenrichedCount})
+                  </Button>
+                )}
+                {clientId && (
+                  <Button variant="outline" size="sm" onClick={openAddModal}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add {getTabLabel()}
                   </Button>
                 )}
                 {clientId && ghlLocationId && (
