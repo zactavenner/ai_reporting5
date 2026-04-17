@@ -5570,6 +5570,10 @@ export type Database = {
           lifetime_budget: number | null
           meta_adset_id: string
           meta_campaign_id: string | null
+          meta_reported_conversion_value: number | null
+          meta_reported_conversions: number | null
+          meta_reported_leads: number | null
+          meta_reported_purchases: number | null
           name: string
           optimization_goal: string | null
           reach: number | null
@@ -5609,6 +5613,10 @@ export type Database = {
           lifetime_budget?: number | null
           meta_adset_id: string
           meta_campaign_id?: string | null
+          meta_reported_conversion_value?: number | null
+          meta_reported_conversions?: number | null
+          meta_reported_leads?: number | null
+          meta_reported_purchases?: number | null
           name: string
           optimization_goal?: string | null
           reach?: number | null
@@ -5648,6 +5656,10 @@ export type Database = {
           lifetime_budget?: number | null
           meta_adset_id?: string
           meta_campaign_id?: string | null
+          meta_reported_conversion_value?: number | null
+          meta_reported_conversions?: number | null
+          meta_reported_leads?: number | null
+          meta_reported_purchases?: number | null
           name?: string
           optimization_goal?: string | null
           reach?: number | null
@@ -5716,6 +5728,10 @@ export type Database = {
           meta_ad_id: string
           meta_adset_id: string | null
           meta_campaign_id: string | null
+          meta_reported_conversion_value: number | null
+          meta_reported_conversions: number | null
+          meta_reported_leads: number | null
+          meta_reported_purchases: number | null
           name: string
           preview_url: string | null
           reach: number | null
@@ -5760,6 +5776,10 @@ export type Database = {
           meta_ad_id: string
           meta_adset_id?: string | null
           meta_campaign_id?: string | null
+          meta_reported_conversion_value?: number | null
+          meta_reported_conversions?: number | null
+          meta_reported_leads?: number | null
+          meta_reported_purchases?: number | null
           name: string
           preview_url?: string | null
           reach?: number | null
@@ -5804,6 +5824,10 @@ export type Database = {
           meta_ad_id?: string
           meta_adset_id?: string | null
           meta_campaign_id?: string | null
+          meta_reported_conversion_value?: number | null
+          meta_reported_conversions?: number | null
+          meta_reported_leads?: number | null
+          meta_reported_purchases?: number | null
           name?: string
           preview_url?: string | null
           reach?: number | null
@@ -5918,6 +5942,10 @@ export type Database = {
           impressions: number | null
           lifetime_budget: number | null
           meta_campaign_id: string
+          meta_reported_conversion_value: number | null
+          meta_reported_conversions: number | null
+          meta_reported_leads: number | null
+          meta_reported_purchases: number | null
           name: string
           objective: string | null
           spend: number | null
@@ -5952,6 +5980,10 @@ export type Database = {
           impressions?: number | null
           lifetime_budget?: number | null
           meta_campaign_id: string
+          meta_reported_conversion_value?: number | null
+          meta_reported_conversions?: number | null
+          meta_reported_leads?: number | null
+          meta_reported_purchases?: number | null
           name: string
           objective?: string | null
           spend?: number | null
@@ -5986,6 +6018,10 @@ export type Database = {
           impressions?: number | null
           lifetime_budget?: number | null
           meta_campaign_id?: string
+          meta_reported_conversion_value?: number | null
+          meta_reported_conversions?: number | null
+          meta_reported_leads?: number | null
+          meta_reported_purchases?: number | null
           name?: string
           objective?: string | null
           spend?: number | null

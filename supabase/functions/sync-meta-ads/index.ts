@@ -758,6 +758,48 @@ Deno.serve(async (req) => {
 
       // ── 5. Fetch Per-Entity Insights with attribution windows ──
       const attrWindowsParam = encodeURIComponent('["7d_click","1d_view"]');
+
+      // Helper: extract Meta-reported conversion metrics from actions/action_values arrays
+      const LEAD_TYPES = new Set([
+        "lead",
+        "leadgen.other",
+        "offsite_conversion.fb_pixel_lead",
+        "onsite_conversion.lead_grouped",
+        "onsite_web_lead",
+      ]);
+      const PURCHASE_TYPES = new Set([
+        "purchase",
+        "offsite_conversion.fb_pixel_purchase",
+        "onsite_conversion.purchase",
+        "omni_purchase",
+      ]);
+      function extractMetaReported(actions: any[] | undefined, actionValues: any[] | undefined) {
+        let leads = 0, purchases = 0, conversions = 0, conversionValue = 0;
+        for (const a of actions || []) {
+          const t = a.action_type;
+          const v = Number(a.value) || 0;
+          if (LEAD_TYPES.has(t)) leads += v;
+          if (PURCHASE_TYPES.has(t)) purchases += v;
+          // Treat any "offsite_conversion" or "onsite_conversion" or core conversion event as a conversion
+          if (
+            LEAD_TYPES.has(t) ||
+            PURCHASE_TYPES.has(t) ||
+            t === "complete_registration" ||
+            t === "offsite_conversion.fb_pixel_complete_registration" ||
+            t === "submit_application" ||
+            t === "schedule"
+          ) {
+            conversions += v;
+          }
+        }
+        for (const av of actionValues || []) {
+          const t = av.action_type;
+          const v = Number(av.value) || 0;
+          if (PURCHASE_TYPES.has(t) || LEAD_TYPES.has(t)) conversionValue += v;
+        }
+        return { leads, purchases, conversions, conversionValue };
+      }
+
       try {
         const insightsFields = "campaign_id,impressions,clicks,spend,ctr,cpc,cpm,actions,action_values";
         checkCallBudget("campaign-insights");
@@ -766,6 +808,7 @@ Deno.serve(async (req) => {
           accessToken, 50, "campaign-insights"
         );
         for (const ins of insights) {
+          const m = extractMetaReported(ins.actions, ins.action_values);
           await supabase.from("meta_campaigns").update({
             spend: Number(ins.spend) || 0,
             impressions: Number(ins.impressions) || 0,
@@ -773,6 +816,10 @@ Deno.serve(async (req) => {
             ctr: Number(ins.ctr) || 0,
             cpc: Number(ins.cpc) || 0,
             cpm: Number(ins.cpm) || 0,
+            meta_reported_leads: m.leads,
+            meta_reported_purchases: m.purchases,
+            meta_reported_conversions: m.conversions,
+            meta_reported_conversion_value: m.conversionValue,
           }).eq("client_id", clientId).eq("meta_campaign_id", ins.campaign_id);
         }
 
@@ -782,6 +829,7 @@ Deno.serve(async (req) => {
           accessToken, 50, "adset-insights"
         );
         for (const ins of adSetInsights) {
+          const m = extractMetaReported(ins.actions, ins.action_values);
           await supabase.from("meta_ad_sets").update({
             spend: Number(ins.spend) || 0,
             impressions: Number(ins.impressions) || 0,
@@ -791,27 +839,36 @@ Deno.serve(async (req) => {
             cpm: Number(ins.cpm) || 0,
             reach: Number(ins.reach) || 0,
             frequency: Number(ins.frequency) || 0,
+            meta_reported_leads: m.leads,
+            meta_reported_purchases: m.purchases,
+            meta_reported_conversions: m.conversions,
+            meta_reported_conversion_value: m.conversionValue,
           }).eq("client_id", clientId).eq("meta_adset_id", ins.adset_id);
         }
 
-        // Ad-level insights in 7-day chunks
+        // Ad-level insights in 7-day chunks (now includes actions for Meta-reported conversions)
         const adChunks = getDateChunks(startDate, endDate, 7, accountTz);
-        const adSpendAccum = new Map<string, { spend: number; impressions: number; clicks: number; ctr: number; cpc: number; cpm: number; reach: number; conversions: number; costPerConversion: number }>();
+        const adSpendAccum = new Map<string, { spend: number; impressions: number; clicks: number; reach: number; leads: number; purchases: number; conversions: number; conversionValue: number }>();
 
         for (const chunk of adChunks) {
           checkCallBudget("ad-insights-chunk");
           const chunkTimeRange = `time_range={"since":"${chunk.since}","until":"${chunk.until}"}`;
           try {
             const adInsights = await fetchAllPages(
-              `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,ctr,cpc,cpm,reach&level=ad&${chunkTimeRange}&time_increment=all_days&action_attribution_windows=${attrWindowsParam}&filtering=[{"field":"spend","operator":"GREATER_THAN","value":"0"}]`,
+              `${META_GRAPH_API_URL}/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,ctr,cpc,cpm,reach,actions,action_values&level=ad&${chunkTimeRange}&time_increment=all_days&action_attribution_windows=${attrWindowsParam}&filtering=[{"field":"spend","operator":"GREATER_THAN","value":"0"}]`,
               accessToken, 50, `ad-insights ${chunk.since}-${chunk.until}`
             );
             for (const ins of adInsights) {
-              const existing = adSpendAccum.get(ins.ad_id) || { spend: 0, impressions: 0, clicks: 0, ctr: 0, cpc: 0, cpm: 0, reach: 0, conversions: 0, costPerConversion: 0 };
+              const existing = adSpendAccum.get(ins.ad_id) || { spend: 0, impressions: 0, clicks: 0, reach: 0, leads: 0, purchases: 0, conversions: 0, conversionValue: 0 };
               existing.spend += Number(ins.spend) || 0;
               existing.impressions += Number(ins.impressions) || 0;
               existing.clicks += Number(ins.clicks) || 0;
               existing.reach += Number(ins.reach) || 0;
+              const m = extractMetaReported(ins.actions, ins.action_values);
+              existing.leads += m.leads;
+              existing.purchases += m.purchases;
+              existing.conversions += m.conversions;
+              existing.conversionValue += m.conversionValue;
               adSpendAccum.set(ins.ad_id, existing);
             }
           } catch (chunkErr) {
@@ -832,6 +889,10 @@ Deno.serve(async (req) => {
             cpc: Math.round(cpc * 100) / 100,
             cpm: Math.round(cpm * 100) / 100,
             reach: stats.reach,
+            meta_reported_leads: stats.leads,
+            meta_reported_purchases: stats.purchases,
+            meta_reported_conversions: stats.conversions,
+            meta_reported_conversion_value: stats.conversionValue,
           }).eq("client_id", clientId).eq("meta_ad_id", adId);
         }
       } catch (insightErr) {

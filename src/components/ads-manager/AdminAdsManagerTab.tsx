@@ -10,14 +10,19 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import {
-  RefreshCw, Search, Filter, Image as ImageIcon, Video, Play, Pause,
+  RefreshCw, Search, Image as ImageIcon, Video, Play,
   TrendingUp, MousePointerClick, Eye, DollarSign, Target, ExternalLink,
-  CheckCircle, AlertCircle, Layers, Megaphone, FileImage, ChevronRight
+  Layers, Megaphone, FileImage, ChevronRight, Calendar as CalIcon, Plus, Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { CreateAdDialog } from './CreateAdDialog';
+import { CreateCampaignDialog } from './CreateCampaignDialog';
+import { AdHDPreviewDialog } from './AdHDPreviewDialog';
 
 const fmt$ = (v: number | null | undefined) =>
   !v ? '$0' : `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -38,6 +43,25 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [selectedAdSetId, setSelectedAdSetId] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({ from: subDays(new Date(), 30), to: new Date() });
+  const [datePreset, setDatePreset] = useState<string>('30d');
+  const [createCampaignOpen, setCreateCampaignOpen] = useState(false);
+  const [createAdContext, setCreateAdContext] = useState<{ adSetId: string; name: string } | null>(null);
+  const [previewAd, setPreviewAd] = useState<any | null>(null);
+
+  const applyPreset = (preset: string) => {
+    setDatePreset(preset);
+    const today = new Date();
+    if (preset === '7d') setDateRange({ from: subDays(today, 7), to: today });
+    else if (preset === '14d') setDateRange({ from: subDays(today, 14), to: today });
+    else if (preset === '30d') setDateRange({ from: subDays(today, 30), to: today });
+    else if (preset === '90d') setDateRange({ from: subDays(today, 90), to: today });
+    else if (preset === 'mtd') setDateRange({ from: startOfMonth(today), to: today });
+    else if (preset === 'last-month') {
+      const lm = subMonths(today, 1);
+      setDateRange({ from: startOfMonth(lm), to: endOfMonth(lm) });
+    }
+  };
 
   // Cached campaigns
   const { data: campaigns = [], isLoading: cLoading } = useQuery({
@@ -91,7 +115,11 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
     toast.loading(`Syncing Meta Ads for ${clientName}…`, { id: `sync-${clientId}` });
     try {
       const { data, error } = await supabase.functions.invoke('sync-meta-ads', {
-        body: { clientId },
+        body: {
+          clientId,
+          startDate: format(dateRange.from, 'yyyy-MM-dd'),
+          endDate: format(dateRange.to, 'yyyy-MM-dd'),
+        },
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Sync failed');
