@@ -200,12 +200,12 @@ export function TopPerformerUploadsSection() {
                   {u.file_type}
                 </Badge>
                 {u.transcription_status === 'processing' && (
-                  <Badge className="absolute top-2 right-2 text-[9px] gap-1 bg-blue-500/90">
+                  <Badge className="absolute top-2 right-2 text-[9px] gap-1 bg-primary/90 text-primary-foreground">
                     <Loader2 className="h-2.5 w-2.5 animate-spin" />transcribing
                   </Badge>
                 )}
                 {u.transcription_status === 'completed' && (
-                  <Badge className="absolute top-2 right-2 text-[9px] gap-1 bg-green-600/90">
+                  <Badge className="absolute top-2 right-2 text-[9px] gap-1 bg-chart-2/90 text-primary-foreground">
                     <FileText className="h-2.5 w-2.5" />script
                   </Badge>
                 )}
