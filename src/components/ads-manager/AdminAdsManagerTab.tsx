@@ -115,7 +115,11 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
     toast.loading(`Syncing Meta Ads for ${clientName}…`, { id: `sync-${clientId}` });
     try {
       const { data, error } = await supabase.functions.invoke('sync-meta-ads', {
-        body: { clientId },
+        body: {
+          clientId,
+          startDate: format(dateRange.from, 'yyyy-MM-dd'),
+          endDate: format(dateRange.to, 'yyyy-MM-dd'),
+        },
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Sync failed');
