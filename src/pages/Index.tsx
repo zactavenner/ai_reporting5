@@ -357,8 +357,7 @@ const Index = () => {
                         <p className="text-sm text-muted-foreground">Add a client to start tracking metrics</p>
                       </div>
                     ) : (
-                      <>
-                        <SyncHealthBanner />
+                       <>
                         <AgencyStatsBar
                           clients={clients}
                           clientMRRSettings={clientMRRSettings}
