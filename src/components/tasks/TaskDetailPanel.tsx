@@ -164,13 +164,54 @@ import { toast } from 'sonner';
      return lookup;
    }, [agencyMembers]);
    
-   const timeline = useMemo<TimelineEntry[]>(() => {
+  const timeline = useMemo<TimelineEntry[]>(() => {
      const entries: TimelineEntry[] = [
        ...comments.map(c => ({ type: 'comment' as const, data: c, timestamp: new Date(c.created_at) })),
        ...history.map(h => ({ type: 'history' as const, data: h, timestamp: new Date(h.created_at) })),
      ];
+
+     // Always inject a synthetic "created" entry from the task itself so authorship is visible
+     if (task?.created_at) {
+       const hasCreated = history.some(h => h.action === 'created');
+       if (!hasCreated) {
+         entries.push({
+           type: 'history' as const,
+           data: {
+             id: `synthetic-created-${task.id}`,
+             task_id: task.id,
+             action: 'created',
+             old_value: null,
+             new_value: null,
+             changed_by: task.created_by || null,
+             created_at: task.created_at,
+           } as TaskHistory,
+           timestamp: new Date(task.created_at),
+         });
+       }
+     }
+
+     // Inject a synthetic "completed" entry when the task is completed
+     if (task?.completed_at) {
+       const hasCompleted = history.some(h => h.action === 'completed');
+       if (!hasCompleted) {
+         entries.push({
+           type: 'history' as const,
+           data: {
+             id: `synthetic-completed-${task.id}`,
+             task_id: task.id,
+             action: 'completed',
+             old_value: null,
+             new_value: null,
+             changed_by: null,
+             created_at: task.completed_at,
+           } as TaskHistory,
+           timestamp: new Date(task.completed_at),
+         });
+       }
+     }
+
      return entries.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-   }, [comments, history]);
+   }, [comments, history, task?.id, task?.created_at, task?.created_by, task?.completed_at]);
    
   const getAuthorName = useCallback(() => {
     if (isPublicView) return task?.assigned_client_name || 'Client';
