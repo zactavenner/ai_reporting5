@@ -7685,6 +7685,72 @@ export type Database = {
           },
         ]
       }
+      top_performer_uploads: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          file_type: string
+          file_url: string
+          id: string
+          mime_type: string | null
+          name: string
+          notes: string | null
+          size_bytes: number | null
+          storage_path: string | null
+          thumbnail_url: string | null
+          transcript: string | null
+          transcription_status: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          file_type?: string
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          name: string
+          notes?: string | null
+          size_bytes?: number | null
+          storage_path?: string | null
+          thumbnail_url?: string | null
+          transcript?: string | null
+          transcription_status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          file_type?: string
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          name?: string
+          notes?: string | null
+          size_bytes?: number | null
+          storage_path?: string | null
+          thumbnail_url?: string | null
+          transcript?: string | null
+          transcription_status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "top_performer_uploads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "top_performer_uploads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_projects: {
         Row: {
           aspect_ratio: string | null

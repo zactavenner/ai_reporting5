@@ -72,6 +72,7 @@ import { AvatarAdWizard } from '@/components/avatar-ad/AvatarAdWizard';
 const StaticCreativesInline = lazy(() => import('@/pages/StaticCreativesPage'));
 const AvatarAdGenInline = lazy(() => Promise.resolve({ default: () => <AvatarAdProvider><AvatarAdWizard /></AvatarAdProvider> }));
 import { TopPerformersSection } from '@/components/creative/TopPerformersSection';
+import { TopPerformerUploadsSection } from '@/components/creative/TopPerformerUploadsSection';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -511,6 +512,9 @@ const Index = () => {
                   <p className="text-sm text-muted-foreground">Best performing creatives across all clients</p>
                 </div>
                 <TopPerformersSection clients={clients} />
+                <div className="mt-8">
+                  <TopPerformerUploadsSection />
+                </div>
               </SectionErrorBoundary>
             )}
 
