@@ -927,6 +927,7 @@ function MetaStatusCell({
 }) {
   const [adAccountId, setAdAccountId] = useState(client.meta_ad_account_id || '');
   const [accessToken, setAccessToken] = useState(client.meta_access_token || '');
+  const [bmUrl, setBmUrl] = useState(client.business_manager_url || '');
   const [open, setOpen] = useState(false);
   const updateClient = useUpdateClient();
 
@@ -940,7 +941,8 @@ function MetaStatusCell({
         id: client.id,
         meta_ad_account_id: adAccountId || null,
         meta_access_token: accessToken || null,
-      });
+        business_manager_url: bmUrl || null,
+      } as any);
       toast.success('Meta settings updated');
       setOpen(false);
     } catch {
@@ -984,6 +986,20 @@ function MetaStatusCell({
       <PopoverContent className="w-72 p-3" side="left" align="start" onClick={(e) => e.stopPropagation()}>
         <div className="space-y-3">
           <h4 className="font-medium text-xs">Meta Integration — {client.name}</h4>
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground font-medium">Business Manager URL</label>
+            <Input
+              value={bmUrl}
+              onChange={(e) => {
+                const url = e.target.value;
+                setBmUrl(url);
+                const m = url.match(/(?:act[=\/]|act_|account_id=)(\d+)/);
+                if (m && m[1] && !adAccountId) setAdAccountId(m[1]);
+              }}
+              placeholder="https://business.facebook.com/..."
+              className="h-7 text-xs"
+            />
+          </div>
           <div className="space-y-1.5">
             <label className="text-[11px] text-muted-foreground font-medium">Ad Account ID</label>
             <Input
