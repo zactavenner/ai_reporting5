@@ -30,6 +30,7 @@ import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
 import { AgencyBillingTab } from '@/components/billing/AgencyBillingTab';
 import { DealPipelineBoard } from '@/components/deals/DealPipelineBoard';
 import { DataHealthCard } from '@/components/dashboard/DataHealthCard';
+import { DataIntegrityBanner } from '@/components/dashboard/DataIntegrityBanner';
 import { AgencyIntegrationsTab } from '@/components/settings/AgencyIntegrationsTab';
 import { IntegrationStatusCards } from '@/components/dashboard/IntegrationStatusCards';
 import { Button } from '@/components/ui/button';
@@ -329,6 +330,11 @@ const Index = () => {
                       </div>
                     ) : (
                       <>
+                        <DataIntegrityBanner
+                          clients={clients}
+                          metrics={clientMetrics}
+                          fullSettings={clientFullSettings}
+                        />
                         <AgencyStatsBar
                           clients={clients}
                           clientMRRSettings={clientMRRSettings}

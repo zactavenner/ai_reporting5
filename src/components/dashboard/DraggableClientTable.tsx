@@ -594,8 +594,23 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* Meta Leads (valid non-spam with email+phone) */}
-                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {m.totalLeads || 0}
+                    <TableCell className={cn(
+                      "text-right font-mono tabular-nums text-[11px] py-0 px-1",
+                      (m.crmLeads || 0) > 0 && (m.totalLeads || 0) === 0 && 'text-yellow-600 dark:text-yellow-500'
+                    )}>
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.totalLeads || 0}
+                        {(m.crmLeads || 0) > 0 && (m.totalLeads || 0) === 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-2.5 w-2.5 text-yellow-600 dark:text-yellow-500 shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-[220px]">
+                              {m.crmLeads} CRM leads exist but none have both email &amp; phone — check lead form fields
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                     </TableCell>
 
                     {/* CRM Leads (all leads from GHL/CRM — should be ≥ Meta Leads) */}
@@ -680,7 +695,19 @@ export function DraggableClientTable({
                       "text-right font-mono tabular-nums text-[11px] py-0 px-1",
                       (m.totalCalls || 0) > 0 && (m.showedCalls || 0) === 0 && 'text-yellow-600 dark:text-yellow-500'
                     )}>
-                      {m.showedCalls || 0}
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.showedCalls || 0}
+                        {(m.totalCalls || 0) > 0 && (m.showedCalls || 0) === 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertCircle className="h-2.5 w-2.5 text-yellow-600 dark:text-yellow-500 shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-[220px]">
+                              {m.totalCalls} booked calls but 0 shows — check GHL appointment statuses are being updated to "showed" or "completed"
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                     </TableCell>
 
                     {/* Show Rate */}
