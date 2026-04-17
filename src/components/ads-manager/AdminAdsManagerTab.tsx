@@ -43,6 +43,25 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [selectedAdSetId, setSelectedAdSetId] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({ from: subDays(new Date(), 30), to: new Date() });
+  const [datePreset, setDatePreset] = useState<string>('30d');
+  const [createCampaignOpen, setCreateCampaignOpen] = useState(false);
+  const [createAdContext, setCreateAdContext] = useState<{ adSetId: string; name: string } | null>(null);
+  const [previewAd, setPreviewAd] = useState<any | null>(null);
+
+  const applyPreset = (preset: string) => {
+    setDatePreset(preset);
+    const today = new Date();
+    if (preset === '7d') setDateRange({ from: subDays(today, 7), to: today });
+    else if (preset === '14d') setDateRange({ from: subDays(today, 14), to: today });
+    else if (preset === '30d') setDateRange({ from: subDays(today, 30), to: today });
+    else if (preset === '90d') setDateRange({ from: subDays(today, 90), to: today });
+    else if (preset === 'mtd') setDateRange({ from: startOfMonth(today), to: today });
+    else if (preset === 'last-month') {
+      const lm = subMonths(today, 1);
+      setDateRange({ from: startOfMonth(lm), to: endOfMonth(lm) });
+    }
+  };
 
   // Cached campaigns
   const { data: campaigns = [], isLoading: cLoading } = useQuery({
