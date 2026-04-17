@@ -847,6 +847,22 @@ export function DraggableClientTable({
                         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onOpenSettings(client)}>
                           <Settings className="h-2.5 w-2.5" />
                         </Button>
+                        {client.business_manager_url && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5"
+                                onClick={(e) => openAdsManager(e, client.business_manager_url)}
+                                title="Open Business Manager"
+                              >
+                                <BarChart3 className="h-2.5 w-2.5 text-chart-2" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-[10px]">Business Manager</TooltipContent>
+                          </Tooltip>
+                        )}
                         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => client.public_token && copyPublicLink(client.public_token)}>
                           <Copy className="h-2.5 w-2.5" />
                         </Button>
