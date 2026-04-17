@@ -10,14 +10,19 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import {
-  RefreshCw, Search, Filter, Image as ImageIcon, Video, Play, Pause,
+  RefreshCw, Search, Image as ImageIcon, Video, Play,
   TrendingUp, MousePointerClick, Eye, DollarSign, Target, ExternalLink,
-  CheckCircle, AlertCircle, Layers, Megaphone, FileImage, ChevronRight
+  Layers, Megaphone, FileImage, ChevronRight, Calendar as CalIcon, Plus, Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { CreateAdDialog } from './CreateAdDialog';
+import { CreateCampaignDialog } from './CreateCampaignDialog';
+import { AdHDPreviewDialog } from './AdHDPreviewDialog';
 
 const fmt$ = (v: number | null | undefined) =>
   !v ? '$0' : `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
