@@ -164,13 +164,54 @@ import { toast } from 'sonner';
      return lookup;
    }, [agencyMembers]);
    
-   const timeline = useMemo<TimelineEntry[]>(() => {
+  const timeline = useMemo<TimelineEntry[]>(() => {
      const entries: TimelineEntry[] = [
        ...comments.map(c => ({ type: 'comment' as const, data: c, timestamp: new Date(c.created_at) })),
        ...history.map(h => ({ type: 'history' as const, data: h, timestamp: new Date(h.created_at) })),
      ];
+
+     // Always inject a synthetic "created" entry from the task itself so authorship is visible
+     if (task?.created_at) {
+       const hasCreated = history.some(h => h.action === 'created');
+       if (!hasCreated) {
+         entries.push({
+           type: 'history' as const,
+           data: {
+             id: `synthetic-created-${task.id}`,
+             task_id: task.id,
+             action: 'created',
+             old_value: null,
+             new_value: null,
+             changed_by: task.created_by || null,
+             created_at: task.created_at,
+           } as TaskHistory,
+           timestamp: new Date(task.created_at),
+         });
+       }
+     }
+
+     // Inject a synthetic "completed" entry when the task is completed
+     if (task?.completed_at) {
+       const hasCompleted = history.some(h => h.action === 'completed');
+       if (!hasCompleted) {
+         entries.push({
+           type: 'history' as const,
+           data: {
+             id: `synthetic-completed-${task.id}`,
+             task_id: task.id,
+             action: 'completed',
+             old_value: null,
+             new_value: null,
+             changed_by: null,
+             created_at: task.completed_at,
+           } as TaskHistory,
+           timestamp: new Date(task.completed_at),
+         });
+       }
+     }
+
      return entries.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-   }, [comments, history]);
+   }, [comments, history, task?.id, task?.created_at, task?.created_by, task?.completed_at]);
    
   const getAuthorName = useCallback(() => {
     if (isPublicView) return task?.assigned_client_name || 'Client';
@@ -675,14 +716,38 @@ const getHistoryIcon = (action: string) => {
          <SheetContent className="w-full sm:max-w-xl p-0 flex flex-col">
             <SheetHeader className="p-6 pb-4 border-b flex-shrink-0">
               <div className="space-y-3">
-                <div className="min-w-0">
-                   <SheetTitle className="text-lg font-semibold leading-tight w-[80%]">
-                     {task.title}
-                   </SheetTitle>
-                  {clientName && (
-                    <p className="text-sm text-muted-foreground mt-1">Client: {clientName}</p>
+              <div className="min-w-0">
+                 <SheetTitle className="text-lg font-semibold leading-tight w-[80%]">
+                   {task.title}
+                 </SheetTitle>
+                {clientName && (
+                  <p className="text-sm text-muted-foreground mt-1">Client: {clientName}</p>
+                )}
+                <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-xs text-muted-foreground mt-1">
+                  {task.created_at && (
+                    <span>
+                      Created{task.created_by ? <> by <span className="font-medium text-foreground">{getDisplayAuthorName(task.created_by)}</span></> : ''} · {format(new Date(task.created_at), 'MMM d, yyyy h:mm a')}
+                    </span>
+                  )}
+                  {task.completed_at && (
+                    <span>
+                      Completed · <span className="font-medium text-foreground">{format(new Date(task.completed_at), 'MMM d, yyyy h:mm a')}</span>
+                      {task.created_at && (() => {
+                        const ms = new Date(task.completed_at).getTime() - new Date(task.created_at).getTime();
+                        if (ms <= 0) return null;
+                        const days = Math.floor(ms / 86400000);
+                        const hours = Math.floor((ms % 86400000) / 3600000);
+                        const mins = Math.floor((ms % 3600000) / 60000);
+                        const parts = [];
+                        if (days) parts.push(`${days}d`);
+                        if (hours) parts.push(`${hours}h`);
+                        if (!days && mins) parts.push(`${mins}m`);
+                        return parts.length ? <> ({parts.join(' ')})</> : null;
+                      })()}
+                    </span>
                   )}
                 </div>
+              </div>
                 <div className="flex items-center gap-2 flex-wrap">
                    {!isPublicView && (
                      <Button
