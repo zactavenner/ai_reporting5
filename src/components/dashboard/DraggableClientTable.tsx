@@ -93,19 +93,13 @@ function getClientSyncStatus(client: Client): {
     const ghlSyncStatus = client.ghl_sync_status;
     const lastGhlSyncAt = client.last_ghl_sync_at;
     const ghlSyncError = client.ghl_sync_error;
-    if (ghlSyncStatus) {
-      // Override "healthy" to "stale" if last sync was >24 hours ago
-      let effectiveStatus = ghlSyncStatus as 'healthy' | 'stale' | 'error' | 'not_configured';
-      if (effectiveStatus === 'healthy' && lastGhlSyncAt) {
-        const hoursSince = (Date.now() - new Date(lastGhlSyncAt).getTime()) / (1000 * 60 * 60);
-        if (hoursSince > 24) effectiveStatus = 'stale';
-      }
-      return {
-        status: effectiveStatus,
-        lastSyncAt: lastGhlSyncAt,
-        error: ghlSyncError,
-        source: 'ghl',
-      };
+    if (ghlSyncStatus === 'error') {
+      return { status: 'error', lastSyncAt: lastGhlSyncAt, error: ghlSyncError, source: 'ghl' };
+    }
+    if (lastGhlSyncAt) {
+      const hoursSince = (Date.now() - new Date(lastGhlSyncAt).getTime()) / (1000 * 60 * 60);
+      const effectiveStatus = hoursSince <= 26 ? 'healthy' : hoursSince <= 72 ? 'stale' : 'error';
+      return { status: effectiveStatus, lastSyncAt: lastGhlSyncAt, error: ghlSyncError, source: 'ghl' };
     }
     return { status: 'stale', lastSyncAt: null, error: null, source: 'ghl' };
   }
@@ -404,7 +398,7 @@ export function DraggableClientTable({
               <TableHead className="font-bold text-[11px] py-0 px-1 text-center min-w-[80px]">AM</TableHead>
               <SortableHeader column="adSpend" label="Spend" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="dailyTarget" label="$/Day" sortConfig={sortConfig} onSort={handleSort} />
-              <SortableHeader column="metaLeads" label="Meta Leads" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="metaLeads" label="Leads" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="crmLeads" label="CRM Leads" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="cpl" label="CPL" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="calls" label="Booked" sortConfig={sortConfig} onSort={handleSort} />
@@ -593,12 +587,12 @@ export function DraggableClientTable({
                       {computed.dailyTarget > 0 ? formatCurrency(computed.dailyTarget * numberOfDays) : <span className="text-muted-foreground">-</span>}
                     </TableCell>
 
-                    {/* Meta Leads (valid non-spam with email+phone) */}
+                    {/* Leads (non-spam) */}
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
                       {m.totalLeads || 0}
                     </TableCell>
 
-                    {/* CRM Leads (all leads from GHL/CRM — should be ≥ Meta Leads) */}
+                    {/* CRM Leads (all leads from GHL/CRM including spam) */}
                     <TableCell className={cn(
                       "text-right font-mono tabular-nums text-[11px] py-0 px-1",
                       (() => {

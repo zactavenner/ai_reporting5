@@ -29,6 +29,7 @@ import { AIAnalysisChat } from '@/components/ai/AIAnalysisChat';
 import { CashBagLoader } from '@/components/ui/CashBagLoader';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import { DataAuditSection } from '@/components/dashboard/DataAuditSection';
+import { SyncFreshnessBanner } from '@/components/dashboard/SyncFreshnessBanner';
 
 import { FunnelPreviewTab } from '@/components/funnel/FunnelPreviewTab';
 import { PipelineTab } from '@/components/pipeline/PipelineTab';
@@ -318,7 +319,15 @@ export default function ClientDetail() {
 
           {/* ─── PERFORMANCE TAB ─── */}
           <TabsContent value="performance" className="space-y-6">
-            
+
+            <SyncFreshnessBanner
+              clientId={clientId!}
+              clientName={client.name}
+              hasAdSpend={aggregatedMetrics.totalAdSpend > 0}
+              leadsCount={leads.length}
+              callsCount={calls.length}
+            />
+
             <Collapsible open={kpiOpen} onOpenChange={setKpiOpen}>
               <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
                 <h2 className="text-lg font-bold">Key Performance Indicators</h2>

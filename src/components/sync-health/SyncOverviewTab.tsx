@@ -176,7 +176,7 @@ export function SyncOverviewTab() {
   clients.forEach(c => {
     const s = settingsMap.get(c.id);
     const metaStatus = getTimeStatus(s?.meta_ads_last_sync, !!(c as any).meta_ad_account_id);
-    const ghlStatus = c.ghl_sync_status === 'error' ? 'error' : getTimeStatus(c.last_ghl_sync_at, !!(c.ghl_location_id && c.ghl_api_key), 4);
+    const ghlStatus = c.ghl_sync_status === 'error' ? 'error' : getTimeStatus(c.last_ghl_sync_at, !!(c.ghl_location_id && c.ghl_api_key), 26);
 
     if (metaStatus === 'healthy') stats.metaHealthy++;
     else if (metaStatus === 'stale') stats.metaStale++;
@@ -287,7 +287,7 @@ export function SyncOverviewTab() {
                 {clients.map((c, i) => {
                   const s = settingsMap.get(c.id);
                   const metaStatus = getTimeStatus(s?.meta_ads_last_sync, !!(c as any).meta_ad_account_id);
-                  const ghlStatus = c.ghl_sync_status === 'error' ? 'error' : getTimeStatus(c.last_ghl_sync_at, !!(c.ghl_location_id && c.ghl_api_key), 4);
+                  const ghlStatus = c.ghl_sync_status === 'error' ? 'error' : getTimeStatus(c.last_ghl_sync_at, !!(c.ghl_location_id && c.ghl_api_key), 26);
                   const isFullyHealthy = metaStatus === 'healthy' && ghlStatus === 'healthy';
                   const hasIssue = metaStatus === 'error' || ghlStatus === 'error';
 
