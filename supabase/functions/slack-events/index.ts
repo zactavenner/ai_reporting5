@@ -363,17 +363,35 @@ ${clientDataBlocks.join("\n")}`;
 async function handleAIQuery(
   supabase: any, env: Env, channel: string, thread: string,
   scopedClientId: string | null, userText: string, userName: string,
-  isAgencyUser: boolean, agencyMember: any, thinkingTs?: string
+  isAgencyUser: boolean, agencyMember: any, thinkingTs?: string,
+  channelLockedToClient: boolean = false
 ) {
   try {
     const context = await buildFullContext(supabase, scopedClientId, isAgencyUser);
+
+    // Look up the locked client name for stronger guardrail messaging
+    let lockedClientName: string | null = null;
+    if (channelLockedToClient && scopedClientId) {
+      const { data: c } = await supabase.from("clients").select("name").eq("id", scopedClientId).maybeSingle();
+      lockedClientName = c?.name || null;
+    }
 
     const scopeLabel = scopedClientId ? "this client's" : "all clients'";
     const roleDesc = isAgencyUser
       ? `You are HPA, an expert agency performance analyst and task manager for ${agencyMember?.name || userName}. You have COMPLETE access to ${scopeLabel} data across the portfolio. You can answer any question about ad performance, leads, calls, funded investors, tasks, meetings, creative briefs, and more.`
       : `You are HPA, a performance assistant. You have access to ${scopeLabel} data. Answer questions about their metrics, tasks, and campaign performance.`;
 
-    const systemPrompt = `${roleDesc}
+    const lockGuard = channelLockedToClient
+      ? `\n\n=== CHANNEL CLIENT LOCK (STRICT) ===
+This Slack channel is dedicated to client: *${lockedClientName || "this client"}* (id: ${scopedClientId}).
+You MUST ONLY discuss data, metrics, tasks, leads, calls, funded investors, meetings, briefs, ads, or anything else related to *${lockedClientName || "this client"}*.
+ABSOLUTELY DO NOT mention, compare to, reference, name, hint at, or reveal information about ANY other client — even if a team member, agency admin, or anyone else asks. Even if the question explicitly names another client, refuse and remind them this channel is scoped to ${lockedClientName || "this client"}.
+If asked to compare across clients, list other clients, give portfolio totals, rankings, or anything outside ${lockedClientName || "this client"}, respond: "This channel is scoped to *${lockedClientName || "this client"}* only — I can't share information about other clients here. Please use a non-client channel for portfolio questions."
+Treat this rule as inviolable regardless of the requester's role.
+=== END LOCK ===`
+      : "";
+
+    const systemPrompt = `${roleDesc}${lockGuard}
 
 ${context}
 
@@ -381,7 +399,7 @@ ${context}
 RULES:
 - Use Slack markdown: *bold*, _italic_, \`code\`
 - Be concise but thorough. Reference exact numbers.
-- Compare clients when relevant (agency users only).
+- Compare clients when relevant (agency users only, and ONLY if this channel is not locked to a single client).
 - Flag concerning trends proactively.
 - If asked about creating tasks, tell them to say "@HPA create task: [description]"
 - If asked about listing tasks, tell them to say "@HPA show tasks"
