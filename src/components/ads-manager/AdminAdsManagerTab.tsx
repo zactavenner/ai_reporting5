@@ -23,6 +23,7 @@ import { format, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { CreateAdDialog } from './CreateAdDialog';
 import { CreateCampaignDialog } from './CreateCampaignDialog';
 import { AdHDPreviewDialog } from './AdHDPreviewDialog';
+import { Switch } from '@/components/ui/switch';
 
 const fmt$ = (v: number | null | undefined) =>
   !v ? '$0' : `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -344,6 +345,7 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                     <TableHeader className="sticky top-0 bg-card z-10">
                       <TableRow>
                         <TableHead className="w-8"></TableHead>
+                        <TableHead className="w-[90px]">On/Off</TableHead>
                         <TableHead>Campaign</TableHead>
                         <TableHead>Client</TableHead>
                         <TableHead>Objective</TableHead>
@@ -376,6 +378,14 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                           onClick={() => { setSelectedCampaignId(c.id); setSelectedAdSetId(null); setActiveTab('adsets'); }}
                         >
                           <TableCell><StatusDot status={c.status} /></TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <MetaStatusToggle
+                              clientId={c.client_id}
+                              level="campaign"
+                              rowId={c.id}
+                              status={c.status}
+                            />
+                          </TableCell>
                           <TableCell className="font-medium text-sm max-w-[280px] truncate">{c.name}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{clientMap[c.client_id]?.name || '—'}</TableCell>
                           <TableCell><Badge variant="outline" className="text-[10px]">{c.objective || '—'}</Badge></TableCell>
@@ -413,6 +423,7 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                     <TableHeader className="sticky top-0 bg-card z-10">
                       <TableRow>
                         <TableHead className="w-8"></TableHead>
+                        <TableHead className="w-[90px]">On/Off</TableHead>
                         <TableHead>Ad Set</TableHead>
                         <TableHead>Optimization</TableHead>
                         <TableHead className="text-right">Daily Budget</TableHead>
@@ -434,6 +445,14 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                           onClick={() => { setSelectedAdSetId(a.id); setActiveTab('ads'); }}
                         >
                           <TableCell><StatusDot status={a.status} /></TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <MetaStatusToggle
+                              clientId={a.client_id}
+                              level="adset"
+                              rowId={a.id}
+                              status={a.status}
+                            />
+                          </TableCell>
                           <TableCell className="font-medium text-sm max-w-[260px] truncate">{a.name}</TableCell>
                           <TableCell><Badge variant="outline" className="text-[10px]">{a.optimization_goal || '—'}</Badge></TableCell>
                           <TableCell className="text-right text-xs">{a.daily_budget ? fmt$(Number(a.daily_budget) / 100) : '—'}</TableCell>
@@ -555,6 +574,74 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+function MetaStatusToggle({
+  clientId,
+  level,
+  rowId,
+  status,
+  size = 'sm',
+}: {
+  clientId: string;
+  level: 'campaign' | 'adset' | 'ad';
+  rowId: string;
+  status: string | null;
+  size?: 'sm' | 'md';
+}) {
+  const qc = useQueryClient();
+  const [pending, setPending] = useState(false);
+  const [localOn, setLocalOn] = useState((status || '').toUpperCase() === 'ACTIVE');
+
+  const handleToggle = async (next: boolean) => {
+    if (pending) return;
+    setPending(true);
+    const prev = localOn;
+    setLocalOn(next);
+    const toastId = `toggle-${level}-${rowId}`;
+    toast.loading(`${next ? 'Activating' : 'Pausing'} on Meta…`, { id: toastId });
+    try {
+      const { data, error } = await supabase.functions.invoke('toggle-meta-status', {
+        body: {
+          clientId,
+          level,
+          rowId,
+          status: next ? 'ACTIVE' : 'PAUSED',
+        },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Meta toggle failed');
+      toast.success(`${next ? 'Active' : 'Paused'} on Meta`, { id: toastId });
+      qc.invalidateQueries({ queryKey: ['admin-meta-campaigns'] });
+      qc.invalidateQueries({ queryKey: ['admin-meta-adsets'] });
+      qc.invalidateQueries({ queryKey: ['admin-meta-ads'] });
+    } catch (err: any) {
+      setLocalOn(prev);
+      toast.error(err?.message || 'Failed to update Meta status', { id: toastId });
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <div
+      className="inline-flex items-center gap-1.5"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Switch
+        checked={localOn}
+        disabled={pending}
+        onCheckedChange={handleToggle}
+        aria-label={localOn ? 'Pause on Meta' : 'Activate on Meta'}
+      />
+      <span className={cn(
+        "text-[10px] font-medium uppercase tracking-wide",
+        localOn ? "text-chart-2" : "text-muted-foreground"
+      )}>
+        {pending ? '…' : localOn ? 'On' : 'Off'}
+      </span>
+    </div>
+  );
+}
+
 function AdCard({ ad, clientName, onClick }: { ad: any; clientName?: string; onClick?: () => void }) {
   const thumb = ad.full_image_url || ad.image_url || ad.video_thumbnail_url || ad.thumbnail_url;
   const isVideo = ad.media_type === 'video' || !!ad.video_source_url;
@@ -585,6 +672,14 @@ function AdCard({ ad, clientName, onClick }: { ad: any; clientName?: string; onC
           <StatusDot status={ad.status} />
         </div>
         <div className="absolute top-2 right-2 flex items-center gap-1">
+          <div className="bg-background/90 backdrop-blur rounded-md px-1.5 py-1">
+            <MetaStatusToggle
+              clientId={ad.client_id}
+              level="ad"
+              rowId={ad.id}
+              status={ad.status}
+            />
+          </div>
           {downloadUrl && (
             <a
               href={downloadUrl}
