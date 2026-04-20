@@ -15,7 +15,7 @@ import { Calendar } from '@/components/ui/calendar';
 import {
   RefreshCw, Search, Image as ImageIcon, Video, Play,
   TrendingUp, MousePointerClick, Eye, DollarSign, Target, ExternalLink,
-  Layers, Megaphone, FileImage, ChevronRight, Calendar as CalIcon, Plus, Upload
+  Layers, Megaphone, FileImage, ChevronRight, Calendar as CalIcon, Plus, Upload, Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -556,11 +556,25 @@ function EmptyState({ message }: { message: string }) {
 }
 
 function AdCard({ ad, clientName, onClick }: { ad: any; clientName?: string; onClick?: () => void }) {
-  const thumb = ad.thumbnail_url || ad.image_url;
+  const thumb = ad.full_image_url || ad.image_url || ad.video_thumbnail_url || ad.thumbnail_url;
+  const isVideo = ad.media_type === 'video' || !!ad.video_source_url;
+  const downloadUrl = ad.video_source_url || ad.full_image_url || ad.image_url || null;
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={onClick}>
       <div className="aspect-square bg-muted relative overflow-hidden">
-        {thumb ? (
+        {isVideo && ad.video_source_url ? (
+          <video
+            src={ad.video_source_url}
+            poster={thumb || undefined}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            className="w-full h-full object-cover"
+            onMouseEnter={(e) => { (e.currentTarget as HTMLVideoElement).play().catch(() => {}); }}
+            onMouseLeave={(e) => { const v = e.currentTarget as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
+          />
+        ) : thumb ? (
           <img src={thumb} alt={ad.name} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -570,17 +584,33 @@ function AdCard({ ad, clientName, onClick }: { ad: any; clientName?: string; onC
         <div className="absolute top-2 left-2 flex items-center gap-1">
           <StatusDot status={ad.status} />
         </div>
-        {ad.preview_url && (
-          <a
-            href={ad.preview_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="absolute top-2 right-2 bg-background/90 backdrop-blur rounded-md p-1.5 hover:bg-background"
-            onClick={e => e.stopPropagation()}
-          >
-            <ExternalLink className="h-3 w-3" />
-          </a>
-        )}
+        <div className="absolute top-2 right-2 flex items-center gap-1">
+          {downloadUrl && (
+            <a
+              href={downloadUrl}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Download HD"
+              className="bg-background/90 backdrop-blur rounded-md p-1.5 hover:bg-background"
+              onClick={e => e.stopPropagation()}
+            >
+              <Download className="h-3 w-3" />
+            </a>
+          )}
+          {ad.preview_url && (
+            <a
+              href={ad.preview_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open in Meta"
+              className="bg-background/90 backdrop-blur rounded-md p-1.5 hover:bg-background"
+              onClick={e => e.stopPropagation()}
+            >
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
       </div>
       <div className="p-2.5 space-y-1.5">
         <p className="text-xs font-medium truncate" title={ad.name}>{ad.name}</p>
@@ -594,22 +624,12 @@ function AdCard({ ad, clientName, onClick }: { ad: any; clientName?: string; onC
           <span className="text-muted-foreground">CTR · CPC</span>
           <span className="font-semibold tabular-nums">{fmtPct(ad.ctr)} · {fmt$(ad.cpc)}</span>
         </div>
-        {(ad.meta_reported_leads > 0 || ad.attributed_leads > 0) && (
-          <div className="space-y-0.5">
-            {ad.meta_reported_leads > 0 && (
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-muted-foreground">Meta leads</span>
-                <span className="font-semibold tabular-nums text-primary">{fmtN(ad.meta_reported_leads)}</span>
-              </div>
-            )}
-            {ad.attributed_leads > 0 && (
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-muted-foreground">CRM leads · CPL</span>
-                <span className="font-semibold tabular-nums text-chart-2">{fmtN(ad.attributed_leads)} · {fmt$(ad.cost_per_lead)}</span>
-              </div>
-            )}
-          </div>
-        )}
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="text-muted-foreground">Leads · CPL</span>
+          <span className="font-semibold tabular-nums text-chart-2">
+            {fmtN(ad.attributed_leads || ad.meta_reported_leads || 0)} · {fmt$(ad.cost_per_lead)}
+          </span>
+        </div>
       </div>
     </Card>
   );
