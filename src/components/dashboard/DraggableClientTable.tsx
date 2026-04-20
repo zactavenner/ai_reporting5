@@ -743,46 +743,8 @@ export function DraggableClientTable({
 
                     {/* CRM Status */}
                     <TableCell className="text-center py-0 px-1">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="inline-flex">
-                              {syncInfo.status === 'healthy' && (
-                                <Badge variant="success" className="text-[9px] px-1 py-0 h-4">
-                                  {syncInfo.source === 'hubspot' ? 'HS' : 'GHL'}
-                                </Badge>
-                              )}
-                              {syncInfo.status === 'stale' && (
-                                <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
-                                  Old
-                                </Badge>
-                              )}
-                              {syncInfo.status === 'error' && (
-                                <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4">
-                                  {syncInfo.source === 'hubspot' ? 'HS' : syncInfo.source === 'ghl' ? 'GHL' : 'ERR'}
-                                </Badge>
-                              )}
-                              {syncInfo.status === 'not_configured' && (
-                                <span className="text-muted-foreground text-[9px]">—</span>
-                              )}
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="text-xs max-w-[200px]">
-                            {syncInfo.status === 'healthy' && (
-                              <span>✅ {syncInfo.source === 'hubspot' ? 'HubSpot' : 'GHL'} synced {syncInfo.lastSyncAt ? formatDistanceToNow(new Date(syncInfo.lastSyncAt), { addSuffix: true }) : ''}</span>
-                            )}
-                            {syncInfo.status === 'stale' && (
-                              <span>⚠️ Last sync: {syncInfo.lastSyncAt ? formatDistanceToNow(new Date(syncInfo.lastSyncAt), { addSuffix: true }) : 'unknown'}</span>
-                            )}
-                            {syncInfo.status === 'error' && (
-                              <span>🔴 {syncInfo.error || (syncInfo.lastSyncAt ? `Last sync ${formatDistanceToNow(new Date(syncInfo.lastSyncAt), { addSuffix: true })}` : 'Never synced — credentials may be invalid')}</span>
-                            )}
-                            {syncInfo.status === 'not_configured' && (
-                              <span>No CRM configured</span>
-                            )}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                    <TableCell className="text-center py-0 px-1" onClick={(e) => e.stopPropagation()}>
+                      <CrmStatusCell client={client} syncInfo={syncInfo} />
                     </TableCell>
 
                     {/* MRR - admin only */}
