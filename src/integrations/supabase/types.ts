@@ -2757,6 +2757,7 @@ export type Database = {
           media_buyer: string | null
           meta_access_token: string | null
           meta_ad_account_id: string | null
+          meta_ad_account_ids: string[] | null
           name: string
           offer_description: string | null
           product_images: Json | null
@@ -2796,6 +2797,7 @@ export type Database = {
           media_buyer?: string | null
           meta_access_token?: string | null
           meta_ad_account_id?: string | null
+          meta_ad_account_ids?: string[] | null
           name: string
           offer_description?: string | null
           product_images?: Json | null
@@ -2835,6 +2837,7 @@ export type Database = {
           media_buyer?: string | null
           meta_access_token?: string | null
           meta_ad_account_id?: string | null
+          meta_ad_account_ids?: string[] | null
           name?: string
           offer_description?: string | null
           product_images?: Json | null
