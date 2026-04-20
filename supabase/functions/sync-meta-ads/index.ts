@@ -551,7 +551,8 @@ Deno.serve(async (req) => {
         throw new Error("Client not found");
       }
 
-      if (!client.meta_ad_account_id) {
+      const effectiveAccountId = adAccountOverride || client.meta_ad_account_id;
+      if (!effectiveAccountId) {
         throw new Error("Meta Ad Account ID must be configured in client settings.");
       }
 
@@ -559,9 +560,9 @@ Deno.serve(async (req) => {
       if (!accessToken) {
         throw new Error("No Meta access token available (client token and shared token both missing).");
       }
-      const adAccountId = client.meta_ad_account_id.startsWith("act_")
-        ? client.meta_ad_account_id
-        : `act_${client.meta_ad_account_id}`;
+      const adAccountId = effectiveAccountId.startsWith("act_")
+        ? effectiveAccountId
+        : `act_${effectiveAccountId}`;
 
       console.log(`Syncing Meta Ads for ${client.name} (${adAccountId})`);
 
