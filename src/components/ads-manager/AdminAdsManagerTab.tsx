@@ -654,6 +654,14 @@ function AdCard({ ad, clientName, onClick }: { ad: any; clientName?: string; onC
           <StatusDot status={ad.status} />
         </div>
         <div className="absolute top-2 right-2 flex items-center gap-1">
+          <div className="bg-background/90 backdrop-blur rounded-md px-1.5 py-1">
+            <MetaStatusToggle
+              clientId={ad.client_id}
+              level="ad"
+              rowId={ad.id}
+              status={ad.status}
+            />
+          </div>
           {downloadUrl && (
             <a
               href={downloadUrl}
