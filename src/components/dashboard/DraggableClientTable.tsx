@@ -1011,3 +1011,122 @@ function MetaStatusCell({
     </Popover>
   );
 }
+
+// CRM (GHL/HubSpot) status cell with quick-edit popover — mirrors MetaStatusCell
+function CrmStatusCell({
+  client,
+  syncInfo,
+}: {
+  client: Client;
+  syncInfo: { status: 'healthy' | 'stale' | 'error' | 'not_configured'; lastSyncAt: string | null; error: string | null; source: 'ghl' | 'hubspot' | 'none' };
+}) {
+  const [locationId, setLocationId] = useState(client.ghl_location_id || '');
+  const [apiKey, setApiKey] = useState(client.ghl_api_key || '');
+  const [accountUrl, setAccountUrl] = useState((client as any).ghl_account_url || '');
+  const [open, setOpen] = useState(false);
+  const updateClient = useUpdateClient();
+
+  const handleSave = async () => {
+    try {
+      await updateClient.mutateAsync({
+        id: client.id,
+        ghl_location_id: locationId || null,
+        ghl_api_key: apiKey || null,
+        ghl_account_url: accountUrl || null,
+      } as any);
+      toast.success('GHL settings updated');
+      setOpen(false);
+    } catch {
+      toast.error('Failed to update GHL settings');
+    }
+  };
+
+  const openGhl = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = accountUrl || (locationId ? `https://app.gohighlevel.com/v2/location/${locationId}` : null);
+    if (url) window.open(url, '_blank');
+    else toast.error('No GHL URL or Location ID set');
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <div className="inline-flex items-center gap-0.5 cursor-pointer">
+          {syncInfo.status === 'healthy' && (
+            <Badge variant="success" className="text-[9px] px-1 py-0 h-4">
+              {syncInfo.source === 'hubspot' ? 'HS' : 'GHL'}
+            </Badge>
+          )}
+          {syncInfo.status === 'stale' && (
+            <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">Old</Badge>
+          )}
+          {syncInfo.status === 'error' && (
+            <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4">
+              {syncInfo.source === 'hubspot' ? 'HS' : syncInfo.source === 'ghl' ? 'GHL' : 'ERR'}
+            </Badge>
+          )}
+          {syncInfo.status === 'not_configured' && (
+            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-muted-foreground">—</Badge>
+          )}
+          <Pencil className="h-2 w-2 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-3" side="left" align="start" onClick={(e) => e.stopPropagation()}>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium text-xs">GHL Integration — {client.name}</h4>
+            {(accountUrl || locationId) && (
+              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={openGhl} title="Open GHL account">
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground font-medium">Location ID</label>
+            <Input
+              value={locationId}
+              onChange={(e) => setLocationId(e.target.value)}
+              placeholder="e.g. abc123XYZ"
+              className="h-7 text-xs"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground font-medium">Private API Key</label>
+            <Input
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="pit-xxxxxxxxxxxx"
+              className="h-7 text-xs"
+              type="password"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground font-medium">GHL Account URL <span className="text-muted-foreground">(if custom domain)</span></label>
+            <Input
+              value={accountUrl}
+              onChange={(e) => setAccountUrl(e.target.value)}
+              placeholder="https://app.gohighlevel.com/v2/location/..."
+              className="h-7 text-xs"
+            />
+          </div>
+          {syncInfo.lastSyncAt && (
+            <div className="text-[10px] text-muted-foreground">
+              Last sync: {formatDistanceToNow(new Date(syncInfo.lastSyncAt), { addSuffix: true })}
+            </div>
+          )}
+          {syncInfo.error && (
+            <div className="text-[10px] text-destructive bg-destructive/10 rounded p-1.5">
+              {syncInfo.error}
+            </div>
+          )}
+          <div className="flex justify-end gap-1.5">
+            <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button size="sm" className="h-6 text-[10px]" onClick={handleSave} disabled={updateClient.isPending}>
+              {updateClient.isPending ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
