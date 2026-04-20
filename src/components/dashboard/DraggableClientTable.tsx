@@ -982,7 +982,14 @@ function MetaStatusCell({
       </PopoverTrigger>
       <PopoverContent className="w-72 p-3" side="left" align="start" onClick={(e) => e.stopPropagation()}>
         <div className="space-y-3">
-          <h4 className="font-medium text-xs">Meta Integration — {client.name}</h4>
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium text-xs">Meta Integration — {client.name}</h4>
+            {bmUrl && (
+              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => { e.stopPropagation(); window.open(bmUrl, '_blank'); }} title="Open Business Manager">
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
           <div className="space-y-1.5">
             <label className="text-[11px] text-muted-foreground font-medium">Business Manager URL</label>
             <Input
@@ -997,33 +1004,32 @@ function MetaStatusCell({
               className="h-7 text-xs"
             />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-[11px] text-muted-foreground font-medium">Ad Account ID (Primary)</label>
-            <Input
-              value={adAccountId}
-              onChange={(e) => setAdAccountId(e.target.value)}
-              placeholder="act_123456789"
-              className="h-7 text-xs"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[11px] text-muted-foreground font-medium">Ad Account ID #2 <span className="text-muted-foreground">(optional)</span></label>
-            <Input
-              value={extraAccount1}
-              onChange={(e) => setExtraAccount1(e.target.value)}
-              placeholder="act_..."
-              className="h-7 text-xs"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[11px] text-muted-foreground font-medium">Ad Account ID #3 <span className="text-muted-foreground">(optional)</span></label>
-            <Input
-              value={extraAccount2}
-              onChange={(e) => setExtraAccount2(e.target.value)}
-              placeholder="act_..."
-              className="h-7 text-xs"
-            />
-          </div>
+          {[
+            { label: 'Ad Account ID (Primary)', value: adAccountId, set: setAdAccountId, placeholder: 'act_123456789' },
+            { label: 'Ad Account ID #2 (optional)', value: extraAccount1, set: setExtraAccount1, placeholder: 'act_...' },
+            { label: 'Ad Account ID #3 (optional)', value: extraAccount2, set: setExtraAccount2, placeholder: 'act_...' },
+          ].map((f, idx) => {
+            const cleanId = f.value.replace(/^act_/, '').trim();
+            const adsUrl = cleanId ? `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${cleanId}` : null;
+            return (
+              <div className="space-y-1.5" key={idx}>
+                <label className="text-[11px] text-muted-foreground font-medium">{f.label}</label>
+                <div className="flex items-center gap-1">
+                  <Input
+                    value={f.value}
+                    onChange={(e) => f.set(e.target.value)}
+                    placeholder={f.placeholder}
+                    className="h-7 text-xs flex-1"
+                  />
+                  {adsUrl && (
+                    <Button variant="outline" size="icon" className="h-7 w-7 shrink-0" onClick={(e) => { e.stopPropagation(); window.open(adsUrl, '_blank'); }} title="Open in Ads Manager">
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
           <div className="space-y-1.5">
             <label className="text-[11px] text-muted-foreground font-medium">Access Token <span className="text-muted-foreground">(optional override)</span></label>
             <Input
