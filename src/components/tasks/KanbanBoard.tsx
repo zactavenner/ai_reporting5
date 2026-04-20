@@ -302,7 +302,7 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
     }
     
     return filtered;
-  }, [tasks, clientId, filterClientId, filterAssigneeId, searchQuery, showCompleted, dueDateFilter, allTaskAssignees, myTaskIds, showMyTasksOnly, currentMember]);
+  }, [tasks, clientId, filterClientId, filterAssigneeId, searchQuery, showCompleted, dueDateFilter, allTaskAssignees, myTaskIds, showMyTasksOnly, currentMember, isPublicView]);
 
   // Group by stage
   const tasksByStage = useMemo(() => {
