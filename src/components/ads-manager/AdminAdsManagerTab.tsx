@@ -352,7 +352,18 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                         <TableHead className="text-right">Clicks</TableHead>
                         <TableHead className="text-right">CTR</TableHead>
                         <TableHead className="text-right">CPC</TableHead>
-                        <TableHead className="text-right">Leads</TableHead>
+                        <TableHead className="text-right">
+                          <Tooltip>
+                            <TooltipTrigger>Meta Leads</TooltipTrigger>
+                            <TooltipContent className="text-xs max-w-[220px]">As reported by Meta (pixel + on-platform lead forms, 7d-click/1d-view)</TooltipContent>
+                          </Tooltip>
+                        </TableHead>
+                        <TableHead className="text-right">
+                          <Tooltip>
+                            <TooltipTrigger>CRM Leads</TooltipTrigger>
+                            <TooltipContent className="text-xs max-w-[220px]">Leads in your CRM attributed to this campaign via name/UTM matching</TooltipContent>
+                          </Tooltip>
+                        </TableHead>
                         <TableHead className="text-right">CPL</TableHead>
                         <TableHead className="w-12"></TableHead>
                       </TableRow>
@@ -373,7 +384,8 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                           <TableCell className="text-right text-xs">{fmtN(c.clicks)}</TableCell>
                           <TableCell className="text-right text-xs">{fmtPct(c.ctr)}</TableCell>
                           <TableCell className="text-right text-xs">{fmt$(c.cpc)}</TableCell>
-                          <TableCell className="text-right text-xs">{fmtN(c.attributed_leads)}</TableCell>
+                          <TableCell className="text-right text-xs font-medium text-blue-500">{fmtN(c.meta_reported_leads)}</TableCell>
+                          <TableCell className="text-right text-xs font-medium text-emerald-500">{fmtN(c.attributed_leads)}</TableCell>
                           <TableCell className="text-right text-xs">{fmt$(c.cost_per_lead)}</TableCell>
                           <TableCell><ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /></TableCell>
                         </TableRow>
