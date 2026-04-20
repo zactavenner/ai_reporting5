@@ -626,9 +626,18 @@ function AdCard({ ad, clientName, onClick }: { ad: any; clientName?: string; onC
         </div>
         <div className="flex items-center justify-between text-[10px]">
           <span className="text-muted-foreground">Leads · CPL</span>
-          <span className="font-semibold tabular-nums text-chart-2">
-            {fmtN(ad.attributed_leads || ad.meta_reported_leads || 0)} · {fmt$(ad.cost_per_lead)}
-          </span>
+          {(() => {
+            const leads = Number(ad.attributed_leads || 0) || Number(ad.meta_reported_leads || 0);
+            const spend = Number(ad.spend || 0);
+            const cpl = ad.cost_per_lead && Number(ad.cost_per_lead) > 0
+              ? Number(ad.cost_per_lead)
+              : (leads > 0 ? spend / leads : 0);
+            return (
+              <span className="font-semibold tabular-nums text-chart-2">
+                {fmtN(leads)} · {cpl > 0 ? fmt$(cpl) : '—'}
+              </span>
+            );
+          })()}
         </div>
       </div>
     </Card>
