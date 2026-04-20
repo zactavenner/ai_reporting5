@@ -135,16 +135,21 @@ async function handleMention(event: any, env: Env) {
   // Determine intent
   const intent = await detectIntent(userText, env.LOVABLE_API_KEY);
 
+  // CRITICAL: If this channel is mapped to a specific client, the bot is hard-scoped
+  // to that client ONLY — never reference other clients, regardless of who is asking.
+  const channelLockedToClient = !!scopedClientId;
+  const effectiveAgencyView = isAgencyUser && !channelLockedToClient;
+
   switch (intent.action) {
     case "create_task":
       await handleCreateTask(supabase, env, channelId, threadTs, scopedClientId, userText, event, userName, thinkingMsg?.ts);
       break;
     case "list_tasks":
-      await handleListTasks(supabase, env, channelId, threadTs, scopedClientId, userName, isAgencyUser, thinkingMsg?.ts);
+      await handleListTasks(supabase, env, channelId, threadTs, scopedClientId, userName, effectiveAgencyView, thinkingMsg?.ts);
       break;
     default:
       // Full AI-powered response with rich context
-      await handleAIQuery(supabase, env, channelId, threadTs, scopedClientId, userText, userName, isAgencyUser, agencyMember, thinkingMsg?.ts);
+      await handleAIQuery(supabase, env, channelId, threadTs, scopedClientId, userText, userName, effectiveAgencyView, agencyMember, thinkingMsg?.ts, channelLockedToClient);
       break;
   }
 }
