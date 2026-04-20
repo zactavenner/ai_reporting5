@@ -345,6 +345,7 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                     <TableHeader className="sticky top-0 bg-card z-10">
                       <TableRow>
                         <TableHead className="w-8"></TableHead>
+                        <TableHead className="w-[90px]">On/Off</TableHead>
                         <TableHead>Campaign</TableHead>
                         <TableHead>Client</TableHead>
                         <TableHead>Objective</TableHead>
@@ -377,6 +378,14 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                           onClick={() => { setSelectedCampaignId(c.id); setSelectedAdSetId(null); setActiveTab('adsets'); }}
                         >
                           <TableCell><StatusDot status={c.status} /></TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <MetaStatusToggle
+                              clientId={c.client_id}
+                              level="campaign"
+                              rowId={c.id}
+                              status={c.status}
+                            />
+                          </TableCell>
                           <TableCell className="font-medium text-sm max-w-[280px] truncate">{c.name}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{clientMap[c.client_id]?.name || '—'}</TableCell>
                           <TableCell><Badge variant="outline" className="text-[10px]">{c.objective || '—'}</Badge></TableCell>
