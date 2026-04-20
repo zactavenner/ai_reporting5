@@ -9,21 +9,21 @@ declare const EdgeRuntime: { waitUntil: (promise: Promise<any>) => void } | unde
 
 // ── Timezone-aware date helper ──
 // Returns a date string (YYYY-MM-DD) for "today" or "N days ago" in a given timezone.
+// DST-safe: operates on UTC milliseconds then formats in the target timezone,
+// instead of constructing a naive Date from a string (which can misinterpret DST boundaries).
 function getDateInTimezone(tz: string, daysOffset = 0): string {
-  const now = new Date();
+  // Shift by `daysOffset * 86400000` ms in UTC space first, then format in target TZ.
+  // Using noon UTC as the anchor avoids DST ambiguity at the date boundary —
+  // no timezone has a DST transition that would shift a noon UTC moment across a date.
+  const shifted = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000);
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: tz,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
-  const parts = formatter.formatToParts(now);
-  const y = parts.find(p => p.type === "year")!.value;
-  const m = parts.find(p => p.type === "month")!.value;
-  const d = parts.find(p => p.type === "day")!.value;
-  const localDate = new Date(`${y}-${m}-${d}T12:00:00`);
-  localDate.setDate(localDate.getDate() + daysOffset);
-  return localDate.toISOString().split("T")[0];
+  // en-CA formats as YYYY-MM-DD directly
+  return formatter.format(shifted);
 }
 
 // Get the ad account's cached timezone, falling back to America/New_York
