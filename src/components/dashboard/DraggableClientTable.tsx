@@ -1191,11 +1191,33 @@ function CrmStatusCell({
               {syncInfo.error}
             </div>
           )}
-          <div className="flex justify-end gap-1.5">
+          {testResult && (
+            <div className={cn(
+              "text-[10px] rounded p-1.5 flex items-center gap-1",
+              testResult.ok
+                ? "text-green-700 dark:text-green-400 bg-green-500/10 border border-green-500/30"
+                : "text-destructive bg-destructive/10"
+            )}>
+              {testResult.ok ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+              {testResult.message}
+            </div>
+          )}
+          <div className="flex justify-between gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 text-[10px]"
+              onClick={handleTestConnection}
+              disabled={testing || !apiKey || !locationId}
+            >
+              {testing ? 'Testing…' : 'Test Connection'}
+            </Button>
+            <div className="flex gap-1.5">
             <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={() => setOpen(false)}>Cancel</Button>
             <Button size="sm" className="h-6 text-[10px]" onClick={handleSave} disabled={updateClient.isPending}>
               {updateClient.isPending ? 'Saving…' : 'Save'}
             </Button>
+            </div>
           </div>
         </div>
       </PopoverContent>
