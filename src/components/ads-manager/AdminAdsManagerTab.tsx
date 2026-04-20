@@ -556,6 +556,74 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+function MetaStatusToggle({
+  clientId,
+  level,
+  rowId,
+  status,
+  size = 'sm',
+}: {
+  clientId: string;
+  level: 'campaign' | 'adset' | 'ad';
+  rowId: string;
+  status: string | null;
+  size?: 'sm' | 'md';
+}) {
+  const qc = useQueryClient();
+  const [pending, setPending] = useState(false);
+  const [localOn, setLocalOn] = useState((status || '').toUpperCase() === 'ACTIVE');
+
+  const handleToggle = async (next: boolean) => {
+    if (pending) return;
+    setPending(true);
+    const prev = localOn;
+    setLocalOn(next);
+    const toastId = `toggle-${level}-${rowId}`;
+    toast.loading(`${next ? 'Activating' : 'Pausing'} on Meta…`, { id: toastId });
+    try {
+      const { data, error } = await supabase.functions.invoke('toggle-meta-status', {
+        body: {
+          clientId,
+          level,
+          rowId,
+          status: next ? 'ACTIVE' : 'PAUSED',
+        },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Meta toggle failed');
+      toast.success(`${next ? 'Active' : 'Paused'} on Meta`, { id: toastId });
+      qc.invalidateQueries({ queryKey: ['admin-meta-campaigns'] });
+      qc.invalidateQueries({ queryKey: ['admin-meta-adsets'] });
+      qc.invalidateQueries({ queryKey: ['admin-meta-ads'] });
+    } catch (err: any) {
+      setLocalOn(prev);
+      toast.error(err?.message || 'Failed to update Meta status', { id: toastId });
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <div
+      className="inline-flex items-center gap-1.5"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Switch
+        checked={localOn}
+        disabled={pending}
+        onCheckedChange={handleToggle}
+        aria-label={localOn ? 'Pause on Meta' : 'Activate on Meta'}
+      />
+      <span className={cn(
+        "text-[10px] font-medium uppercase tracking-wide",
+        localOn ? "text-chart-2" : "text-muted-foreground"
+      )}>
+        {pending ? '…' : localOn ? 'On' : 'Off'}
+      </span>
+    </div>
+  );
+}
+
 function AdCard({ ad, clientName, onClick }: { ad: any; clientName?: string; onClick?: () => void }) {
   const thumb = ad.full_image_url || ad.image_url || ad.video_thumbnail_url || ad.thumbnail_url;
   const isVideo = ad.media_type === 'video' || !!ad.video_source_url;
