@@ -2739,6 +2739,7 @@ export type Database = {
           consecutive_meta_failures: number
           created_at: string
           description: string | null
+          ghl_account_url: string | null
           ghl_api_key: string | null
           ghl_location_id: string | null
           ghl_sync_error: string | null
@@ -2777,6 +2778,7 @@ export type Database = {
           consecutive_meta_failures?: number
           created_at?: string
           description?: string | null
+          ghl_account_url?: string | null
           ghl_api_key?: string | null
           ghl_location_id?: string | null
           ghl_sync_error?: string | null
@@ -2815,6 +2817,7 @@ export type Database = {
           consecutive_meta_failures?: number
           created_at?: string
           description?: string | null
+          ghl_account_url?: string | null
           ghl_api_key?: string | null
           ghl_location_id?: string | null
           ghl_sync_error?: string | null

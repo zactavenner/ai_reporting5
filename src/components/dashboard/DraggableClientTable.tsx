@@ -143,6 +143,18 @@ function getSyncBorderStyle(status: 'healthy' | 'stale' | 'error' | 'not_configu
   }
 }
 
+// Row tint when integration is missing — faded red so it's actionable at a glance
+function getMissingIntegrationRowStyle(client: Client): string {
+  const hasGhl = !!(client.ghl_api_key && client.ghl_location_id);
+  const hasHubspot = !!(client.hubspot_portal_id && client.hubspot_access_token);
+  const hasCrm = hasGhl || hasHubspot;
+  const hasMeta = !!client.meta_ad_account_id;
+  if (!hasCrm || !hasMeta) {
+    return 'bg-destructive/5 hover:bg-destructive/10';
+  }
+  return '';
+}
+
 export function DraggableClientTable({
   clients,
   metrics,
@@ -467,6 +479,7 @@ export function DraggableClientTable({
               const syncInfo = getClientSyncStatus(client);
               const syncBorderStyle = getSyncBorderStyle(syncInfo.status);
               const isInactive = inactiveClientIds.has(client.id);
+              const missingIntegrationStyle = getMissingIntegrationRowStyle(client);
 
               return (
                 <TooltipProvider key={client.id}>
@@ -475,11 +488,9 @@ export function DraggableClientTable({
                       "cursor-pointer hover:bg-muted/50 border-b h-7 relative",
                       draggedId === client.id && "opacity-50",
                       syncBorderStyle,
-                      isInactive && "opacity-60"
+                      missingIntegrationStyle,
+                      isInactive && "opacity-70"
                     )}
-                    style={isInactive ? {
-                      backgroundImage: 'linear-gradient(transparent calc(50% - 0.5px), hsl(var(--destructive) / 0.35) calc(50% - 0.5px), hsl(var(--destructive) / 0.35) calc(50% + 0.5px), transparent calc(50% + 0.5px))',
-                    } : undefined}
                     draggable
                     onDragStart={(e) => handleDragStart(e, client.id)}
                     onDragOver={handleDragOver}
@@ -547,19 +558,7 @@ export function DraggableClientTable({
 
                     {/* Client name */}
                     <TableCell className="font-medium text-[11px] sticky left-7 bg-card z-10 py-0 px-1 truncate max-w-[120px]">
-                      <span className="flex items-center gap-1">
-                        {client.name}
-                        {isInactive && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <AlertTriangle className="h-3 w-3 text-destructive shrink-0" />
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="text-xs">
-                              $0 ad spend &amp; 0 leads yesterday
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
+                      <span className="truncate">{client.name}</span>
                     </TableCell>
 
                     {/* Status */}
@@ -743,47 +742,8 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* CRM Status */}
-                    <TableCell className="text-center py-0 px-1">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="inline-flex">
-                              {syncInfo.status === 'healthy' && (
-                                <Badge variant="success" className="text-[9px] px-1 py-0 h-4">
-                                  {syncInfo.source === 'hubspot' ? 'HS' : 'GHL'}
-                                </Badge>
-                              )}
-                              {syncInfo.status === 'stale' && (
-                                <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
-                                  Old
-                                </Badge>
-                              )}
-                              {syncInfo.status === 'error' && (
-                                <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4">
-                                  {syncInfo.source === 'hubspot' ? 'HS' : syncInfo.source === 'ghl' ? 'GHL' : 'ERR'}
-                                </Badge>
-                              )}
-                              {syncInfo.status === 'not_configured' && (
-                                <span className="text-muted-foreground text-[9px]">—</span>
-                              )}
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="text-xs max-w-[200px]">
-                            {syncInfo.status === 'healthy' && (
-                              <span>✅ {syncInfo.source === 'hubspot' ? 'HubSpot' : 'GHL'} synced {syncInfo.lastSyncAt ? formatDistanceToNow(new Date(syncInfo.lastSyncAt), { addSuffix: true }) : ''}</span>
-                            )}
-                            {syncInfo.status === 'stale' && (
-                              <span>⚠️ Last sync: {syncInfo.lastSyncAt ? formatDistanceToNow(new Date(syncInfo.lastSyncAt), { addSuffix: true }) : 'unknown'}</span>
-                            )}
-                            {syncInfo.status === 'error' && (
-                              <span>🔴 {syncInfo.error || (syncInfo.lastSyncAt ? `Last sync ${formatDistanceToNow(new Date(syncInfo.lastSyncAt), { addSuffix: true })}` : 'Never synced — credentials may be invalid')}</span>
-                            )}
-                            {syncInfo.status === 'not_configured' && (
-                              <span>No CRM configured</span>
-                            )}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                    <TableCell className="text-center py-0 px-1" onClick={(e) => e.stopPropagation()}>
+                      <CrmStatusCell client={client} syncInfo={syncInfo} />
                     </TableCell>
 
                     {/* MRR - admin only */}
@@ -1038,6 +998,125 @@ function MetaStatusCell({
           {isDuplicate && (
             <div className="text-[10px] text-destructive bg-destructive/10 rounded p-1.5">
               ⚠️ This ad account is shared with: {duplicateWith.join(', ')}
+            </div>
+          )}
+          <div className="flex justify-end gap-1.5">
+            <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button size="sm" className="h-6 text-[10px]" onClick={handleSave} disabled={updateClient.isPending}>
+              {updateClient.isPending ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// CRM (GHL/HubSpot) status cell with quick-edit popover — mirrors MetaStatusCell
+function CrmStatusCell({
+  client,
+  syncInfo,
+}: {
+  client: Client;
+  syncInfo: { status: 'healthy' | 'stale' | 'error' | 'not_configured'; lastSyncAt: string | null; error: string | null; source: 'ghl' | 'hubspot' | 'none' };
+}) {
+  const [locationId, setLocationId] = useState(client.ghl_location_id || '');
+  const [apiKey, setApiKey] = useState(client.ghl_api_key || '');
+  const [accountUrl, setAccountUrl] = useState((client as any).ghl_account_url || '');
+  const [open, setOpen] = useState(false);
+  const updateClient = useUpdateClient();
+
+  const handleSave = async () => {
+    try {
+      await updateClient.mutateAsync({
+        id: client.id,
+        ghl_location_id: locationId || null,
+        ghl_api_key: apiKey || null,
+        ghl_account_url: accountUrl || null,
+      } as any);
+      toast.success('GHL settings updated');
+      setOpen(false);
+    } catch {
+      toast.error('Failed to update GHL settings');
+    }
+  };
+
+  const openGhl = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = accountUrl || (locationId ? `https://app.gohighlevel.com/v2/location/${locationId}` : null);
+    if (url) window.open(url, '_blank');
+    else toast.error('No GHL URL or Location ID set');
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <div className="inline-flex items-center gap-0.5 cursor-pointer">
+          {syncInfo.status === 'healthy' && (
+            <Badge variant="success" className="text-[9px] px-1 py-0 h-4">
+              {syncInfo.source === 'hubspot' ? 'HS' : 'GHL'}
+            </Badge>
+          )}
+          {syncInfo.status === 'stale' && (
+            <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">Old</Badge>
+          )}
+          {syncInfo.status === 'error' && (
+            <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4">
+              {syncInfo.source === 'hubspot' ? 'HS' : syncInfo.source === 'ghl' ? 'GHL' : 'ERR'}
+            </Badge>
+          )}
+          {syncInfo.status === 'not_configured' && (
+            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-muted-foreground">—</Badge>
+          )}
+          <Pencil className="h-2 w-2 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-3" side="left" align="start" onClick={(e) => e.stopPropagation()}>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium text-xs">GHL Integration — {client.name}</h4>
+            {(accountUrl || locationId) && (
+              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={openGhl} title="Open GHL account">
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground font-medium">Location ID</label>
+            <Input
+              value={locationId}
+              onChange={(e) => setLocationId(e.target.value)}
+              placeholder="e.g. abc123XYZ"
+              className="h-7 text-xs"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground font-medium">Private API Key</label>
+            <Input
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="pit-xxxxxxxxxxxx"
+              className="h-7 text-xs"
+              type="password"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground font-medium">GHL Account URL <span className="text-muted-foreground">(if custom domain)</span></label>
+            <Input
+              value={accountUrl}
+              onChange={(e) => setAccountUrl(e.target.value)}
+              placeholder="https://app.gohighlevel.com/v2/location/..."
+              className="h-7 text-xs"
+            />
+          </div>
+          {syncInfo.lastSyncAt && (
+            <div className="text-[10px] text-muted-foreground">
+              Last sync: {formatDistanceToNow(new Date(syncInfo.lastSyncAt), { addSuffix: true })}
+            </div>
+          )}
+          {syncInfo.error && (
+            <div className="text-[10px] text-destructive bg-destructive/10 rounded p-1.5">
+              {syncInfo.error}
             </div>
           )}
           <div className="flex justify-end gap-1.5">
