@@ -71,12 +71,38 @@ Deno.serve(async (req) => {
       fixedOutbound++;
     }
 
+    // 4) Detect missing master sync cron — if last master run > 25h ago, fire it now
+    const dayAgo = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    const { data: recentMaster } = await supabase
+      .from("sync_runs")
+      .select("id")
+      .eq("function_name", "daily-master-sync")
+      .eq("source", "master")
+      .gte("started_at", dayAgo)
+      .limit(1);
+
+    let masterRecovered = false;
+    if (!recentMaster?.length) {
+      console.warn("[Watchdog] No master sync in 25h — triggering manually");
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/daily-master-sync`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: JSON.stringify({}),
+        });
+        masterRecovered = true;
+      } catch (e) {
+        console.error("[Watchdog] Master recovery failed:", e);
+      }
+    }
+
     const summary = {
       success: true,
       timestamp: now,
       stuck_sync_logs_fixed: fixedLogs,
       stuck_queue_jobs_fixed: fixedJobs,
       stuck_outbound_fixed: fixedOutbound,
+      master_recovered: masterRecovered,
     };
 
     console.log("[Watchdog] Completed:", JSON.stringify(summary));

@@ -60,13 +60,13 @@ Deno.serve(async (req) => {
     const endDate = new Date();
     endDate.setUTCDate(endDate.getUTCDate() - 1);
     const startDate = new Date(endDate);
-    startDate.setUTCDate(startDate.getUTCDate() - 6);
+    startDate.setUTCDate(startDate.getUTCDate() - 29); // 30-day window for resilience
     const startStr = startDate.toISOString().split("T")[0];
     const endStr = endDate.toISOString().split("T")[0];
 
     const { data: clients } = await supabase
       .from("clients")
-      .select("id, name, meta_ad_account_id, ghl_api_key, ghl_location_id")
+      .select("id, name, meta_ad_account_id, ghl_api_key, ghl_location_id, last_ghl_sync_at")
       .in("status", ["active", "onboarding"]);
 
     if (!clients?.length) {
@@ -107,11 +107,19 @@ Deno.serve(async (req) => {
         }
 
         if (!skipSteps.includes("ghl") && client.ghl_api_key && client.ghl_location_id) {
+          // Backfill detection: if no sync in last 24h (or never), pull a wider window
+          const lastSync = client.last_ghl_sync_at ? new Date(client.last_ghl_sync_at).getTime() : 0;
+          const hoursSinceSync = lastSync ? (Date.now() - lastSync) / (1000 * 60 * 60) : Infinity;
+          let ghlDays = 30;
+          if (!lastSync) ghlDays = 365;            // never synced → full backfill
+          else if (hoursSinceSync > 168) ghlDays = 90;  // >1 week stale → 90d
+          else if (hoursSinceSync > 24) ghlDays = 60;   // >24h stale → 60d
+
           fireAndForget(supabaseUrl, supabaseKey, "sync-ghl-contacts", {
             client_id: client.id,
             syncType: "contacts",
-            sinceDateDays: 7,
-          }, `${client.name}/ghl-contacts`);
+            sinceDateDays: ghlDays,
+          }, `${client.name}/ghl-contacts(${ghlDays}d)`);
 
           // Pipelines a few seconds later, same client
           setTimeout(() => {

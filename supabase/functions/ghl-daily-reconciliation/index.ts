@@ -197,6 +197,19 @@ Deno.serve(async (req) => {
 
         if (insertErr) console.error(`[Recon] Insert error for ${client.name}: ${insertErr.message}`);
 
+        // Auto-resync if match rate below 95%
+        if (matchRate < 0.95 && sampleSize >= 5) {
+          console.log(`[Recon] Triggering re-sync for ${client.name} (match rate ${(matchRate * 100).toFixed(1)}%)`);
+          fetch(`${supabaseUrl}/functions/v1/sync-ghl-contacts`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${serviceKey}`,
+            },
+            body: JSON.stringify({ client_id: client.id, syncType: "contacts", sinceDateDays: 90 }),
+          }).catch((e) => console.error(`[Recon] Re-sync dispatch failed: ${e.message}`));
+        }
+
         results.push({
           client: client.name,
           local: localCount || 0,
@@ -204,6 +217,7 @@ Deno.serve(async (req) => {
           match_rate: `${(matchRate * 100).toFixed(1)}%`,
           estimated_missing: estimatedMissing,
           sample_missing: missingIds.length,
+          resync_triggered: matchRate < 0.95 && sampleSize >= 5,
         });
       } catch (clientError: any) {
         console.error(`[Recon] Error for ${client.name}: ${clientError.message}`);
