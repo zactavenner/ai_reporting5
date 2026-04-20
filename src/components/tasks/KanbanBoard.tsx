@@ -72,7 +72,8 @@ const STAGES = [
   { id: 'todo', label: 'To-Do', color: 'bg-blue-500/20' },
   { id: 'in_progress', label: 'In Progress', color: 'bg-orange-500/20' },
   { id: 'stuck', label: 'Stuck', color: 'bg-destructive/20' },
-  { id: 'review', label: 'Review', color: 'bg-purple-500/20' },
+  { id: 'agency_review', label: 'Agency Review', color: 'bg-indigo-500/20', agencyOnly: true },
+  { id: 'review', label: 'Client Review', color: 'bg-purple-500/20' },
   { id: 'revisions', label: 'Revisions', color: 'bg-amber-500/20' },
   { id: 'done', label: 'Completed', color: 'bg-green-500/20' },
 ];
