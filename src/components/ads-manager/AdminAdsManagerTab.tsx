@@ -352,7 +352,18 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                         <TableHead className="text-right">Clicks</TableHead>
                         <TableHead className="text-right">CTR</TableHead>
                         <TableHead className="text-right">CPC</TableHead>
-                        <TableHead className="text-right">Leads</TableHead>
+                        <TableHead className="text-right">
+                          <Tooltip>
+                            <TooltipTrigger>Meta Leads</TooltipTrigger>
+                            <TooltipContent className="text-xs max-w-[220px]">As reported by Meta (pixel + on-platform lead forms, 7d-click/1d-view)</TooltipContent>
+                          </Tooltip>
+                        </TableHead>
+                        <TableHead className="text-right">
+                          <Tooltip>
+                            <TooltipTrigger>CRM Leads</TooltipTrigger>
+                            <TooltipContent className="text-xs max-w-[220px]">Leads in your CRM attributed to this campaign via name/UTM matching</TooltipContent>
+                          </Tooltip>
+                        </TableHead>
                         <TableHead className="text-right">CPL</TableHead>
                         <TableHead className="w-12"></TableHead>
                       </TableRow>
@@ -373,7 +384,8 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                           <TableCell className="text-right text-xs">{fmtN(c.clicks)}</TableCell>
                           <TableCell className="text-right text-xs">{fmtPct(c.ctr)}</TableCell>
                           <TableCell className="text-right text-xs">{fmt$(c.cpc)}</TableCell>
-                          <TableCell className="text-right text-xs">{fmtN(c.attributed_leads)}</TableCell>
+                          <TableCell className="text-right text-xs font-medium text-primary">{fmtN(c.meta_reported_leads)}</TableCell>
+                          <TableCell className="text-right text-xs font-medium text-chart-2">{fmtN(c.attributed_leads)}</TableCell>
                           <TableCell className="text-right text-xs">{fmt$(c.cost_per_lead)}</TableCell>
                           <TableCell><ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /></TableCell>
                         </TableRow>
@@ -409,7 +421,8 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                         <TableHead className="text-right">Clicks</TableHead>
                         <TableHead className="text-right">CTR</TableHead>
                         <TableHead className="text-right">Reach</TableHead>
-                        <TableHead className="text-right">Leads</TableHead>
+                        <TableHead className="text-right text-primary">Meta</TableHead>
+                        <TableHead className="text-right text-chart-2">CRM</TableHead>
                         <TableHead className="w-20"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -429,7 +442,8 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                           <TableCell className="text-right text-xs">{fmtN(a.clicks)}</TableCell>
                           <TableCell className="text-right text-xs">{fmtPct(a.ctr)}</TableCell>
                           <TableCell className="text-right text-xs">{fmtN(a.reach)}</TableCell>
-                          <TableCell className="text-right text-xs">{fmtN(a.attributed_leads)}</TableCell>
+                          <TableCell className="text-right text-xs font-medium text-primary">{fmtN(a.meta_reported_leads)}</TableCell>
+                          <TableCell className="text-right text-xs font-medium text-chart-2">{fmtN(a.attributed_leads)}</TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <Button
                               size="sm"
@@ -580,10 +594,20 @@ function AdCard({ ad, clientName, onClick }: { ad: any; clientName?: string; onC
           <span className="text-muted-foreground">CTR · CPC</span>
           <span className="font-semibold tabular-nums">{fmtPct(ad.ctr)} · {fmt$(ad.cpc)}</span>
         </div>
-        {ad.attributed_leads > 0 && (
-          <div className="flex items-center justify-between text-[10px]">
-            <span className="text-muted-foreground">Leads · CPL</span>
-            <span className="font-semibold tabular-nums text-chart-2">{fmtN(ad.attributed_leads)} · {fmt$(ad.cost_per_lead)}</span>
+        {(ad.meta_reported_leads > 0 || ad.attributed_leads > 0) && (
+          <div className="space-y-0.5">
+            {ad.meta_reported_leads > 0 && (
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-muted-foreground">Meta leads</span>
+                <span className="font-semibold tabular-nums text-primary">{fmtN(ad.meta_reported_leads)}</span>
+              </div>
+            )}
+            {ad.attributed_leads > 0 && (
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-muted-foreground">CRM leads · CPL</span>
+                <span className="font-semibold tabular-nums text-chart-2">{fmtN(ad.attributed_leads)} · {fmt$(ad.cost_per_lead)}</span>
+              </div>
+            )}
           </div>
         )}
       </div>
