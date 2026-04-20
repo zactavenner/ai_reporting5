@@ -3383,19 +3383,56 @@ serve(async (req) => {
         .eq('client_id', targetClientId)
         .maybeSingle();
       
-      const trackedCalendarIds: string[] = settings?.tracked_calendar_ids || [];
+      let trackedCalendarIds: string[] = settings?.tracked_calendar_ids || [];
       const reconnectCalendarIds: string[] = settings?.reconnect_calendar_ids || [];
       const fundedPipelineId: string | null = settings?.funded_pipeline_id || null;
       const fundedStageIds: string[] = settings?.funded_stage_ids || [];
       const committedStageIds: string[] = settings?.committed_stage_ids || [];
-      
+
       // Build warnings for missing configuration
       const configWarnings: string[] = [];
-      
+
+      // Auto-discover calendars from GHL if none are configured
       if (trackedCalendarIds.length === 0) {
-        configWarnings.push('No tracked calendars configured - booked calls will not be synced. Configure calendars in Settings > Calendar Tracking.');
+        console.log(`[master_sync] ${client.name}: No tracked calendars configured, auto-discovering from GHL...`);
+        try {
+          const calResponse = await fetch(
+            `${GHL_BASE_URL}/calendars/?locationId=${client.ghl_location_id}`,
+            {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${client.ghl_api_key}`,
+                'Content-Type': 'application/json',
+                'Version': '2021-07-28',
+              },
+            }
+          );
+          if (calResponse.ok) {
+            const calData = await calResponse.json();
+            const allCalendars = (calData.calendars || []).filter((c: any) => c.isActive !== false);
+            if (allCalendars.length > 0) {
+              trackedCalendarIds = allCalendars.map((c: any) => c.id);
+              console.log(`[master_sync] ${client.name}: Auto-discovered ${trackedCalendarIds.length} calendars: ${allCalendars.map((c: any) => c.name).join(', ')}`);
+              // Persist to client_settings
+              await supabase
+                .from('client_settings')
+                .upsert({
+                  client_id: targetClientId,
+                  tracked_calendar_ids: trackedCalendarIds,
+                }, { onConflict: 'client_id' });
+              configWarnings.push(`Auto-discovered ${trackedCalendarIds.length} calendars from GHL and saved to settings.`);
+            } else {
+              configWarnings.push('No calendars found in GHL location - booked calls cannot be synced.');
+            }
+          } else {
+            configWarnings.push('Failed to auto-discover calendars from GHL - booked calls will not be synced.');
+          }
+        } catch (discoverErr) {
+          console.error(`[master_sync] ${client.name}: Calendar auto-discovery failed:`, discoverErr);
+          configWarnings.push('Calendar auto-discovery failed - configure calendars manually in Settings > Calendar Tracking.');
+        }
       }
-      
+
       if (reconnectCalendarIds.length === 0) {
         configWarnings.push('No reconnect calendars configured - reconnect calls will not be synced.');
       }

@@ -422,21 +422,59 @@ serve(async (req) => {
       .eq('client_id', clientId)
       .single();
 
-    const trackedCalendarIds = settings?.tracked_calendar_ids || [];
+    let trackedCalendarIds = settings?.tracked_calendar_ids || [];
     const reconnectCalendarIds = settings?.reconnect_calendar_ids || [];
+    let autoDiscovered = false;
 
     if (trackedCalendarIds.length === 0 && reconnectCalendarIds.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'No calendars configured for tracking',
-          tracked: trackedCalendarIds.length,
-          reconnect: reconnectCalendarIds.length
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      // Auto-discover all calendars from GHL when none are configured
+      console.log(`[sync-calendar] ${client.name}: No calendars configured, auto-discovering from GHL...`);
+      try {
+        const calResponse = await fetchWithRetry(
+          `${GHL_BASE_URL}/calendars/?locationId=${client.ghl_location_id}`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${client.ghl_api_key}`,
+              'Content-Type': 'application/json',
+              'Version': '2021-07-28',
+            },
+          }
+        );
+        if (calResponse.ok) {
+          const calData = await calResponse.json();
+          const allCalendars = (calData.calendars || []).filter((c: any) => c.isActive !== false);
+          if (allCalendars.length > 0) {
+            trackedCalendarIds = allCalendars.map((c: any) => c.id);
+            autoDiscovered = true;
+            console.log(`[sync-calendar] ${client.name}: Auto-discovered ${trackedCalendarIds.length} calendars: ${allCalendars.map((c: any) => c.name).join(', ')}`);
+            // Persist auto-discovered calendars to client_settings
+            await supabase
+              .from('client_settings')
+              .upsert({
+                client_id: clientId,
+                tracked_calendar_ids: trackedCalendarIds,
+              }, { onConflict: 'client_id' });
+            console.log(`[sync-calendar] ${client.name}: Saved auto-discovered calendars to client_settings`);
+          }
+        }
+      } catch (discoverErr) {
+        console.error(`[sync-calendar] ${client.name}: Calendar auto-discovery failed:`, discoverErr);
+      }
+
+      if (trackedCalendarIds.length === 0) {
+        return new Response(
+          JSON.stringify({
+            error: 'No calendars found in GHL location',
+            tracked: 0,
+            reconnect: 0
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
-    console.log(`Starting calendar sync for ${client.name}: tracked=${trackedCalendarIds.length}, reconnect=${reconnectCalendarIds.length}`);
+    console.log(`Starting calendar sync for ${client.name}: tracked=${trackedCalendarIds.length}${autoDiscovered ? ' (auto-discovered)' : ''}, reconnect=${reconnectCalendarIds.length}`);
 
     // Build lead lookup map — paginated to handle >1000 leads
     const allLeads: any[] = [];
@@ -645,6 +683,7 @@ serve(async (req) => {
         client: client.name,
         trackedCalendars: trackedCalendarIds,
         reconnectCalendars: reconnectCalendarIds,
+        autoDiscovered,
         created: result.created,
         updated: result.updated,
         skipped: result.skipped,

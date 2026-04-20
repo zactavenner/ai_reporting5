@@ -659,8 +659,18 @@ export function DraggableClientTable({
                             <TooltipTrigger asChild>
                               <Calendar className="h-2.5 w-2.5 text-destructive shrink-0" />
                             </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs max-w-[220px]">
-                              No tracked calendars configured — add calendar IDs in client settings to sync booked/show calls
+                            <TooltipContent side="top" className="text-xs max-w-[250px]">
+                              No tracked calendars configured — run a master sync to auto-discover calendars from GHL, or add calendar IDs manually in client settings
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                        {(m.totalCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && !(client.ghl_api_key && client.ghl_location_id) && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-2.5 w-2.5 text-destructive shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-[250px]">
+                              {formatCurrency(m.totalAdSpend)} ad spend but no GHL credentials — add GHL API key &amp; location ID in settings to sync booked calls
                             </TooltipContent>
                           </Tooltip>
                         )}
@@ -680,7 +690,19 @@ export function DraggableClientTable({
                       "text-right font-mono tabular-nums text-[11px] py-0 px-1",
                       (m.totalCalls || 0) > 0 && (m.showedCalls || 0) === 0 && 'text-yellow-600 dark:text-yellow-500'
                     )}>
-                      {m.showedCalls || 0}
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.showedCalls || 0}
+                        {(m.totalCalls || 0) > 0 && (m.showedCalls || 0) === 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertCircle className="h-2.5 w-2.5 text-yellow-600 dark:text-yellow-500 shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-[220px]">
+                              {m.totalCalls} booked call(s) but 0 showed — GHL appointment statuses may not be updated yet, or all calls are still upcoming
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                     </TableCell>
 
                     {/* Show Rate */}
