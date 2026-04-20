@@ -52,12 +52,12 @@ export function AdHDPreviewDialog({ ad, open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[92vh] overflow-hidden p-0">
+      <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto p-0">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="truncate pr-8">{ad.name}</DialogTitle>
         </DialogHeader>
-        <div className="grid md:grid-cols-2 gap-0 max-h-[82vh]">
-          <div className="bg-black flex items-center justify-center p-2 max-h-[82vh] overflow-hidden">
+        <div className="grid md:grid-cols-2 gap-0">
+          <div className="bg-black flex items-center justify-center p-2 md:sticky md:top-0 md:max-h-[88vh] overflow-hidden">
             {isVideo && ad.video_source_url ? (
               <video
                 src={ad.video_source_url}
@@ -73,7 +73,7 @@ export function AdHDPreviewDialog({ ad, open, onOpenChange }: Props) {
             )}
           </div>
 
-          <div className="px-6 pb-6 pt-2 space-y-4 overflow-y-auto">
+          <div className="px-6 pb-6 pt-2 space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
               {ad.preview_url && (
                 <a href={ad.preview_url} target="_blank" rel="noopener noreferrer">
