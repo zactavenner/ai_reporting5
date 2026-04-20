@@ -639,6 +639,36 @@ function AdCard({ ad, clientName, onClick }: { ad: any; clientName?: string; onC
             );
           })()}
         </div>
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="text-muted-foreground">Calls · CPC</span>
+          {(() => {
+            const calls = Number(ad.attributed_calls || 0);
+            const spend = Number(ad.spend || 0);
+            const cpCall = ad.cost_per_call && Number(ad.cost_per_call) > 0
+              ? Number(ad.cost_per_call)
+              : (calls > 0 ? spend / calls : 0);
+            return (
+              <span className="font-semibold tabular-nums text-chart-3">
+                {fmtN(calls)} · {cpCall > 0 ? fmt$(cpCall) : '—'}
+              </span>
+            );
+          })()}
+        </div>
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="text-muted-foreground">Funded · CPF</span>
+          {(() => {
+            const funded = Number(ad.attributed_funded || 0);
+            const spend = Number(ad.spend || 0);
+            const cpf = ad.cost_per_funded && Number(ad.cost_per_funded) > 0
+              ? Number(ad.cost_per_funded)
+              : (funded > 0 ? spend / funded : 0);
+            return (
+              <span className="font-semibold tabular-nums text-chart-4">
+                {fmtN(funded)} · {cpf > 0 ? fmt$(cpf) : '—'}
+              </span>
+            );
+          })()}
+        </div>
       </div>
     </Card>
   );
