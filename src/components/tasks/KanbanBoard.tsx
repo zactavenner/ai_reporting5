@@ -222,6 +222,11 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
   const filteredTasks = useMemo(() => {
     // Filter out subtasks from top-level board view
     let filtered = tasks.filter(t => !t.parent_task_id);
+
+    // Hide agency-only stage tasks from public/client view
+    if (isPublicView) {
+      filtered = filtered.filter(t => t.stage !== 'agency_review');
+    }
     
     // Filter by client - use prop clientId if provided, otherwise use filter dropdown
     const effectiveClientId = clientId || (filterClientId && filterClientId !== 'all' ? filterClientId : '');
