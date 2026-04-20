@@ -26,6 +26,13 @@ interface Ad {
   meta_reported_leads?: number;
   meta_reported_conversions?: number;
   meta_reported_conversion_value?: number;
+  attributed_calls?: number;
+  cost_per_call?: number;
+  attributed_showed?: number;
+  attributed_funded?: number;
+  cost_per_funded?: number;
+  attributed_funded_dollars?: number;
+  cost_per_lead?: number;
 }
 
 interface Props {
@@ -110,11 +117,33 @@ export function AdHDPreviewDialog({ ad, open, onOpenChange }: Props) {
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <Stat label="Meta-reported leads" value={fmtN(ad.meta_reported_leads)} highlight />
                 <Stat label="CRM attributed leads" value={fmtN(ad.attributed_leads)} highlight />
+                <Stat label="Cost / Lead" value={(() => {
+                  const leads = Number(ad.attributed_leads || 0) || Number(ad.meta_reported_leads || 0);
+                  const spend = Number(ad.spend || 0);
+                  const cpl = ad.cost_per_lead && Number(ad.cost_per_lead) > 0 ? Number(ad.cost_per_lead) : (leads > 0 ? spend / leads : 0);
+                  return cpl > 0 ? fmt$(cpl) : '—';
+                })()} highlight />
+                <Stat label="Calls booked" value={fmtN(ad.attributed_calls)} />
+                <Stat label="Cost / Call" value={(() => {
+                  const calls = Number(ad.attributed_calls || 0);
+                  const spend = Number(ad.spend || 0);
+                  const cpc = ad.cost_per_call && Number(ad.cost_per_call) > 0 ? Number(ad.cost_per_call) : (calls > 0 ? spend / calls : 0);
+                  return cpc > 0 ? fmt$(cpc) : '—';
+                })()} />
+                <Stat label="Calls showed" value={fmtN(ad.attributed_showed)} />
+                <Stat label="Funded investors" value={fmtN(ad.attributed_funded)} highlight />
+                <Stat label="Cost / Funded" value={(() => {
+                  const funded = Number(ad.attributed_funded || 0);
+                  const spend = Number(ad.spend || 0);
+                  const cpf = ad.cost_per_funded && Number(ad.cost_per_funded) > 0 ? Number(ad.cost_per_funded) : (funded > 0 ? spend / funded : 0);
+                  return cpf > 0 ? fmt$(cpf) : '—';
+                })()} highlight />
+                <Stat label="Funded $" value={fmt$(ad.attributed_funded_dollars)} />
                 <Stat label="Meta conversions" value={fmtN(ad.meta_reported_conversions)} />
                 <Stat label="Meta value" value={fmt$(ad.meta_reported_conversion_value)} />
               </div>
               <p className="text-[10px] text-muted-foreground italic">
-                Side-by-side: Meta pixel data vs your CRM-attributed leads.
+                Full funnel: Meta pixel data vs your CRM-attributed leads, calls, and funded investors.
               </p>
             </div>
           </div>
