@@ -478,7 +478,7 @@ Deno.serve(async (req) => {
   metaApiCallCount = 0;
 
   try {
-    const { clientId, startDate, endDate } = await req.json();
+    const { clientId, startDate, endDate, adAccountOverride } = await req.json();
     if (!clientId) {
       return new Response(JSON.stringify({ success: false, error: "clientId is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -492,6 +492,40 @@ Deno.serve(async (req) => {
     // Set up logging context
     _supabaseForLogging = supabase;
     _clientIdForLogging = clientId;
+
+    // ── Multi-account fan-out ──
+    // If the client has additional Meta ad accounts (meta_ad_account_ids), sync each
+    // extra account by recursively invoking this function with adAccountOverride.
+    // The current invocation continues with the primary meta_ad_account_id.
+    if (!adAccountOverride) {
+      const { data: clientForFanout } = await supabase
+        .from("clients")
+        .select("meta_ad_account_id, meta_ad_account_ids")
+        .eq("id", clientId)
+        .maybeSingle();
+      const extras: string[] = Array.isArray((clientForFanout as any)?.meta_ad_account_ids)
+        ? ((clientForFanout as any).meta_ad_account_ids as string[]).filter(
+            (a) => a && a !== clientForFanout?.meta_ad_account_id,
+          )
+        : [];
+      // Cap to 2 extras (3 accounts total including the primary)
+      const fanoutTargets = extras.slice(0, 2);
+      for (const acct of fanoutTargets) {
+        try {
+          await fetch(`${supabaseUrl}/functions/v1/sync-meta-ads`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${supabaseKey}`,
+            },
+            body: JSON.stringify({ clientId, startDate, endDate, adAccountOverride: acct }),
+          });
+          console.log(`[fanout] Triggered sync for extra Meta account ${acct}`);
+        } catch (e) {
+          console.warn(`[fanout] Failed to trigger sync for ${acct}:`, e);
+        }
+      }
+    }
 
     // ── Create sync_run record ──
     const { data: syncRun } = await supabase.from("sync_runs").insert({
@@ -517,7 +551,8 @@ Deno.serve(async (req) => {
         throw new Error("Client not found");
       }
 
-      if (!client.meta_ad_account_id) {
+      const effectiveAccountId = adAccountOverride || client.meta_ad_account_id;
+      if (!effectiveAccountId) {
         throw new Error("Meta Ad Account ID must be configured in client settings.");
       }
 
@@ -525,9 +560,9 @@ Deno.serve(async (req) => {
       if (!accessToken) {
         throw new Error("No Meta access token available (client token and shared token both missing).");
       }
-      const adAccountId = client.meta_ad_account_id.startsWith("act_")
-        ? client.meta_ad_account_id
-        : `act_${client.meta_ad_account_id}`;
+      const adAccountId = effectiveAccountId.startsWith("act_")
+        ? effectiveAccountId
+        : `act_${effectiveAccountId}`;
 
       console.log(`Syncing Meta Ads for ${client.name} (${adAccountId})`);
 

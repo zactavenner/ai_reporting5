@@ -904,6 +904,11 @@ function MetaStatusCell({
   const [adAccountId, setAdAccountId] = useState(client.meta_ad_account_id || '');
   const [accessToken, setAccessToken] = useState(client.meta_access_token || '');
   const [bmUrl, setBmUrl] = useState(client.business_manager_url || '');
+  const extraInitial = (((client as any).meta_ad_account_ids as string[] | null) || []).filter(
+    (a) => a && a !== client.meta_ad_account_id,
+  );
+  const [extraAccount1, setExtraAccount1] = useState(extraInitial[0] || '');
+  const [extraAccount2, setExtraAccount2] = useState(extraInitial[1] || '');
   const [open, setOpen] = useState(false);
   const updateClient = useUpdateClient();
 
@@ -913,11 +918,15 @@ function MetaStatusCell({
 
   const handleSave = async () => {
     try {
+      const extras = [extraAccount1, extraAccount2]
+        .map((a) => a.trim())
+        .filter((a) => a && a !== adAccountId);
       await updateClient.mutateAsync({
         id: client.id,
         meta_ad_account_id: adAccountId || null,
         meta_access_token: accessToken || null,
         business_manager_url: bmUrl || null,
+        meta_ad_account_ids: extras,
       } as any);
       toast.success('Meta settings updated');
       setOpen(false);
@@ -977,11 +986,29 @@ function MetaStatusCell({
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[11px] text-muted-foreground font-medium">Ad Account ID</label>
+            <label className="text-[11px] text-muted-foreground font-medium">Ad Account ID (Primary)</label>
             <Input
               value={adAccountId}
               onChange={(e) => setAdAccountId(e.target.value)}
               placeholder="act_123456789"
+              className="h-7 text-xs"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground font-medium">Ad Account ID #2 <span className="text-muted-foreground">(optional)</span></label>
+            <Input
+              value={extraAccount1}
+              onChange={(e) => setExtraAccount1(e.target.value)}
+              placeholder="act_..."
+              className="h-7 text-xs"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground font-medium">Ad Account ID #3 <span className="text-muted-foreground">(optional)</span></label>
+            <Input
+              value={extraAccount2}
+              onChange={(e) => setExtraAccount2(e.target.value)}
+              placeholder="act_..."
               className="h-7 text-xs"
             />
           </div>

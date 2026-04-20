@@ -1,0 +1,1 @@
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS meta_ad_account_ids TEXT[] DEFAULT '{}'::text[];
