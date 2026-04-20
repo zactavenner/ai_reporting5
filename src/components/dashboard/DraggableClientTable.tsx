@@ -982,7 +982,14 @@ function MetaStatusCell({
       </PopoverTrigger>
       <PopoverContent className="w-72 p-3" side="left" align="start" onClick={(e) => e.stopPropagation()}>
         <div className="space-y-3">
-          <h4 className="font-medium text-xs">Meta Integration — {client.name}</h4>
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium text-xs">Meta Integration — {client.name}</h4>
+            {bmUrl && (
+              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => { e.stopPropagation(); window.open(bmUrl, '_blank'); }} title="Open Business Manager">
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
           <div className="space-y-1.5">
             <label className="text-[11px] text-muted-foreground font-medium">Business Manager URL</label>
             <Input
@@ -997,33 +1004,32 @@ function MetaStatusCell({
               className="h-7 text-xs"
             />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-[11px] text-muted-foreground font-medium">Ad Account ID (Primary)</label>
-            <Input
-              value={adAccountId}
-              onChange={(e) => setAdAccountId(e.target.value)}
-              placeholder="act_123456789"
-              className="h-7 text-xs"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[11px] text-muted-foreground font-medium">Ad Account ID #2 <span className="text-muted-foreground">(optional)</span></label>
-            <Input
-              value={extraAccount1}
-              onChange={(e) => setExtraAccount1(e.target.value)}
-              placeholder="act_..."
-              className="h-7 text-xs"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[11px] text-muted-foreground font-medium">Ad Account ID #3 <span className="text-muted-foreground">(optional)</span></label>
-            <Input
-              value={extraAccount2}
-              onChange={(e) => setExtraAccount2(e.target.value)}
-              placeholder="act_..."
-              className="h-7 text-xs"
-            />
-          </div>
+          {[
+            { label: 'Ad Account ID (Primary)', value: adAccountId, set: setAdAccountId, placeholder: 'act_123456789' },
+            { label: 'Ad Account ID #2 (optional)', value: extraAccount1, set: setExtraAccount1, placeholder: 'act_...' },
+            { label: 'Ad Account ID #3 (optional)', value: extraAccount2, set: setExtraAccount2, placeholder: 'act_...' },
+          ].map((f, idx) => {
+            const cleanId = f.value.replace(/^act_/, '').trim();
+            const adsUrl = cleanId ? `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${cleanId}` : null;
+            return (
+              <div className="space-y-1.5" key={idx}>
+                <label className="text-[11px] text-muted-foreground font-medium">{f.label}</label>
+                <div className="flex items-center gap-1">
+                  <Input
+                    value={f.value}
+                    onChange={(e) => f.set(e.target.value)}
+                    placeholder={f.placeholder}
+                    className="h-7 text-xs flex-1"
+                  />
+                  {adsUrl && (
+                    <Button variant="outline" size="icon" className="h-7 w-7 shrink-0" onClick={(e) => { e.stopPropagation(); window.open(adsUrl, '_blank'); }} title="Open in Ads Manager">
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
           <div className="space-y-1.5">
             <label className="text-[11px] text-muted-foreground font-medium">Access Token <span className="text-muted-foreground">(optional override)</span></label>
             <Input
@@ -1063,6 +1069,8 @@ function CrmStatusCell({
   const [apiKey, setApiKey] = useState(client.ghl_api_key || '');
   const [accountUrl, setAccountUrl] = useState((client as any).ghl_account_url || '');
   const [open, setOpen] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const updateClient = useUpdateClient();
 
   const handleSave = async () => {
@@ -1085,6 +1093,31 @@ function CrmStatusCell({
     const url = accountUrl || (locationId ? `https://app.gohighlevel.com/v2/location/${locationId}` : null);
     if (url) window.open(url, '_blank');
     else toast.error('No GHL URL or Location ID set');
+  };
+
+  const handleTestConnection = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!apiKey || !locationId) {
+      setTestResult({ ok: false, message: 'Enter both Location ID and API Key first' });
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('test-ghl-connection', {
+        body: { api_key: apiKey, location_id: locationId },
+      });
+      if (error) throw error;
+      if (data?.ok) {
+        setTestResult({ ok: true, message: `Connected${data.location_name ? ` — ${data.location_name}` : ''}` });
+      } else {
+        setTestResult({ ok: false, message: data?.error || 'Connection failed' });
+      }
+    } catch (err: any) {
+      setTestResult({ ok: false, message: err?.message || 'Test failed' });
+    } finally {
+      setTesting(false);
+    }
   };
 
   return (
@@ -1158,11 +1191,33 @@ function CrmStatusCell({
               {syncInfo.error}
             </div>
           )}
-          <div className="flex justify-end gap-1.5">
+          {testResult && (
+            <div className={cn(
+              "text-[10px] rounded p-1.5 flex items-center gap-1",
+              testResult.ok
+                ? "text-green-700 dark:text-green-400 bg-green-500/10 border border-green-500/30"
+                : "text-destructive bg-destructive/10"
+            )}>
+              {testResult.ok ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+              {testResult.message}
+            </div>
+          )}
+          <div className="flex justify-between gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 text-[10px]"
+              onClick={handleTestConnection}
+              disabled={testing || !apiKey || !locationId}
+            >
+              {testing ? 'Testing…' : 'Test Connection'}
+            </Button>
+            <div className="flex gap-1.5">
             <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={() => setOpen(false)}>Cancel</Button>
             <Button size="sm" className="h-6 text-[10px]" onClick={handleSave} disabled={updateClient.isPending}>
               {updateClient.isPending ? 'Saving…' : 'Save'}
             </Button>
+            </div>
           </div>
         </div>
       </PopoverContent>
