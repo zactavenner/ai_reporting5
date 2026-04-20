@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 const SLACK_GATEWAY_URL = "https://connector-gateway.lovable.dev/slack/api";
-const DEFAULT_CHANNEL = "#ops";
+const DEFAULT_CHANNEL = "C079MMNEKK6"; // #sales-reporting
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
