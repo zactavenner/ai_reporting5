@@ -457,7 +457,12 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {filteredAds.slice(0, 60).map((ad: any) => (
-                  <AdCard key={ad.id} ad={ad} clientName={clientMap[ad.client_id]?.name} />
+                  <AdCard
+                    key={ad.id}
+                    ad={ad}
+                    clientName={clientMap[ad.client_id]?.name}
+                    onClick={() => setPreviewAd(ad)}
+                  />
                 ))}
               </div>
             )}
