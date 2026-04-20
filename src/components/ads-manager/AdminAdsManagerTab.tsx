@@ -189,6 +189,50 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Date range picker */}
+            <Select value={datePreset} onValueChange={applyPreset}>
+              <SelectTrigger className="w-[140px] h-8 text-xs">
+                <CalIcon className="h-3 w-3 mr-1" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="14d">Last 14 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="90d">Last 90 days</SelectItem>
+                <SelectItem value="mtd">Month to date</SelectItem>
+                <SelectItem value="last-month">Last month</SelectItem>
+                <SelectItem value="custom">Custom…</SelectItem>
+              </SelectContent>
+            </Select>
+            {datePreset === 'custom' && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-8 text-xs">
+                    {format(dateRange.from, 'MMM d')} – {format(dateRange.to, 'MMM d')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="range"
+                    selected={{ from: dateRange.from, to: dateRange.to }}
+                    onSelect={(r: any) => r?.from && r?.to && setDateRange({ from: r.from, to: r.to })}
+                    numberOfMonths={2}
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => setCreateCampaignOpen(true)}
+              disabled={clientFilter === 'all'}
+              title={clientFilter === 'all' ? 'Select a client first' : 'Create new campaign'}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              New Campaign
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -366,7 +410,7 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                         <TableHead className="text-right">CTR</TableHead>
                         <TableHead className="text-right">Reach</TableHead>
                         <TableHead className="text-right">Leads</TableHead>
-                        <TableHead className="w-12"></TableHead>
+                        <TableHead className="w-20"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -386,7 +430,17 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                           <TableCell className="text-right text-xs">{fmtPct(a.ctr)}</TableCell>
                           <TableCell className="text-right text-xs">{fmtN(a.reach)}</TableCell>
                           <TableCell className="text-right text-xs">{fmtN(a.attributed_leads)}</TableCell>
-                          <TableCell><ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /></TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-[10px]"
+                              onClick={() => setCreateAdContext({ adSetId: a.id, name: a.name })}
+                            >
+                              <Upload className="h-3 w-3 mr-1" />
+                              Ad
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -403,7 +457,12 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {filteredAds.slice(0, 60).map((ad: any) => (
-                  <AdCard key={ad.id} ad={ad} clientName={clientMap[ad.client_id]?.name} />
+                  <AdCard
+                    key={ad.id}
+                    ad={ad}
+                    clientName={clientMap[ad.client_id]?.name}
+                    onClick={() => setPreviewAd(ad)}
+                  />
                 ))}
               </div>
             )}
@@ -415,19 +474,31 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
           </TabsContent>
         </Tabs>
 
-        {/* Phase 2 / 3 placeholder */}
-        <Card className="p-4 border-dashed bg-muted/20">
-          <div className="flex items-start gap-3">
-            <div className="rounded-lg bg-primary/10 p-2"><Megaphone className="h-4 w-4 text-primary" /></div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold">Coming next</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                <strong>Phase 2:</strong> Upload creatives + create ads from existing campaigns ·{' '}
-                <strong>Phase 3:</strong> Full campaign builder with targeting, budget, bidding (requires Meta App ads_management scope verification)
-              </p>
-            </div>
-          </div>
-        </Card>
+        {/* Dialogs */}
+        {clientFilter !== 'all' && (
+          <CreateCampaignDialog
+            open={createCampaignOpen}
+            onOpenChange={setCreateCampaignOpen}
+            clientId={clientFilter}
+            clientName={clientMap[clientFilter]?.name || ''}
+          />
+        )}
+        {createAdContext && clientFilter !== 'all' && (
+          <CreateAdDialog
+            open={!!createAdContext}
+            onOpenChange={(v) => !v && setCreateAdContext(null)}
+            clientId={clientFilter}
+            adSetId={createAdContext.adSetId}
+            adSetName={createAdContext.name}
+          />
+        )}
+        {previewAd && (
+          <AdHDPreviewDialog
+            open={!!previewAd}
+            onOpenChange={(v) => !v && setPreviewAd(null)}
+            ad={previewAd}
+          />
+        )}
       </div>
     </TooltipProvider>
   );
@@ -470,10 +541,10 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
-function AdCard({ ad, clientName }: { ad: any; clientName?: string }) {
+function AdCard({ ad, clientName, onClick }: { ad: any; clientName?: string; onClick?: () => void }) {
   const thumb = ad.thumbnail_url || ad.image_url;
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow">
+    <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={onClick}>
       <div className="aspect-square bg-muted relative overflow-hidden">
         {thumb ? (
           <img src={thumb} alt={ad.name} className="w-full h-full object-cover" loading="lazy" />
