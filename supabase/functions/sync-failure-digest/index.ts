@@ -22,11 +22,10 @@ Deno.serve(async (req) => {
       if (body?.channel) channel = body.channel;
     } catch {}
 
-    // Pull all clients with credentials and current sync health
+    // Pull sync health view (already aggregates last_meta/last_ghl per client)
     const { data: clients } = await supabase
-      .from("clients")
-      .select("id, name, last_ghl_sync_at, ghl_sync_status, ghl_sync_error, last_meta_sync_at, meta_ad_account_id, ghl_api_key, ghl_location_id")
-      .in("status", ["active", "onboarding"]);
+      .from("client_sync_health")
+      .select("client_id, client_name, has_ghl_credentials, meta_ad_account_id, last_meta_success_at, last_ghl_success_at, last_ghl_error, meta_hours_since_success, ghl_hours_since_success, overall_health");
 
     if (!clients?.length) {
       return new Response(JSON.stringify({ success: true, message: "No clients" }), {
@@ -39,24 +38,18 @@ Deno.serve(async (req) => {
     const metaIssues: string[] = [];
 
     for (const c of clients) {
-      if (c.ghl_api_key && c.ghl_location_id) {
-        const last = c.last_ghl_sync_at ? new Date(c.last_ghl_sync_at).getTime() : 0;
-        const hours = last ? Math.round((now - last) / (1000 * 60 * 60)) : -1;
-        if (!last) {
-          ghlIssues.push(`• *${c.name}* — never synced`);
-        } else if (hours > 25) {
-          const errPart = c.ghl_sync_error ? ` _(${c.ghl_sync_error.substring(0, 80)})_` : "";
-          ghlIssues.push(`• *${c.name}* — ${hours}h stale${errPart}`);
-        } else if (c.ghl_sync_status === "error") {
-          ghlIssues.push(`• *${c.name}* — error: ${(c.ghl_sync_error || "unknown").substring(0, 80)}`);
+      if (c.has_ghl_credentials) {
+        const hours = c.ghl_hours_since_success != null ? Math.round(c.ghl_hours_since_success) : -1;
+        if (hours < 0) ghlIssues.push(`• *${c.client_name}* — never synced`);
+        else if (hours > 25) {
+          const errPart = c.last_ghl_error ? ` _(${String(c.last_ghl_error).substring(0, 80)})_` : "";
+          ghlIssues.push(`• *${c.client_name}* — ${hours}h stale${errPart}`);
         }
       }
-
       if (c.meta_ad_account_id) {
-        const last = c.last_meta_sync_at ? new Date(c.last_meta_sync_at).getTime() : 0;
-        const hours = last ? Math.round((now - last) / (1000 * 60 * 60)) : -1;
-        if (!last) metaIssues.push(`• *${c.name}* — never synced`);
-        else if (hours > 25) metaIssues.push(`• *${c.name}* — ${hours}h stale`);
+        const hours = c.meta_hours_since_success != null ? Math.round(c.meta_hours_since_success) : -1;
+        if (hours < 0) metaIssues.push(`• *${c.client_name}* — never synced`);
+        else if (hours > 25) metaIssues.push(`• *${c.client_name}* — ${hours}h stale`);
       }
     }
 
@@ -84,8 +77,8 @@ Deno.serve(async (req) => {
       if (r.ghl_contact_count > 0) {
         const ratio = r.matched_count / r.ghl_contact_count;
         if (ratio < 0.95) {
-          const client = clients.find((c) => c.id === r.client_id);
-          if (client) reconIssues.push(`• *${client.name}* — ${(ratio * 100).toFixed(1)}% match (${r.matched_count}/${r.ghl_contact_count})`);
+          const client = clients.find((c: any) => c.client_id === r.client_id);
+          if (client) reconIssues.push(`• *${client.client_name}* — ${(ratio * 100).toFixed(1)}% match (${r.matched_count}/${r.ghl_contact_count})`);
         }
       }
     }
