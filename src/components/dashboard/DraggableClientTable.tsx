@@ -9,6 +9,8 @@ import { Client, useUpdateClient } from '@/hooks/useClients';
 import { useClientAssignments, useUpdateClientAssignment } from '@/hooks/useClientAssignments';
 import { AggregatedMetrics } from '@/hooks/useMetrics';
 import { KPIThresholds, ClientSettings } from '@/hooks/useClientSettings';
+import { getEffectiveMonthlyTarget } from '@/hooks/useClientSettings';
+import { calculateClientRevenue } from '@/hooks/useClientMRR';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
