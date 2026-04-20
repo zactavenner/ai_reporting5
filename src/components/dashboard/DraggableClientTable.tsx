@@ -742,7 +742,6 @@ export function DraggableClientTable({
                     </TableCell>
 
                     {/* CRM Status */}
-                    <TableCell className="text-center py-0 px-1">
                     <TableCell className="text-center py-0 px-1" onClick={(e) => e.stopPropagation()}>
                       <CrmStatusCell client={client} syncInfo={syncInfo} />
                     </TableCell>
