@@ -480,6 +480,7 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
             open={createCampaignOpen}
             onOpenChange={setCreateCampaignOpen}
             clientId={clientFilter}
+            clientName={clientMap[clientFilter]?.name || ''}
           />
         )}
         {createAdContext && clientFilter !== 'all' && (
@@ -496,7 +497,6 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
             open={!!previewAd}
             onOpenChange={(v) => !v && setPreviewAd(null)}
             ad={previewAd}
-            clientId={previewAd.client_id}
           />
         )}
       </div>
