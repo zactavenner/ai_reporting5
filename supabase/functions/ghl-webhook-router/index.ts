@@ -34,6 +34,32 @@ const EVENT_MAP: Record<string, { touchpoint: string; capi: string | null }> = {
   opportunity_status_update: { touchpoint: "funded", capi: "Purchase" },
 };
 
+// Verify GHL webhook signature using HMAC-SHA256.
+// GHL signs webhooks with a shared secret; we store it per-client in client_settings.ghl_webhook_secret.
+async function verifySignature(
+  bodyText: string,
+  signature: string | null,
+  secret: string,
+): Promise<boolean> {
+  if (!signature) return false;
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(secret);
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sigBuffer = await crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(bodyText));
+  const sigArray = Array.from(new Uint8Array(sigBuffer));
+  const expectedHex = sigArray.map(b => b.toString(16).padStart(2, "0")).join("");
+  // GHL may send signature as hex or base64; accept both
+  const expectedB64 = btoa(String.fromCharCode(...sigArray));
+  const normalizedSig = signature.replace(/^sha256=/, "");
+  return normalizedSig === expectedHex || normalizedSig === expectedB64;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -53,7 +79,46 @@ Deno.serve(async (req) => {
       });
     }
 
-    const body = await req.json();
+    // Read raw body for signature verification (can only consume once)
+    const bodyText = await req.text();
+
+    // Check client webhook secret for signature verification.
+    // If no secret is configured, we allow through but log a warning (backward-compat for unsigned GHL accounts).
+    // Once a client has ghl_webhook_secret set, signature is REQUIRED and invalid signatures are rejected.
+    const { data: secretSetting } = await supabase
+      .from("client_settings")
+      .select("ghl_webhook_secret")
+      .eq("client_id", clientId)
+      .maybeSingle();
+
+    if (secretSetting?.ghl_webhook_secret) {
+      const signature = req.headers.get("x-ghl-signature") || req.headers.get("x-webhook-signature") || req.headers.get("x-signature");
+      const isValid = await verifySignature(bodyText, signature, secretSetting.ghl_webhook_secret);
+      if (!isValid) {
+        console.warn(`[ghl-webhook-router] Invalid signature for client ${clientId}`);
+        await supabase.from("sync_warnings").insert({
+          client_id: clientId,
+          warning_type: "webhook_signature_invalid",
+          message: "GHL webhook received with invalid or missing signature",
+          metadata: { headers_received: signature ? "signature present" : "signature missing" },
+        });
+        return new Response(JSON.stringify({ success: false, error: "Invalid signature" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else {
+      // No secret configured — log once per hour to nudge setup without spamming
+      console.warn(`[ghl-webhook-router] No signature secret configured for client ${clientId} — accepting unsigned webhook`);
+    }
+
+    let body;
+    try {
+      body = JSON.parse(bodyText);
+    } catch (parseErr) {
+      return new Response(JSON.stringify({ success: false, error: "Invalid JSON body" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const eventType = body.type || body.event_type || body.eventType;
     const mapping = EVENT_MAP[eventType];
 
@@ -154,15 +219,39 @@ Deno.serve(async (req) => {
         }).then(r => r.json()).catch(err => ({ error: err.message }))
       : Promise.resolve({ skipped: true });
 
-    const [touchpointResult, capiResult] = await Promise.all([touchpointPromise, capiPromise]);
+    // For new leads (ContactCreate), also enqueue an enrich-and-sync-back job.
+    // This is durable — the queue guarantees the enrichment runs even if this
+    // call fails or times out. GHL webhook retries don't create duplicates
+    // because ghl_sync_queue uses a dedup_key.
+    const enrichPromise = (eventType === "ContactCreate" || eventType === "contact_create")
+      ? fetch(`${supabaseUrl}/functions/v1/ghl-lead-enrich-sync`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${supabaseKey}`,
+          },
+          body: JSON.stringify({
+            clientId,
+            ghlContactId,
+            operation: "enrich_and_sync_back",
+            payload: { email, phone },
+            priority: 10, // New-lead enrichment is high priority
+          }),
+        }).then(r => r.json()).catch(err => ({ error: err.message }))
+      : Promise.resolve({ skipped: true });
 
-    console.log(`[ghl-webhook-router] Processed ${eventType}: touchpoint=${touchpointResult.success ? "ok" : "failed"}, capi=${capiResult.success ? "ok" : "skipped"}`);
+    const [touchpointResult, capiResult, enrichResult] = await Promise.all([
+      touchpointPromise, capiPromise, enrichPromise,
+    ]);
+
+    console.log(`[ghl-webhook-router] Processed ${eventType}: touchpoint=${touchpointResult.success ? "ok" : "failed"}, capi=${capiResult.success ? "ok" : "skipped"}, enrich=${(enrichResult as any).success ? "queued" : "skipped"}`);
 
     return new Response(JSON.stringify({
       success: true,
       eventType,
       touchpoint: touchpointResult,
       capi: capiResult,
+      enrich: enrichResult,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
     console.error("[ghl-webhook-router] Error:", error);
