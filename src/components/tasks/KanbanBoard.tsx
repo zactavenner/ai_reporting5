@@ -623,7 +623,7 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-4 overflow-x-auto pb-4">
-            {STAGES.map(stage => (
+            {STAGES.filter(stage => !(isPublicView && (stage as any).agencyOnly)).map(stage => (
               <KanbanColumn
                 key={stage.id}
                 stage={stage}
