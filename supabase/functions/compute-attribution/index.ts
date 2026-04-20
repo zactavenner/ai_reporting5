@@ -126,12 +126,16 @@ Deno.serve(async (req) => {
     }
 
     const results: any[] = [];
+    const clientErrors: Array<{ client: string; error: string }> = [];
 
     for (const client of clients) {
       console.log(`[compute-attribution] Processing ${client.name}...`);
 
+      // Per-client try/catch: one client's failure should not kill the whole run
+      try {
+
       // 1. Fetch all touchpoints for this client in the period
-      const { data: touchpoints } = await supabase
+      const { data: touchpoints, error: tpErr } = await supabase
         .from("lead_touchpoints")
         .select("id, lead_id, touchpoint_type, meta_campaign_id, meta_adset_id, meta_ad_id, timestamp")
         .eq("client_id", client.id)
@@ -139,55 +143,79 @@ Deno.serve(async (req) => {
         .lte("timestamp", `${periodEnd}T23:59:59Z`)
         .order("timestamp", { ascending: true });
 
+      if (tpErr) throw new Error(`Failed to fetch touchpoints: ${tpErr.message}`);
+
       // 2. Fetch leads created in the period
-      const { data: leads } = await supabase
+      const { data: leads, error: leadsErr } = await supabase
         .from("leads")
         .select("id, client_id, created_at, is_spam")
         .eq("client_id", client.id)
         .gte("created_at", `${periodStart}T00:00:00Z`)
         .lte("created_at", `${periodEnd}T23:59:59Z`);
 
-      // 3. Fetch calls for these leads
+      if (leadsErr) throw new Error(`Failed to fetch leads: ${leadsErr.message}`);
+
+      // 3. Fetch calls for these leads (FIXED: was silently dropping leads beyond 1000)
       const leadIds = (leads || []).map(l => l.id);
       let callsByLead: Record<string, { total: number; showed: number }> = {};
       if (leadIds.length > 0) {
-        const { data: calls } = await supabase
-          .from("calls")
-          .select("lead_id, showed")
-          .in("lead_id", leadIds.slice(0, 1000)); // batch limit
+        // Chunk to avoid Postgres IN() limits while still fetching ALL leads
+        const CHUNK_SIZE = 500;
+        for (let i = 0; i < leadIds.length; i += CHUNK_SIZE) {
+          const chunk = leadIds.slice(i, i + CHUNK_SIZE);
+          const { data: calls, error: callsErr } = await supabase
+            .from("calls")
+            .select("lead_id, showed")
+            .in("lead_id", chunk);
 
-        for (const c of calls || []) {
-          if (!c.lead_id) continue;
-          if (!c.lead_id) continue;
-          const existing = callsByLead[c.lead_id] || { total: 0, showed: 0 };
-          existing.total++;
-          if (c.showed) existing.showed++;
-          callsByLead[c.lead_id] = existing;
+          if (callsErr) {
+            throw new Error(`Failed to fetch calls for ${client.name}: ${callsErr.message}`);
+          }
+
+          for (const c of calls || []) {
+            if (!c.lead_id) continue;
+            const existing = callsByLead[c.lead_id] || { total: 0, showed: 0 };
+            existing.total++;
+            // Explicit === true check: NULL showed is NOT counted as shown (it's unknown)
+            if (c.showed === true) existing.showed++;
+            callsByLead[c.lead_id] = existing;
+          }
         }
       }
 
-      // 4. Fetch funded investors for these leads
+      // 4. Fetch funded investors for these leads (FIXED: chunked, proper NULL handling)
       let fundedByLead: Record<string, { count: number; dollars: number; commitments: number; commitmentDollars: number }> = {};
       if (leadIds.length > 0) {
-        const { data: funded } = await supabase
-          .from("funded_investors")
-          .select("lead_id, funded_amount, commitment_amount")
-          .in("lead_id", leadIds.slice(0, 1000));
+        const CHUNK_SIZE = 500;
+        for (let i = 0; i < leadIds.length; i += CHUNK_SIZE) {
+          const chunk = leadIds.slice(i, i + CHUNK_SIZE);
+          const { data: funded, error: fundedErr } = await supabase
+            .from("funded_investors")
+            .select("lead_id, funded_amount, commitment_amount")
+            .in("lead_id", chunk);
 
-        for (const f of funded || []) {
-          if (!f.lead_id) continue;
-          const existing = fundedByLead[f.lead_id] || { count: 0, dollars: 0, commitments: 0, commitmentDollars: 0 };
-          const amt = Number(f.funded_amount) || 0;
-          const commitAmt = Number(f.commitment_amount) || 0;
-          if (amt > 0) {
-            existing.count++;
-            existing.dollars += amt;
+          if (fundedErr) {
+            throw new Error(`Failed to fetch funded investors for ${client.name}: ${fundedErr.message}`);
           }
-          if (commitAmt > 0) {
-            existing.commitments++;
-            existing.commitmentDollars += commitAmt;
+
+          for (const f of funded || []) {
+            if (!f.lead_id) continue;
+            const existing = fundedByLead[f.lead_id] || { count: 0, dollars: 0, commitments: 0, commitmentDollars: 0 };
+            // Explicit NULL → 0 conversion. `Number(null) === 0`, but `Number(undefined) === NaN`, so use fallback
+            const amt = f.funded_amount === null || f.funded_amount === undefined ? 0 : Number(f.funded_amount);
+            const commitAmt = f.commitment_amount === null || f.commitment_amount === undefined ? 0 : Number(f.commitment_amount);
+            // Count as funded if funded_amount > 0
+            if (amt > 0) {
+              existing.count++;
+              existing.dollars += amt;
+            }
+            // Count as commitment if commitment_amount > 0 (independent of funded status)
+            if (commitAmt > 0) {
+              existing.commitments++;
+              existing.commitmentDollars += commitAmt;
+            }
+            fundedByLead[f.lead_id] = existing;
           }
-          fundedByLead[f.lead_id] = existing;
         }
       }
 
@@ -314,7 +342,7 @@ Deno.serve(async (req) => {
           });
         }
 
-        // Batch upsert
+        // Batch upsert — throw on error so sync_runs correctly marks as failed
         if (rows.length > 0) {
           const { error: upsertErr } = await supabase
             .from("attribution_results")
@@ -322,8 +350,15 @@ Deno.serve(async (req) => {
               onConflict: "client_id,period_start,period_end,attribution_model,meta_campaign_id,meta_adset_id,meta_ad_id",
             });
           if (upsertErr) {
-            console.error(`[compute-attribution] Upsert error for ${client.name}/${model}:`, upsertErr);
+            throw new Error(`Upsert failed for ${client.name}/${model}: ${upsertErr.message}`);
           }
+        }
+
+        // Track unattributed revenue: funded leads with zero trackable touchpoints
+        const unattributedLeads = enrichedLeads.filter(l => l.touchpoints.length === 0 && l.funded_dollars > 0);
+        const unattributedDollars = unattributedLeads.reduce((s, l) => s + l.funded_dollars, 0);
+        if (unattributedLeads.length > 0) {
+          console.warn(`[compute-attribution] ${client.name}/${model}: ${unattributedLeads.length} funded leads have zero touchpoints, $${unattributedDollars.toFixed(2)} unattributed`);
         }
 
         results.push({
@@ -332,10 +367,12 @@ Deno.serve(async (req) => {
           campaigns: Object.keys(byCampaign).length,
           leadsProcessed: enrichedLeads.length,
           touchpointsUsed: (touchpoints || []).length,
+          unattributedLeads: unattributedLeads.length,
+          unattributedDollars,
         });
       }
 
-      // Log sync run
+      // Log sync run (success path)
       await supabase.from("sync_runs").insert({
         client_id: client.id,
         source: "reconciliation",
@@ -345,10 +382,34 @@ Deno.serve(async (req) => {
         rows_written: results.filter(r => r.client === client.name).reduce((s, r) => s + r.campaigns, 0),
         metadata: { models, periodStart, periodEnd },
       }).then(() => {});
+
+      } catch (clientErr) {
+        // Per-client failure: log and continue with remaining clients
+        const errMsg = clientErr instanceof Error ? clientErr.message : "Unknown error";
+        console.error(`[compute-attribution] ${client.name} failed:`, errMsg);
+        clientErrors.push({ client: client.name, error: errMsg });
+
+        await supabase.from("sync_runs").insert({
+          client_id: client.id,
+          source: "reconciliation",
+          function_name: "compute-attribution",
+          finished_at: new Date().toISOString(),
+          status: "failed",
+          rows_written: 0,
+          error_message: errMsg,
+          metadata: { models, periodStart, periodEnd },
+        }).then(() => {});
+      }
     }
 
-    console.log(`[compute-attribution] Complete: ${results.length} model/client combinations processed`);
-    return new Response(JSON.stringify({ success: true, results }), {
+    const totalErrors = clientErrors.length;
+    console.log(`[compute-attribution] Complete: ${results.length} model/client combinations processed, ${totalErrors} client errors`);
+    return new Response(JSON.stringify({
+      success: totalErrors === 0,
+      results,
+      clientErrors: clientErrors.length > 0 ? clientErrors : undefined,
+    }), {
+      status: totalErrors === clients.length ? 500 : 200, // Fail only if ALL clients failed
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
