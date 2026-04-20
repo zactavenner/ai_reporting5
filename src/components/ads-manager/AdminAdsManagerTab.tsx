@@ -384,8 +384,8 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                           <TableCell className="text-right text-xs">{fmtN(c.clicks)}</TableCell>
                           <TableCell className="text-right text-xs">{fmtPct(c.ctr)}</TableCell>
                           <TableCell className="text-right text-xs">{fmt$(c.cpc)}</TableCell>
-                          <TableCell className="text-right text-xs font-medium text-blue-500">{fmtN(c.meta_reported_leads)}</TableCell>
-                          <TableCell className="text-right text-xs font-medium text-emerald-500">{fmtN(c.attributed_leads)}</TableCell>
+                          <TableCell className="text-right text-xs font-medium text-primary">{fmtN(c.meta_reported_leads)}</TableCell>
+                          <TableCell className="text-right text-xs font-medium text-chart-2">{fmtN(c.attributed_leads)}</TableCell>
                           <TableCell className="text-right text-xs">{fmt$(c.cost_per_lead)}</TableCell>
                           <TableCell><ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /></TableCell>
                         </TableRow>
