@@ -421,7 +421,8 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                         <TableHead className="text-right">Clicks</TableHead>
                         <TableHead className="text-right">CTR</TableHead>
                         <TableHead className="text-right">Reach</TableHead>
-                        <TableHead className="text-right">Leads</TableHead>
+                        <TableHead className="text-right text-primary">Meta</TableHead>
+                        <TableHead className="text-right text-chart-2">CRM</TableHead>
                         <TableHead className="w-20"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -441,7 +442,8 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                           <TableCell className="text-right text-xs">{fmtN(a.clicks)}</TableCell>
                           <TableCell className="text-right text-xs">{fmtPct(a.ctr)}</TableCell>
                           <TableCell className="text-right text-xs">{fmtN(a.reach)}</TableCell>
-                          <TableCell className="text-right text-xs">{fmtN(a.attributed_leads)}</TableCell>
+                          <TableCell className="text-right text-xs font-medium text-primary">{fmtN(a.meta_reported_leads)}</TableCell>
+                          <TableCell className="text-right text-xs font-medium text-chart-2">{fmtN(a.attributed_leads)}</TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <Button
                               size="sm"
