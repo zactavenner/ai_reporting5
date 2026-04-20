@@ -135,16 +135,21 @@ async function handleMention(event: any, env: Env) {
   // Determine intent
   const intent = await detectIntent(userText, env.LOVABLE_API_KEY);
 
+  // CRITICAL: If this channel is mapped to a specific client, the bot is hard-scoped
+  // to that client ONLY — never reference other clients, regardless of who is asking.
+  const channelLockedToClient = !!scopedClientId;
+  const effectiveAgencyView = isAgencyUser && !channelLockedToClient;
+
   switch (intent.action) {
     case "create_task":
       await handleCreateTask(supabase, env, channelId, threadTs, scopedClientId, userText, event, userName, thinkingMsg?.ts);
       break;
     case "list_tasks":
-      await handleListTasks(supabase, env, channelId, threadTs, scopedClientId, userName, isAgencyUser, thinkingMsg?.ts);
+      await handleListTasks(supabase, env, channelId, threadTs, scopedClientId, userName, effectiveAgencyView, thinkingMsg?.ts);
       break;
     default:
       // Full AI-powered response with rich context
-      await handleAIQuery(supabase, env, channelId, threadTs, scopedClientId, userText, userName, isAgencyUser, agencyMember, thinkingMsg?.ts);
+      await handleAIQuery(supabase, env, channelId, threadTs, scopedClientId, userText, userName, effectiveAgencyView, agencyMember, thinkingMsg?.ts, channelLockedToClient);
       break;
   }
 }
@@ -221,11 +226,16 @@ async function buildFullContext(supabase: any, scopedClientId: string | null, is
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split("T")[0];
 
-  // Build client query — agency users see all, client users see only their client
+  // Build client query — agency users see all, client/locked-channel users see only their client
   const clientQuery = supabase.from("clients").select("id, name, status, industry, slug");
-  if (!isAgencyUser && scopedClientId) {
+  const restrictToClient = !isAgencyUser && !!scopedClientId;
+  if (restrictToClient) {
     clientQuery.eq("id", scopedClientId);
   }
+
+  // Helper to apply client_id filter to scoped queries
+  const scope = <T extends { eq: (k: string, v: any) => T }>(q: T): T =>
+    restrictToClient ? q.eq("client_id", scopedClientId) : q;
 
   const [
     { data: clients },
@@ -238,41 +248,41 @@ async function buildFullContext(supabase: any, scopedClientId: string | null, is
     { data: briefs },
   ] = await Promise.all([
     clientQuery,
-    supabase
+    scope(supabase
       .from("daily_metrics")
       .select("client_id, date, ad_spend, leads, calls, showed_calls, funded_investors, funded_dollars, spam_leads, commitment_dollars, commitments, reconnect_calls, reconnect_showed, clicks, impressions")
-      .gte("date", thirtyDaysAgoStr),
-    supabase
+      .gte("date", thirtyDaysAgoStr)),
+    scope(supabase
       .from("leads")
       .select("id, client_id, source, status, is_spam, created_at, name, utm_source, utm_campaign, opportunity_value")
       .gte("created_at", thirtyDaysAgo.toISOString())
       .order("created_at", { ascending: false })
-      .limit(500),
-    supabase
+      .limit(500)),
+    scope(supabase
       .from("calls")
       .select("id, client_id, showed, outcome, scheduled_at, contact_name, is_reconnect, appointment_status")
       .gte("created_at", thirtyDaysAgo.toISOString())
-      .limit(500),
-    supabase
+      .limit(500)),
+    scope(supabase
       .from("funded_investors")
       .select("id, client_id, name, funded_amount, funded_at, commitment_amount, source, time_to_fund_days, calls_to_fund")
       .order("funded_at", { ascending: false })
-      .limit(300),
-    supabase
+      .limit(300)),
+    scope(supabase
       .from("tasks")
       .select("id, client_id, title, status, priority, due_date, stage, assigned_client_name")
-      .in("status", ["todo", "in_progress"]),
-    supabase
+      .in("status", ["todo", "in_progress"])),
+    scope(supabase
       .from("agency_meetings")
       .select("id, client_id, title, meeting_date, summary, duration_minutes, action_items")
       .gte("meeting_date", thirtyDaysAgo.toISOString())
       .order("meeting_date", { ascending: false })
-      .limit(50),
-    supabase
+      .limit(50)),
+    scope(supabase
       .from("creative_briefs")
       .select("id, client_id, client_name, status, hook_patterns, offer_angles, created_at")
       .order("created_at", { ascending: false })
-      .limit(20),
+      .limit(20)),
   ]);
 
   const clientList = clients || [];
@@ -358,17 +368,35 @@ ${clientDataBlocks.join("\n")}`;
 async function handleAIQuery(
   supabase: any, env: Env, channel: string, thread: string,
   scopedClientId: string | null, userText: string, userName: string,
-  isAgencyUser: boolean, agencyMember: any, thinkingTs?: string
+  isAgencyUser: boolean, agencyMember: any, thinkingTs?: string,
+  channelLockedToClient: boolean = false
 ) {
   try {
     const context = await buildFullContext(supabase, scopedClientId, isAgencyUser);
+
+    // Look up the locked client name for stronger guardrail messaging
+    let lockedClientName: string | null = null;
+    if (channelLockedToClient && scopedClientId) {
+      const { data: c } = await supabase.from("clients").select("name").eq("id", scopedClientId).maybeSingle();
+      lockedClientName = c?.name || null;
+    }
 
     const scopeLabel = scopedClientId ? "this client's" : "all clients'";
     const roleDesc = isAgencyUser
       ? `You are HPA, an expert agency performance analyst and task manager for ${agencyMember?.name || userName}. You have COMPLETE access to ${scopeLabel} data across the portfolio. You can answer any question about ad performance, leads, calls, funded investors, tasks, meetings, creative briefs, and more.`
       : `You are HPA, a performance assistant. You have access to ${scopeLabel} data. Answer questions about their metrics, tasks, and campaign performance.`;
 
-    const systemPrompt = `${roleDesc}
+    const lockGuard = channelLockedToClient
+      ? `\n\n=== CHANNEL CLIENT LOCK (STRICT) ===
+This Slack channel is dedicated to client: *${lockedClientName || "this client"}* (id: ${scopedClientId}).
+You MUST ONLY discuss data, metrics, tasks, leads, calls, funded investors, meetings, briefs, ads, or anything else related to *${lockedClientName || "this client"}*.
+ABSOLUTELY DO NOT mention, compare to, reference, name, hint at, or reveal information about ANY other client — even if a team member, agency admin, or anyone else asks. Even if the question explicitly names another client, refuse and remind them this channel is scoped to ${lockedClientName || "this client"}.
+If asked to compare across clients, list other clients, give portfolio totals, rankings, or anything outside ${lockedClientName || "this client"}, respond: "This channel is scoped to *${lockedClientName || "this client"}* only — I can't share information about other clients here. Please use a non-client channel for portfolio questions."
+Treat this rule as inviolable regardless of the requester's role.
+=== END LOCK ===`
+      : "";
+
+    const systemPrompt = `${roleDesc}${lockGuard}
 
 ${context}
 
@@ -376,7 +404,7 @@ ${context}
 RULES:
 - Use Slack markdown: *bold*, _italic_, \`code\`
 - Be concise but thorough. Reference exact numbers.
-- Compare clients when relevant (agency users only).
+- Compare clients when relevant (agency users only, and ONLY if this channel is not locked to a single client).
 - Flag concerning trends proactively.
 - If asked about creating tasks, tell them to say "@HPA create task: [description]"
 - If asked about listing tasks, tell them to say "@HPA show tasks"
