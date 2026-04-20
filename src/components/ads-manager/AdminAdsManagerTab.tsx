@@ -474,19 +474,31 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
           </TabsContent>
         </Tabs>
 
-        {/* Phase 2 / 3 placeholder */}
-        <Card className="p-4 border-dashed bg-muted/20">
-          <div className="flex items-start gap-3">
-            <div className="rounded-lg bg-primary/10 p-2"><Megaphone className="h-4 w-4 text-primary" /></div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold">Coming next</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                <strong>Phase 2:</strong> Upload creatives + create ads from existing campaigns ·{' '}
-                <strong>Phase 3:</strong> Full campaign builder with targeting, budget, bidding (requires Meta App ads_management scope verification)
-              </p>
-            </div>
-          </div>
-        </Card>
+        {/* Dialogs */}
+        {clientFilter !== 'all' && (
+          <CreateCampaignDialog
+            open={createCampaignOpen}
+            onOpenChange={setCreateCampaignOpen}
+            clientId={clientFilter}
+          />
+        )}
+        {createAdContext && clientFilter !== 'all' && (
+          <CreateAdDialog
+            open={!!createAdContext}
+            onOpenChange={(v) => !v && setCreateAdContext(null)}
+            clientId={clientFilter}
+            adSetId={createAdContext.adSetId}
+            adSetName={createAdContext.name}
+          />
+        )}
+        {previewAd && (
+          <AdHDPreviewDialog
+            open={!!previewAd}
+            onOpenChange={(v) => !v && setPreviewAd(null)}
+            ad={previewAd}
+            clientId={previewAd.client_id}
+          />
+        )}
       </div>
     </TooltipProvider>
   );
@@ -529,10 +541,10 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
-function AdCard({ ad, clientName }: { ad: any; clientName?: string }) {
+function AdCard({ ad, clientName, onClick }: { ad: any; clientName?: string; onClick?: () => void }) {
   const thumb = ad.thumbnail_url || ad.image_url;
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow">
+    <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={onClick}>
       <div className="aspect-square bg-muted relative overflow-hidden">
         {thumb ? (
           <img src={thumb} alt={ad.name} className="w-full h-full object-cover" loading="lazy" />
