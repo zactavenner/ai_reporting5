@@ -189,6 +189,50 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Date range picker */}
+            <Select value={datePreset} onValueChange={applyPreset}>
+              <SelectTrigger className="w-[140px] h-8 text-xs">
+                <CalIcon className="h-3 w-3 mr-1" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="14d">Last 14 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="90d">Last 90 days</SelectItem>
+                <SelectItem value="mtd">Month to date</SelectItem>
+                <SelectItem value="last-month">Last month</SelectItem>
+                <SelectItem value="custom">Custom…</SelectItem>
+              </SelectContent>
+            </Select>
+            {datePreset === 'custom' && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-8 text-xs">
+                    {format(dateRange.from, 'MMM d')} – {format(dateRange.to, 'MMM d')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="range"
+                    selected={{ from: dateRange.from, to: dateRange.to }}
+                    onSelect={(r: any) => r?.from && r?.to && setDateRange({ from: r.from, to: r.to })}
+                    numberOfMonths={2}
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => setCreateCampaignOpen(true)}
+              disabled={clientFilter === 'all'}
+              title={clientFilter === 'all' ? 'Select a client first' : 'Create new campaign'}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              New Campaign
+            </Button>
             <Button
               size="sm"
               variant="outline"
