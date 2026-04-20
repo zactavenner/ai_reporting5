@@ -1069,6 +1069,8 @@ function CrmStatusCell({
   const [apiKey, setApiKey] = useState(client.ghl_api_key || '');
   const [accountUrl, setAccountUrl] = useState((client as any).ghl_account_url || '');
   const [open, setOpen] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const updateClient = useUpdateClient();
 
   const handleSave = async () => {
@@ -1091,6 +1093,31 @@ function CrmStatusCell({
     const url = accountUrl || (locationId ? `https://app.gohighlevel.com/v2/location/${locationId}` : null);
     if (url) window.open(url, '_blank');
     else toast.error('No GHL URL or Location ID set');
+  };
+
+  const handleTestConnection = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!apiKey || !locationId) {
+      setTestResult({ ok: false, message: 'Enter both Location ID and API Key first' });
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('test-ghl-connection', {
+        body: { api_key: apiKey, location_id: locationId },
+      });
+      if (error) throw error;
+      if (data?.ok) {
+        setTestResult({ ok: true, message: `Connected${data.location_name ? ` — ${data.location_name}` : ''}` });
+      } else {
+        setTestResult({ ok: false, message: data?.error || 'Connection failed' });
+      }
+    } catch (err: any) {
+      setTestResult({ ok: false, message: err?.message || 'Test failed' });
+    } finally {
+      setTesting(false);
+    }
   };
 
   return (
