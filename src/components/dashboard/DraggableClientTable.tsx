@@ -986,11 +986,29 @@ function MetaStatusCell({
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[11px] text-muted-foreground font-medium">Ad Account ID</label>
+            <label className="text-[11px] text-muted-foreground font-medium">Ad Account ID (Primary)</label>
             <Input
               value={adAccountId}
               onChange={(e) => setAdAccountId(e.target.value)}
               placeholder="act_123456789"
+              className="h-7 text-xs"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground font-medium">Ad Account ID #2 <span className="text-muted-foreground">(optional)</span></label>
+            <Input
+              value={extraAccount1}
+              onChange={(e) => setExtraAccount1(e.target.value)}
+              placeholder="act_..."
+              className="h-7 text-xs"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground font-medium">Ad Account ID #3 <span className="text-muted-foreground">(optional)</span></label>
+            <Input
+              value={extraAccount2}
+              onChange={(e) => setExtraAccount2(e.target.value)}
+              placeholder="act_..."
               className="h-7 text-xs"
             />
           </div>
