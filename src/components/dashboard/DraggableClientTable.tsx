@@ -558,19 +558,7 @@ export function DraggableClientTable({
 
                     {/* Client name */}
                     <TableCell className="font-medium text-[11px] sticky left-7 bg-card z-10 py-0 px-1 truncate max-w-[120px]">
-                      <span className="flex items-center gap-1">
-                        {client.name}
-                        {isInactive && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <AlertTriangle className="h-3 w-3 text-destructive shrink-0" />
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="text-xs">
-                              $0 ad spend &amp; 0 leads yesterday
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
+                      <span className="truncate">{client.name}</span>
                     </TableCell>
 
                     {/* Status */}
