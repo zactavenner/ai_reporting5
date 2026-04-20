@@ -287,7 +287,17 @@ export function DraggableClientTable({
       const showedToFunded = (m.showedCalls || 0) > 0 ? ((m.fundedInvestors || 0) / (m.showedCalls || 1)) * 100 : 0;
       const bottleneck = computeBottleneck(leadToBooked, bookedToShowed, showedToFunded);
       const metaSync = getMetaSyncStatus(s, client);
-      const mrr = (s as any)?.mrr || 0;
+      // Total projected MRR = base MRR + projected ad spend fees on monthly target
+      const baseMrr = (s as any)?.mrr || 0;
+      const monthlyTarget = s ? getEffectiveMonthlyTarget(s) : 0;
+      const mrr = s
+        ? calculateClientRevenue(
+            baseMrr,
+            monthlyTarget,
+            s.ad_spend_fee_threshold || 30000,
+            s.ad_spend_fee_percent || 10
+          )
+        : baseMrr;
       // Calculate effective daily ad spend target
       const dailyTarget = (() => {
         if (!s) return 0;
