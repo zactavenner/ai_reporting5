@@ -425,7 +425,7 @@ export function ApiReferenceTab() {
       const { supabase } = await import('@/integrations/supabase/client');
       
       const [clientsRes, settingsRes, funnelsRes] = await Promise.all([
-        supabase.from('clients').select('id, name, ghl_api_key, ghl_location_id, website_url, business_manager_url, meta_ad_account_id, status, slug').order('name'),
+        supabase.from('clients').select('id, name, ghl_api_key, ghl_location_id, ghl_account_url, website_url, business_manager_url, meta_ad_account_id, meta_ad_account_ids, status, slug').order('name'),
         supabase.from('client_settings').select('client_id, funded_pipeline_id, ads_library_url, tracked_calendar_ids, reconnect_calendar_ids'),
         supabase.from('client_funnel_steps').select('client_id, name, url, sort_order').order('client_id').order('sort_order'),
       ]);
@@ -451,8 +451,12 @@ export function ApiReferenceTab() {
         dirLines.push(`- Client ID: ${c.id}`);
         if (c.slug) dirLines.push(`- Slug: ${c.slug}`);
         if (c.ghl_location_id) dirLines.push(`- GHL Location ID: ${c.ghl_location_id}`);
-        if (c.ghl_api_key && c.ghl_api_key.startsWith('pit-')) dirLines.push(`- GHL API Key: ${c.ghl_api_key}`);
-        if (c.meta_ad_account_id) dirLines.push(`- Meta Ad Account ID: ${c.meta_ad_account_id}`);
+        if (c.ghl_api_key) dirLines.push(`- GHL Private API Key: ${c.ghl_api_key}`);
+        if ((c as any).ghl_account_url) dirLines.push(`- GHL Account URL: ${(c as any).ghl_account_url}`);
+        {
+          const ids = [c.meta_ad_account_id, ...(((c as any).meta_ad_account_ids as string[] | null) || [])].filter(Boolean);
+          if (ids.length) dirLines.push(`- Meta Ad Account IDs: ${ids.join(', ')}`);
+        }
         if (c.business_manager_url) dirLines.push(`- Ads Manager: ${c.business_manager_url}`);
         if (c.website_url) dirLines.push(`- Website: ${c.website_url}`);
         if (s?.ads_library_url) dirLines.push(`- Ads Library: ${s.ads_library_url}`);
