@@ -423,6 +423,7 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                     <TableHeader className="sticky top-0 bg-card z-10">
                       <TableRow>
                         <TableHead className="w-8"></TableHead>
+                        <TableHead className="w-[90px]">On/Off</TableHead>
                         <TableHead>Ad Set</TableHead>
                         <TableHead>Optimization</TableHead>
                         <TableHead className="text-right">Daily Budget</TableHead>
@@ -444,6 +445,14 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                           onClick={() => { setSelectedAdSetId(a.id); setActiveTab('ads'); }}
                         >
                           <TableCell><StatusDot status={a.status} /></TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <MetaStatusToggle
+                              clientId={a.client_id}
+                              level="adset"
+                              rowId={a.id}
+                              status={a.status}
+                            />
+                          </TableCell>
                           <TableCell className="font-medium text-sm max-w-[260px] truncate">{a.name}</TableCell>
                           <TableCell><Badge variant="outline" className="text-[10px]">{a.optimization_goal || '—'}</Badge></TableCell>
                           <TableCell className="text-right text-xs">{a.daily_budget ? fmt$(Number(a.daily_budget) / 100) : '—'}</TableCell>
