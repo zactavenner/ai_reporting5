@@ -594,10 +594,20 @@ function AdCard({ ad, clientName, onClick }: { ad: any; clientName?: string; onC
           <span className="text-muted-foreground">CTR · CPC</span>
           <span className="font-semibold tabular-nums">{fmtPct(ad.ctr)} · {fmt$(ad.cpc)}</span>
         </div>
-        {ad.attributed_leads > 0 && (
-          <div className="flex items-center justify-between text-[10px]">
-            <span className="text-muted-foreground">Leads · CPL</span>
-            <span className="font-semibold tabular-nums text-chart-2">{fmtN(ad.attributed_leads)} · {fmt$(ad.cost_per_lead)}</span>
+        {(ad.meta_reported_leads > 0 || ad.attributed_leads > 0) && (
+          <div className="space-y-0.5">
+            {ad.meta_reported_leads > 0 && (
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-muted-foreground">Meta leads</span>
+                <span className="font-semibold tabular-nums text-primary">{fmtN(ad.meta_reported_leads)}</span>
+              </div>
+            )}
+            {ad.attributed_leads > 0 && (
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-muted-foreground">CRM leads · CPL</span>
+                <span className="font-semibold tabular-nums text-chart-2">{fmtN(ad.attributed_leads)} · {fmt$(ad.cost_per_lead)}</span>
+              </div>
+            )}
           </div>
         )}
       </div>
