@@ -226,11 +226,16 @@ async function buildFullContext(supabase: any, scopedClientId: string | null, is
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split("T")[0];
 
-  // Build client query — agency users see all, client users see only their client
+  // Build client query — agency users see all, client/locked-channel users see only their client
   const clientQuery = supabase.from("clients").select("id, name, status, industry, slug");
-  if (!isAgencyUser && scopedClientId) {
+  const restrictToClient = !isAgencyUser && !!scopedClientId;
+  if (restrictToClient) {
     clientQuery.eq("id", scopedClientId);
   }
+
+  // Helper to apply client_id filter to scoped queries
+  const scope = <T extends { eq: (k: string, v: any) => T }>(q: T): T =>
+    restrictToClient ? q.eq("client_id", scopedClientId) : q;
 
   const [
     { data: clients },
@@ -243,41 +248,41 @@ async function buildFullContext(supabase: any, scopedClientId: string | null, is
     { data: briefs },
   ] = await Promise.all([
     clientQuery,
-    supabase
+    scope(supabase
       .from("daily_metrics")
       .select("client_id, date, ad_spend, leads, calls, showed_calls, funded_investors, funded_dollars, spam_leads, commitment_dollars, commitments, reconnect_calls, reconnect_showed, clicks, impressions")
-      .gte("date", thirtyDaysAgoStr),
-    supabase
+      .gte("date", thirtyDaysAgoStr)),
+    scope(supabase
       .from("leads")
       .select("id, client_id, source, status, is_spam, created_at, name, utm_source, utm_campaign, opportunity_value")
       .gte("created_at", thirtyDaysAgo.toISOString())
       .order("created_at", { ascending: false })
-      .limit(500),
-    supabase
+      .limit(500)),
+    scope(supabase
       .from("calls")
       .select("id, client_id, showed, outcome, scheduled_at, contact_name, is_reconnect, appointment_status")
       .gte("created_at", thirtyDaysAgo.toISOString())
-      .limit(500),
-    supabase
+      .limit(500)),
+    scope(supabase
       .from("funded_investors")
       .select("id, client_id, name, funded_amount, funded_at, commitment_amount, source, time_to_fund_days, calls_to_fund")
       .order("funded_at", { ascending: false })
-      .limit(300),
-    supabase
+      .limit(300)),
+    scope(supabase
       .from("tasks")
       .select("id, client_id, title, status, priority, due_date, stage, assigned_client_name")
-      .in("status", ["todo", "in_progress"]),
-    supabase
+      .in("status", ["todo", "in_progress"])),
+    scope(supabase
       .from("agency_meetings")
       .select("id, client_id, title, meeting_date, summary, duration_minutes, action_items")
       .gte("meeting_date", thirtyDaysAgo.toISOString())
       .order("meeting_date", { ascending: false })
-      .limit(50),
-    supabase
+      .limit(50)),
+    scope(supabase
       .from("creative_briefs")
       .select("id, client_id, client_name, status, hook_patterns, offer_angles, created_at")
       .order("created_at", { ascending: false })
-      .limit(20),
+      .limit(20)),
   ]);
 
   const clientList = clients || [];
