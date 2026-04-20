@@ -904,6 +904,11 @@ function MetaStatusCell({
   const [adAccountId, setAdAccountId] = useState(client.meta_ad_account_id || '');
   const [accessToken, setAccessToken] = useState(client.meta_access_token || '');
   const [bmUrl, setBmUrl] = useState(client.business_manager_url || '');
+  const extraInitial = (((client as any).meta_ad_account_ids as string[] | null) || []).filter(
+    (a) => a && a !== client.meta_ad_account_id,
+  );
+  const [extraAccount1, setExtraAccount1] = useState(extraInitial[0] || '');
+  const [extraAccount2, setExtraAccount2] = useState(extraInitial[1] || '');
   const [open, setOpen] = useState(false);
   const updateClient = useUpdateClient();
 
@@ -913,11 +918,15 @@ function MetaStatusCell({
 
   const handleSave = async () => {
     try {
+      const extras = [extraAccount1, extraAccount2]
+        .map((a) => a.trim())
+        .filter((a) => a && a !== adAccountId);
       await updateClient.mutateAsync({
         id: client.id,
         meta_ad_account_id: adAccountId || null,
         meta_access_token: accessToken || null,
         business_manager_url: bmUrl || null,
+        meta_ad_account_ids: extras,
       } as any);
       toast.success('Meta settings updated');
       setOpen(false);
