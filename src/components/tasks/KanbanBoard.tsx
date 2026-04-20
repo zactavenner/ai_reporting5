@@ -72,7 +72,8 @@ const STAGES = [
   { id: 'todo', label: 'To-Do', color: 'bg-blue-500/20' },
   { id: 'in_progress', label: 'In Progress', color: 'bg-orange-500/20' },
   { id: 'stuck', label: 'Stuck', color: 'bg-destructive/20' },
-  { id: 'review', label: 'Review', color: 'bg-purple-500/20' },
+  { id: 'agency_review', label: 'Agency Review', color: 'bg-indigo-500/20', agencyOnly: true },
+  { id: 'review', label: 'Client Review', color: 'bg-purple-500/20' },
   { id: 'revisions', label: 'Revisions', color: 'bg-amber-500/20' },
   { id: 'done', label: 'Completed', color: 'bg-green-500/20' },
 ];
@@ -221,6 +222,11 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
   const filteredTasks = useMemo(() => {
     // Filter out subtasks from top-level board view
     let filtered = tasks.filter(t => !t.parent_task_id);
+
+    // Hide agency-only stage tasks from public/client view
+    if (isPublicView) {
+      filtered = filtered.filter(t => t.stage !== 'agency_review');
+    }
     
     // Filter by client - use prop clientId if provided, otherwise use filter dropdown
     const effectiveClientId = clientId || (filterClientId && filterClientId !== 'all' ? filterClientId : '');
@@ -296,7 +302,7 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
     }
     
     return filtered;
-  }, [tasks, clientId, filterClientId, filterAssigneeId, searchQuery, showCompleted, dueDateFilter, allTaskAssignees, myTaskIds, showMyTasksOnly, currentMember]);
+  }, [tasks, clientId, filterClientId, filterAssigneeId, searchQuery, showCompleted, dueDateFilter, allTaskAssignees, myTaskIds, showMyTasksOnly, currentMember, isPublicView]);
 
   // Group by stage
   const tasksByStage = useMemo(() => {
@@ -622,7 +628,7 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-4 overflow-x-auto pb-4">
-            {STAGES.map(stage => (
+            {STAGES.filter(stage => !(isPublicView && (stage as any).agencyOnly)).map(stage => (
               <KanbanColumn
                 key={stage.id}
                 stage={stage}

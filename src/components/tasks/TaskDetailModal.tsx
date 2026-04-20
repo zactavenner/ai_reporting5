@@ -87,7 +87,8 @@ const STAGES = [
   { id: 'todo', label: 'To Do' },
   { id: 'in_progress', label: 'In Progress' },
   { id: 'stuck', label: 'Stuck' },
-  { id: 'review', label: 'Review' },
+  { id: 'agency_review', label: 'Agency Review' },
+  { id: 'review', label: 'Client Review' },
   { id: 'revisions', label: 'Revisions' },
   { id: 'done', label: 'Completed' },
 ];
