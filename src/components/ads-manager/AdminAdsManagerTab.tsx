@@ -410,7 +410,7 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                         <TableHead className="text-right">CTR</TableHead>
                         <TableHead className="text-right">Reach</TableHead>
                         <TableHead className="text-right">Leads</TableHead>
-                        <TableHead className="w-12"></TableHead>
+                        <TableHead className="w-20"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -430,7 +430,17 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                           <TableCell className="text-right text-xs">{fmtPct(a.ctr)}</TableCell>
                           <TableCell className="text-right text-xs">{fmtN(a.reach)}</TableCell>
                           <TableCell className="text-right text-xs">{fmtN(a.attributed_leads)}</TableCell>
-                          <TableCell><ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /></TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-[10px]"
+                              onClick={() => setCreateAdContext({ adSetId: a.id, name: a.name })}
+                            >
+                              <Upload className="h-3 w-3 mr-1" />
+                              Ad
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
