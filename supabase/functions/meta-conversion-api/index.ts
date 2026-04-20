@@ -19,6 +19,7 @@ async function hashValue(value: string): Promise<string> {
 interface CAPIEvent {
   event_name: string;
   event_time: number;
+  event_id?: string; // Meta deduplication key — critical to prevent 2x/3x counting on retries
   event_source_url?: string;
   action_source: "system_generated";
   user_data: {
@@ -83,9 +84,18 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Build deterministic event_id for Meta deduplication.
+    // Same lead + event name + hour window = same event_id → Meta drops duplicates.
+    // Without this, network retries, duplicate webhooks, or double-sync create 2x/3x counting.
+    const eventTime = Math.floor((eventData?.event_time ? new Date(eventData.event_time).getTime() : Date.now()) / 1000);
+    const eventHourBucket = Math.floor(eventTime / 3600); // 1-hour dedup window
+    const dedupKey = `${clientId}|${leadId || "nolead"}|${eventName}|${eventHourBucket}`;
+    const eventId = await hashValue(dedupKey);
+
     const capiEvent: CAPIEvent = {
       event_name: eventName,
-      event_time: Math.floor((eventData?.event_time ? new Date(eventData.event_time).getTime() : Date.now()) / 1000),
+      event_time: eventTime,
+      event_id: eventId,
       event_source_url: eventData?.source_url || undefined,
       action_source: "system_generated",
       user_data: userData,
@@ -117,7 +127,10 @@ Deno.serve(async (req) => {
       client_id: clientId, lead_id: leadId || null, event_name: eventName,
       event_time: new Date(capiEvent.event_time * 1000).toISOString(),
       event_source_url: capiEvent.event_source_url,
-      user_data: { fields_sent: Object.keys(userData).filter(k => (userData as any)[k]?.length > 0) },
+      user_data: {
+        event_id: eventId, // Store event_id for duplicate detection
+        fields_sent: Object.keys(userData).filter(k => (userData as any)[k]?.length > 0),
+      },
       custom_data: capiEvent.custom_data || {},
       meta_response_code: response.status, meta_response_body: responseBody,
       sent_at: new Date().toISOString(),
