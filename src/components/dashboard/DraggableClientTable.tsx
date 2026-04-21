@@ -1047,9 +1047,21 @@ function MetaStatusCell({
                     className="h-7 text-xs flex-1"
                   />
                   {adsUrl && (
-                    <Button variant="outline" size="icon" className="h-7 w-7 shrink-0" onClick={(e) => { e.stopPropagation(); window.open(adsUrl, '_blank'); }} title="Open in Ads Manager">
-                      <ExternalLink className="h-3 w-3" />
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7 shrink-0"
+                        disabled={syncingAccount === cleanId}
+                        onClick={(e) => syncAccount(e, f.value)}
+                        title={`Sync act_${cleanId}`}
+                      >
+                        <RefreshCw className={cn("h-3 w-3", syncingAccount === cleanId && "animate-spin")} />
+                      </Button>
+                      <Button variant="outline" size="icon" className="h-7 w-7 shrink-0" onClick={(e) => { e.stopPropagation(); window.open(adsUrl, '_blank'); }} title="Open in Ads Manager">
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
