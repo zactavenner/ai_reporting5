@@ -1001,6 +1001,26 @@ function MetaStatusCell({
               className="h-7 text-xs"
             />
           </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground font-medium">Sync Timeframe</label>
+            <Select value={syncDays} onValueChange={setSyncDays}>
+              <SelectTrigger className="h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Last 1 day</SelectItem>
+                <SelectItem value="3">Last 3 days</SelectItem>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="14">Last 14 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="60">Last 60 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+                <SelectItem value="180">Last 180 days</SelectItem>
+                <SelectItem value="365">Last 365 days</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">Applies to the per-account sync button below.</p>
+          </div>
           {[
             { label: 'Ad Account ID (Primary)', value: adAccountId, set: setAdAccountId, placeholder: 'act_123456789' },
             { label: 'Ad Account ID #2 (optional)', value: extraAccount1, set: setExtraAccount1, placeholder: 'act_...' },
