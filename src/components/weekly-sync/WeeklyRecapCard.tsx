@@ -78,7 +78,7 @@ export function WeeklyRecapCard({ clientId, sinceDate, compact, onAutoFill, wind
                 <ul className="space-y-1 text-sm">
                   {recap.tasks.completedList.map((t) => (
                     <li key={t.id} className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                      <CheckCircle2 className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                       <span className="truncate">{t.title}</span>
                       <Badge variant="outline" className="text-[10px] ml-auto">{t.stage}</Badge>
                     </li>
