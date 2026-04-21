@@ -36,7 +36,7 @@ const generatorLinks = [
 ];
 
 export function CreativesSection({ clientId, clientName, isPublicView = false }: CreativesSectionProps) {
-  const [activeSubTab, setActiveSubTab] = useState('approval');
+  const [activeSubTab, setActiveSubTab] = useState('top-creatives');
 
   if (isPublicView) {
     return (
