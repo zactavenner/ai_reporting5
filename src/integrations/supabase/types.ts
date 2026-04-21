@@ -8076,6 +8076,91 @@ export type Database = {
           },
         ]
       }
+      weekly_syncs: {
+        Row: {
+          action_items: string | null
+          attendees: string | null
+          blockers: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          crm_updated: boolean | null
+          id: string
+          meeting_id: string | null
+          numbers_notes: string | null
+          pipeline_notes: string | null
+          recap_email_sent: boolean | null
+          recording_storage_path: string | null
+          recording_url: string | null
+          sync_date: string
+          updated_at: string
+          wins: string | null
+          working_not_working: string | null
+        }
+        Insert: {
+          action_items?: string | null
+          attendees?: string | null
+          blockers?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          crm_updated?: boolean | null
+          id?: string
+          meeting_id?: string | null
+          numbers_notes?: string | null
+          pipeline_notes?: string | null
+          recap_email_sent?: boolean | null
+          recording_storage_path?: string | null
+          recording_url?: string | null
+          sync_date?: string
+          updated_at?: string
+          wins?: string | null
+          working_not_working?: string | null
+        }
+        Update: {
+          action_items?: string | null
+          attendees?: string | null
+          blockers?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          crm_updated?: boolean | null
+          id?: string
+          meeting_id?: string | null
+          numbers_notes?: string | null
+          pipeline_notes?: string | null
+          recap_email_sent?: boolean | null
+          recording_storage_path?: string | null
+          recording_url?: string | null
+          sync_date?: string
+          updated_at?: string
+          wins?: string | null
+          working_not_working?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_syncs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "weekly_syncs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_syncs_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "agency_meetings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       client_sync_health: {
