@@ -2521,6 +2521,9 @@ export type Database = {
           tracked_calendar_ids: string[] | null
           updated_at: string
           webhook_mappings: Json | null
+          weekly_sync_day: number | null
+          weekly_sync_time: string | null
+          weekly_sync_timezone: string | null
         }
         Insert: {
           ad_spend_fee_percent?: number | null
@@ -2595,6 +2598,9 @@ export type Database = {
           tracked_calendar_ids?: string[] | null
           updated_at?: string
           webhook_mappings?: Json | null
+          weekly_sync_day?: number | null
+          weekly_sync_time?: string | null
+          weekly_sync_timezone?: string | null
         }
         Update: {
           ad_spend_fee_percent?: number | null
@@ -2669,6 +2675,9 @@ export type Database = {
           tracked_calendar_ids?: string[] | null
           updated_at?: string
           webhook_mappings?: Json | null
+          weekly_sync_day?: number | null
+          weekly_sync_time?: string | null
+          weekly_sync_timezone?: string | null
         }
         Relationships: []
       }
