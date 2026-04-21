@@ -1237,6 +1237,46 @@ function CrmStatusCell({
               {testResult.message}
             </div>
           )}
+          <div className="space-y-1.5 pt-1 border-t border-border">
+            <label className="text-[11px] text-muted-foreground font-medium">Manual Sync</label>
+            <div className="flex gap-1.5">
+              <Select value={syncDays} onValueChange={setSyncDays}>
+                <SelectTrigger className="h-7 text-xs flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Last 1 day</SelectItem>
+                  <SelectItem value="3">Last 3 days</SelectItem>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="14">Last 14 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                  <SelectItem value="365">Last 365 days</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] gap-1"
+                onClick={handleManualSync}
+                disabled={syncing || !client.ghl_api_key || !client.ghl_location_id}
+              >
+                <RefreshCw className={cn('h-3 w-3', syncing && 'animate-spin')} />
+                {syncing ? 'Syncing…' : 'Sync'}
+              </Button>
+            </div>
+            {syncResult && (
+              <div className={cn(
+                'text-[10px] rounded p-1.5 flex items-center gap-1',
+                syncResult.ok
+                  ? 'text-green-700 dark:text-green-400 bg-green-500/10 border border-green-500/30'
+                  : 'text-destructive bg-destructive/10'
+              )}>
+                {syncResult.ok ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                {syncResult.message}
+              </div>
+            )}
+          </div>
           <div className="flex justify-between gap-1.5">
             <Button
               variant="outline"
