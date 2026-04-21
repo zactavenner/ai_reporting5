@@ -157,9 +157,9 @@ export function useWeeklyRecap(clientId: string | undefined, sinceDate?: string 
       try {
         const { data: deals } = await (supabase as any)
           .from('deals')
-          .select('id, name, amount, stage, updated_at')
+          .select('id, deal_name, deal_value, stage, updated_at')
           .eq('client_id', cId)
-          .order('amount', { ascending: false })
+          .order('deal_value', { ascending: false })
           .limit(200);
         const dealRows = (deals || []) as any[];
         const sevenDaysAgo = new Date(windowStartIso).getTime();
@@ -174,7 +174,7 @@ export function useWeeklyRecap(clientId: string | undefined, sinceDate?: string 
         closestList = dealRows
           .filter((d) => !['closed_won', 'closed_lost'].includes(d.stage))
           .slice(0, 5)
-          .map((d) => ({ id: d.id, name: d.name, amount: Number(d.amount || 0), stage: d.stage }));
+          .map((d) => ({ id: d.id, name: d.deal_name, amount: Number(d.deal_value || 0), stage: d.stage }));
       } catch {
         // deals table may not exist for some clients — silent fallback
       }
