@@ -1075,6 +1075,10 @@ function CrmStatusCell({
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const updateClient = useUpdateClient();
+  const queryClient = useQueryClient();
+  const [syncing, setSyncing] = useState(false);
+  const [syncDays, setSyncDays] = useState<string>('7');
+  const [syncResult, setSyncResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   const handleSave = async () => {
     try {
