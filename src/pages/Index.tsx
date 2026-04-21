@@ -38,6 +38,7 @@ import { Sliders, CheckCircle, RefreshCw, Wifi, Smartphone } from 'lucide-react'
 import { MasterMetaTokenCard } from '@/components/dashboard/MasterMetaTokenCard';
 import { OutreachTab } from '@/components/outreach/OutreachTab';
 import { OnboardingTab } from '@/components/dashboard/OnboardingTab';
+import { YesterdayDataHealthBar } from '@/components/dashboard/YesterdayDataHealthBar';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, useFundedInvestors, AggregatedMetrics } from '@/hooks/useMetrics';
 import { aggregateFromSourceData, SourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
@@ -302,6 +303,16 @@ const Index = () => {
                   onAddClient={() => setAddClientOpen(true)}
                   onRefresh={handleRefresh}
                 />
+
+                {!isLoading && clients.length > 0 && (
+                  <SectionErrorBoundary sectionName="Data Health">
+                    <YesterdayDataHealthBar
+                      clients={clients}
+                      clientMetrics={clientMetrics}
+                      clientFullSettings={clientFullSettings}
+                    />
+                  </SectionErrorBoundary>
+                )}
 
                 <SectionErrorBoundary sectionName="Client Summary">
                   <section>

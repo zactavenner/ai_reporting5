@@ -605,8 +605,13 @@ export function DraggableClientTable({
                         const crmTotal = m.crmLeads || 0;
                         const metaLeads = m.totalLeads || 0;
                         const hasAdSpend = (m.totalAdSpend || 0) > 0;
-                        // Flag: client has ad spend but 0 CRM leads = GHL integration issue
+                        const hasGHL = !!(client.ghl_api_key && client.ghl_location_id);
+                        const hasHubspot = !!(client.hubspot_portal_id && client.hubspot_access_token);
+                        const hasCrm = hasGHL || hasHubspot;
+                        // Flag: client has ad spend but 0 CRM leads = integration issue
                         if (hasAdSpend && crmTotal === 0) return 'text-destructive font-semibold';
+                        // Flag: CRM configured but 0 leads even without ad spend
+                        if (hasCrm && crmTotal === 0 && syncInfo.status === 'error') return 'text-destructive font-semibold';
                         if (crmTotal === 0 && metaLeads === 0) return 'text-muted-foreground';
                         if (crmTotal >= metaLeads) return 'text-chart-2';
                         return 'text-destructive font-semibold';
@@ -614,15 +619,21 @@ export function DraggableClientTable({
                     )}>
                       <span className="flex items-center justify-end gap-0.5">
                         {m.crmLeads || 0}
-                        {(m.totalAdSpend || 0) > 0 && (m.crmLeads || 0) === 0 && (
+                        {(m.crmLeads || 0) === 0 && ((m.totalAdSpend || 0) > 0 || syncInfo.status === 'error') && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <AlertTriangle className="h-2.5 w-2.5 text-destructive shrink-0" />
                             </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs max-w-[250px]">
+                            <TooltipContent side="top" className="text-xs max-w-[280px]">
                               {!client.ghl_api_key || !client.ghl_location_id
-                                ? `${formatCurrency(m.totalAdSpend)} ad spend but no GHL credentials configured — add GHL API key & location ID in settings`
-                                : `${formatCurrency(m.totalAdSpend)} ad spend but 0 CRM leads — GHL integration problem, run master sync or check API key`
+                                ? (m.totalAdSpend || 0) > 0
+                                  ? `${formatCurrency(m.totalAdSpend)} ad spend but no GHL credentials — add GHL API key & location ID in settings`
+                                  : 'No CRM credentials configured — add GHL API key & location ID'
+                                : syncInfo.status === 'error'
+                                  ? `GHL sync error: ${syncInfo.error || 'unknown'}. Run master sync or check API key.`
+                                  : syncInfo.status === 'stale'
+                                    ? `GHL sync is stale (last: ${syncInfo.lastSyncAt ? new Date(syncInfo.lastSyncAt).toLocaleDateString() : 'never'}). Run master sync to pull CRM leads.`
+                                    : `${formatCurrency(m.totalAdSpend || 0)} ad spend but 0 CRM leads — GHL integration problem, run master sync`
                               }
                             </TooltipContent>
                           </Tooltip>
@@ -646,21 +657,39 @@ export function DraggableClientTable({
                         const hasCalls = (m.totalCalls || 0) > 0;
                         const hasGHL = !!(client.ghl_api_key && client.ghl_location_id);
                         const hasCalendars = (fullSettings[client.id]?.tracked_calendar_ids || []).length > 0;
+                        const hasCrmLeads = (m.crmLeads || 0) > 0;
                         if (!hasCalls && hasAdSpend && hasGHL && !hasCalendars) return 'text-destructive font-semibold';
+                        if (!hasCalls && hasCalendars && (hasAdSpend || hasCrmLeads)) return 'text-yellow-600 dark:text-yellow-500';
                         if (!hasCalls && hasAdSpend && syncInfo.status !== 'healthy') return 'text-yellow-600 dark:text-yellow-500';
-                        if (!hasCalls && (m.crmLeads || 0) > 0) return 'text-yellow-600 dark:text-yellow-500';
+                        if (!hasCalls && hasCrmLeads) return 'text-yellow-600 dark:text-yellow-500';
                         return '';
                       })()
                     )}>
                       <span className="flex items-center justify-end gap-0.5">
                         {m.totalCalls || 0}
-                        {(m.totalCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && !!(client.ghl_api_key && client.ghl_location_id) && (fullSettings[client.id]?.tracked_calendar_ids || []).length === 0 && (
+                        {(m.totalCalls || 0) === 0 && (() => {
+                          const hasGHL = !!(client.ghl_api_key && client.ghl_location_id);
+                          const hasCalendars = (fullSettings[client.id]?.tracked_calendar_ids || []).length > 0;
+                          const hasAdSpend = (m.totalAdSpend || 0) > 0;
+                          const hasCrmLeads = (m.crmLeads || 0) > 0;
+                          if (!hasGHL) return false;
+                          return !hasCalendars ? (hasAdSpend || hasCrmLeads) : (hasAdSpend || hasCrmLeads);
+                        })() && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Calendar className="h-2.5 w-2.5 text-destructive shrink-0" />
                             </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs max-w-[220px]">
-                              No tracked calendars configured — add calendar IDs in client settings to sync booked/show calls
+                            <TooltipContent side="top" className="text-xs max-w-[280px]">
+                              {(fullSettings[client.id]?.tracked_calendar_ids || []).length === 0
+                                ? 'No tracked calendars configured — add calendar IDs in client settings to sync booked/show calls'
+                                : (() => {
+                                    const calSync = fullSettings[client.id]?.ghl_last_calls_sync;
+                                    if (!calSync) return 'Calendars configured but sync has never run — trigger a calendar sync from the Sync Status panel';
+                                    const hoursSince = (Date.now() - new Date(calSync).getTime()) / (1000 * 60 * 60);
+                                    if (hoursSince > 24) return `Calendars configured but last sync was ${Math.round(hoursSince)}h ago — calendar sync may be stale`;
+                                    return 'Calendars configured and synced recently but 0 booked calls for this date range — verify calendar IDs are correct';
+                                  })()
+                              }
                             </TooltipContent>
                           </Tooltip>
                         )}
@@ -680,7 +709,19 @@ export function DraggableClientTable({
                       "text-right font-mono tabular-nums text-[11px] py-0 px-1",
                       (m.totalCalls || 0) > 0 && (m.showedCalls || 0) === 0 && 'text-yellow-600 dark:text-yellow-500'
                     )}>
-                      {m.showedCalls || 0}
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.showedCalls || 0}
+                        {(m.totalCalls || 0) > 0 && (m.showedCalls || 0) === 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-2.5 w-2.5 text-yellow-500 shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-[220px]">
+                              {m.totalCalls} booked calls but 0 shows — check if appointment statuses are being updated in GHL calendar
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                     </TableCell>
 
                     {/* Show Rate */}
