@@ -889,6 +889,7 @@ function MetaStatusCell({
   const [extraAccount2, setExtraAccount2] = useState(extraInitial[1] || '');
   const [open, setOpen] = useState(false);
   const [syncingAccount, setSyncingAccount] = useState<string | null>(null);
+  const [syncDays, setSyncDays] = useState<string>('30');
   const updateClient = useUpdateClient();
   const queryClient = useQueryClient();
 
@@ -901,11 +902,16 @@ function MetaStatusCell({
     }
     setSyncingAccount(cleanId);
     try {
+      const days = parseInt(syncDays, 10) || 30;
+      const today = new Date();
+      const start = new Date(today.getTime() - days * 24 * 60 * 60 * 1000);
+      const startDate = start.toISOString().split('T')[0];
+      const endDate = today.toISOString().split('T')[0];
       const { error } = await supabase.functions.invoke('sync-meta-ads', {
-        body: { clientId: client.id, adAccountOverride: cleanId },
+        body: { clientId: client.id, adAccountOverride: cleanId, startDate, endDate },
       });
       if (error) throw error;
-      toast.success(`Synced act_${cleanId}`);
+      toast.success(`Synced act_${cleanId} (last ${days}d)`);
       queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['meta_ads'] });
     } catch (err: any) {
