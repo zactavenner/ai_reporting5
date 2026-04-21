@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,8 @@ export function MetaTopCreatives({ clientId, clientName }: Props) {
   const qc = useQueryClient();
   const [syncing, setSyncing] = useState(false);
   const [previewing, setPreviewing] = useState<MetaAdRow | null>(null);
+  const autoSyncedRef = useRef<string | null>(null);
+  const STALE_MS = 6 * 60 * 60 * 1000; // 6 hours
 
   const sevenDaysAgo = subDays(new Date(), 7).toISOString();
 
@@ -79,12 +81,37 @@ export function MetaTopCreatives({ clientId, clientName }: Props) {
       toast.success(`Sync complete — ${data?.ads ?? 0} ads, ${data?.dailyMetrics ?? 0} day rows`);
       await refetch();
       qc.invalidateQueries({ queryKey: ['meta-top-creatives', clientId] });
+      // Backfill HD media (videos + full-res images) for any ads missing it
+      try {
+        await supabase.functions.invoke('fetch-ad-media-hd', { body: { clientId } });
+        await refetch();
+      } catch (hdErr) {
+        console.warn('HD media backfill skipped:', hdErr);
+      }
     } catch (e: any) {
       toast.error(e.message || 'Sync failed');
     } finally {
       setSyncing(false);
     }
   };
+
+  // Auto-sync on mount if data is stale or missing
+  useEffect(() => {
+    if (!clientId || isLoading) return;
+    if (autoSyncedRef.current === clientId) return;
+
+    const newest = ads.reduce<number>((max, a) => {
+      const t = a.synced_at ? new Date(a.synced_at).getTime() : 0;
+      return t > max ? t : max;
+    }, 0);
+    const isStale = ads.length === 0 || Date.now() - newest > STALE_MS;
+
+    if (isStale && !syncing) {
+      autoSyncedRef.current = clientId;
+      handleSync();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, isLoading, ads.length]);
 
   const totals = ads.reduce(
     (acc, a) => {
