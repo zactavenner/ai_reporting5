@@ -42,6 +42,7 @@ import { SlackChannelMappingSection } from '@/components/settings/SlackChannelMa
 import { KPISettingsSection } from '@/components/settings/KPISettingsSection';
 import { ClientBillingTab } from '@/components/billing/ClientBillingTab';
 import { WeeklySyncTab } from '@/components/weekly-sync/WeeklySyncTab';
+import { WeeklyRecapCard } from '@/components/weekly-sync/WeeklyRecapCard';
 import { useClient } from '@/hooks/useClients';
 import { useDailyMetrics, useFundedInvestors } from '@/hooks/useMetrics';
 import { useSourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
@@ -324,6 +325,10 @@ export default function ClientDetail() {
           {/* ─── PERFORMANCE TAB ─── */}
           <TabsContent value="performance" className="space-y-6">
             
+            <SectionErrorBoundary sectionName="Weekly Recap">
+              <WeeklyRecapCard clientId={clientId} compact />
+            </SectionErrorBoundary>
+
             <Collapsible open={kpiOpen} onOpenChange={setKpiOpen}>
               <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
                 <h2 className="text-lg font-bold">Key Performance Indicators</h2>
