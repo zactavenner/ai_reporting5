@@ -922,7 +922,32 @@ function MetaStatusCell({
   const [extraAccount1, setExtraAccount1] = useState(extraInitial[0] || '');
   const [extraAccount2, setExtraAccount2] = useState(extraInitial[1] || '');
   const [open, setOpen] = useState(false);
+  const [syncingAccount, setSyncingAccount] = useState<string | null>(null);
   const updateClient = useUpdateClient();
+  const queryClient = useQueryClient();
+
+  const syncAccount = async (e: React.MouseEvent, accountId: string) => {
+    e.stopPropagation();
+    const cleanId = accountId.replace(/^act_/, '').trim();
+    if (!cleanId) {
+      toast.error('Enter an Ad Account ID first');
+      return;
+    }
+    setSyncingAccount(cleanId);
+    try {
+      const { error } = await supabase.functions.invoke('sync-meta-ads', {
+        body: { clientId: client.id, adAccountOverride: cleanId },
+      });
+      if (error) throw error;
+      toast.success(`Synced act_${cleanId}`);
+      queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['meta_ads'] });
+    } catch (err: any) {
+      toast.error(`Sync failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setSyncingAccount(null);
+    }
+  };
 
   const duplicateWith = isDuplicate
     ? clients.filter(c => c.id !== client.id && c.meta_ad_account_id === client.meta_ad_account_id).map(c => c.name)
