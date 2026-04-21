@@ -294,6 +294,10 @@ export default function ClientDetail() {
               <Layers className="h-4 w-4" />
               Pipeline
             </TabsTrigger>
+            <TabsTrigger value="weekly-sync" className="gap-2">
+              <CalendarCheck className="h-4 w-4" />
+              Weekly Sync
+            </TabsTrigger>
             <TabsTrigger value="slack" className="gap-2">
               <MessageSquare className="h-4 w-4" />
               Slack
