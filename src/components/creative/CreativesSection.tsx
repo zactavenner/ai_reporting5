@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CreativeApproval } from './CreativeApproval';
-import { Upload, Image, Video, Target, ExternalLink } from 'lucide-react';
+import { MetaTopCreatives } from './MetaTopCreatives';
+import { Upload, Image, Video, Target, ExternalLink, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
@@ -51,6 +52,10 @@ export function CreativesSection({ clientId, clientName, isPublicView = false }:
     <div className="space-y-4">
       <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
         <TabsList className="bg-muted/50">
+          <TabsTrigger value="top-creatives" className="gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Top Creatives (7d)
+          </TabsTrigger>
           <TabsTrigger value="approval" className="gap-2">
             <Upload className="h-4 w-4" />
             Creative Approval
@@ -60,6 +65,10 @@ export function CreativesSection({ clientId, clientName, isPublicView = false }:
             Generators
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="top-creatives" className="mt-4">
+          <MetaTopCreatives clientId={clientId} clientName={clientName} />
+        </TabsContent>
 
         <TabsContent value="approval" className="mt-4">
           <CreativeApproval 
