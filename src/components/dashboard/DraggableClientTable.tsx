@@ -789,21 +789,6 @@ export function DraggableClientTable({
                               variant="ghost"
                               size="icon"
                               className="h-5 w-5"
-                              disabled={syncingMeta[client.id] || !client.meta_ad_account_id}
-                              onClick={(e) => handleSyncMetaClient(e, client.id, client.name)}
-                              title="Sync Meta"
-                            >
-                              <BarChart className={cn("h-2.5 w-2.5", syncingMeta[client.id] && "animate-pulse")} />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="text-[10px]">Sync Meta Ads</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-5 w-5"
                               disabled={enriching[client.id]}
                               onClick={(e) => handleEnrichClient(e, client.id, client.name)}
                               title="Enrich"
@@ -813,28 +798,9 @@ export function DraggableClientTable({
                           </TooltipTrigger>
                           <TooltipContent side="top" className="text-[10px]">Enrich Contacts</TooltipContent>
                         </Tooltip>
-                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => openAdsManager(e, client.business_manager_url)} title="Ads Manager">
-                          <BarChart3 className="h-2.5 w-2.5" />
-                        </Button>
                         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onOpenSettings(client)}>
                           <Settings className="h-2.5 w-2.5" />
                         </Button>
-                        {client.business_manager_url && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-5 w-5"
-                                onClick={(e) => openAdsManager(e, client.business_manager_url)}
-                                title="Open Business Manager"
-                              >
-                                <BarChart3 className="h-2.5 w-2.5 text-chart-2" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-[10px]">Business Manager</TooltipContent>
-                          </Tooltip>
-                        )}
                         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => client.public_token && copyPublicLink(client.public_token)}>
                           <Copy className="h-2.5 w-2.5" />
                         </Button>
@@ -922,7 +888,32 @@ function MetaStatusCell({
   const [extraAccount1, setExtraAccount1] = useState(extraInitial[0] || '');
   const [extraAccount2, setExtraAccount2] = useState(extraInitial[1] || '');
   const [open, setOpen] = useState(false);
+  const [syncingAccount, setSyncingAccount] = useState<string | null>(null);
   const updateClient = useUpdateClient();
+  const queryClient = useQueryClient();
+
+  const syncAccount = async (e: React.MouseEvent, accountId: string) => {
+    e.stopPropagation();
+    const cleanId = accountId.replace(/^act_/, '').trim();
+    if (!cleanId) {
+      toast.error('Enter an Ad Account ID first');
+      return;
+    }
+    setSyncingAccount(cleanId);
+    try {
+      const { error } = await supabase.functions.invoke('sync-meta-ads', {
+        body: { clientId: client.id, adAccountOverride: cleanId },
+      });
+      if (error) throw error;
+      toast.success(`Synced act_${cleanId}`);
+      queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['meta_ads'] });
+    } catch (err: any) {
+      toast.error(`Sync failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setSyncingAccount(null);
+    }
+  };
 
   const duplicateWith = isDuplicate
     ? clients.filter(c => c.id !== client.id && c.meta_ad_account_id === client.meta_ad_account_id).map(c => c.name)
@@ -1022,9 +1013,21 @@ function MetaStatusCell({
                     className="h-7 text-xs flex-1"
                   />
                   {adsUrl && (
-                    <Button variant="outline" size="icon" className="h-7 w-7 shrink-0" onClick={(e) => { e.stopPropagation(); window.open(adsUrl, '_blank'); }} title="Open in Ads Manager">
-                      <ExternalLink className="h-3 w-3" />
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7 shrink-0"
+                        disabled={syncingAccount === cleanId}
+                        onClick={(e) => syncAccount(e, f.value)}
+                        title={`Sync act_${cleanId}`}
+                      >
+                        <RefreshCw className={cn("h-3 w-3", syncingAccount === cleanId && "animate-spin")} />
+                      </Button>
+                      <Button variant="outline" size="icon" className="h-7 w-7 shrink-0" onClick={(e) => { e.stopPropagation(); window.open(adsUrl, '_blank'); }} title="Open in Ads Manager">
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
