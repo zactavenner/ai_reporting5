@@ -459,6 +459,13 @@ export default function ClientDetail() {
             </SectionErrorBoundary>
           </TabsContent>
 
+          {/* ─── WEEKLY SYNC TAB ─── */}
+          <TabsContent value="weekly-sync" className="space-y-6">
+            <SectionErrorBoundary sectionName="Weekly Sync">
+              <WeeklySyncTab clientId={client.id} clientName={client.name} />
+            </SectionErrorBoundary>
+          </TabsContent>
+
           {/* ─── FUNNELS TAB ─── */}
           <TabsContent value="funnels" className="space-y-6">
             <SectionErrorBoundary sectionName="Funnels">
