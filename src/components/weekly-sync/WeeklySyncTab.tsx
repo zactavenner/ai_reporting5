@@ -16,6 +16,9 @@ import {
   useDeleteWeeklySync,
   WeeklySync,
 } from '@/hooks/useWeeklySyncs';
+import { useWeeklyRecap, buildAutoFillFromRecap } from '@/hooks/useWeeklyRecap';
+import { WeeklyRecapCard } from './WeeklyRecapCard';
+import { WeeklySyncSettings } from './WeeklySyncSettings';
 
 interface Props {
   clientId: string;
@@ -39,6 +42,10 @@ export function WeeklySyncTab({ clientId, clientName }: Props) {
   const [draft, setDraft] = useState<Partial<WeeklySync> | null>(null);
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
 
+  // Roll recap window from the date of the most recent saved sync
+  const lastSyncDate = syncs[0]?.sync_date ?? null;
+  const { data: recap } = useWeeklyRecap(clientId, lastSyncDate);
+
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -50,19 +57,32 @@ export function WeeklySyncTab({ clientId, clientName }: Props) {
 
   const startNew = () => {
     setActiveId(null);
+    const autoFill = recap ? buildAutoFillFromRecap(recap) : { numbers_notes: '', pipeline_notes: '', working_not_working: '' };
     setDraft({
       client_id: clientId,
       sync_date: format(new Date(), 'yyyy-MM-dd'),
       attendees: '',
       wins: '',
-      numbers_notes: '',
-      pipeline_notes: '',
-      working_not_working: '',
+      numbers_notes: autoFill.numbers_notes,
+      pipeline_notes: autoFill.pipeline_notes,
+      working_not_working: autoFill.working_not_working,
       blockers: '',
       action_items: '',
       recap_email_sent: false,
       crm_updated: false,
     });
+  };
+
+  const autoFillCurrentDraft = () => {
+    if (!recap || !draft) return;
+    const autoFill = buildAutoFillFromRecap(recap);
+    setDraft({
+      ...draft,
+      numbers_notes: autoFill.numbers_notes,
+      pipeline_notes: autoFill.pipeline_notes,
+      working_not_working: autoFill.working_not_working,
+    });
+    toast.success('Agenda auto-filled from recap');
   };
 
   const editExisting = (s: WeeklySync) => {
