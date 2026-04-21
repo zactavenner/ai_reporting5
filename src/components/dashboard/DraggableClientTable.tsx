@@ -889,6 +889,7 @@ function MetaStatusCell({
   const [extraAccount2, setExtraAccount2] = useState(extraInitial[1] || '');
   const [open, setOpen] = useState(false);
   const [syncingAccount, setSyncingAccount] = useState<string | null>(null);
+  const [syncDays, setSyncDays] = useState<string>('30');
   const updateClient = useUpdateClient();
   const queryClient = useQueryClient();
 
@@ -901,11 +902,16 @@ function MetaStatusCell({
     }
     setSyncingAccount(cleanId);
     try {
+      const days = parseInt(syncDays, 10) || 30;
+      const today = new Date();
+      const start = new Date(today.getTime() - days * 24 * 60 * 60 * 1000);
+      const startDate = start.toISOString().split('T')[0];
+      const endDate = today.toISOString().split('T')[0];
       const { error } = await supabase.functions.invoke('sync-meta-ads', {
-        body: { clientId: client.id, adAccountOverride: cleanId },
+        body: { clientId: client.id, adAccountOverride: cleanId, startDate, endDate },
       });
       if (error) throw error;
-      toast.success(`Synced act_${cleanId}`);
+      toast.success(`Synced act_${cleanId} (last ${days}d)`);
       queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['meta_ads'] });
     } catch (err: any) {
@@ -994,6 +1000,26 @@ function MetaStatusCell({
               placeholder="https://business.facebook.com/..."
               className="h-7 text-xs"
             />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground font-medium">Sync Timeframe</label>
+            <Select value={syncDays} onValueChange={setSyncDays}>
+              <SelectTrigger className="h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Last 1 day</SelectItem>
+                <SelectItem value="3">Last 3 days</SelectItem>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="14">Last 14 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="60">Last 60 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+                <SelectItem value="180">Last 180 days</SelectItem>
+                <SelectItem value="365">Last 365 days</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">Applies to the per-account sync button below.</p>
           </div>
           {[
             { label: 'Ad Account ID (Primary)', value: adAccountId, set: setAdAccountId, placeholder: 'act_123456789' },
