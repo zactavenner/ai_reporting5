@@ -195,6 +195,16 @@ export function WeeklySyncTab({ clientId, clientName }: Props) {
         </CardHeader>
       </Card>
 
+      {/* Schedule settings */}
+      <WeeklySyncSettings clientId={clientId} />
+
+      {/* Auto recap */}
+      <WeeklyRecapCard
+        clientId={clientId}
+        sinceDate={lastSyncDate}
+        onAutoFill={draft ? autoFillCurrentDraft : undefined}
+      />
+
       {/* Active draft form */}
       {draft && (
         <Card className="border-primary/40">
