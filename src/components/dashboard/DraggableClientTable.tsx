@@ -789,21 +789,6 @@ export function DraggableClientTable({
                               variant="ghost"
                               size="icon"
                               className="h-5 w-5"
-                              disabled={syncingMeta[client.id] || !client.meta_ad_account_id}
-                              onClick={(e) => handleSyncMetaClient(e, client.id, client.name)}
-                              title="Sync Meta"
-                            >
-                              <BarChart className={cn("h-2.5 w-2.5", syncingMeta[client.id] && "animate-pulse")} />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="text-[10px]">Sync Meta Ads</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-5 w-5"
                               disabled={enriching[client.id]}
                               onClick={(e) => handleEnrichClient(e, client.id, client.name)}
                               title="Enrich"
@@ -813,28 +798,9 @@ export function DraggableClientTable({
                           </TooltipTrigger>
                           <TooltipContent side="top" className="text-[10px]">Enrich Contacts</TooltipContent>
                         </Tooltip>
-                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => openAdsManager(e, client.business_manager_url)} title="Ads Manager">
-                          <BarChart3 className="h-2.5 w-2.5" />
-                        </Button>
                         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onOpenSettings(client)}>
                           <Settings className="h-2.5 w-2.5" />
                         </Button>
-                        {client.business_manager_url && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-5 w-5"
-                                onClick={(e) => openAdsManager(e, client.business_manager_url)}
-                                title="Open Business Manager"
-                              >
-                                <BarChart3 className="h-2.5 w-2.5 text-chart-2" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-[10px]">Business Manager</TooltipContent>
-                          </Tooltip>
-                        )}
                         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => client.public_token && copyPublicLink(client.public_token)}>
                           <Copy className="h-2.5 w-2.5" />
                         </Button>
