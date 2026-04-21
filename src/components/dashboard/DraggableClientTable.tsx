@@ -1127,6 +1127,34 @@ function CrmStatusCell({
     }
   };
 
+  const handleManualSync = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!client.ghl_api_key || !client.ghl_location_id) {
+      setSyncResult({ ok: false, message: 'Save credentials before syncing' });
+      return;
+    }
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const days = parseInt(syncDays, 10) || 7;
+      const { data, error } = await supabase.functions.invoke('sync-ghl-contacts', {
+        body: { clientId: client.id, sinceDateDays: days, syncTimeline: days >= 30 },
+      });
+      if (error) throw error;
+      const summary = data?.results?.[0];
+      const synced = summary?.contacts?.created ?? summary?.contacts?.updated ?? 0;
+      setSyncResult({ ok: true, message: `Synced last ${days} day${days === 1 ? '' : 's'}${synced ? ` — ${synced} records` : ''}` });
+      queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['calls'] });
+      queryClient.invalidateQueries({ queryKey: ['integration-statuses'] });
+    } catch (err: any) {
+      setSyncResult({ ok: false, message: err?.message || 'Sync failed' });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
