@@ -123,16 +123,37 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
     return m;
   }, [clients]);
 
+  // Pull human-readable Meta ad-account names (populated by sync-meta-ads)
+  const { data: adAccountRows = [] } = useQuery({
+    queryKey: ['admin-meta-ad-account-names'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('meta_ad_accounts')
+        .select('ad_account_id, account_name');
+      if (error) { console.error(error); return []; }
+      return data || [];
+    },
+    staleTime: 5 * 60_000,
+  });
+  const accountNameMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    adAccountRows.forEach((r: any) => {
+      const id = String(r.ad_account_id || '').replace(/^act_/, '');
+      if (id && r.account_name) m[id] = r.account_name;
+    });
+    return m;
+  }, [adAccountRows]);
+
   // Flat list of all ad accounts across clients for the Ad Account filter
   const allAdAccounts = useMemo(() => {
-    const out: { accountId: string; clientId: string; clientName: string }[] = [];
+    const out: { accountId: string; clientId: string; clientName: string; accountName: string | null }[] = [];
     clients.forEach((c: any) => {
       (accountsByClient[c.id] || []).forEach(acc => {
-        out.push({ accountId: acc, clientId: c.id, clientName: c.name });
+        out.push({ accountId: acc, clientId: c.id, clientName: c.name, accountName: accountNameMap[acc] || null });
       });
     });
     return out.sort((a, b) => a.clientName.localeCompare(b.clientName));
-  }, [clients, accountsByClient]);
+  }, [clients, accountsByClient, accountNameMap]);
 
   // Last-sync timestamps per client, pulled from client_settings
   const { data: syncRows = [] } = useQuery({
