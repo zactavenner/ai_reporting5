@@ -897,6 +897,26 @@ function CreativeDetailModal({
 }) {
   const [commentText, setCommentText] = useState('');
   const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: string } | null>(null);
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  const [revisionText, setRevisionText] = useState('');
+
+  const submitRevision = () => {
+    if (!revisionText.trim()) {
+      toast.error('Please describe what you want changed');
+      return;
+    }
+    const comment: CreativeComment = {
+      id: Date.now().toString(),
+      author: isPublicView ? 'Client' : 'Agency',
+      text: `Revision request: ${revisionText.trim()}`,
+      createdAt: new Date().toISOString(),
+    };
+    addCommentMutation.mutate({ id: creative.id, comment, clientId });
+    onStatusChange(creative, 'revisions');
+    setRevisionText('');
+    setRevisionOpen(false);
+    toast.success('Revision requested');
+  };
 
   const handleAddComment = () => {
     if (!commentText.trim() && !pendingAttachment) return;
