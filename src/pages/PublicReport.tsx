@@ -218,6 +218,15 @@ function PublicReportContent() {
             <p className="text-sm text-muted-foreground">Capital Raising Performance Dashboard</p>
           </div>
           <div className="flex items-center gap-2">
+            <MetricsSourceToggle
+              source={metricsSource}
+              onChange={setMetricsSource}
+              hasSheet={hasSheet}
+              lastSyncedAt={sheetQuery.data?.fetchedAt}
+              rowCount={sheetQuery.data?.rowCount}
+              isLoading={sheetQuery.isFetching}
+              onRefresh={() => sheetQuery.refetch()}
+            />
             <SectionErrorBoundary sectionName="Voice Recording">
               <VoiceRecordButton 
                 clientId={client.id}
@@ -342,7 +351,7 @@ function PublicReportContent() {
               <section>
                 <h2 className="text-lg font-bold mb-2">Key Performance Indicators</h2>
                 <KPIGrid 
-                  metrics={metrics} 
+                  metrics={activeMetrics} 
                   showFundedMetrics 
                   onMetricClick={(metric) => setDrillDownModal(metric)}
                 />
@@ -350,11 +359,11 @@ function PublicReportContent() {
             </SectionErrorBoundary>
 
             <SectionErrorBoundary sectionName="Periodic Stats">
-              <PeriodicStatsTable dailyMetrics={dailyMetrics} />
+              <PeriodicStatsTable dailyMetrics={activeDailyMetrics} />
             </SectionErrorBoundary>
 
             <SectionErrorBoundary sectionName="Charts">
-              <MetricChartsGrid dailyMetrics={dailyMetrics} />
+              <MetricChartsGrid dailyMetrics={activeDailyMetrics} />
             </SectionErrorBoundary>
 
             <SectionErrorBoundary sectionName="Creative Approval">
