@@ -897,6 +897,26 @@ function CreativeDetailModal({
 }) {
   const [commentText, setCommentText] = useState('');
   const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: string } | null>(null);
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  const [revisionText, setRevisionText] = useState('');
+
+  const submitRevision = () => {
+    if (!revisionText.trim()) {
+      toast.error('Please describe what you want changed');
+      return;
+    }
+    const comment: CreativeComment = {
+      id: Date.now().toString(),
+      author: isPublicView ? 'Client' : 'Agency',
+      text: `Revision request: ${revisionText.trim()}`,
+      createdAt: new Date().toISOString(),
+    };
+    addCommentMutation.mutate({ id: creative.id, comment, clientId });
+    onStatusChange(creative, 'revisions');
+    setRevisionText('');
+    setRevisionOpen(false);
+    toast.success('Revision requested');
+  };
 
   const handleAddComment = () => {
     if (!commentText.trim() && !pendingAttachment) return;
@@ -984,20 +1004,52 @@ function CreativeDetailModal({
               Send to Client
             </Button>
           )}
-          {/* Request Approval - for public/client view on draft or revisions */}
-          {isPublicView && (creative.status === 'revisions' || creative.status === 'rejected') && (
-            <Button
-              className="bg-amber-600 hover:bg-amber-700 text-white"
-              onClick={() => {
-                onStatusChange(creative, 'approved');
-                toast.success('Approval requested');
-              }}
-            >
-              <FileUp className="h-4 w-4 mr-1" />
-              Request Approval
-            </Button>
+          {/* Public client view: Approve / Request Revision (with toggle) */}
+          {isPublicView && creative.status !== 'launched' && (
+            <>
+              {creative.status === 'approved' ? (
+                <Button variant="outline" onClick={() => setRevisionOpen(true)}>
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Switch to Request Revision
+                </Button>
+              ) : creative.status === 'revisions' ? (
+                <>
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      onStatusChange(creative, 'approved');
+                      toast.success('Approved');
+                    }}
+                  >
+                    <Check className="h-4 w-4 mr-1" />
+                    Switch to Approve
+                  </Button>
+                  <Button variant="outline" onClick={() => setRevisionOpen(true)}>
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                    Update Revision Notes
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      onStatusChange(creative, 'approved');
+                      toast.success('Approved');
+                    }}
+                  >
+                    <Check className="h-4 w-4 mr-1" />
+                    Approve
+                  </Button>
+                  <Button variant="outline" onClick={() => setRevisionOpen(true)}>
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                    Request Revision
+                  </Button>
+                </>
+              )}
+            </>
           )}
-          {creative.status !== 'launched' && creative.status !== 'draft' && (
+          {creative.status !== 'launched' && creative.status !== 'draft' && !isPublicView && (
             <>
               {creative.status === 'approved' && !isPublicView && (
                 <Button
@@ -1099,6 +1151,29 @@ function CreativeDetailModal({
           </div>
         </div>
       </div>
+      <Dialog open={revisionOpen} onOpenChange={setRevisionOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>What do you want changed?</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={revisionText}
+            onChange={(e) => setRevisionText(e.target.value)}
+            placeholder="Describe the changes you'd like to see..."
+            rows={5}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setRevisionOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={submitRevision}>
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Submit Revision Request
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -1376,6 +1451,27 @@ function CreativeCard({
 
   const commentCount = creative.comments?.length || 0;
 
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  const [revisionText, setRevisionText] = useState('');
+
+  const submitRevision = () => {
+    if (!revisionText.trim()) {
+      toast.error('Please describe what you want changed');
+      return;
+    }
+    const comment: CreativeComment = {
+      id: Date.now().toString(),
+      author: isPublicView ? 'Client' : 'Agency',
+      text: `Revision request: ${revisionText.trim()}`,
+      createdAt: new Date().toISOString(),
+    };
+    addCommentMutation.mutate({ id: creative.id, comment, clientId });
+    onStatusChange(creative, 'revisions');
+    setRevisionText('');
+    setRevisionOpen(false);
+    toast.success('Revision requested');
+  };
+
   return (
     <Card className="border hover:shadow-md transition-shadow overflow-hidden">
       <CardContent className="p-0">
@@ -1438,12 +1534,56 @@ function CreativeCard({
               Send
             </Button>
           )}
-          {/* Request Approval for public/client view */}
-          {isPublicView && creative.status !== 'approved' && creative.status !== 'launched' && (
-            <Button size="sm" className="h-6 text-[10px] gap-0.5 bg-amber-600 hover:bg-amber-700 text-white" onClick={() => onStatusChange(creative, 'approved')}>
-              <FileUp className="h-2.5 w-2.5" />
-              Request Approval
-            </Button>
+          {/* Approve / Request Revision for public/client view */}
+          {isPublicView && creative.status !== 'launched' && (
+            <>
+              {creative.status === 'approved' ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 text-[10px] gap-0.5"
+                  onClick={() => setRevisionOpen(true)}
+                >
+                  <RefreshCw className="h-2.5 w-2.5" />
+                  Request Revision
+                </Button>
+              ) : creative.status === 'revisions' ? (
+                <Button
+                  size="sm"
+                  className="h-6 text-[10px] gap-0.5 bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => {
+                    onStatusChange(creative, 'approved');
+                    toast.success('Approved');
+                  }}
+                >
+                  <Check className="h-2.5 w-2.5" />
+                  Switch to Approve
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    size="sm"
+                    className="h-6 text-[10px] gap-0.5 bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      onStatusChange(creative, 'approved');
+                      toast.success('Approved');
+                    }}
+                  >
+                    <Check className="h-2.5 w-2.5" />
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-[10px] gap-0.5"
+                    onClick={() => setRevisionOpen(true)}
+                  >
+                    <RefreshCw className="h-2.5 w-2.5" />
+                    Request Revision
+                  </Button>
+                </>
+              )}
+            </>
           )}
           {creative.status !== 'launched' && creative.status !== 'draft' && !isPublicView && (
             <>
@@ -1547,6 +1687,29 @@ function CreativeCard({
           </div>
         </div>
       </CardContent>
+      <Dialog open={revisionOpen} onOpenChange={setRevisionOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>What do you want changed?</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={revisionText}
+            onChange={(e) => setRevisionText(e.target.value)}
+            placeholder="Describe the changes you'd like to see..."
+            rows={5}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setRevisionOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={submitRevision}>
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Submit Revision Request
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
