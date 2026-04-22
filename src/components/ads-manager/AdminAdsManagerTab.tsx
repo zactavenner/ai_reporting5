@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { format, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, subMonths, formatDistanceToNow } from 'date-fns';
 import { CreateAdDialog } from './CreateAdDialog';
 import { CreateCampaignDialog } from './CreateCampaignDialog';
 import { AdHDPreviewDialog } from './AdHDPreviewDialog';
@@ -39,6 +39,7 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
   const { data: clients = [] } = useClients();
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [adAccountFilter, setAdAccountFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('campaigns');
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
@@ -70,7 +71,7 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
     queryFn: async () => {
       let q = (supabase as any).from('meta_campaigns').select('*').order('spend', { ascending: false }).limit(2000);
       if (clientFilter !== 'all') q = q.eq('client_id', clientFilter);
-      if (statusFilter !== 'all') q = q.eq('effective_status', statusFilter);
+      if (statusFilter !== 'all') q = q.eq('status', statusFilter);
       const { data, error } = await q;
       if (error) { console.error(error); return []; }
       return data || [];
@@ -108,6 +109,50 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
     clients.forEach(c => { m[c.id] = { name: c.name, meta_ad_account_id: (c as any).meta_ad_account_id || null }; });
     return m;
   }, [clients]);
+
+  // Per-client list of ad accounts (primary + extras stored in meta_ad_account_ids[])
+  const accountsByClient = useMemo(() => {
+    const m: Record<string, string[]> = {};
+    clients.forEach((c: any) => {
+      const set = new Set<string>();
+      if (c.meta_ad_account_id) set.add(String(c.meta_ad_account_id).replace(/^act_/, ''));
+      const extras: string[] = Array.isArray(c.meta_ad_account_ids) ? c.meta_ad_account_ids : [];
+      extras.forEach(a => a && set.add(String(a).replace(/^act_/, '')));
+      m[c.id] = Array.from(set);
+    });
+    return m;
+  }, [clients]);
+
+  // Flat list of all ad accounts across clients for the Ad Account filter
+  const allAdAccounts = useMemo(() => {
+    const out: { accountId: string; clientId: string; clientName: string }[] = [];
+    clients.forEach((c: any) => {
+      (accountsByClient[c.id] || []).forEach(acc => {
+        out.push({ accountId: acc, clientId: c.id, clientName: c.name });
+      });
+    });
+    return out.sort((a, b) => a.clientName.localeCompare(b.clientName));
+  }, [clients, accountsByClient]);
+
+  // Last-sync timestamps per client, pulled from client_settings
+  const { data: syncRows = [] } = useQuery({
+    queryKey: ['admin-client-meta-sync'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('client_settings')
+        .select('client_id, meta_ads_last_sync, meta_ads_sync_enabled');
+      if (error) { console.error(error); return []; }
+      return data || [];
+    },
+    staleTime: 60_000,
+  });
+  const syncByClient = useMemo(() => {
+    const m: Record<string, { lastSync: string | null; enabled: boolean }> = {};
+    syncRows.forEach((r: any) => {
+      m[r.client_id] = { lastSync: r.meta_ads_last_sync || null, enabled: !!r.meta_ads_sync_enabled };
+    });
+    return m;
+  }, [syncRows]);
 
   // Manual sync per client
   const handleSync = async (clientId: string, clientName: string) => {
@@ -147,24 +192,36 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
   // Filter & search
   const filteredCampaigns = useMemo(() => {
     const term = search.toLowerCase();
-    return campaigns.filter((c: any) =>
-      !term || c.name?.toLowerCase().includes(term) || clientMap[c.client_id]?.name.toLowerCase().includes(term)
-    );
-  }, [campaigns, search, clientMap]);
+    const acctClient = adAccountFilter !== 'all'
+      ? allAdAccounts.find(a => a.accountId === adAccountFilter)?.clientId
+      : null;
+    return campaigns.filter((c: any) => {
+      if (acctClient && c.client_id !== acctClient) return false;
+      return !term || c.name?.toLowerCase().includes(term) || clientMap[c.client_id]?.name.toLowerCase().includes(term);
+    });
+  }, [campaigns, search, clientMap, adAccountFilter, allAdAccounts]);
 
   const filteredAdSets = useMemo(() => {
     const term = search.toLowerCase();
-    return adSets.filter((a: any) =>
-      !term || a.name?.toLowerCase().includes(term)
-    );
-  }, [adSets, search]);
+    const acctClient = adAccountFilter !== 'all'
+      ? allAdAccounts.find(a => a.accountId === adAccountFilter)?.clientId
+      : null;
+    return adSets.filter((a: any) => {
+      if (acctClient && a.client_id !== acctClient) return false;
+      return !term || a.name?.toLowerCase().includes(term);
+    });
+  }, [adSets, search, adAccountFilter, allAdAccounts]);
 
   const filteredAds = useMemo(() => {
     const term = search.toLowerCase();
-    return ads.filter((a: any) =>
-      !term || a.name?.toLowerCase().includes(term) || a.headline?.toLowerCase().includes(term)
-    );
-  }, [ads, search]);
+    const acctClient = adAccountFilter !== 'all'
+      ? allAdAccounts.find(a => a.accountId === adAccountFilter)?.clientId
+      : null;
+    return ads.filter((a: any) => {
+      if (acctClient && a.client_id !== acctClient) return false;
+      return !term || a.name?.toLowerCase().includes(term) || a.headline?.toLowerCase().includes(term);
+    });
+  }, [ads, search, adAccountFilter, allAdAccounts]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -269,12 +326,61 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
             />
           </div>
           <Select value={clientFilter} onValueChange={setClientFilter}>
-            <SelectTrigger className="w-[200px] h-9"><SelectValue placeholder="All Clients" /></SelectTrigger>
-            <SelectContent>
+            <SelectTrigger className="w-[280px] h-9"><SelectValue placeholder="All Clients" /></SelectTrigger>
+            <SelectContent className="max-h-[420px]">
               <SelectItem value="all">All Clients ({clients.length})</SelectItem>
-              {clients.map(c => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name} {!(c as any).meta_ad_account_id && '(no Meta)'}
+              {[...clients]
+                .sort((a: any, b: any) => {
+                  // Connected (has account) first, then alpha
+                  const aHas = (accountsByClient[a.id] || []).length > 0 ? 0 : 1;
+                  const bHas = (accountsByClient[b.id] || []).length > 0 ? 0 : 1;
+                  if (aHas !== bHas) return aHas - bHas;
+                  return a.name.localeCompare(b.name);
+                })
+                .map(c => {
+                  const accts = accountsByClient[c.id] || [];
+                  const sync = syncByClient[c.id];
+                  const enabled = sync?.enabled ?? false;
+                  const lastSync = sync?.lastSync
+                    ? formatDistanceToNow(new Date(sync.lastSync), { addSuffix: true })
+                    : null;
+                  return (
+                    <SelectItem key={c.id} value={c.id} className="py-2">
+                      <div className="flex items-center gap-2 w-full">
+                        <span
+                          className={cn(
+                            'h-1.5 w-1.5 rounded-full shrink-0',
+                            enabled ? 'bg-chart-2' : 'bg-muted-foreground/40'
+                          )}
+                          title={enabled ? 'Sync on' : 'Sync off'}
+                        />
+                        <span className="font-medium truncate">{c.name}</span>
+                        <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0">
+                          {accts.length > 0 ? (
+                            <Badge variant="outline" className="h-4 px-1 text-[10px] font-normal">
+                              {accts.length} acct{accts.length === 1 ? '' : 's'}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="h-4 px-1 text-[10px] font-normal text-muted-foreground/60">
+                              no Meta
+                            </Badge>
+                          )}
+                          {lastSync && <span>· synced {lastSync}</span>}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+            </SelectContent>
+          </Select>
+          <Select value={adAccountFilter} onValueChange={setAdAccountFilter}>
+            <SelectTrigger className="w-[220px] h-9"><SelectValue placeholder="All Ad Accounts" /></SelectTrigger>
+            <SelectContent className="max-h-[420px]">
+              <SelectItem value="all">All Ad Accounts ({allAdAccounts.length})</SelectItem>
+              {allAdAccounts.map(a => (
+                <SelectItem key={a.accountId} value={a.accountId}>
+                  <span className="truncate">{a.clientName}</span>
+                  <span className="ml-2 text-[10px] text-muted-foreground">act_{a.accountId}</span>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -283,8 +389,8 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
             <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="All Status" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="ACTIVE">Active</SelectItem>
-              <SelectItem value="PAUSED">Paused</SelectItem>
+              <SelectItem value="ACTIVE">On (Active)</SelectItem>
+              <SelectItem value="PAUSED">Off (Paused)</SelectItem>
               <SelectItem value="ARCHIVED">Archived</SelectItem>
               <SelectItem value="DELETED">Deleted</SelectItem>
             </SelectContent>
