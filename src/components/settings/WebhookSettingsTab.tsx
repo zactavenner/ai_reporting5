@@ -465,9 +465,16 @@ export function WebhookSettingsTab({ clientId }: WebhookSettingsTabProps) {
 
                   {/* URL Display */}
                   <div className="px-3 py-2 bg-background border-t border-border">
-                    <code className="text-xs text-muted-foreground break-all">
-                      {`${baseUrl}/${def.endpointSuffix}`}
-                    </code>
+                    {clientSlug && (
+                      <code className="text-xs text-muted-foreground break-all block">
+                        {buildSlugUrl(def.endpointSuffix)}
+                      </code>
+                    )}
+                    {(showLegacyUrls || !clientSlug) && (
+                      <code className="text-[11px] text-muted-foreground/70 break-all block mt-1">
+                        <span className="opacity-60">legacy:</span> {`${baseUrl}/${def.endpointSuffix}`}
+                      </code>
+                    )}
                   </div>
 
                   {/* Mapping Fields */}
