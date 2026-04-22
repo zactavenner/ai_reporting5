@@ -418,6 +418,132 @@ async function attributeCRMData(supabase: any, clientId: string, startDate?: str
     }).eq("id", campaign.id);
   }
 
+  // ── Proportional fallback: distribute campaign-level attribution to ad sets/ads
+  // by spend share when sub-level UTMs (ad_set_name, ad_id) are missing. ──
+  const adSetsByCampaignId = new Map<string, any[]>();
+  for (const as of metaAdSets || []) {
+    const cid = (metaCampaigns.find((c: any) => c.meta_campaign_id === (as as any).meta_campaign_id) || {}).id;
+    if (!cid) continue;
+    const arr = adSetsByCampaignId.get(cid) || [];
+    arr.push(as);
+    adSetsByCampaignId.set(cid, arr);
+  }
+
+  function distribute(total: number, weights: number[]): number[] {
+    const sum = weights.reduce((a, b) => a + b, 0);
+    if (sum <= 0 || total <= 0) return weights.map(() => 0);
+    const raw = weights.map(w => (w / sum) * total);
+    const floored = raw.map(v => Math.floor(v));
+    let remainder = Math.round(total - floored.reduce((a, b) => a + b, 0));
+    const order = raw.map((v, i) => ({ i, frac: v - Math.floor(v) })).sort((a, b) => b.frac - a.frac);
+    for (const { i } of order) { if (remainder <= 0) break; floored[i]++; remainder--; }
+    return floored;
+  }
+
+  for (const campaign of metaCampaigns) {
+    const cStats = campaignStats.get(campaign.name);
+    if (!cStats) continue;
+    const childAdSets = adSetsByCampaignId.get(campaign.id) || [];
+    if (childAdSets.length === 0) continue;
+
+    // Sum of stats already directly attributed to ad sets in this campaign
+    const directlyAttributed = childAdSets.reduce(
+      (acc, as) => {
+        const s = adSetStats.get(as.name);
+        if (s) {
+          acc.leads += s.leads; acc.spamLeads += s.spamLeads;
+          acc.calls += s.calls; acc.showed += s.showed;
+          acc.funded += s.funded; acc.fundedDollars += s.fundedDollars;
+        }
+        return acc;
+      },
+      { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 },
+    );
+
+    const remainder = {
+      leads: Math.max(0, cStats.leads - directlyAttributed.leads),
+      spamLeads: Math.max(0, cStats.spamLeads - directlyAttributed.spamLeads),
+      calls: Math.max(0, cStats.calls - directlyAttributed.calls),
+      showed: Math.max(0, cStats.showed - directlyAttributed.showed),
+      funded: Math.max(0, cStats.funded - directlyAttributed.funded),
+      fundedDollars: Math.max(0, cStats.fundedDollars - directlyAttributed.fundedDollars),
+    };
+    if (remainder.leads + remainder.spamLeads + remainder.calls + remainder.funded === 0 && remainder.fundedDollars === 0) continue;
+
+    const weights = childAdSets.map(as => Number(as.spend) || 0);
+    const totalChildSpend = weights.reduce((a, b) => a + b, 0);
+    if (totalChildSpend <= 0) continue;
+
+    const leadDist = distribute(remainder.leads, weights);
+    const spamDist = distribute(remainder.spamLeads, weights);
+    const callDist = distribute(remainder.calls, weights);
+    const showedDist = distribute(remainder.showed, weights);
+    const fundedDist = distribute(remainder.funded, weights);
+
+    childAdSets.forEach((as, idx) => {
+      const existing = adSetStats.get(as.name) || { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
+      existing.leads += leadDist[idx];
+      existing.spamLeads += spamDist[idx];
+      existing.calls += callDist[idx];
+      existing.showed += showedDist[idx];
+      existing.funded += fundedDist[idx];
+      existing.fundedDollars += remainder.fundedDollars * (weights[idx] / totalChildSpend);
+      adSetStats.set(as.name, existing);
+    });
+  }
+
+  // Now distribute each ad set's stats down to its ads by spend share
+  for (const adSet of metaAdSets || []) {
+    const asStats = adSetStats.get(adSet.name);
+    if (!asStats) continue;
+    const childAds = adsByAdSetId.get(adSet.id) || [];
+    if (childAds.length === 0) continue;
+
+    const directly = childAds.reduce(
+      (acc, ad) => {
+        const s = adStats.get(ad.id);
+        if (s) {
+          acc.leads += s.leads; acc.spamLeads += s.spamLeads;
+          acc.calls += s.calls; acc.showed += s.showed;
+          acc.funded += s.funded; acc.fundedDollars += s.fundedDollars;
+        }
+        return acc;
+      },
+      { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 },
+    );
+
+    const rem = {
+      leads: Math.max(0, asStats.leads - directly.leads),
+      spamLeads: Math.max(0, asStats.spamLeads - directly.spamLeads),
+      calls: Math.max(0, asStats.calls - directly.calls),
+      showed: Math.max(0, asStats.showed - directly.showed),
+      funded: Math.max(0, asStats.funded - directly.funded),
+      fundedDollars: Math.max(0, asStats.fundedDollars - directly.fundedDollars),
+    };
+    if (rem.leads + rem.spamLeads + rem.calls + rem.funded === 0 && rem.fundedDollars === 0) continue;
+
+    const weights = childAds.map(ad => Number(ad.spend) || 0);
+    const totalChildSpend = weights.reduce((a, b) => a + b, 0);
+    if (totalChildSpend <= 0) continue;
+
+    const leadDist = distribute(rem.leads, weights);
+    const spamDist = distribute(rem.spamLeads, weights);
+    const callDist = distribute(rem.calls, weights);
+    const showedDist = distribute(rem.showed, weights);
+    const fundedDist = distribute(rem.funded, weights);
+
+    childAds.forEach((ad, idx) => {
+      const existing = adStats.get(ad.id) || { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
+      existing.leads += leadDist[idx];
+      existing.spamLeads += spamDist[idx];
+      existing.calls += callDist[idx];
+      existing.showed += showedDist[idx];
+      existing.funded += fundedDist[idx];
+      existing.fundedDollars += rem.fundedDollars * (weights[idx] / totalChildSpend);
+      adStats.set(ad.id, existing);
+    });
+  }
+
   for (const adSet of metaAdSets || []) {
     const stats = adSetStats.get(adSet.name) || { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
     const spend = Number(adSet.spend) || 0;
