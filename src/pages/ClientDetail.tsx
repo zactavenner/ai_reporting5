@@ -256,6 +256,15 @@ export default function ClientDetail() {
             </div>
           </div>
           <div className="flex items-center gap-1.5">
+            <MetricsSourceToggle
+              source={metricsSource}
+              onChange={setMetricsSource}
+              hasSheet={hasSheet}
+              lastSyncedAt={sheetQuery.data?.fetchedAt}
+              rowCount={sheetQuery.data?.rowCount}
+              isLoading={sheetQuery.isFetching}
+              onRefresh={() => sheetQuery.refetch()}
+            />
             {(client.slug || client.public_token) && (
               <Button
                 variant="outline"
@@ -358,7 +367,7 @@ export default function ClientDetail() {
               <CollapsibleContent className="mt-3">
                 <SectionErrorBoundary sectionName="KPI Grid">
                   <KPIGrid
-                    metrics={aggregatedMetrics}
+                    metrics={activeMetrics}
                     priorMetrics={priorMetrics || undefined}
                     showFundedMetrics
                     thresholds={thresholds}
@@ -380,7 +389,7 @@ export default function ClientDetail() {
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3">
                 <SectionErrorBoundary sectionName="Metric Charts">
-                  <MetricChartsGrid dailyMetrics={dailyMetrics} />
+                  <MetricChartsGrid dailyMetrics={activeDailyMetrics} />
                 </SectionErrorBoundary>
               </CollapsibleContent>
             </Collapsible>
