@@ -51,7 +51,14 @@ import {
   RotateCcw,
   Paperclip,
   FileUp,
-  AlertTriangle
+  AlertTriangle,
+  ThumbsUp,
+  MessageCircle,
+  Share2,
+  Globe,
+  Volume2,
+  VolumeX,
+  MoreHorizontal
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
