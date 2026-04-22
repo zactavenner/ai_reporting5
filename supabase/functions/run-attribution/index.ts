@@ -189,6 +189,126 @@ Deno.serve(async (req) => {
 
     console.log(`Attribution done: ${campaignStats.size} campaigns, ${adSetStats.size} ad sets, ${adStats.size} ads, ${unattributedCount} unattributed`);
 
+    // ── Proportional fallback: distribute campaign-level attribution down to ad
+    // sets and ads by spend share when sub-level UTMs are missing. ──
+    function distribute(total: number, weights: number[]): number[] {
+      const sum = weights.reduce((a, b) => a + b, 0);
+      if (sum <= 0 || total <= 0) return weights.map(() => 0);
+      const raw = weights.map(w => (w / sum) * total);
+      const floored = raw.map(v => Math.floor(v));
+      let remainder = Math.round(total - floored.reduce((a, b) => a + b, 0));
+      const order = raw.map((v, i) => ({ i, frac: v - Math.floor(v) })).sort((a, b) => b.frac - a.frac);
+      for (const { i } of order) { if (remainder <= 0) break; floored[i]++; remainder--; }
+      return floored;
+    }
+
+    const adSetsByCampaignId = new Map<string, any[]>();
+    const campaignByDbId = new Map<string, any>();
+    for (const c of metaCampaigns) campaignByDbId.set(c.id, c);
+    // Need ad set -> campaign linkage; refetch with campaign_id
+    const { data: adSetsWithCampaign } = await supabase
+      .from("meta_ad_sets")
+      .select("id, name, spend, campaign_id")
+      .eq("client_id", clientId);
+    for (const as of (adSetsWithCampaign || [])) {
+      if (!as.campaign_id) continue;
+      const arr = adSetsByCampaignId.get(as.campaign_id) || [];
+      arr.push(as);
+      adSetsByCampaignId.set(as.campaign_id, arr);
+    }
+
+    for (const campaign of metaCampaigns) {
+      const cStats = campaignStats.get(campaign.name);
+      if (!cStats) continue;
+      const childAdSets = adSetsByCampaignId.get(campaign.id) || [];
+      if (childAdSets.length === 0) continue;
+
+      const direct = childAdSets.reduce((acc, as) => {
+        const s = adSetStats.get(as.name);
+        if (s) {
+          acc.leads += s.leads; acc.spamLeads += s.spamLeads;
+          acc.calls += s.calls; acc.showed += s.showed;
+          acc.funded += s.funded; acc.fundedDollars += s.fundedDollars;
+        }
+        return acc;
+      }, { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 });
+
+      const rem = {
+        leads: Math.max(0, cStats.leads - direct.leads),
+        spamLeads: Math.max(0, cStats.spamLeads - direct.spamLeads),
+        calls: Math.max(0, cStats.calls - direct.calls),
+        showed: Math.max(0, cStats.showed - direct.showed),
+        funded: Math.max(0, cStats.funded - direct.funded),
+        fundedDollars: Math.max(0, cStats.fundedDollars - direct.fundedDollars),
+      };
+      const weights = childAdSets.map((as: any) => Number(as.spend) || 0);
+      const totalChildSpend = weights.reduce((a, b) => a + b, 0);
+      if (totalChildSpend <= 0) continue;
+
+      const lD = distribute(rem.leads, weights);
+      const sD = distribute(rem.spamLeads, weights);
+      const cD = distribute(rem.calls, weights);
+      const shD = distribute(rem.showed, weights);
+      const fD = distribute(rem.funded, weights);
+
+      childAdSets.forEach((as: any, idx: number) => {
+        const ex = adSetStats.get(as.name) || { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
+        ex.leads += lD[idx];
+        ex.spamLeads += sD[idx];
+        ex.calls += cD[idx];
+        ex.showed += shD[idx];
+        ex.funded += fD[idx];
+        ex.fundedDollars += rem.fundedDollars * (weights[idx] / totalChildSpend);
+        adSetStats.set(as.name, ex);
+      });
+    }
+
+    for (const adSet of (metaAdSets || [])) {
+      const asStats = adSetStats.get(adSet.name);
+      if (!asStats) continue;
+      const childAds = adsByAdSetId.get(adSet.id) || [];
+      if (childAds.length === 0) continue;
+
+      const direct = childAds.reduce((acc, ad) => {
+        const s = adStats.get(ad.id);
+        if (s) {
+          acc.leads += s.leads; acc.spamLeads += s.spamLeads;
+          acc.calls += s.calls; acc.showed += s.showed;
+          acc.funded += s.funded; acc.fundedDollars += s.fundedDollars;
+        }
+        return acc;
+      }, { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 });
+
+      const rem = {
+        leads: Math.max(0, asStats.leads - direct.leads),
+        spamLeads: Math.max(0, asStats.spamLeads - direct.spamLeads),
+        calls: Math.max(0, asStats.calls - direct.calls),
+        showed: Math.max(0, asStats.showed - direct.showed),
+        funded: Math.max(0, asStats.funded - direct.funded),
+        fundedDollars: Math.max(0, asStats.fundedDollars - direct.fundedDollars),
+      };
+      const weights = childAds.map((ad: any) => Number(ad.spend) || 0);
+      const totalChildSpend = weights.reduce((a, b) => a + b, 0);
+      if (totalChildSpend <= 0) continue;
+
+      const lD = distribute(rem.leads, weights);
+      const sD = distribute(rem.spamLeads, weights);
+      const cD = distribute(rem.calls, weights);
+      const shD = distribute(rem.showed, weights);
+      const fD = distribute(rem.funded, weights);
+
+      childAds.forEach((ad: any, idx: number) => {
+        const ex = adStats.get(ad.id) || { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
+        ex.leads += lD[idx];
+        ex.spamLeads += sD[idx];
+        ex.calls += cD[idx];
+        ex.showed += shD[idx];
+        ex.funded += fD[idx];
+        ex.fundedDollars += rem.fundedDollars * (weights[idx] / totalChildSpend);
+        adStats.set(ad.id, ex);
+      });
+    }
+
     // 6. Batch write results - campaigns
     for (const campaign of metaCampaigns) {
       const stats = campaignStats.get(campaign.name) || { leads: 0, spamLeads: 0, calls: 0, showed: 0, funded: 0, fundedDollars: 0 };
