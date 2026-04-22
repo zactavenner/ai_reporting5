@@ -110,6 +110,50 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
     return m;
   }, [clients]);
 
+  // Per-client list of ad accounts (primary + extras stored in meta_ad_account_ids[])
+  const accountsByClient = useMemo(() => {
+    const m: Record<string, string[]> = {};
+    clients.forEach((c: any) => {
+      const set = new Set<string>();
+      if (c.meta_ad_account_id) set.add(String(c.meta_ad_account_id).replace(/^act_/, ''));
+      const extras: string[] = Array.isArray(c.meta_ad_account_ids) ? c.meta_ad_account_ids : [];
+      extras.forEach(a => a && set.add(String(a).replace(/^act_/, '')));
+      m[c.id] = Array.from(set);
+    });
+    return m;
+  }, [clients]);
+
+  // Flat list of all ad accounts across clients for the Ad Account filter
+  const allAdAccounts = useMemo(() => {
+    const out: { accountId: string; clientId: string; clientName: string }[] = [];
+    clients.forEach((c: any) => {
+      (accountsByClient[c.id] || []).forEach(acc => {
+        out.push({ accountId: acc, clientId: c.id, clientName: c.name });
+      });
+    });
+    return out.sort((a, b) => a.clientName.localeCompare(b.clientName));
+  }, [clients, accountsByClient]);
+
+  // Last-sync timestamps per client, pulled from client_settings
+  const { data: syncRows = [] } = useQuery({
+    queryKey: ['admin-client-meta-sync'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('client_settings')
+        .select('client_id, meta_ads_last_sync, meta_ads_sync_enabled');
+      if (error) { console.error(error); return []; }
+      return data || [];
+    },
+    staleTime: 60_000,
+  });
+  const syncByClient = useMemo(() => {
+    const m: Record<string, { lastSync: string | null; enabled: boolean }> = {};
+    syncRows.forEach((r: any) => {
+      m[r.client_id] = { lastSync: r.meta_ads_last_sync || null, enabled: !!r.meta_ads_sync_enabled };
+    });
+    return m;
+  }, [syncRows]);
+
   // Manual sync per client
   const handleSync = async (clientId: string, clientName: string) => {
     if (syncing[clientId]) return;
