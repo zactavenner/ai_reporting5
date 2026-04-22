@@ -376,6 +376,7 @@ serve(async (req) => {
       } else {
         // No contact ID or no GHL credentials - acknowledge but can't sync
         console.log(`[AUTO-SYNC] Cannot sync - contactId: ${contactId}, hasApiKey: ${!!client.ghl_api_key}, hasLocationId: ${!!client.ghl_location_id}`);
+        await logHit('success');
         
         return new Response(
           JSON.stringify({
@@ -398,6 +399,7 @@ serve(async (req) => {
 
     // All other webhook types - acknowledge without processing
     console.log(`[ACK] Webhook received - Type: ${webhookType}, Client: ${client.name} (${clientId})`);
+    await logHit('success');
 
     return new Response(
       JSON.stringify({
