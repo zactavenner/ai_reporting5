@@ -326,12 +326,61 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
             />
           </div>
           <Select value={clientFilter} onValueChange={setClientFilter}>
-            <SelectTrigger className="w-[200px] h-9"><SelectValue placeholder="All Clients" /></SelectTrigger>
-            <SelectContent>
+            <SelectTrigger className="w-[280px] h-9"><SelectValue placeholder="All Clients" /></SelectTrigger>
+            <SelectContent className="max-h-[420px]">
               <SelectItem value="all">All Clients ({clients.length})</SelectItem>
-              {clients.map(c => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name} {!(c as any).meta_ad_account_id && '(no Meta)'}
+              {[...clients]
+                .sort((a: any, b: any) => {
+                  // Connected (has account) first, then alpha
+                  const aHas = (accountsByClient[a.id] || []).length > 0 ? 0 : 1;
+                  const bHas = (accountsByClient[b.id] || []).length > 0 ? 0 : 1;
+                  if (aHas !== bHas) return aHas - bHas;
+                  return a.name.localeCompare(b.name);
+                })
+                .map(c => {
+                  const accts = accountsByClient[c.id] || [];
+                  const sync = syncByClient[c.id];
+                  const enabled = sync?.enabled ?? false;
+                  const lastSync = sync?.lastSync
+                    ? formatDistanceToNow(new Date(sync.lastSync), { addSuffix: true })
+                    : null;
+                  return (
+                    <SelectItem key={c.id} value={c.id} className="py-2">
+                      <div className="flex items-center gap-2 w-full">
+                        <span
+                          className={cn(
+                            'h-1.5 w-1.5 rounded-full shrink-0',
+                            enabled ? 'bg-chart-2' : 'bg-muted-foreground/40'
+                          )}
+                          title={enabled ? 'Sync on' : 'Sync off'}
+                        />
+                        <span className="font-medium truncate">{c.name}</span>
+                        <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0">
+                          {accts.length > 0 ? (
+                            <Badge variant="outline" className="h-4 px-1 text-[10px] font-normal">
+                              {accts.length} acct{accts.length === 1 ? '' : 's'}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="h-4 px-1 text-[10px] font-normal text-muted-foreground/60">
+                              no Meta
+                            </Badge>
+                          )}
+                          {lastSync && <span>· synced {lastSync}</span>}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+            </SelectContent>
+          </Select>
+          <Select value={adAccountFilter} onValueChange={setAdAccountFilter}>
+            <SelectTrigger className="w-[220px] h-9"><SelectValue placeholder="All Ad Accounts" /></SelectTrigger>
+            <SelectContent className="max-h-[420px]">
+              <SelectItem value="all">All Ad Accounts ({allAdAccounts.length})</SelectItem>
+              {allAdAccounts.map(a => (
+                <SelectItem key={a.accountId} value={a.accountId}>
+                  <span className="truncate">{a.clientName}</span>
+                  <span className="ml-2 text-[10px] text-muted-foreground">act_{a.accountId}</span>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -340,8 +389,8 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
             <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="All Status" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="ACTIVE">Active</SelectItem>
-              <SelectItem value="PAUSED">Paused</SelectItem>
+              <SelectItem value="ACTIVE">On (Active)</SelectItem>
+              <SelectItem value="PAUSED">Off (Paused)</SelectItem>
               <SelectItem value="ARCHIVED">Archived</SelectItem>
               <SelectItem value="DELETED">Deleted</SelectItem>
             </SelectContent>
