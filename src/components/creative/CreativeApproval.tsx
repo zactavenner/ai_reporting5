@@ -1376,6 +1376,27 @@ function CreativeCard({
 
   const commentCount = creative.comments?.length || 0;
 
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  const [revisionText, setRevisionText] = useState('');
+
+  const submitRevision = () => {
+    if (!revisionText.trim()) {
+      toast.error('Please describe what you want changed');
+      return;
+    }
+    const comment: CreativeComment = {
+      id: Date.now().toString(),
+      author: isPublicView ? 'Client' : 'Agency',
+      text: `Revision request: ${revisionText.trim()}`,
+      createdAt: new Date().toISOString(),
+    };
+    addCommentMutation.mutate({ id: creative.id, comment, clientId });
+    onStatusChange(creative, 'revisions');
+    setRevisionText('');
+    setRevisionOpen(false);
+    toast.success('Revision requested');
+  };
+
   return (
     <Card className="border hover:shadow-md transition-shadow overflow-hidden">
       <CardContent className="p-0">
