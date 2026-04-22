@@ -51,7 +51,14 @@ import {
   RotateCcw,
   Paperclip,
   FileUp,
-  AlertTriangle
+  AlertTriangle,
+  ThumbsUp,
+  MessageCircle,
+  Share2,
+  Globe,
+  Volume2,
+  VolumeX,
+  MoreHorizontal
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -1190,28 +1197,113 @@ function UploadNewVersionButton({ creative, clientId }: { creative: Creative; cl
 function getCardAspectClass(aspectRatio: string | null | undefined): string {
   switch (aspectRatio) {
     case '16:9': return 'aspect-video';
-    case '9:16': return 'aspect-[9/16] max-h-[400px]';
+    case '9:16': return 'aspect-[9/16]';
     case '1:1': return 'aspect-square';
     case '4:5': return 'aspect-[4/5]';
     default: return 'aspect-square';
   }
 }
 
+// Fake Facebook ad chrome — wraps creative media to look like a real FB sponsored post
+function FacebookAdChrome({
+  pageName,
+  headline,
+  bodyCopy,
+  ctaText,
+  ctaSubtext,
+  children,
+}: {
+  pageName: string;
+  headline?: string | null;
+  bodyCopy?: string | null;
+  ctaText?: string | null;
+  ctaSubtext?: string | null;
+  children: React.ReactNode;
+}) {
+  const initial = (pageName || 'A').trim().charAt(0).toUpperCase();
+  const copy = bodyCopy || headline || 'Discover how leading investors are growing their portfolio with our proven strategy. Learn more today.';
+  return (
+    <div className="bg-card text-foreground">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 pt-2.5 pb-2">
+        <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-[11px] font-semibold text-primary flex-shrink-0">
+          {initial}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold text-foreground truncate leading-tight">{pageName}</p>
+          <p className="text-[10px] text-muted-foreground flex items-center gap-1 leading-tight">
+            Sponsored · <Globe className="h-2.5 w-2.5" />
+          </p>
+        </div>
+        <MoreHorizontal className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+      </div>
+
+      {/* Body copy */}
+      <p className="px-3 pb-2 text-[11px] text-foreground/90 leading-snug line-clamp-3">
+        {copy}
+      </p>
+
+      {/* Media (preserves dynamic aspect ratio) */}
+      {children}
+
+      {/* CTA bar */}
+      <div className="flex items-center justify-between bg-muted/40 border-t border-b border-border px-3 py-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-[9px] uppercase tracking-wide text-muted-foreground truncate">
+            {ctaSubtext || `${pageName.toLowerCase().replace(/\s+/g, '')}.com`}
+          </p>
+          <p className="text-[11px] font-semibold text-foreground truncate">
+            {headline || 'Invest With Confidence'}
+          </p>
+        </div>
+        <div className="bg-muted text-foreground text-[10px] font-semibold px-3 py-1.5 rounded ml-2 flex-shrink-0">
+          {ctaText || 'Learn More'}
+        </div>
+      </div>
+
+      {/* Engagement row */}
+      <div className="flex items-center justify-around px-2 py-1.5 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1.5"><ThumbsUp className="h-3 w-3" /> Like</span>
+        <span className="flex items-center gap-1.5"><MessageCircle className="h-3 w-3" /> Comment</span>
+        <span className="flex items-center gap-1.5"><Share2 className="h-3 w-3" /> Share</span>
+      </div>
+    </div>
+  );
+}
+
 // Inline video player
 function InlineVideoPlayer({ src, aspectRatio }: { src: string; aspectRatio?: string | null }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(true);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   const toggle = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (videoRef.current) {
       if (videoRef.current.paused) {
+        // Unmute on first user-initiated play so audio is audible
+        if (!hasInteracted) {
+          videoRef.current.muted = false;
+          setMuted(false);
+          setHasInteracted(true);
+        }
         videoRef.current.play();
         setPlaying(true);
       } else {
         videoRef.current.pause();
         setPlaying(false);
       }
+    }
+  };
+
+  const toggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (videoRef.current) {
+      const next = !videoRef.current.muted;
+      videoRef.current.muted = next;
+      setMuted(next);
+      setHasInteracted(true);
     }
   };
 
@@ -1236,6 +1328,15 @@ function InlineVideoPlayer({ src, aspectRatio }: { src: string; aspectRatio?: st
           )}
         </div>
       </div>
+      {/* Mute / unmute control */}
+      <button
+        type="button"
+        onClick={toggleMute}
+        className="absolute bottom-2 right-2 z-10 bg-black/60 hover:bg-black/80 text-white rounded-full p-1.5 transition-opacity opacity-80 hover:opacity-100"
+        aria-label={muted ? 'Unmute video' : 'Mute video'}
+      >
+        {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+      </button>
     </div>
   );
 }
@@ -1283,26 +1384,34 @@ function CreativeCard({
           <Badge className={`absolute top-2 right-2 z-10 text-[10px] ${getStatusColor(creative.status)}`}>
             {creative.status.charAt(0).toUpperCase() + creative.status.slice(1)}
           </Badge>
-          
-          <div className={`${getCardAspectClass(creative.aspect_ratio)} bg-muted relative overflow-hidden`}>
-            {creative.type === 'image' && creative.file_url ? (
-              <img 
-                src={creative.file_url} 
-                alt={creative.title}
-                className="w-full h-full object-cover cursor-pointer"
-                onClick={onPreview}
-              />
-            ) : creative.type === 'video' && creative.file_url ? (
-              <InlineVideoPlayer src={creative.file_url} aspectRatio={creative.aspect_ratio} />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center cursor-pointer" onClick={onPreview}>
-                {getTypeIcon(creative.type)}
-                <p className="text-xs text-muted-foreground mt-1">
-                  {creative.headline || 'Ad Copy'}
-                </p>
-              </div>
-            )}
-          </div>
+
+          <FacebookAdChrome
+            pageName={clientName || 'Sponsored Page'}
+            headline={creative.headline}
+            bodyCopy={creative.body_copy}
+            ctaText={null}
+            ctaSubtext={null}
+          >
+            <div className={`${getCardAspectClass(creative.aspect_ratio)} bg-muted relative overflow-hidden`}>
+              {creative.type === 'image' && creative.file_url ? (
+                <img 
+                  src={creative.file_url} 
+                  alt={creative.title}
+                  className="w-full h-full object-contain cursor-pointer"
+                  onClick={onPreview}
+                />
+              ) : creative.type === 'video' && creative.file_url ? (
+                <InlineVideoPlayer src={creative.file_url} aspectRatio={creative.aspect_ratio} />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center cursor-pointer" onClick={onPreview}>
+                  {getTypeIcon(creative.type)}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {creative.headline || 'Ad Copy'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </FacebookAdChrome>
         </div>
         
         {/* Info */}
