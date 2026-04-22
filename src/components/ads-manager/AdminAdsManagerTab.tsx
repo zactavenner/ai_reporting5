@@ -123,16 +123,37 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
     return m;
   }, [clients]);
 
+  // Pull human-readable Meta ad-account names (populated by sync-meta-ads)
+  const { data: adAccountRows = [] } = useQuery({
+    queryKey: ['admin-meta-ad-account-names'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('meta_ad_accounts')
+        .select('ad_account_id, account_name');
+      if (error) { console.error(error); return []; }
+      return data || [];
+    },
+    staleTime: 5 * 60_000,
+  });
+  const accountNameMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    adAccountRows.forEach((r: any) => {
+      const id = String(r.ad_account_id || '').replace(/^act_/, '');
+      if (id && r.account_name) m[id] = r.account_name;
+    });
+    return m;
+  }, [adAccountRows]);
+
   // Flat list of all ad accounts across clients for the Ad Account filter
   const allAdAccounts = useMemo(() => {
-    const out: { accountId: string; clientId: string; clientName: string }[] = [];
+    const out: { accountId: string; clientId: string; clientName: string; accountName: string | null }[] = [];
     clients.forEach((c: any) => {
       (accountsByClient[c.id] || []).forEach(acc => {
-        out.push({ accountId: acc, clientId: c.id, clientName: c.name });
+        out.push({ accountId: acc, clientId: c.id, clientName: c.name, accountName: accountNameMap[acc] || null });
       });
     });
     return out.sort((a, b) => a.clientName.localeCompare(b.clientName));
-  }, [clients, accountsByClient]);
+  }, [clients, accountsByClient, accountNameMap]);
 
   // Last-sync timestamps per client, pulled from client_settings
   const { data: syncRows = [] } = useQuery({
@@ -228,11 +249,22 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
     const totalSpend = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.spend || 0), 0);
     const totalImpr = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.impressions || 0), 0);
     const totalClicks = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.clicks || 0), 0);
-    const totalLeads = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.attributed_leads || 0), 0);
+    const totalCrmLeads = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.attributed_leads || 0), 0);
+    const totalMetaLeads = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.meta_reported_leads || 0), 0);
+    const totalCalls = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.attributed_calls || 0), 0);
+    const totalFunded = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.attributed_funded || 0), 0);
     const ctr = totalImpr > 0 ? (totalClicks / totalImpr) * 100 : 0;
     const cpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
-    const cpl = totalLeads > 0 ? totalSpend / totalLeads : 0;
-    return { totalSpend, totalImpr, totalClicks, totalLeads, ctr, cpc, cpl, count: filteredCampaigns.length };
+    const crmCpl = totalCrmLeads > 0 ? totalSpend / totalCrmLeads : 0;
+    const metaCpl = totalMetaLeads > 0 ? totalSpend / totalMetaLeads : 0;
+    const costPerCall = totalCalls > 0 ? totalSpend / totalCalls : 0;
+    const costPerFunded = totalFunded > 0 ? totalSpend / totalFunded : 0;
+    return {
+      totalSpend, totalImpr, totalClicks,
+      totalMetaLeads, totalCrmLeads, totalCalls, totalFunded,
+      ctr, cpc, metaCpl, crmCpl, costPerCall, costPerFunded,
+      count: filteredCampaigns.length,
+    };
   }, [filteredCampaigns]);
 
   return (
@@ -304,14 +336,17 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
         </div>
 
         {/* KPI bar */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-10 gap-2">
           <KpiCell icon={DollarSign} label="Spend" value={fmt$(kpis.totalSpend)} />
           <KpiCell icon={Eye} label="Impressions" value={fmtN(kpis.totalImpr)} />
           <KpiCell icon={MousePointerClick} label="Clicks" value={fmtN(kpis.totalClicks)} />
           <KpiCell icon={TrendingUp} label="CTR" value={fmtPct(kpis.ctr)} />
           <KpiCell icon={DollarSign} label="CPC" value={fmt$(kpis.cpc)} />
-          <KpiCell icon={Target} label="Leads" value={fmtN(kpis.totalLeads)} />
-          <KpiCell icon={DollarSign} label="CPL" value={fmt$(kpis.cpl)} />
+          <KpiCell icon={Target} label="Meta Leads" value={fmtN(kpis.totalMetaLeads)} accent="primary" />
+          <KpiCell icon={DollarSign} label="Meta CPL" value={fmt$(kpis.metaCpl)} accent="primary" />
+          <KpiCell icon={Target} label="CRM Leads" value={fmtN(kpis.totalCrmLeads)} accent="chart-2" />
+          <KpiCell icon={DollarSign} label="Cost / Call" value={fmt$(kpis.costPerCall)} />
+          <KpiCell icon={DollarSign} label="Cost / Funded" value={fmt$(kpis.costPerFunded)} />
         </div>
 
         {/* Filters */}
@@ -344,29 +379,40 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                   const lastSync = sync?.lastSync
                     ? formatDistanceToNow(new Date(sync.lastSync), { addSuffix: true })
                     : null;
+                  // Pick the first known account name for an at-a-glance label
+                  const firstNamed = accts
+                    .map(a => accountNameMap[a])
+                    .filter(Boolean)[0] as string | undefined;
                   return (
                     <SelectItem key={c.id} value={c.id} className="py-2">
-                      <div className="flex items-center gap-2 w-full">
-                        <span
-                          className={cn(
-                            'h-1.5 w-1.5 rounded-full shrink-0',
-                            enabled ? 'bg-chart-2' : 'bg-muted-foreground/40'
-                          )}
-                          title={enabled ? 'Sync on' : 'Sync off'}
-                        />
-                        <span className="font-medium truncate">{c.name}</span>
-                        <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0">
-                          {accts.length > 0 ? (
-                            <Badge variant="outline" className="h-4 px-1 text-[10px] font-normal">
-                              {accts.length} acct{accts.length === 1 ? '' : 's'}
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="h-4 px-1 text-[10px] font-normal text-muted-foreground/60">
-                              no Meta
-                            </Badge>
-                          )}
-                          {lastSync && <span>· synced {lastSync}</span>}
-                        </span>
+                      <div className="flex flex-col gap-0.5 w-full">
+                        <div className="flex items-center gap-2 w-full">
+                          <span
+                            className={cn(
+                              'h-1.5 w-1.5 rounded-full shrink-0',
+                              enabled ? 'bg-chart-2' : 'bg-muted-foreground/40'
+                            )}
+                            title={enabled ? 'Sync on' : 'Sync off'}
+                          />
+                          <span className="font-medium truncate">{c.name}</span>
+                          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0">
+                            {accts.length > 0 ? (
+                              <Badge variant="outline" className="h-4 px-1 text-[10px] font-normal">
+                                {accts.length} acct{accts.length === 1 ? '' : 's'}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="h-4 px-1 text-[10px] font-normal text-muted-foreground/60">
+                                no Meta
+                              </Badge>
+                            )}
+                            {lastSync && <span>· synced {lastSync}</span>}
+                          </span>
+                        </div>
+                        {firstNamed && (
+                          <span className="text-[10px] text-muted-foreground/80 truncate pl-3.5">
+                            {firstNamed}{accts.length > 1 ? ` +${accts.length - 1} more` : ''}
+                          </span>
+                        )}
                       </div>
                     </SelectItem>
                   );
@@ -379,8 +425,14 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
               <SelectItem value="all">All Ad Accounts ({allAdAccounts.length})</SelectItem>
               {allAdAccounts.map(a => (
                 <SelectItem key={a.accountId} value={a.accountId}>
-                  <span className="truncate">{a.clientName}</span>
-                  <span className="ml-2 text-[10px] text-muted-foreground">act_{a.accountId}</span>
+                  <div className="flex flex-col">
+                    <span className="truncate text-xs font-medium">
+                      {a.accountName || a.clientName}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {a.accountName ? `${a.clientName} · ` : ''}act_{a.accountId}
+                    </span>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -472,7 +524,16 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                             <TooltipContent className="text-xs max-w-[220px]">Leads in your CRM attributed to this campaign via name/UTM matching</TooltipContent>
                           </Tooltip>
                         </TableHead>
-                        <TableHead className="text-right">CPL</TableHead>
+                        <TableHead className="text-right">
+                          <Tooltip>
+                            <TooltipTrigger>CPL</TooltipTrigger>
+                            <TooltipContent className="text-xs max-w-[220px]">Spend ÷ CRM leads. Discrepancy with Meta Leads usually means UTM/attribution is missing.</TooltipContent>
+                          </Tooltip>
+                        </TableHead>
+                        <TableHead className="text-right">Calls</TableHead>
+                        <TableHead className="text-right">Cost / Call</TableHead>
+                        <TableHead className="text-right">Funded</TableHead>
+                        <TableHead className="text-right">Cost / Funded</TableHead>
                         <TableHead className="w-12"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -503,6 +564,10 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                           <TableCell className="text-right text-xs font-medium text-primary">{fmtN(c.meta_reported_leads)}</TableCell>
                           <TableCell className="text-right text-xs font-medium text-chart-2">{fmtN(c.attributed_leads)}</TableCell>
                           <TableCell className="text-right text-xs">{fmt$(c.cost_per_lead)}</TableCell>
+                          <TableCell className="text-right text-xs">{fmtN(c.attributed_calls)}</TableCell>
+                          <TableCell className="text-right text-xs">{fmt$(c.cost_per_call)}</TableCell>
+                          <TableCell className="text-right text-xs">{fmtN(c.attributed_funded)}</TableCell>
+                          <TableCell className="text-right text-xs">{fmt$(c.cost_per_funded)}</TableCell>
                           <TableCell><ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /></TableCell>
                         </TableRow>
                       ))}
@@ -643,13 +708,17 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
   );
 }
 
-function KpiCell({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+function KpiCell({ icon: Icon, label, value, accent }: { icon: any; label: string; value: string; accent?: 'primary' | 'chart-2' }) {
+  const accentClass =
+    accent === 'primary' ? 'text-primary' :
+    accent === 'chart-2' ? 'text-chart-2' :
+    '';
   return (
     <Card className="p-3">
       <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-wide">
         <Icon className="h-3 w-3" />{label}
       </div>
-      <p className="text-base font-bold mt-1 tabular-nums">{value}</p>
+      <p className={cn("text-base font-bold mt-1 tabular-nums", accentClass)}>{value}</p>
     </Card>
   );
 }
