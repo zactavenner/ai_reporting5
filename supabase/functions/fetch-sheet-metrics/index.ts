@@ -40,6 +40,24 @@ const FIELD_ALIASES: Record<string, string[]> = {
   clicks: ['clicks'],
 };
 
+// Aliases used when the sheet is column-major (metrics down rows, dates across columns).
+// Matched against the value in column A.
+const COLMAJOR_METRIC_ALIASES: Record<string, string[]> = {
+  ad_spend: ['ad spend', 'spend', 'total spend'],
+  impressions: ['impressions'],
+  clicks: ['link clicks', 'clicks'],
+  leads: ['leads'],
+  spam_leads: ['spam', 'spam leads'],
+  calls: ['discovery call booked', 'discovery calls booked', 'calls booked', 'booked calls', 'calls'],
+  showed_calls: ['discovery call showed', 'discovery calls showed', 'calls showed', 'showed calls'],
+  reconnect_calls: ['reconnect calls #2', 'reconnect calls', 'reconnects'],
+  reconnect_showed: ['reconnect call showed', 'reconnect calls showed'],
+  commitments: ['committed investors #', 'committed investors', 'commitments', 'committed'],
+  commitment_dollars: ['committed $', 'commitment $', 'committed dollars'],
+  funded_investors: ['funded investors #', 'funded investors', 'funded'],
+  funded_dollars: ['funded $', 'capital raised'],
+};
+
 function normalize(s: string): string {
   return (s || '').toString().trim().toLowerCase().replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ');
 }
@@ -74,6 +92,85 @@ function parseDate(v: any): string | null {
   const d = new Date(s);
   if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
   return null;
+}
+
+function isSingleDateString(s: string): boolean {
+  const t = (s || '').toString().trim();
+  if (!t) return false;
+  // Skip ranges like "1/1-1/7"
+  if (/-/.test(t) && !/^\d{4}-\d{2}-\d{2}$/.test(t)) return false;
+  return parseDate(t) !== null;
+}
+
+/**
+ * Parses a column-major sheet (dates across columns, metrics down rows).
+ * Returns daily metrics keyed by date.
+ */
+function parseColumnMajor(rows: any[][], mapping?: Record<string, string>): DailyMetric[] {
+  // Find the date header row: the one with the most parseable single dates in cols >= 2
+  let bestRow = -1;
+  let bestCount = 0;
+  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+    const r = rows[i] || [];
+    let count = 0;
+    for (let c = 2; c < r.length; c++) {
+      if (isSingleDateString(String(r[c] ?? ''))) count++;
+    }
+    if (count > bestCount) { bestCount = count; bestRow = i; }
+  }
+  if (bestRow < 0 || bestCount < 2) return [];
+
+  // Map column index -> date (skip weekly-total / non-date columns)
+  const dateRow = rows[bestRow];
+  const colDates: Record<number, string> = {};
+  for (let c = 2; c < dateRow.length; c++) {
+    const ds = parseDate(dateRow[c]);
+    if (ds && isSingleDateString(String(dateRow[c]))) colDates[c] = ds;
+  }
+
+  // Build per-date metric accumulators
+  const byDate: Record<string, DailyMetric> = {};
+  for (const ds of Object.values(colDates)) {
+    byDate[ds] = {
+      date: ds, ad_spend: 0, impressions: 0, clicks: 0, ctr: 0,
+      leads: 0, spam_leads: 0, calls: 0, showed_calls: 0,
+      commitments: 0, commitment_dollars: 0,
+      funded_investors: 0, funded_dollars: 0,
+      reconnect_calls: 0, reconnect_showed: 0,
+    };
+  }
+
+  // Build metric-label lookup
+  const labelToField: Record<string, string> = {};
+  for (const [field, aliases] of Object.entries(COLMAJOR_METRIC_ALIASES)) {
+    if (mapping && mapping[field]) labelToField[normalize(mapping[field])] = field;
+    for (const a of aliases) labelToField[normalize(a)] = field;
+  }
+
+  // Walk metric rows. A metric row has col A = label, col B containing 'ACTUAL'.
+  for (let i = bestRow + 1; i < rows.length; i++) {
+    const r = rows[i] || [];
+    const label = normalize(String(r[0] ?? ''));
+    const subLabel = normalize(String(r[1] ?? ''));
+    if (!label) continue;
+    if (!subLabel.startsWith('actual')) continue; // only ACTUAL rows
+    const field = labelToField[label];
+    if (!field) continue;
+
+    for (const [colStr, ds] of Object.entries(colDates)) {
+      const c = Number(colStr);
+      const v = parseNumber(r[c]);
+      (byDate[ds] as any)[field] = ((byDate[ds] as any)[field] || 0) + v;
+    }
+  }
+
+  // Compute CTR per day
+  const result = Object.values(byDate).map((d) => ({
+    ...d,
+    ctr: d.impressions > 0 ? (d.clicks / d.impressions) * 100 : 0,
+  }));
+  result.sort((a, b) => a.date.localeCompare(b.date));
+  return result;
 }
 
 function buildHeaderMap(headers: string[], override?: Record<string, string>): Record<string, number> {
@@ -160,53 +257,53 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Find the header row — the first row that contains a recognizable "date" column
-    let headerRowIdx = 0;
-    for (let i = 0; i < Math.min(rows.length, 5); i++) {
-      const candidate = rows[i].map(normalize);
-      if (FIELD_ALIASES.date.some((a) => candidate.includes(normalize(a)))) {
-        headerRowIdx = i; break;
+    // Try column-major first (metrics-down, dates-across) — common for KPI dashboards.
+    // Fall back to row-major (header row + data rows) if not detected.
+    let daily: DailyMetric[] = parseColumnMajor(rows, mapping);
+    let layout: 'column-major' | 'row-major' = 'column-major';
+
+    if (daily.length === 0) {
+      layout = 'row-major';
+      let headerRowIdx = 0;
+      for (let i = 0; i < Math.min(rows.length, 5); i++) {
+        const candidate = (rows[i] || []).map((c) => normalize(String(c ?? '')));
+        if (FIELD_ALIASES.date.some((a) => candidate.includes(normalize(a)))) {
+          headerRowIdx = i; break;
+        }
+      }
+      const headerRow = (rows[headerRowIdx] || []).map((c) => String(c ?? ''));
+      const headerMap = buildHeaderMap(headerRow, mapping);
+      if (headerMap.date === undefined) {
+        throw new Error(`Could not detect sheet layout. Headers: ${headerRow.slice(0, 10).join(', ')}`);
+      }
+      for (let i = headerRowIdx + 1; i < rows.length; i++) {
+        const row = rows[i];
+        const dateStr = parseDate(row[headerMap.date]);
+        if (!dateStr) continue;
+        const get = (k: string) => headerMap[k] !== undefined ? parseNumber(row[headerMap[k]]) : 0;
+        const impressions = get('impressions');
+        const clicks = get('clicks');
+        daily.push({
+          date: dateStr, ad_spend: get('ad_spend'), impressions, clicks,
+          ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+          leads: get('leads'), spam_leads: get('spam_leads'),
+          calls: get('calls'), showed_calls: get('showed_calls'),
+          commitments: get('commitments'), commitment_dollars: get('commitment_dollars'),
+          funded_investors: get('funded_investors'), funded_dollars: get('funded_dollars'),
+          reconnect_calls: get('reconnect_calls'), reconnect_showed: get('reconnect_showed'),
+        });
       }
     }
 
-    const headerRow = rows[headerRowIdx].map((c) => String(c ?? ''));
-    const headerMap = buildHeaderMap(headerRow, mapping);
-
-    if (headerMap.date === undefined) {
-      throw new Error(`Could not find a 'Date' column in sheet headers: ${headerRow.join(', ')}`);
-    }
-
+    // Apply date-range filter
     const startD = start_date ? new Date(start_date) : null;
     const endD = end_date ? new Date(end_date) : null;
-
-    const daily: DailyMetric[] = [];
-    for (let i = headerRowIdx + 1; i < rows.length; i++) {
-      const row = rows[i];
-      const dateStr = parseDate(row[headerMap.date]);
-      if (!dateStr) continue;
-      if (startD && new Date(dateStr) < startD) continue;
-      if (endD && new Date(dateStr) > endD) continue;
-
-      const get = (k: string) => headerMap[k] !== undefined ? parseNumber(row[headerMap[k]]) : 0;
-      const impressions = get('impressions');
-      const clicks = get('clicks');
-
-      daily.push({
-        date: dateStr,
-        ad_spend: get('ad_spend'),
-        impressions,
-        clicks,
-        ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
-        leads: get('leads'),
-        spam_leads: get('spam_leads'),
-        calls: get('calls'),
-        showed_calls: get('showed_calls'),
-        commitments: get('commitments'),
-        commitment_dollars: get('commitment_dollars'),
-        funded_investors: get('funded_investors'),
-        funded_dollars: get('funded_dollars'),
-        reconnect_calls: get('reconnect_calls'),
-        reconnect_showed: get('reconnect_showed'),
+    if (startD || endD) {
+      daily = daily.filter((d) => {
+        const dt = new Date(d.date);
+        if (startD && dt < startD) return false;
+        if (endD && dt > endD) return false;
+        return true;
       });
     }
 
@@ -263,8 +360,7 @@ Deno.serve(async (req) => {
       daily,
       aggregated,
       sheetTitle,
-      headerMap,
-      headers: headerRow,
+      layout,
       fetchedAt: new Date().toISOString(),
       rowCount: daily.length,
     }), {
