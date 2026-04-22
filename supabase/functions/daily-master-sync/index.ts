@@ -102,6 +102,9 @@ Deno.serve(async (req) => {
     }
 
     // ── Step 2: GHL All Clients (contacts, calendar, pipelines) ──
+    // Note: sync-ghl-all-clients runs in background via EdgeRuntime.waitUntil,
+    // so it returns immediately. We wait longer to give it time to complete
+    // before running recalculate-daily-metrics in step 4.
     if (!skipSteps.includes("ghl")) {
       const start = Date.now();
       console.log(`[daily-master-sync] Step 2: sync-ghl-all-clients`);
@@ -120,7 +123,17 @@ Deno.serve(async (req) => {
           `The daily GHL all-clients sync failed: ${res.error}. Check GHL API keys.`
         );
       }
-      await new Promise(r => setTimeout(r, 10000));
+      // Count active GHL clients to estimate background sync time
+      const { count: ghlClientCount } = await supabase
+        .from("clients")
+        .select("id", { count: "exact", head: true })
+        .not("ghl_api_key", "is", null)
+        .not("ghl_location_id", "is", null);
+      // Each client takes ~40-75s (contacts + calendar + pipeline + delays)
+      // Wait proportionally but cap at 10 minutes
+      const estimatedWaitSecs = Math.min((ghlClientCount || 1) * 60, 600);
+      console.log(`[daily-master-sync] Waiting ${estimatedWaitSecs}s for ${ghlClientCount} GHL clients to sync in background...`);
+      await new Promise(r => setTimeout(r, estimatedWaitSecs * 1000));
     }
 
     // ── Step 3: HubSpot All Clients ──
@@ -142,20 +155,42 @@ Deno.serve(async (req) => {
           `The daily HubSpot sync failed: ${res.error}. Check HubSpot access tokens.`
         );
       }
-      await new Promise(r => setTimeout(r, 5000));
+      // HubSpot sync also runs in background — wait proportionally
+      const { count: hubspotClientCount } = await supabase
+        .from("clients")
+        .select("id", { count: "exact", head: true })
+        .not("hubspot_portal_id", "is", null)
+        .not("hubspot_access_token", "is", null);
+      if (hubspotClientCount && hubspotClientCount > 0) {
+        const hubspotWaitSecs = Math.min(hubspotClientCount * 45, 300);
+        console.log(`[daily-master-sync] Waiting ${hubspotWaitSecs}s for ${hubspotClientCount} HubSpot clients...`);
+        await new Promise(r => setTimeout(r, hubspotWaitSecs * 1000));
+      } else {
+        await new Promise(r => setTimeout(r, 5000));
+      }
     }
 
-    // ── Step 4: Recalculate Daily Metrics ──
+    // ── Step 4: Recalculate Daily Metrics (last 14 days) ──
+    // Covers a 14-day window to catch any data synced during the background
+    // GHL/HubSpot processing and fill in any gaps from prior days.
     if (!skipSteps.includes("recalculate")) {
       const start = Date.now();
-      console.log(`[daily-master-sync] Step 4: recalculate-daily-metrics`);
-      const res = await callFunction(supabaseUrl, supabaseKey, "recalculate-daily-metrics");
+      const recalcEnd = new Date();
+      const recalcStart = new Date();
+      recalcStart.setUTCDate(recalcStart.getUTCDate() - 14);
+      const recalcStartStr = recalcStart.toISOString().split("T")[0];
+      const recalcEndStr = recalcEnd.toISOString().split("T")[0];
+      console.log(`[daily-master-sync] Step 4: recalculate-daily-metrics (${recalcStartStr} to ${recalcEndStr})`);
+      const res = await callFunction(supabaseUrl, supabaseKey, "recalculate-daily-metrics", {
+        startDate: recalcStartStr,
+        endDate: recalcEndStr,
+      });
       const duration = Date.now() - start;
       results.push({
         step: "recalculate-daily-metrics",
         success: res.success,
         duration_ms: duration,
-        details: `${res.data?.totalUpdated || 0} days updated`,
+        details: `${res.data?.totalUpdated || 0} days updated (${recalcStartStr} to ${recalcEndStr})`,
         error: res.error,
       });
       await new Promise(r => setTimeout(r, 5000));

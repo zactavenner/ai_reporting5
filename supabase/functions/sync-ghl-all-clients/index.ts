@@ -46,18 +46,18 @@ Deno.serve(async (req) => {
   console.log(`[sync-ghl-all-clients] Found ${ghlClients.length} GHL clients to sync`);
 
   const doSync = async () => {
-    const results: Array<{ clientId: string; name: string; contacts: boolean; calendar: boolean; pipelines: boolean; errors: string[] }> = [];
+    const results: Array<{ clientId: string; name: string; contacts: boolean; calendar: boolean; pipelines: boolean; calendarsDiscovered?: number; errors: string[] }> = [];
 
     for (let i = 0; i < ghlClients.length; i++) {
       const client = ghlClients[i];
-      const clientResult = { clientId: client.id, name: client.name, contacts: false, calendar: false, pipelines: false, errors: [] as string[] };
+      const clientResult = { clientId: client.id, name: client.name, contacts: false, calendar: false, pipelines: false, calendarsDiscovered: 0, errors: [] as string[] };
       console.log(`[sync-ghl-all-clients] (${i + 1}/${ghlClients.length}) Syncing ${client.name}...`);
 
       // 1. Sync contacts (leads) - pass sinceDateDays if provided
       try {
         const contactsBody: Record<string, unknown> = { client_id: client.id, syncType: "contacts" };
         if (sinceDateDays) contactsBody.sinceDateDays = sinceDateDays;
-        
+
         const res = await fetch(`${supabaseUrl}/functions/v1/sync-ghl-contacts`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseKey}` },
@@ -73,11 +73,48 @@ Deno.serve(async (req) => {
 
       await new Promise(resolve => setTimeout(resolve, 10000));
 
+      // 1b. Auto-discover calendars if none configured
+      try {
+        const { data: settings } = await supabase
+          .from("client_settings")
+          .select("tracked_calendar_ids, reconnect_calendar_ids")
+          .eq("client_id", client.id)
+          .maybeSingle();
+
+        const hasTrackedCalendars = (settings?.tracked_calendar_ids || []).length > 0;
+        if (!hasTrackedCalendars) {
+          console.log(`[sync-ghl-all-clients] ${client.name}: No tracked calendars — auto-discovering...`);
+          const calRes = await fetch(`${supabaseUrl}/functions/v1/fetch-ghl-calendars`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseKey}` },
+            body: JSON.stringify({ ghlApiKey: client.ghl_api_key, ghlLocationId: client.ghl_location_id }),
+          });
+          const calData = await calRes.json();
+          const calendars = calData.calendars || [];
+          if (calendars.length > 0) {
+            const calendarIds = calendars.map((c: any) => c.id);
+            await supabase
+              .from("client_settings")
+              .upsert(
+                { client_id: client.id, tracked_calendar_ids: calendarIds },
+                { onConflict: "client_id" }
+              );
+            clientResult.calendarsDiscovered = calendarIds.length;
+            console.log(`[sync-ghl-all-clients] ✓ ${client.name}: Auto-saved ${calendarIds.length} calendars: ${calendars.map((c: any) => c.name || c.id).join(", ")}`);
+          } else {
+            console.log(`[sync-ghl-all-clients] ${client.name}: No calendars found in GHL location`);
+          }
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+      } catch (err) {
+        console.error(`[sync-ghl-all-clients] ${client.name}: Calendar auto-discovery error (non-fatal):`, err);
+      }
+
       // 2. Sync calendar appointments
       try {
         const calendarBody: Record<string, unknown> = { clientId: client.id };
         if (sinceDateDays) calendarBody.sinceDateDays = sinceDateDays;
-        
+
         const res = await fetch(`${supabaseUrl}/functions/v1/sync-calendar-appointments`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseKey}` },

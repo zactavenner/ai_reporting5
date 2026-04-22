@@ -338,7 +338,12 @@ async function recalculateClientMetrics(supabase: any, clientId: string) {
 
   console.log(`Updating metrics for ${metricsByDate.size} dates`);
 
-  // Update daily_metrics for each date
+  // Update daily_metrics for each date — only UPDATE existing rows, never INSERT.
+  // INSERT would create rows with only calls data and missing ad_spend/leads,
+  // which fragments the data. The recalculate-daily-metrics function handles
+  // INSERT via its upsert logic and preserves ad_spend from sync-meta-ads.
+  let updated = 0;
+  let skippedNoRow = 0;
   for (const [date, metrics] of metricsByDate) {
     const { data: existing } = await supabase
       .from('daily_metrics')
@@ -358,18 +363,13 @@ async function recalculateClientMetrics(supabase: any, clientId: string) {
           updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id);
+      updated++;
     } else {
-      await supabase
-        .from('daily_metrics')
-        .insert({
-          client_id: clientId,
-          date,
-          calls: metrics.calls,
-          showed_calls: metrics.showed_calls,
-          reconnect_calls: metrics.reconnect_calls,
-          reconnect_showed: metrics.reconnect_showed,
-        });
+      skippedNoRow++;
     }
+  }
+  if (skippedNoRow > 0) {
+    console.log(`Skipped ${skippedNoRow} dates with no existing daily_metrics row (will be created by recalculate-daily-metrics)`);
   }
 
   console.log('Metrics recalculation complete');
