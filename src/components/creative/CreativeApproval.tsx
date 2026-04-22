@@ -1197,7 +1197,7 @@ function UploadNewVersionButton({ creative, clientId }: { creative: Creative; cl
 function getCardAspectClass(aspectRatio: string | null | undefined): string {
   switch (aspectRatio) {
     case '16:9': return 'aspect-video';
-    case '9:16': return 'aspect-[9/16] max-h-[400px]';
+    case '9:16': return 'aspect-[9/16]';
     case '1:1': return 'aspect-square';
     case '4:5': return 'aspect-[4/5]';
     default: return 'aspect-square';
@@ -1208,17 +1208,35 @@ function getCardAspectClass(aspectRatio: string | null | undefined): string {
 function InlineVideoPlayer({ src, aspectRatio }: { src: string; aspectRatio?: string | null }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(true);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   const toggle = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (videoRef.current) {
       if (videoRef.current.paused) {
+        // Unmute on first user-initiated play so audio is audible
+        if (!hasInteracted) {
+          videoRef.current.muted = false;
+          setMuted(false);
+          setHasInteracted(true);
+        }
         videoRef.current.play();
         setPlaying(true);
       } else {
         videoRef.current.pause();
         setPlaying(false);
       }
+    }
+  };
+
+  const toggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (videoRef.current) {
+      const next = !videoRef.current.muted;
+      videoRef.current.muted = next;
+      setMuted(next);
+      setHasInteracted(true);
     }
   };
 
@@ -1243,6 +1261,15 @@ function InlineVideoPlayer({ src, aspectRatio }: { src: string; aspectRatio?: st
           )}
         </div>
       </div>
+      {/* Mute / unmute control */}
+      <button
+        type="button"
+        onClick={toggleMute}
+        className="absolute bottom-2 right-2 z-10 bg-black/60 hover:bg-black/80 text-white rounded-full p-1.5 transition-opacity opacity-80 hover:opacity-100"
+        aria-label={muted ? 'Unmute video' : 'Mute video'}
+      >
+        {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+      </button>
     </div>
   );
 }
