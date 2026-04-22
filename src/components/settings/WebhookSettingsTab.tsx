@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Copy, Check, Play, Trash2, RefreshCw, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Loader2, X, Radio, Plus, Minus, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,8 +57,53 @@ export function WebhookSettingsTab({ clientId }: WebhookSettingsTabProps) {
   // Live test hook
   const liveTest = useLiveWebhookTest(clientId, testingWebhookId);
 
-  // Build the base webhook URL
-  const baseUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/webhook-ingest/${clientId}`;
+  // Fetch client slug for new-style URLs
+  const { data: clientRow } = useQuery({
+    queryKey: ['client-slug', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('slug, name')
+        .eq('id', clientId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!clientId,
+  });
+
+  const clientSlug = clientRow?.slug || null;
+  const functionsBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/webhook-ingest`;
+  // Slug-based URL: one segment, /<slug>-<event>
+  const slugBaseAvailable = !!clientSlug;
+  // Legacy UUID base (kept for backward compat)
+  const baseUrl = `${functionsBase}/${clientId}`;
+  const [showLegacyUrls, setShowLegacyUrls] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
+
+  const buildSlugUrl = (suffix: string) =>
+    clientSlug ? `${functionsBase}/${clientSlug}-${suffix}` : '';
+
+  const handleCopyAll = () => {
+    if (!clientSlug) return;
+    const all = WEBHOOK_DEFINITIONS.reduce((acc, d) => {
+      acc[d.id] = buildSlugUrl(d.endpointSuffix);
+      return acc;
+    }, {} as Record<string, string>);
+    navigator.clipboard.writeText(JSON.stringify(all, null, 2));
+    setCopiedAll(true);
+    toast.success('All webhook URLs copied as JSON');
+    setTimeout(() => setCopiedAll(false), 2000);
+  };
+
+  const handleCopySlugUrl = (suffix: string) => {
+    const url = buildSlugUrl(suffix);
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    setCopiedUrl(`slug-${suffix}`);
+    toast.success('Webhook URL copied');
+    setTimeout(() => setCopiedUrl(null), 2000);
+  };
 
   // Available paths from received payload
   const availablePaths = useMemo(() => {
@@ -66,7 +113,10 @@ export function WebhookSettingsTab({ clientId }: WebhookSettingsTabProps) {
 
   const handleCopyUrl = (webhookId: string) => {
     const def = WEBHOOK_DEFINITIONS.find(d => d.id === webhookId);
-    const url = `${baseUrl}/${def?.endpointSuffix || webhookId}`;
+    // Prefer slug-based URL when available
+    const url = clientSlug
+      ? `${functionsBase}/${clientSlug}-${def?.endpointSuffix || webhookId}`
+      : `${baseUrl}/${def?.endpointSuffix || webhookId}`;
     navigator.clipboard.writeText(url);
     setCopiedUrl(webhookId);
     toast.success('Webhook URL copied to clipboard');
@@ -178,6 +228,62 @@ export function WebhookSettingsTab({ clientId }: WebhookSettingsTabProps) {
           No authentication required - just send JSON data to the URL and it will automatically be parsed and stored.
         </p>
       </div>
+
+      {/* GHL Snapshot URLs (slug-based, zero-config) */}
+      {slugBaseAvailable && (
+        <div className="border-2 border-primary/40 bg-primary/5 p-4 rounded-lg space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium flex items-center gap-2">
+                <Radio className="h-4 w-4 text-primary" />
+                GHL Snapshot URLs
+              </h4>
+              <p className="text-xs text-muted-foreground mt-1">
+                Use these clean slug-based URLs in your GHL workflow snapshot. Adding a new client = just change the slug{' '}
+                <code className="px-1 py-0.5 bg-muted rounded">{clientSlug}</code> to the new client's slug.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleCopyAll}>
+              {copiedAll ? <Check className="h-4 w-4 mr-2 text-chart-2" /> : <Copy className="h-4 w-4 mr-2" />}
+              Copy All as JSON
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {WEBHOOK_DEFINITIONS.map(def => {
+              const url = buildSlugUrl(def.endpointSuffix);
+              const copied = copiedUrl === `slug-${def.endpointSuffix}`;
+              return (
+                <div
+                  key={def.id}
+                  className="flex items-center gap-2 p-2 bg-background rounded border border-border"
+                >
+                  <Badge variant="secondary" className="text-[10px] shrink-0 uppercase">
+                    {def.endpointSuffix}
+                  </Badge>
+                  <code className="flex-1 text-xs font-mono truncate text-muted-foreground" title={url}>
+                    {url}
+                  </code>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 shrink-0"
+                    onClick={() => handleCopySlugUrl(def.endpointSuffix)}
+                  >
+                    {copied ? <Check className="h-3.5 w-3.5 text-chart-2" /> : <Copy className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            className="text-xs text-muted-foreground hover:text-foreground underline"
+            onClick={() => setShowLegacyUrls(v => !v)}
+          >
+            {showLegacyUrls ? 'Hide' : 'Show'} legacy UUID URLs
+          </button>
+        </div>
+      )}
 
       {/* Live Test Status Banner */}
       {liveTest.isListening && (
@@ -359,9 +465,16 @@ export function WebhookSettingsTab({ clientId }: WebhookSettingsTabProps) {
 
                   {/* URL Display */}
                   <div className="px-3 py-2 bg-background border-t border-border">
-                    <code className="text-xs text-muted-foreground break-all">
-                      {`${baseUrl}/${def.endpointSuffix}`}
-                    </code>
+                    {clientSlug && (
+                      <code className="text-xs text-muted-foreground break-all block">
+                        {buildSlugUrl(def.endpointSuffix)}
+                      </code>
+                    )}
+                    {(showLegacyUrls || !clientSlug) && (
+                      <code className="text-[11px] text-muted-foreground/70 break-all block mt-1">
+                        <span className="opacity-60">legacy:</span> {`${baseUrl}/${def.endpointSuffix}`}
+                      </code>
+                    )}
                   </div>
 
                   {/* Mapping Fields */}

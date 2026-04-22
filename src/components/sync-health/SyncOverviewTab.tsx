@@ -142,6 +142,26 @@ export function SyncOverviewTab() {
     },
   });
 
+  // Per-client last inbound webhook timestamp, for "stale webhook" badge.
+  const { data: lastWebhookByClient = new Map<string, string>() } = useQuery({
+    queryKey: ['sync-overview-last-webhook-by-client'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('webhook_logs')
+        .select('client_id, processed_at')
+        .order('processed_at', { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      const map = new Map<string, string>();
+      (data || []).forEach(row => {
+        if (row.client_id && !map.has(row.client_id)) {
+          map.set(row.client_id, row.processed_at as string);
+        }
+      });
+      return map;
+    },
+  });
+
   const { data: errorCount = 0 } = useQuery({
     queryKey: ['sync-overview-errors'],
     queryFn: async () => {
@@ -290,6 +310,10 @@ export function SyncOverviewTab() {
                   const ghlStatus = c.ghl_sync_status === 'error' ? 'error' : getTimeStatus(c.last_ghl_sync_at, !!(c.ghl_location_id && c.ghl_api_key), 4);
                   const isFullyHealthy = metaStatus === 'healthy' && ghlStatus === 'healthy';
                   const hasIssue = metaStatus === 'error' || ghlStatus === 'error';
+                  const lastHook = lastWebhookByClient.get(c.id);
+                  const hoursSinceHook = lastHook ? (now - new Date(lastHook).getTime()) / 3600000 : null;
+                  // Stale-webhook flag: client has previously sent webhooks but nothing in 24h+
+                  const staleWebhook = lastHook && hoursSinceHook !== null && hoursSinceHook > 24;
 
                   return (
                     <div
@@ -303,9 +327,24 @@ export function SyncOverviewTab() {
                     >
                       <div className="flex items-center justify-between mb-2.5">
                         <span className="text-sm font-semibold truncate">{c.name}</span>
-                        <Badge variant={c.status === 'active' ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0 shrink-0 ml-2">
-                          {c.status}
-                        </Badge>
+                        <div className="flex items-center gap-1 shrink-0 ml-2">
+                          {staleWebhook && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                                  <Radio className="h-2.5 w-2.5 mr-0.5" />
+                                  Stale
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                No inbound webhook in {Math.round(hoursSinceHook!)}h. Check the GHL workflow.
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                          <Badge variant={c.status === 'active' ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0">
+                            {c.status}
+                          </Badge>
+                        </div>
                       </div>
                       <div className="flex items-center gap-4 text-xs">
                         <Tooltip>
