@@ -1221,7 +1221,7 @@ function FacebookAdChrome({
   children: React.ReactNode;
 }) {
   const initial = (pageName || 'A').trim().charAt(0).toUpperCase();
-  const copy = bodyCopy || headline || 'Discover how leading investors are growing their portfolio with our proven strategy. Learn more today.';
+  const copy = bodyCopy || headline || 'Ad copy goes here...';
   return (
     <div className="bg-card text-foreground">
       {/* Header */}
@@ -1253,7 +1253,7 @@ function FacebookAdChrome({
             {ctaSubtext || `${pageName.toLowerCase().replace(/\s+/g, '')}.com`}
           </p>
           <p className="text-[11px] font-semibold text-foreground truncate">
-            {headline || 'Invest With Confidence'}
+            {headline || 'Headline goes here...'}
           </p>
         </div>
         <div className="bg-muted text-foreground text-[10px] font-semibold px-3 py-1.5 rounded ml-2 flex-shrink-0">
