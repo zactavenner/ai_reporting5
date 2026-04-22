@@ -249,11 +249,22 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
     const totalSpend = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.spend || 0), 0);
     const totalImpr = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.impressions || 0), 0);
     const totalClicks = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.clicks || 0), 0);
-    const totalLeads = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.attributed_leads || 0), 0);
+    const totalCrmLeads = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.attributed_leads || 0), 0);
+    const totalMetaLeads = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.meta_reported_leads || 0), 0);
+    const totalCalls = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.attributed_calls || 0), 0);
+    const totalFunded = filteredCampaigns.reduce((s: number, c: any) => s + Number(c.attributed_funded || 0), 0);
     const ctr = totalImpr > 0 ? (totalClicks / totalImpr) * 100 : 0;
     const cpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
-    const cpl = totalLeads > 0 ? totalSpend / totalLeads : 0;
-    return { totalSpend, totalImpr, totalClicks, totalLeads, ctr, cpc, cpl, count: filteredCampaigns.length };
+    const crmCpl = totalCrmLeads > 0 ? totalSpend / totalCrmLeads : 0;
+    const metaCpl = totalMetaLeads > 0 ? totalSpend / totalMetaLeads : 0;
+    const costPerCall = totalCalls > 0 ? totalSpend / totalCalls : 0;
+    const costPerFunded = totalFunded > 0 ? totalSpend / totalFunded : 0;
+    return {
+      totalSpend, totalImpr, totalClicks,
+      totalMetaLeads, totalCrmLeads, totalCalls, totalFunded,
+      ctr, cpc, metaCpl, crmCpl, costPerCall, costPerFunded,
+      count: filteredCampaigns.length,
+    };
   }, [filteredCampaigns]);
 
   return (
@@ -325,14 +336,17 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
         </div>
 
         {/* KPI bar */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-10 gap-2">
           <KpiCell icon={DollarSign} label="Spend" value={fmt$(kpis.totalSpend)} />
           <KpiCell icon={Eye} label="Impressions" value={fmtN(kpis.totalImpr)} />
           <KpiCell icon={MousePointerClick} label="Clicks" value={fmtN(kpis.totalClicks)} />
           <KpiCell icon={TrendingUp} label="CTR" value={fmtPct(kpis.ctr)} />
           <KpiCell icon={DollarSign} label="CPC" value={fmt$(kpis.cpc)} />
-          <KpiCell icon={Target} label="Leads" value={fmtN(kpis.totalLeads)} />
-          <KpiCell icon={DollarSign} label="CPL" value={fmt$(kpis.cpl)} />
+          <KpiCell icon={Target} label="Meta Leads" value={fmtN(kpis.totalMetaLeads)} accent="primary" />
+          <KpiCell icon={DollarSign} label="Meta CPL" value={fmt$(kpis.metaCpl)} accent="primary" />
+          <KpiCell icon={Target} label="CRM Leads" value={fmtN(kpis.totalCrmLeads)} accent="chart-2" />
+          <KpiCell icon={DollarSign} label="Cost / Call" value={fmt$(kpis.costPerCall)} />
+          <KpiCell icon={DollarSign} label="Cost / Funded" value={fmt$(kpis.costPerFunded)} />
         </div>
 
         {/* Filters */}
