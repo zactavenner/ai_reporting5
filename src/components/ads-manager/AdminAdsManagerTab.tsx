@@ -365,29 +365,40 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                   const lastSync = sync?.lastSync
                     ? formatDistanceToNow(new Date(sync.lastSync), { addSuffix: true })
                     : null;
+                  // Pick the first known account name for an at-a-glance label
+                  const firstNamed = accts
+                    .map(a => accountNameMap[a])
+                    .filter(Boolean)[0] as string | undefined;
                   return (
                     <SelectItem key={c.id} value={c.id} className="py-2">
-                      <div className="flex items-center gap-2 w-full">
-                        <span
-                          className={cn(
-                            'h-1.5 w-1.5 rounded-full shrink-0',
-                            enabled ? 'bg-chart-2' : 'bg-muted-foreground/40'
-                          )}
-                          title={enabled ? 'Sync on' : 'Sync off'}
-                        />
-                        <span className="font-medium truncate">{c.name}</span>
-                        <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0">
-                          {accts.length > 0 ? (
-                            <Badge variant="outline" className="h-4 px-1 text-[10px] font-normal">
-                              {accts.length} acct{accts.length === 1 ? '' : 's'}
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="h-4 px-1 text-[10px] font-normal text-muted-foreground/60">
-                              no Meta
-                            </Badge>
-                          )}
-                          {lastSync && <span>· synced {lastSync}</span>}
-                        </span>
+                      <div className="flex flex-col gap-0.5 w-full">
+                        <div className="flex items-center gap-2 w-full">
+                          <span
+                            className={cn(
+                              'h-1.5 w-1.5 rounded-full shrink-0',
+                              enabled ? 'bg-chart-2' : 'bg-muted-foreground/40'
+                            )}
+                            title={enabled ? 'Sync on' : 'Sync off'}
+                          />
+                          <span className="font-medium truncate">{c.name}</span>
+                          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0">
+                            {accts.length > 0 ? (
+                              <Badge variant="outline" className="h-4 px-1 text-[10px] font-normal">
+                                {accts.length} acct{accts.length === 1 ? '' : 's'}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="h-4 px-1 text-[10px] font-normal text-muted-foreground/60">
+                                no Meta
+                              </Badge>
+                            )}
+                            {lastSync && <span>· synced {lastSync}</span>}
+                          </span>
+                        </div>
+                        {firstNamed && (
+                          <span className="text-[10px] text-muted-foreground/80 truncate pl-3.5">
+                            {firstNamed}{accts.length > 1 ? ` +${accts.length - 1} more` : ''}
+                          </span>
+                        )}
                       </div>
                     </SelectItem>
                   );
@@ -400,8 +411,14 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
               <SelectItem value="all">All Ad Accounts ({allAdAccounts.length})</SelectItem>
               {allAdAccounts.map(a => (
                 <SelectItem key={a.accountId} value={a.accountId}>
-                  <span className="truncate">{a.clientName}</span>
-                  <span className="ml-2 text-[10px] text-muted-foreground">act_{a.accountId}</span>
+                  <div className="flex flex-col">
+                    <span className="truncate text-xs font-medium">
+                      {a.accountName || a.clientName}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {a.accountName ? `${a.clientName} · ` : ''}act_{a.accountId}
+                    </span>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
