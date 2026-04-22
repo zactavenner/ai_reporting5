@@ -695,13 +695,17 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
   );
 }
 
-function KpiCell({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+function KpiCell({ icon: Icon, label, value, accent }: { icon: any; label: string; value: string; accent?: 'primary' | 'chart-2' }) {
+  const accentClass =
+    accent === 'primary' ? 'text-primary' :
+    accent === 'chart-2' ? 'text-chart-2' :
+    '';
   return (
     <Card className="p-3">
       <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-wide">
         <Icon className="h-3 w-3" />{label}
       </div>
-      <p className="text-base font-bold mt-1 tabular-nums">{value}</p>
+      <p className={cn("text-base font-bold mt-1 tabular-nums", accentClass)}>{value}</p>
     </Card>
   );
 }
