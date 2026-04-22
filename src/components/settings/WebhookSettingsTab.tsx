@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Copy, Check, Play, Trash2, RefreshCw, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Loader2, X, Radio, Plus, Minus, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,8 +57,53 @@ export function WebhookSettingsTab({ clientId }: WebhookSettingsTabProps) {
   // Live test hook
   const liveTest = useLiveWebhookTest(clientId, testingWebhookId);
 
-  // Build the base webhook URL
-  const baseUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/webhook-ingest/${clientId}`;
+  // Fetch client slug for new-style URLs
+  const { data: clientRow } = useQuery({
+    queryKey: ['client-slug', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('slug, name')
+        .eq('id', clientId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!clientId,
+  });
+
+  const clientSlug = clientRow?.slug || null;
+  const functionsBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/webhook-ingest`;
+  // Slug-based URL: one segment, /<slug>-<event>
+  const slugBaseAvailable = !!clientSlug;
+  // Legacy UUID base (kept for backward compat)
+  const baseUrl = `${functionsBase}/${clientId}`;
+  const [showLegacyUrls, setShowLegacyUrls] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
+
+  const buildSlugUrl = (suffix: string) =>
+    clientSlug ? `${functionsBase}/${clientSlug}-${suffix}` : '';
+
+  const handleCopyAll = () => {
+    if (!clientSlug) return;
+    const all = WEBHOOK_DEFINITIONS.reduce((acc, d) => {
+      acc[d.id] = buildSlugUrl(d.endpointSuffix);
+      return acc;
+    }, {} as Record<string, string>);
+    navigator.clipboard.writeText(JSON.stringify(all, null, 2));
+    setCopiedAll(true);
+    toast.success('All webhook URLs copied as JSON');
+    setTimeout(() => setCopiedAll(false), 2000);
+  };
+
+  const handleCopySlugUrl = (suffix: string) => {
+    const url = buildSlugUrl(suffix);
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    setCopiedUrl(`slug-${suffix}`);
+    toast.success('Webhook URL copied');
+    setTimeout(() => setCopiedUrl(null), 2000);
+  };
 
   // Available paths from received payload
   const availablePaths = useMemo(() => {
@@ -66,7 +113,10 @@ export function WebhookSettingsTab({ clientId }: WebhookSettingsTabProps) {
 
   const handleCopyUrl = (webhookId: string) => {
     const def = WEBHOOK_DEFINITIONS.find(d => d.id === webhookId);
-    const url = `${baseUrl}/${def?.endpointSuffix || webhookId}`;
+    // Prefer slug-based URL when available
+    const url = clientSlug
+      ? `${functionsBase}/${clientSlug}-${def?.endpointSuffix || webhookId}`
+      : `${baseUrl}/${def?.endpointSuffix || webhookId}`;
     navigator.clipboard.writeText(url);
     setCopiedUrl(webhookId);
     toast.success('Webhook URL copied to clipboard');
