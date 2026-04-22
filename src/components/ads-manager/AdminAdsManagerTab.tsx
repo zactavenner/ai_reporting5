@@ -192,24 +192,36 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
   // Filter & search
   const filteredCampaigns = useMemo(() => {
     const term = search.toLowerCase();
-    return campaigns.filter((c: any) =>
-      !term || c.name?.toLowerCase().includes(term) || clientMap[c.client_id]?.name.toLowerCase().includes(term)
-    );
-  }, [campaigns, search, clientMap]);
+    const acctClient = adAccountFilter !== 'all'
+      ? allAdAccounts.find(a => a.accountId === adAccountFilter)?.clientId
+      : null;
+    return campaigns.filter((c: any) => {
+      if (acctClient && c.client_id !== acctClient) return false;
+      return !term || c.name?.toLowerCase().includes(term) || clientMap[c.client_id]?.name.toLowerCase().includes(term);
+    });
+  }, [campaigns, search, clientMap, adAccountFilter, allAdAccounts]);
 
   const filteredAdSets = useMemo(() => {
     const term = search.toLowerCase();
-    return adSets.filter((a: any) =>
-      !term || a.name?.toLowerCase().includes(term)
-    );
-  }, [adSets, search]);
+    const acctClient = adAccountFilter !== 'all'
+      ? allAdAccounts.find(a => a.accountId === adAccountFilter)?.clientId
+      : null;
+    return adSets.filter((a: any) => {
+      if (acctClient && a.client_id !== acctClient) return false;
+      return !term || a.name?.toLowerCase().includes(term);
+    });
+  }, [adSets, search, adAccountFilter, allAdAccounts]);
 
   const filteredAds = useMemo(() => {
     const term = search.toLowerCase();
-    return ads.filter((a: any) =>
-      !term || a.name?.toLowerCase().includes(term) || a.headline?.toLowerCase().includes(term)
-    );
-  }, [ads, search]);
+    const acctClient = adAccountFilter !== 'all'
+      ? allAdAccounts.find(a => a.accountId === adAccountFilter)?.clientId
+      : null;
+    return ads.filter((a: any) => {
+      if (acctClient && a.client_id !== acctClient) return false;
+      return !term || a.name?.toLowerCase().includes(term) || a.headline?.toLowerCase().includes(term);
+    });
+  }, [ads, search, adAccountFilter, allAdAccounts]);
 
   // KPIs
   const kpis = useMemo(() => {
