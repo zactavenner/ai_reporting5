@@ -6944,6 +6944,117 @@ export type Database = {
           },
         ]
       }
+      slack_activity_log: {
+        Row: {
+          action_type: string | null
+          channel_id: string | null
+          channel_name: string | null
+          client_id: string | null
+          created_at: string
+          id: string
+          message_text: string | null
+          message_ts: string | null
+          metadata: Json | null
+          task_id: string | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Insert: {
+          action_type?: string | null
+          channel_id?: string | null
+          channel_name?: string | null
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          message_text?: string | null
+          message_ts?: string | null
+          metadata?: Json | null
+          task_id?: string | null
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Update: {
+          action_type?: string | null
+          channel_id?: string | null
+          channel_name?: string | null
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          message_text?: string | null
+          message_ts?: string | null
+          metadata?: Json | null
+          task_id?: string | null
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slack_activity_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "slack_activity_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      slack_channel_mappings: {
+        Row: {
+          auto_create_tasks: boolean
+          channel_id: string
+          channel_name: string | null
+          channel_type: string
+          client_id: string
+          created_at: string
+          id: string
+          monitor_messages: boolean
+          updated_at: string
+        }
+        Insert: {
+          auto_create_tasks?: boolean
+          channel_id: string
+          channel_name?: string | null
+          channel_type?: string
+          client_id: string
+          created_at?: string
+          id?: string
+          monitor_messages?: boolean
+          updated_at?: string
+        }
+        Update: {
+          auto_create_tasks?: boolean
+          channel_id?: string
+          channel_name?: string | null
+          channel_type?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          monitor_messages?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slack_channel_mappings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "slack_channel_mappings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spam_blacklist: {
         Row: {
           created_at: string
