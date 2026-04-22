@@ -692,7 +692,6 @@ Deno.serve(async (req) => {
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      }
 
       const accessToken = client.meta_access_token || Deno.env.get("META_SHARED_ACCESS_TOKEN");
       if (!accessToken) {
