@@ -1,61 +1,71 @@
 
 
-# Plan: Slug-based GHL Inbound Webhooks (one URL per event, zero-config per client)
+# Plan: Connect Google Sheet as a metrics source for Blue Capital
 
-## Goal
-Replace today's UUID-based webhook URL (`/webhook-ingest/<client-uuid>/<type>`) with a clean, human-readable, slug-based URL so adding a new client via GHL snapshot only requires the agency to swap in the slug — nothing in the code or DB needs to change.
+Replace database-derived KPIs with values pulled live from your Google Sheet for **Blue Capital**, with a toggle to flip between **Sheet** and **Database** so you can compare. Defaults to **Sheet** since you trust it more right now.
 
-**New URL shape**
+## What you'll see
+
+On the Blue Capital client view (and its public report), a new **Data Source** toggle in the header:
+
+```text
+Data Source:  [ ● Sheet (live) ]   [ ○ Database ]      Last synced: 2m ago
 ```
-https://<project>.functions.supabase.co/webhook-ingest/<client-slug>-<event>
-```
-Examples:
-- `…/webhook-ingest/lscre-lead`
-- `…/webhook-ingest/quad-j-capital-booked`
-- `…/webhook-ingest/jj-dental-showed`
-- `…/webhook-ingest/titan-management-group-funded`
 
-The legacy UUID path keeps working (backward compatible) so nothing breaks for existing GHL snapshots already pointed at it.
+- **Sheet (default):** KPI cards, Cost-Per metrics, and the funnel are computed from the Google Sheet.
+- **Database:** current behavior (leads/calls/funded tables).
+- A small "Last synced" timestamp + manual **Refresh** button next to the toggle.
+- Toggle preference is remembered per-browser; defaults to **Sheet** for Blue Capital until you change it.
 
-## What changes
+Only Blue Capital is wired up in this pass (per your request). The architecture is generic so we can attach a sheet to any other client later by just pasting a URL.
 
-### 1. `webhook-ingest` edge function — slug router
-- Parse the path. If the segment after `webhook-ingest/` is a UUID → use today's logic (legacy mode).
-- Otherwise treat it as `<slug>-<event>`. Resolve by:
-  1. Take the last hyphenated token as the candidate event (`lead`, `booked`, `showed`, `reconnect`, `funded`, `ad_spend`, `opportunity`, `appointment`).
-  2. Everything before it = client slug. Look up `clients` by `slug`.
-  3. If no match, fall back to a fuzzy match (longest-slug-prefix wins) so multi-word slugs like `quad-j-capital-booked` resolve correctly even if the event token also contains hyphens.
-- All existing event handling (lead/booked/showed/auto-sync/ad_spend) is reused unchanged.
-- Adds `webhook_logs` insert on every call so the Sync Health → Webhook Feed tab populates (today many calls just `[ACK]` to console).
+## How it works
 
-### 2. Snapshot template — single drop-in webhook block
-- Document the 6 standard URLs each new GHL snapshot needs (lead, booked, showed, reconnect, funded, opportunity).
-- Agency workflow becomes: create client → set `slug` → in GHL snapshot replace `{{client-slug}}` placeholder. No platform changes.
+1. **Link the Google Sheets connector** (`zactavenner.com`) to this project so the backend can read the sheet through Lovable's authenticated gateway.
+2. **Store the sheet binding** on the client (new `client_settings` columns):
+   - `metrics_sheet_id` — `10ETeNuyi0dxHjCMyymrros1jDKyH6HKMwP4QVSBpZU0`
+   - `metrics_sheet_gid` — `825433383`
+   - `metrics_sheet_range` — auto-detected, overridable
+   - `metrics_source_default` — `'sheet' | 'database'` (set to `'sheet'` for Blue Capital)
+3. **New edge function `fetch-sheet-metrics`** reads the tab via the Google Sheets gateway, parses it into a normalized shape (date, ad_spend, leads, spam, calls, showed, reconnects, commitments, funded count, funded $, etc.), and returns daily rows + aggregated totals filtered by the active date range.
+4. **New hook `useSheetMetrics(clientId, dateRange)`** calls the function, caches with React Query (5-min stale time), and exposes `{ daily, aggregated, lastSyncedAt, refresh }`.
+5. **New `useActiveMetrics(clientId, dateRange)`** wrapper picks Sheet vs Database based on the toggle and returns the same shape `KPIGrid` / `MetricChartsGrid` / funnel components already consume — no changes needed in those components.
+6. **Toggle UI** added to `ClientDetail.tsx` and `PublicReport.tsx` headers; preference stored in `localStorage` keyed by client id.
 
-### 3. UI — `WebhookSettingsTab` shows the new URLs
-- Compute base URL from `clients.slug` (falls back to `id` if slug missing).
-- New "GHL Snapshot URLs" panel listing all 6 ready-to-copy URLs with one-click copy and a "Copy all as JSON" button for snapshot import.
-- Keep legacy UUID URLs visible behind a "Show legacy URLs" toggle for any client whose GHL still uses the old format.
+## Column mapping (auto + override)
 
-### 4. Sync Health surfacing
-- `WebhookFeedTab` already reads `webhook_logs` — once the function logs every hit, this tab will show real-time inbound webhook traffic per client (it's currently empty for most clients because logging was conditional).
-- Add a "stale webhook" badge per client in `SyncOverviewTab`: red if no inbound webhook in 24 h for an active client that previously sent webhooks (catches a broken GHL workflow before the daily count drift shows up).
+The function detects headers case-insensitively. Recognized aliases:
 
-### 5. Validation + safety
-- Reject events not in the allowlist with 400 (so a typo in GHL is visible immediately, not silently swallowed).
-- Slugs are matched case-insensitively.
-- Per-client + per-minute rate limit (200 req/min) using existing `api_usage` infra to prevent a misconfigured workflow from hammering us.
+| Internal field      | Accepted header names                          |
+|---------------------|------------------------------------------------|
+| date                | Date, Day                                      |
+| ad_spend            | Spend, Ad Spend, Total Spend                   |
+| leads               | Leads, Total Leads                             |
+| spam_leads          | Spam, Bad Leads                                |
+| calls               | Calls, Booked Calls                            |
+| showed              | Showed, Shows                                  |
+| reconnects          | Reconnects, Reconnect Calls                    |
+| commitments         | Commitments, Committed                         |
+| commitment_dollars  | Commitment $, Committed $                      |
+| funded              | Funded, Funded Investors                       |
+| funded_dollars      | Funded $, Capital Raised                       |
 
-## Files
+Cost-per metrics (CPL, Cost/Call, Cost/Show, CPA, CoC%) are derived from the sheet rows the same way they're derived from DB today, so all KPI cards and sparklines stay consistent.
 
-**Modified**
-- `supabase/functions/webhook-ingest/index.ts` — slug parser, allowlist, always-on logging, rate limit
-- `src/components/settings/WebhookSettingsTab.tsx` — new slug-URL panel + "Copy all" + legacy toggle
-- `src/components/sync-health/SyncOverviewTab.tsx` — stale-webhook badge
+If the sheet's columns don't match cleanly, an admin "Edit mapping" link opens a small modal to map columns manually (saved to `client_settings.metrics_sheet_mapping`).
 
-**No DB migration needed** — `clients.slug` already exists and is unique-per-client (auto-generated by `set_client_slug` trigger).
+## Technical details
+
+- **Migration:** add 5 columns to `client_settings` (`metrics_sheet_id`, `metrics_sheet_gid`, `metrics_sheet_range`, `metrics_source_default`, `metrics_sheet_mapping jsonb`). Seed Blue Capital with the sheet ID/GID above and `metrics_source_default = 'sheet'`.
+- **Connector link:** `standard_connectors--connect` for `google_sheets` using `std_01kpv10952e7zv643cb2kkfbzh` (zactavenner.com).
+- **Edge function `fetch-sheet-metrics`:** GET `${GATEWAY_URL}/spreadsheets/{id}?fields=sheets(properties(sheetId,title))` to resolve gid → sheet title, then `GET /spreadsheets/{id}/values/{Title}` (no `encodeURIComponent` on range per Sheets connector rules). Normalizes rows, returns `{ daily: DailyMetric[], aggregated: AggregatedMetrics, sheetTitle, fetchedAt }`. CORS + Zod validation on body.
+- **Hooks:** `useSheetMetrics.ts` (React Query, key `['sheet-metrics', clientId, start, end]`), `useActiveMetrics.ts` (selects source). `useMetricsSourcePreference(clientId)` for localStorage toggle defaulting to `client_settings.metrics_source_default`.
+- **UI:** `<MetricsSourceToggle />` component dropped into the page headers of `ClientDetail.tsx` and `PublicReport.tsx`. KPI/Charts/Funnel components stay as-is — they receive the merged metrics object.
+- **No removal** of database-derived metrics; Database mode still works exactly as today, enabling side-by-side comparison.
 
 ## Out of scope (flag for later)
-- Signed webhook secrets per client (GHL doesn't sign outbound webhooks; if needed later we can require an `X-HPA-Secret` header)
-- Auto-creating GHL workflows via their API (snapshot still does this faster)
+
+- Auto-syncing sheet rows into `daily_metrics` (write-back) — we only read for now.
+- Wiring other clients' sheets (drop-in once the binding fields are populated; no code change).
+- Sheet-driven leads/calls record tables — only KPI/charts/funnel come from the sheet.
 
