@@ -680,7 +680,18 @@ Deno.serve(async (req) => {
 
       const effectiveAccountId = adAccountOverride || client.meta_ad_account_id;
       if (!effectiveAccountId) {
-        throw new Error("Meta Ad Account ID must be configured in client settings.");
+        return new Response(
+          JSON.stringify({
+            success: false,
+            skipped: true,
+            fallback: true,
+            error: "Meta Ad Account ID must be configured in client settings.",
+            client_id: clientId,
+            client_name: client.name,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       }
 
       const accessToken = client.meta_access_token || Deno.env.get("META_SHARED_ACCESS_TOKEN");
