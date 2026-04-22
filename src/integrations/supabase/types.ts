@@ -5539,16 +5539,19 @@ export type Database = {
       }
       meta_ad_accounts: {
         Row: {
+          account_name: string | null
           ad_account_id: string
           last_seen_at: string
           timezone_name: string
         }
         Insert: {
+          account_name?: string | null
           ad_account_id: string
           last_seen_at?: string
           timezone_name?: string
         }
         Update: {
+          account_name?: string | null
           ad_account_id?: string
           last_seen_at?: string
           timezone_name?: string

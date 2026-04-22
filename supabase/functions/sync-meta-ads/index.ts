@@ -125,7 +125,7 @@ async function getAdAccountTimezone(adAccountId: string, accessToken: string, su
   // Check DB cache
   const { data: dbRow } = await supabase
     .from("meta_ad_accounts")
-    .select("timezone_name, last_seen_at")
+    .select("timezone_name, account_name, last_seen_at")
     .eq("ad_account_id", adAccountId)
     .maybeSingle();
 
@@ -141,17 +141,18 @@ async function getAdAccountTimezone(adAccountId: string, accessToken: string, su
   // Fetch from Meta Graph API
   console.log(`Fetching timezone for ${adAccountId} from Meta API...`);
   const res = await fetchMeta(
-    `${META_GRAPH_API_URL}/${adAccountId}?fields=timezone_name`,
+    `${META_GRAPH_API_URL}/${adAccountId}?fields=timezone_name,name`,
     accessToken,
     "ad-account-timezone"
   );
 
   const tz = res.timezone_name || "America/New_York";
+  const accountName = res.name || null;
   console.log(`Timezone for ${adAccountId}: ${tz} (API)`);
 
   // Upsert to DB
   await supabase.from("meta_ad_accounts").upsert(
-    { ad_account_id: adAccountId, timezone_name: tz, last_seen_at: new Date().toISOString() },
+    { ad_account_id: adAccountId, timezone_name: tz, account_name: accountName, last_seen_at: new Date().toISOString() },
     { onConflict: "ad_account_id" }
   );
 
