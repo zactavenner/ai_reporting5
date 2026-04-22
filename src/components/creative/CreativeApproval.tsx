@@ -1151,6 +1151,29 @@ function CreativeDetailModal({
           </div>
         </div>
       </div>
+      <Dialog open={revisionOpen} onOpenChange={setRevisionOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>What do you want changed?</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={revisionText}
+            onChange={(e) => setRevisionText(e.target.value)}
+            placeholder="Describe the changes you'd like to see..."
+            rows={5}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setRevisionOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={submitRevision}>
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Submit Revision Request
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
