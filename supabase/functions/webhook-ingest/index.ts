@@ -358,6 +358,7 @@ serve(async (req) => {
         }
         // If EdgeRuntime not available, the fetch is already fire-and-forget
         
+        await logHit('success');
         return new Response(
           JSON.stringify({
             success: true,
