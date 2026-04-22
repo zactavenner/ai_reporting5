@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { format, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, subMonths, formatDistanceToNow } from 'date-fns';
 import { CreateAdDialog } from './CreateAdDialog';
 import { CreateCampaignDialog } from './CreateCampaignDialog';
 import { AdHDPreviewDialog } from './AdHDPreviewDialog';
@@ -39,6 +39,7 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
   const { data: clients = [] } = useClients();
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [adAccountFilter, setAdAccountFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('campaigns');
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
@@ -70,7 +71,7 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
     queryFn: async () => {
       let q = (supabase as any).from('meta_campaigns').select('*').order('spend', { ascending: false }).limit(2000);
       if (clientFilter !== 'all') q = q.eq('client_id', clientFilter);
-      if (statusFilter !== 'all') q = q.eq('effective_status', statusFilter);
+      if (statusFilter !== 'all') q = q.eq('status', statusFilter);
       const { data, error } = await q;
       if (error) { console.error(error); return []; }
       return data || [];
