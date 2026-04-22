@@ -524,7 +524,16 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                             <TooltipContent className="text-xs max-w-[220px]">Leads in your CRM attributed to this campaign via name/UTM matching</TooltipContent>
                           </Tooltip>
                         </TableHead>
-                        <TableHead className="text-right">CPL</TableHead>
+                        <TableHead className="text-right">
+                          <Tooltip>
+                            <TooltipTrigger>CPL</TooltipTrigger>
+                            <TooltipContent className="text-xs max-w-[220px]">Spend ÷ CRM leads. Discrepancy with Meta Leads usually means UTM/attribution is missing.</TooltipContent>
+                          </Tooltip>
+                        </TableHead>
+                        <TableHead className="text-right">Calls</TableHead>
+                        <TableHead className="text-right">Cost / Call</TableHead>
+                        <TableHead className="text-right">Funded</TableHead>
+                        <TableHead className="text-right">Cost / Funded</TableHead>
                         <TableHead className="w-12"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -555,6 +564,10 @@ export function AdminAdsManagerTab({ platform = 'all' }: Props) {
                           <TableCell className="text-right text-xs font-medium text-primary">{fmtN(c.meta_reported_leads)}</TableCell>
                           <TableCell className="text-right text-xs font-medium text-chart-2">{fmtN(c.attributed_leads)}</TableCell>
                           <TableCell className="text-right text-xs">{fmt$(c.cost_per_lead)}</TableCell>
+                          <TableCell className="text-right text-xs">{fmtN(c.attributed_calls)}</TableCell>
+                          <TableCell className="text-right text-xs">{fmt$(c.cost_per_call)}</TableCell>
+                          <TableCell className="text-right text-xs">{fmtN(c.attributed_funded)}</TableCell>
+                          <TableCell className="text-right text-xs">{fmt$(c.cost_per_funded)}</TableCell>
                           <TableCell><ChevronRight className="h-3.5 w-3.5 text-muted-foreground" /></TableCell>
                         </TableRow>
                       ))}
