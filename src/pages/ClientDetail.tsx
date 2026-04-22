@@ -49,6 +49,9 @@ import { useSourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
 import { usePriorPeriodMetrics } from '@/hooks/usePriorMetrics';
 import { useLeads, useCalls } from '@/hooks/useLeadsAndCalls';
 import { useClientSettings, getThresholdsFromSettings } from '@/hooks/useClientSettings';
+import { useSheetMetrics } from '@/hooks/useSheetMetrics';
+import { useMetricsSourcePreference } from '@/hooks/useMetricsSourcePreference';
+import { MetricsSourceToggle } from '@/components/dashboard/MetricsSourceToggle';
 import { useCustomTabs, useDeleteCustomTab } from '@/hooks/useCustomTabs';
 import { useAllTasks } from '@/hooks/useTasks';
 import { useVoiceNotes } from '@/hooks/useVoiceNotes';
@@ -158,6 +161,24 @@ export default function ClientDetail() {
     (settings as any)?.default_lead_pipeline_value || 0
   );
 
+  // Sheet-backed metrics (Blue Capital + any client with a configured sheet)
+  const sheetId = (settings as any)?.metrics_sheet_id as string | undefined;
+  const sheetGid = (settings as any)?.metrics_sheet_gid as string | undefined;
+  const sheetMapping = (settings as any)?.metrics_sheet_mapping as Record<string, string> | undefined;
+  const sheetDefault = ((settings as any)?.metrics_source_default as 'sheet' | 'database') || 'database';
+  const hasSheet = !!sheetId;
+  const { source: metricsSource, setSource: setMetricsSource } = useMetricsSourcePreference(
+    clientId, sheetDefault, hasSheet
+  );
+  const sheetQuery = useSheetMetrics(clientId, sheetId, sheetGid, startDate, endDate, sheetMapping);
+  const useSheet = hasSheet && metricsSource === 'sheet';
+  const activeMetrics = (useSheet && sheetQuery.data?.aggregated)
+    ? sheetQuery.data.aggregated
+    : aggregatedMetrics;
+  const activeDailyMetrics = (useSheet && sheetQuery.data?.daily?.length)
+    ? (sheetQuery.data.daily as any)
+    : dailyMetrics;
+
   const thresholds = useMemo(() => getThresholdsFromSettings(settings), [settings]);
   const fundedInvestorLabel = settings?.funded_investor_label || 'Funded Investors';
   const isLeasing = (client as any)?.client_type === 'LEASING' || ((client?.name || '').toLowerCase().includes('lscre') && (client?.name || '').toLowerCase().includes('leasing'));
@@ -206,18 +227,18 @@ export default function ClientDetail() {
 
   const aiContext = {
     clientName: client.name,
-    totalAdSpend: aggregatedMetrics.totalAdSpend,
-    leads: aggregatedMetrics.totalLeads,
-    calls: aggregatedMetrics.totalCalls,
-    showedCalls: aggregatedMetrics.showedCalls,
-    costPerLead: aggregatedMetrics.costPerLead,
-    costPerCall: aggregatedMetrics.costPerCall,
-    costPerShow: aggregatedMetrics.costPerShow,
-    fundedInvestors: aggregatedMetrics.fundedInvestors,
-    fundedDollars: aggregatedMetrics.fundedDollars,
-    costPerInvestor: aggregatedMetrics.costPerInvestor,
-    costOfCapital: aggregatedMetrics.costOfCapital,
-    showedPercent: aggregatedMetrics.showedPercent,
+    totalAdSpend: activeMetrics.totalAdSpend,
+    leads: activeMetrics.totalLeads,
+    calls: activeMetrics.totalCalls,
+    showedCalls: activeMetrics.showedCalls,
+    costPerLead: activeMetrics.costPerLead,
+    costPerCall: activeMetrics.costPerCall,
+    costPerShow: activeMetrics.costPerShow,
+    fundedInvestors: activeMetrics.fundedInvestors,
+    fundedDollars: activeMetrics.fundedDollars,
+    costPerInvestor: activeMetrics.costPerInvestor,
+    costOfCapital: activeMetrics.costOfCapital,
+    showedPercent: activeMetrics.showedPercent,
   };
 
   return (
