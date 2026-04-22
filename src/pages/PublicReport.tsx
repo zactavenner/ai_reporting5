@@ -14,6 +14,9 @@ import { useVoiceNotes } from '@/hooks/useVoiceNotes';
 import { useMeetings } from '@/hooks/useMeetings';
 import { useCreatives } from '@/hooks/useCreatives';
 import { useClientSettings } from '@/hooks/useClientSettings';
+import { useSheetMetrics } from '@/hooks/useSheetMetrics';
+import { useMetricsSourcePreference } from '@/hooks/useMetricsSourcePreference';
+import { MetricsSourceToggle } from '@/components/dashboard/MetricsSourceToggle';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
 import { MetricChartsGrid } from '@/components/dashboard/MetricChartsGrid';
@@ -111,6 +114,20 @@ function PublicReportContent() {
   // Calculate KPIs directly from source data (leads, calls, funded_investors)
   const metrics = useSourceAggregatedMetrics(leads, calls, fundedInvestors, dailyMetrics, (clientSettings as any)?.default_lead_pipeline_value || 0);
 
+  // Sheet-backed metrics
+  const sheetId = (clientSettings as any)?.metrics_sheet_id as string | undefined;
+  const sheetGid = (clientSettings as any)?.metrics_sheet_gid as string | undefined;
+  const sheetMapping = (clientSettings as any)?.metrics_sheet_mapping as Record<string, string> | undefined;
+  const sheetDefault = ((clientSettings as any)?.metrics_source_default as 'sheet' | 'database') || 'database';
+  const hasSheet = !!sheetId;
+  const { source: metricsSource, setSource: setMetricsSource } = useMetricsSourcePreference(
+    client?.id, sheetDefault, hasSheet
+  );
+  const sheetQuery = useSheetMetrics(client?.id, sheetId, sheetGid, startDate, endDate, sheetMapping);
+  const useSheet = hasSheet && metricsSource === 'sheet';
+  const activeMetrics = (useSheet && sheetQuery.data?.aggregated) ? sheetQuery.data.aggregated : metrics;
+  const activeDailyMetrics = (useSheet && sheetQuery.data?.daily?.length) ? (sheetQuery.data.daily as any) : dailyMetrics;
+
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });
     queryClient.invalidateQueries({ queryKey: ['funded-investors'] });
@@ -201,6 +218,15 @@ function PublicReportContent() {
             <p className="text-sm text-muted-foreground">Capital Raising Performance Dashboard</p>
           </div>
           <div className="flex items-center gap-2">
+            <MetricsSourceToggle
+              source={metricsSource}
+              onChange={setMetricsSource}
+              hasSheet={hasSheet}
+              lastSyncedAt={sheetQuery.data?.fetchedAt}
+              rowCount={sheetQuery.data?.rowCount}
+              isLoading={sheetQuery.isFetching}
+              onRefresh={() => sheetQuery.refetch()}
+            />
             <SectionErrorBoundary sectionName="Voice Recording">
               <VoiceRecordButton 
                 clientId={client.id}
@@ -325,7 +351,7 @@ function PublicReportContent() {
               <section>
                 <h2 className="text-lg font-bold mb-2">Key Performance Indicators</h2>
                 <KPIGrid 
-                  metrics={metrics} 
+                  metrics={activeMetrics} 
                   showFundedMetrics 
                   onMetricClick={(metric) => setDrillDownModal(metric)}
                 />
@@ -333,11 +359,11 @@ function PublicReportContent() {
             </SectionErrorBoundary>
 
             <SectionErrorBoundary sectionName="Periodic Stats">
-              <PeriodicStatsTable dailyMetrics={dailyMetrics} />
+              <PeriodicStatsTable dailyMetrics={activeDailyMetrics} />
             </SectionErrorBoundary>
 
             <SectionErrorBoundary sectionName="Charts">
-              <MetricChartsGrid dailyMetrics={dailyMetrics} />
+              <MetricChartsGrid dailyMetrics={activeDailyMetrics} />
             </SectionErrorBoundary>
 
             <SectionErrorBoundary sectionName="Creative Approval">
