@@ -1459,12 +1459,56 @@ function CreativeCard({
               Send
             </Button>
           )}
-          {/* Request Approval for public/client view */}
-          {isPublicView && creative.status !== 'approved' && creative.status !== 'launched' && (
-            <Button size="sm" className="h-6 text-[10px] gap-0.5 bg-amber-600 hover:bg-amber-700 text-white" onClick={() => onStatusChange(creative, 'approved')}>
-              <FileUp className="h-2.5 w-2.5" />
-              Request Approval
-            </Button>
+          {/* Approve / Request Revision for public/client view */}
+          {isPublicView && creative.status !== 'launched' && (
+            <>
+              {creative.status === 'approved' ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 text-[10px] gap-0.5"
+                  onClick={() => setRevisionOpen(true)}
+                >
+                  <RefreshCw className="h-2.5 w-2.5" />
+                  Request Revision
+                </Button>
+              ) : creative.status === 'revisions' ? (
+                <Button
+                  size="sm"
+                  className="h-6 text-[10px] gap-0.5 bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => {
+                    onStatusChange(creative, 'approved');
+                    toast.success('Approved');
+                  }}
+                >
+                  <Check className="h-2.5 w-2.5" />
+                  Switch to Approve
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    size="sm"
+                    className="h-6 text-[10px] gap-0.5 bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      onStatusChange(creative, 'approved');
+                      toast.success('Approved');
+                    }}
+                  >
+                    <Check className="h-2.5 w-2.5" />
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-[10px] gap-0.5"
+                    onClick={() => setRevisionOpen(true)}
+                  >
+                    <RefreshCw className="h-2.5 w-2.5" />
+                    Request Revision
+                  </Button>
+                </>
+              )}
+            </>
           )}
           {creative.status !== 'launched' && creative.status !== 'draft' && !isPublicView && (
             <>
