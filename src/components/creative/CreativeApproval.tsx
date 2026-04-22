@@ -1384,26 +1384,34 @@ function CreativeCard({
           <Badge className={`absolute top-2 right-2 z-10 text-[10px] ${getStatusColor(creative.status)}`}>
             {creative.status.charAt(0).toUpperCase() + creative.status.slice(1)}
           </Badge>
-          
-          <div className={`${getCardAspectClass(creative.aspect_ratio)} bg-muted relative overflow-hidden`}>
-            {creative.type === 'image' && creative.file_url ? (
-              <img 
-                src={creative.file_url} 
-                alt={creative.title}
-                className="w-full h-full object-cover cursor-pointer"
-                onClick={onPreview}
-              />
-            ) : creative.type === 'video' && creative.file_url ? (
-              <InlineVideoPlayer src={creative.file_url} aspectRatio={creative.aspect_ratio} />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center cursor-pointer" onClick={onPreview}>
-                {getTypeIcon(creative.type)}
-                <p className="text-xs text-muted-foreground mt-1">
-                  {creative.headline || 'Ad Copy'}
-                </p>
-              </div>
-            )}
-          </div>
+
+          <FacebookAdChrome
+            pageName={clientName || 'Sponsored Page'}
+            headline={creative.headline}
+            bodyCopy={creative.body_copy}
+            ctaText={null}
+            ctaSubtext={null}
+          >
+            <div className={`${getCardAspectClass(creative.aspect_ratio)} bg-muted relative overflow-hidden`}>
+              {creative.type === 'image' && creative.file_url ? (
+                <img 
+                  src={creative.file_url} 
+                  alt={creative.title}
+                  className="w-full h-full object-contain cursor-pointer"
+                  onClick={onPreview}
+                />
+              ) : creative.type === 'video' && creative.file_url ? (
+                <InlineVideoPlayer src={creative.file_url} aspectRatio={creative.aspect_ratio} />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center cursor-pointer" onClick={onPreview}>
+                  {getTypeIcon(creative.type)}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {creative.headline || 'Ad Copy'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </FacebookAdChrome>
         </div>
         
         {/* Info */}
