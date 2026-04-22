@@ -1004,20 +1004,52 @@ function CreativeDetailModal({
               Send to Client
             </Button>
           )}
-          {/* Request Approval - for public/client view on draft or revisions */}
-          {isPublicView && (creative.status === 'revisions' || creative.status === 'rejected') && (
-            <Button
-              className="bg-amber-600 hover:bg-amber-700 text-white"
-              onClick={() => {
-                onStatusChange(creative, 'approved');
-                toast.success('Approval requested');
-              }}
-            >
-              <FileUp className="h-4 w-4 mr-1" />
-              Request Approval
-            </Button>
+          {/* Public client view: Approve / Request Revision (with toggle) */}
+          {isPublicView && creative.status !== 'launched' && (
+            <>
+              {creative.status === 'approved' ? (
+                <Button variant="outline" onClick={() => setRevisionOpen(true)}>
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Switch to Request Revision
+                </Button>
+              ) : creative.status === 'revisions' ? (
+                <>
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      onStatusChange(creative, 'approved');
+                      toast.success('Approved');
+                    }}
+                  >
+                    <Check className="h-4 w-4 mr-1" />
+                    Switch to Approve
+                  </Button>
+                  <Button variant="outline" onClick={() => setRevisionOpen(true)}>
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                    Update Revision Notes
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      onStatusChange(creative, 'approved');
+                      toast.success('Approved');
+                    }}
+                  >
+                    <Check className="h-4 w-4 mr-1" />
+                    Approve
+                  </Button>
+                  <Button variant="outline" onClick={() => setRevisionOpen(true)}>
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                    Request Revision
+                  </Button>
+                </>
+              )}
+            </>
           )}
-          {creative.status !== 'launched' && creative.status !== 'draft' && (
+          {creative.status !== 'launched' && creative.status !== 'draft' && !isPublicView && (
             <>
               {creative.status === 'approved' && !isPublicView && (
                 <Button
