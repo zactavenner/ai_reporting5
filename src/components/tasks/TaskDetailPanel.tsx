@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Sheet,
   SheetContent,
@@ -84,6 +85,30 @@ import { useCreateNotification } from './NotificationsTab';
 import { useAgencyPods } from '@/hooks/useAgencyPods';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+// Fetch the client's Meta ad account IDs (primary + additional) for the
+// "Open Meta Ads" buttons in the task header.
+function useClientMetaAdAccounts(clientId?: string) {
+  return useQuery({
+    queryKey: ['client-meta-ad-accounts', clientId],
+    enabled: !!clientId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('meta_ad_account_id, meta_ad_account_ids')
+        .eq('id', clientId!)
+        .maybeSingle();
+      if (error) throw error;
+      const ids = [
+        (data as any)?.meta_ad_account_id,
+        ...(((data as any)?.meta_ad_account_ids as string[] | null) || []),
+      ]
+        .filter(Boolean)
+        .map((id: string) => String(id).replace(/^act_/, ''));
+      return Array.from(new Set(ids));
+    },
+  });
+}
  
  interface TaskDetailPanelProps {
    task: Task | null;
