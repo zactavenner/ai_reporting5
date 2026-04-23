@@ -508,30 +508,14 @@ Deno.serve(async (req) => {
         const dateStr = day.date_start;
         if (!dateStr) continue;
 
-        const { data: existing } = await supabase
-          .from("daily_metrics")
-          .select("id")
-          .eq("client_id", clientId)
-          .eq("date", dateStr)
-          .maybeSingle();
-
-        if (existing) {
-          await supabase.from("daily_metrics").update({
-            ad_spend: Number(day.spend) || 0,
-            impressions: Number(day.impressions) || 0,
-            clicks: Number(day.clicks) || 0,
-            ctr: Number(day.inline_link_click_ctr) || 0,
-          }).eq("id", existing.id);
-        } else {
-          await supabase.from("daily_metrics").insert({
-            client_id: clientId,
-            date: dateStr,
-            ad_spend: Number(day.spend) || 0,
-            impressions: Number(day.impressions) || 0,
-            clicks: Number(day.clicks) || 0,
-            ctr: Number(day.inline_link_click_ctr) || 0,
-          });
-        }
+        await supabase.from("daily_metrics").upsert({
+          client_id: clientId,
+          date: dateStr,
+          ad_spend: Number(day.spend) || 0,
+          impressions: Number(day.impressions) || 0,
+          clicks: Number(day.clicks) || 0,
+          ctr: Number(day.inline_link_click_ctr) || 0,
+        }, { onConflict: "client_id,date", ignoreDuplicates: false });
         dailyRows++;
       }
       console.log(`Upserted ${dailyRows} daily metric rows`);

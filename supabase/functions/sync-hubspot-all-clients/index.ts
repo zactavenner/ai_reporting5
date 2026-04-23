@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     .select("id, name, hubspot_portal_id, hubspot_access_token")
     .not("hubspot_portal_id", "is", null)
     .not("hubspot_access_token", "is", null)
-    .in("status", ["active", "onboarding"]);
+    .in("status", ["active", "onboarding", "paused"]);
 
   if (error || !clients) {
     console.error("Failed to fetch clients:", error);

@@ -605,7 +605,6 @@ export function DraggableClientTable({
                         const crmTotal = m.crmLeads || 0;
                         const metaLeads = m.totalLeads || 0;
                         const hasAdSpend = (m.totalAdSpend || 0) > 0;
-                        // Flag: client has ad spend but 0 CRM leads = GHL integration issue
                         if (hasAdSpend && crmTotal === 0) return 'text-destructive font-semibold';
                         if (crmTotal === 0 && metaLeads === 0) return 'text-muted-foreground';
                         if (crmTotal >= metaLeads) return 'text-chart-2';
@@ -620,10 +619,17 @@ export function DraggableClientTable({
                               <AlertTriangle className="h-2.5 w-2.5 text-destructive shrink-0" />
                             </TooltipTrigger>
                             <TooltipContent side="top" className="text-xs max-w-[250px]">
-                              {!client.ghl_api_key || !client.ghl_location_id
-                                ? `${formatCurrency(m.totalAdSpend)} ad spend but no GHL credentials configured — add GHL API key & location ID in settings`
-                                : `${formatCurrency(m.totalAdSpend)} ad spend but 0 CRM leads — GHL integration problem, run master sync or check API key`
-                              }
+                              {(() => {
+                                const hasGHL = !!(client.ghl_api_key && client.ghl_location_id);
+                                const hasHubSpot = !!client.hubspot_portal_id;
+                                if (!hasGHL && !hasHubSpot) {
+                                  return `${formatCurrency(m.totalAdSpend)} ad spend but no CRM configured — add GHL or HubSpot credentials in settings`;
+                                }
+                                if (hasHubSpot) {
+                                  return `${formatCurrency(m.totalAdSpend)} ad spend but 0 CRM leads — HubSpot integration problem, check access token or run sync`;
+                                }
+                                return `${formatCurrency(m.totalAdSpend)} ad spend but 0 CRM leads — GHL integration problem, run master sync or check API key`;
+                              })()}
                             </TooltipContent>
                           </Tooltip>
                         )}
@@ -645,8 +651,12 @@ export function DraggableClientTable({
                         const hasAdSpend = (m.totalAdSpend || 0) > 0;
                         const hasCalls = (m.totalCalls || 0) > 0;
                         const hasGHL = !!(client.ghl_api_key && client.ghl_location_id);
+                        const hasHubSpot = !!client.hubspot_portal_id;
                         const hasCalendars = (fullSettings[client.id]?.tracked_calendar_ids || []).length > 0;
-                        if (!hasCalls && hasAdSpend && hasGHL && !hasCalendars) return 'text-destructive font-semibold';
+                        const hasHubSpotMeetings = (fullSettings[client.id]?.hubspot_booked_meeting_types || []).length > 0;
+                        const hasCallTracking = hasCalendars || hasHubSpotMeetings;
+                        if (!hasCalls && hasAdSpend && (hasGHL || hasHubSpot) && !hasCallTracking) return 'text-destructive font-semibold';
+                        if (!hasCalls && hasAdSpend && !hasGHL && !hasHubSpot) return 'text-destructive font-semibold';
                         if (!hasCalls && hasAdSpend && syncInfo.status !== 'healthy') return 'text-yellow-600 dark:text-yellow-500';
                         if (!hasCalls && (m.crmLeads || 0) > 0) return 'text-yellow-600 dark:text-yellow-500';
                         return '';
@@ -654,13 +664,28 @@ export function DraggableClientTable({
                     )}>
                       <span className="flex items-center justify-end gap-0.5">
                         {m.totalCalls || 0}
-                        {(m.totalCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && !!(client.ghl_api_key && client.ghl_location_id) && (fullSettings[client.id]?.tracked_calendar_ids || []).length === 0 && (
+                        {(m.totalCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && (() => {
+                          const hasGHL = !!(client.ghl_api_key && client.ghl_location_id);
+                          const hasHubSpot = !!client.hubspot_portal_id;
+                          const hasCalendars = (fullSettings[client.id]?.tracked_calendar_ids || []).length > 0;
+                          const hasHubSpotMeetings = (fullSettings[client.id]?.hubspot_booked_meeting_types || []).length > 0;
+                          if (!hasGHL && !hasHubSpot) return true;
+                          if (hasGHL && !hasCalendars) return true;
+                          if (hasHubSpot && !hasHubSpotMeetings && !hasCalendars) return true;
+                          return false;
+                        })() && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Calendar className="h-2.5 w-2.5 text-destructive shrink-0" />
                             </TooltipTrigger>
                             <TooltipContent side="top" className="text-xs max-w-[220px]">
-                              No tracked calendars configured — add calendar IDs in client settings to sync booked/show calls
+                              {(() => {
+                                const hasGHL = !!(client.ghl_api_key && client.ghl_location_id);
+                                const hasHubSpot = !!client.hubspot_portal_id;
+                                if (!hasGHL && !hasHubSpot) return 'No CRM configured — add GHL or HubSpot credentials, then configure calendars to sync booked/show calls';
+                                if (hasHubSpot) return 'No HubSpot meeting types or GHL calendars configured — add meeting type IDs in client settings to sync booked/show calls';
+                                return 'No tracked calendars configured — add calendar IDs in client settings to sync booked/show calls';
+                              })()}
                             </TooltipContent>
                           </Tooltip>
                         )}

@@ -338,38 +338,19 @@ async function recalculateClientMetrics(supabase: any, clientId: string) {
 
   console.log(`Updating metrics for ${metricsByDate.size} dates`);
 
-  // Update daily_metrics for each date
+  // Update daily_metrics for each date — use upsert to avoid race conditions
   for (const [date, metrics] of metricsByDate) {
-    const { data: existing } = await supabase
+    await supabase
       .from('daily_metrics')
-      .select('id')
-      .eq('client_id', clientId)
-      .eq('date', date)
-      .maybeSingle();
-
-    if (existing) {
-      await supabase
-        .from('daily_metrics')
-        .update({
-          calls: metrics.calls,
-          showed_calls: metrics.showed_calls,
-          reconnect_calls: metrics.reconnect_calls,
-          reconnect_showed: metrics.reconnect_showed,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existing.id);
-    } else {
-      await supabase
-        .from('daily_metrics')
-        .insert({
-          client_id: clientId,
-          date,
-          calls: metrics.calls,
-          showed_calls: metrics.showed_calls,
-          reconnect_calls: metrics.reconnect_calls,
-          reconnect_showed: metrics.reconnect_showed,
-        });
-    }
+      .upsert({
+        client_id: clientId,
+        date,
+        calls: metrics.calls,
+        showed_calls: metrics.showed_calls,
+        reconnect_calls: metrics.reconnect_calls,
+        reconnect_showed: metrics.reconnect_showed,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'client_id,date', ignoreDuplicates: false });
   }
 
   console.log('Metrics recalculation complete');
