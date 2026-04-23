@@ -810,6 +810,23 @@ const getHistoryIcon = (action: string) => {
                       )}
                       Duplicate
                     </Button>
+                    {metaAdAccountIds.map((adId, idx) => (
+                      <Button
+                        key={adId}
+                        variant="outline"
+                        size="sm"
+                        asChild
+                      >
+                        <a
+                          href={`https://business.facebook.com/adsmanager/manage/campaigns?act=${adId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          {metaAdAccountIds.length > 1 ? `Meta Ads ${idx + 1}` : 'Meta Ads'}
+                        </a>
+                      </Button>
+                    ))}
                    <Button
                      variant={task.stage === 'done' ? 'secondary' : 'outline'}
                      size="sm"
