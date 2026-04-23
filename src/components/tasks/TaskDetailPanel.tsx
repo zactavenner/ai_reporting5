@@ -363,6 +363,10 @@ function useClientMetaAdAccounts(clientId?: string) {
 
   const completeRecurring = useCompleteRecurringTask();
 
+  const { data: metaAdAccountIds = [] } = useClientMetaAdAccounts(
+    clientId || task?.client_id || undefined
+  );
+
   if (!task) return null;
    
    const resolvedClientId = clientId || task.client_id;
@@ -735,7 +739,6 @@ const getHistoryIcon = (action: string) => {
    };
    
    const linkedMeeting = task.meeting_id ? meetings.find(m => m.id === task.meeting_id) : null;
-  const { data: metaAdAccountIds = [] } = useClientMetaAdAccounts(clientId);
    
    return (
      <>
