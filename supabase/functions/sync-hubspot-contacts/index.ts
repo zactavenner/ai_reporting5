@@ -86,10 +86,10 @@ Deno.serve(async (req) => {
       default:
         return await handleFullSync(supabase, client, settings, accessToken, corsHeaders);
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[HubSpot Sync] Error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
@@ -122,9 +122,9 @@ async function handleTestConnection(accessToken: string, corsHeaders: Record<str
       JSON.stringify({ success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (error: unknown) {
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
@@ -147,9 +147,9 @@ async function handleFetchPipelines(accessToken: string, corsHeaders: Record<str
       JSON.stringify({ pipelines }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (error: unknown) {
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
@@ -225,13 +225,13 @@ async function handleFullSync(
       JSON.stringify({ success: true, summary }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (error: unknown) {
     // Update error status
     await supabase
       .from('clients')
       .update({
         hubspot_sync_status: 'error',
-        hubspot_sync_error: error.message,
+        hubspot_sync_error: error instanceof Error ? error.message : String(error),
       })
       .eq('id', client.id);
 

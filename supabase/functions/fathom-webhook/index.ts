@@ -325,9 +325,9 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ success: true, matched, callsUpdated }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('[FathomWebhook] Error:', err);
-    return new Response(JSON.stringify({ success: false, error: err.message }), {
+    return new Response(JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

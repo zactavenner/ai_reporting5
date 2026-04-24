@@ -485,8 +485,8 @@ Deno.serve(async (req) => {
 
     return jsonResp({ error: "Invalid action. Use: list_tables, select, count, insert, upsert, update, delete, create_task, get_ads_overview, list_storage, get_file_url, delete_file, upload_file_base64" }, 400);
 
-  } catch (err) {
-    return jsonResp({ error: err.message }, 500);
+  } catch (err: unknown) {
+    return jsonResp({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });
 
@@ -522,8 +522,8 @@ async function handleFileUpload(req: Request) {
 
     const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
     return jsonResp({ success: true, url: urlData.publicUrl, bucket, file_path: filePath });
-  } catch (err) {
-    return jsonResp({ error: err.message }, 500);
+  } catch (err: unknown) {
+    return jsonResp({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 }
 
