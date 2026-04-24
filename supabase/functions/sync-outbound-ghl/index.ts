@@ -198,9 +198,7 @@ async function pushCall(
       title: `${event.direction === 'inbound' ? 'Inbound' : 'Outbound'} Call`,
       body: noteBody,
       date: event.event_at,
-      ...(payload.duration_seconds && {
-        callDuration: Number(payload.duration_seconds)
-      })
+      ...(payload.duration_seconds ? { callDuration: Number(payload.duration_seconds) } : {})
     };
 
     const response = await fetch(`${GHL_BASE_URL}/contacts/${contactId}/notes`, {
