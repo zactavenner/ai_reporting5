@@ -86,6 +86,10 @@ serve(async (req) => {
       ? `https://reporting.highperformanceads.com/public/${client.public_token}/creatives`
       : `https://reporting.highperformanceads.com/`;
 
+    const creativeDirectUrl = client?.public_token
+      ? `https://reporting.highperformanceads.com/public/${client.public_token}/creatives?creative=${creative.id}`
+      : approvalUrl;
+
     const clientName = client?.name || 'Client';
     const platformLabel = creative.platform ? ` • ${creative.platform}` : '';
     const typeLabel = creative.type ? ` (${creative.type})` : '';
@@ -94,7 +98,37 @@ serve(async (req) => {
       `*Client:* ${clientName}\n` +
       `*Title:* ${creative.title}${typeLabel}${platformLabel}\n` +
       (creative.headline ? `*Headline:* ${creative.headline}\n` : '') +
-      `<${approvalUrl}|Review & Approve>`;
+      (creative.body_copy ? `*Body:* ${String(creative.body_copy).slice(0, 300)}\n` : '') +
+      `\n👉 <${creativeDirectUrl}|Review This Creative>  |  <${approvalUrl}|Open Client Approval Page>`;
+
+    const isVideo = (creative.type || '').toLowerCase().includes('video') ||
+      /\.(mp4|mov|webm|m4v)(\?|$)/i.test(creative.file_url || '');
+    const isImage = !isVideo && /\.(png|jpe?g|gif|webp|bmp)(\?|$)/i.test(creative.file_url || '');
+
+    const blocks: any[] = [
+      {
+        type: 'section',
+        text: { type: 'mrkdwn', text: `🎨 *New Creative Approval Request*\n*Client:* ${clientName}\n*Title:* ${creative.title}${typeLabel}${platformLabel}` },
+      },
+    ];
+    if (creative.headline) {
+      blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `*Headline:* ${creative.headline}` } });
+    }
+    if (creative.body_copy) {
+      blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `*Body:* ${String(creative.body_copy).slice(0, 500)}` } });
+    }
+    if (isImage && creative.file_url) {
+      blocks.push({ type: 'image', image_url: creative.file_url, alt_text: creative.title || 'Creative preview' });
+    } else if (creative.file_url) {
+      blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `📎 *Asset:* <${creative.file_url}|Open file>` } });
+    }
+    blocks.push({
+      type: 'actions',
+      elements: [
+        { type: 'button', text: { type: 'plain_text', text: '✅ Review This Creative' }, url: creativeDirectUrl, style: 'primary' },
+        { type: 'button', text: { type: 'plain_text', text: '📋 Open Client Approval Page' }, url: approvalUrl },
+      ],
+    });
 
     const postRes = await fetch(`${GATEWAY_URL}/chat.postMessage`, {
       method: 'POST',
@@ -106,6 +140,7 @@ serve(async (req) => {
       body: JSON.stringify({
         channel: channelId,
         text,
+        blocks,
         username: 'Creative Approvals',
         icon_emoji: ':art:',
         unfurl_links: true,
