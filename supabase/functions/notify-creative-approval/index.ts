@@ -1,0 +1,132 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const GATEWAY_URL = 'https://connector-gateway.lovable.dev/slack/api';
+const TARGET_CHANNEL = 'hpa-bluecapital-tasks';
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const SLACK_API_KEY = Deno.env.get('SLACK_API_KEY');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    if (!LOVABLE_API_KEY || !SLACK_API_KEY) {
+      console.warn('Slack credentials not configured, skipping notification');
+      return new Response(JSON.stringify({ success: false, skipped: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { creativeId } = await req.json();
+
+    if (!creativeId) {
+      return new Response(JSON.stringify({ error: 'creativeId is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Load creative + client info
+    const { data: creative, error: creativeErr } = await supabase
+      .from('creatives')
+      .select('id, title, type, platform, file_url, headline, body_copy, client_id')
+      .eq('id', creativeId)
+      .single();
+
+    if (creativeErr || !creative) {
+      throw new Error(`Creative not found: ${creativeErr?.message}`);
+    }
+
+    const { data: client } = await supabase
+      .from('clients')
+      .select('name, public_token')
+      .eq('id', creative.client_id)
+      .single();
+
+    // Resolve channel ID by name (paginated)
+    let channelId: string | null = null;
+    let cursor = '';
+    do {
+      const url = `${GATEWAY_URL}/conversations.list?limit=200&types=public_channel,private_channel${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'X-Connection-Api-Key': SLACK_API_KEY,
+        },
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        throw new Error(`Slack conversations.list error: ${data.error}`);
+      }
+      const match = data.channels?.find((c: { name: string; id: string }) => c.name === TARGET_CHANNEL);
+      if (match) {
+        channelId = match.id;
+        break;
+      }
+      cursor = data.response_metadata?.next_cursor || '';
+    } while (cursor);
+
+    if (!channelId) {
+      throw new Error(`Slack channel #${TARGET_CHANNEL} not found. Make sure the bot is invited.`);
+    }
+
+    const approvalUrl = client?.public_token
+      ? `https://aireporting.lovable.app/public/${client.public_token}/creatives`
+      : `https://aireporting.lovable.app/`;
+
+    const clientName = client?.name || 'Client';
+    const platformLabel = creative.platform ? ` • ${creative.platform}` : '';
+    const typeLabel = creative.type ? ` (${creative.type})` : '';
+
+    const text = `🎨 *New Creative Approval Request*\n` +
+      `*Client:* ${clientName}\n` +
+      `*Title:* ${creative.title}${typeLabel}${platformLabel}\n` +
+      (creative.headline ? `*Headline:* ${creative.headline}\n` : '') +
+      `<${approvalUrl}|Review & Approve>`;
+
+    const postRes = await fetch(`${GATEWAY_URL}/chat.postMessage`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'X-Connection-Api-Key': SLACK_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        channel: channelId,
+        text,
+        username: 'Creative Approvals',
+        icon_emoji: ':art:',
+        unfurl_links: true,
+      }),
+    });
+
+    const postData = await postRes.json();
+    if (!postData.ok) {
+      throw new Error(`Slack chat.postMessage error: ${postData.error}`);
+    }
+
+    console.log(`Slack notification sent to #${TARGET_CHANNEL} for creative ${creativeId}`);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (error: unknown) {
+    console.error('notify-creative-approval error:', error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
