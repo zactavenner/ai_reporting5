@@ -83,8 +83,8 @@ serve(async (req) => {
     }
 
     const approvalUrl = client?.public_token
-      ? `https://aireporting.lovable.app/public/${client.public_token}/creatives`
-      : `https://aireporting.lovable.app/`;
+      ? `https://reporting.highperformanceads.com/public/${client.public_token}/creatives`
+      : `https://reporting.highperformanceads.com/`;
 
     const clientName = client?.name || 'Client';
     const platformLabel = creative.platform ? ` • ${creative.platform}` : '';
