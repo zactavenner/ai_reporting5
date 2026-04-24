@@ -184,7 +184,7 @@ export function DraggableClientTable({
     queryFn: async () => {
       const { data } = await supabase
         .from('daily_metrics')
-        .select('client_id, ad_spend, leads')
+        .select('client_id, ad_spend, leads, calls, showed_calls')
         .eq('date', yesterday);
       return data || [];
     },
@@ -654,16 +654,41 @@ export function DraggableClientTable({
                     )}>
                       <span className="flex items-center justify-end gap-0.5">
                         {m.totalCalls || 0}
-                        {(m.totalCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && !!(client.ghl_api_key && client.ghl_location_id) && (fullSettings[client.id]?.tracked_calendar_ids || []).length === 0 && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Calendar className="h-2.5 w-2.5 text-destructive shrink-0" />
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs max-w-[220px]">
-                              No tracked calendars configured — add calendar IDs in client settings to sync booked/show calls
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
+                        {(m.totalCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && (() => {
+                          const hasGHL = !!(client.ghl_api_key && client.ghl_location_id);
+                          const hasCalendars = (fullSettings[client.id]?.tracked_calendar_ids || []).length > 0;
+                          if (!hasGHL) return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertTriangle className="h-2.5 w-2.5 text-destructive shrink-0" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs max-w-[220px]">
+                                No GHL credentials — configure GHL API key & location ID to sync calendar data
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                          if (!hasCalendars) return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Calendar className="h-2.5 w-2.5 text-destructive shrink-0" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs max-w-[220px]">
+                                No tracked calendars configured — add calendar IDs in client settings to sync booked/show calls
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                          if (syncInfo.status === 'stale' || syncInfo.status === 'error') return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertTriangle className="h-2.5 w-2.5 text-yellow-600 dark:text-yellow-500 shrink-0" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs max-w-[220px]">
+                                GHL sync is {syncInfo.status} — calendar data may be outdated, run sync to refresh
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                          return null;
+                        })()}
                       </span>
                     </TableCell>
 
@@ -680,7 +705,19 @@ export function DraggableClientTable({
                       "text-right font-mono tabular-nums text-[11px] py-0 px-1",
                       (m.totalCalls || 0) > 0 && (m.showedCalls || 0) === 0 && 'text-yellow-600 dark:text-yellow-500'
                     )}>
-                      {m.showedCalls || 0}
+                      <span className="flex items-center justify-end gap-0.5">
+                        {m.showedCalls || 0}
+                        {(m.totalCalls || 0) > 0 && (m.showedCalls || 0) === 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-2.5 w-2.5 text-yellow-600 dark:text-yellow-500 shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-[220px]">
+                              {m.totalCalls} booked calls but 0 showed — check calendar sync or appointment statuses in GHL
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                     </TableCell>
 
                     {/* Show Rate */}

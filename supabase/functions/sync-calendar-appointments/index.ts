@@ -338,7 +338,7 @@ async function recalculateClientMetrics(supabase: any, clientId: string) {
 
   console.log(`Updating metrics for ${metricsByDate.size} dates`);
 
-  // Update daily_metrics for each date
+  // Update daily_metrics for each date — only call columns, preserve ad_spend
   for (const [date, metrics] of metricsByDate) {
     const { data: existing } = await supabase
       .from('daily_metrics')
@@ -347,28 +347,23 @@ async function recalculateClientMetrics(supabase: any, clientId: string) {
       .eq('date', date)
       .maybeSingle();
 
+    const callPayload = {
+      calls: metrics.calls,
+      showed_calls: metrics.showed_calls,
+      reconnect_calls: metrics.reconnect_calls,
+      reconnect_showed: metrics.reconnect_showed,
+      updated_at: new Date().toISOString(),
+    };
+
     if (existing) {
       await supabase
         .from('daily_metrics')
-        .update({
-          calls: metrics.calls,
-          showed_calls: metrics.showed_calls,
-          reconnect_calls: metrics.reconnect_calls,
-          reconnect_showed: metrics.reconnect_showed,
-          updated_at: new Date().toISOString(),
-        })
+        .update(callPayload)
         .eq('id', existing.id);
     } else {
       await supabase
         .from('daily_metrics')
-        .insert({
-          client_id: clientId,
-          date,
-          calls: metrics.calls,
-          showed_calls: metrics.showed_calls,
-          reconnect_calls: metrics.reconnect_calls,
-          reconnect_showed: metrics.reconnect_showed,
-        });
+        .insert({ client_id: clientId, date, ...callPayload });
     }
   }
 
