@@ -229,7 +229,7 @@ async function pushCall(
 
 // Process a single event
 async function processEvent(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   client: Client,
   event: OutboundEvent
 ): Promise<{ success: boolean; error?: string }> {
@@ -249,7 +249,7 @@ async function processEvent(
       }
 
       // Update the event with the GHL contact ID for future reference
-      await supabase
+      await (supabase as any)
         .from('sync_outbound_events')
         .update({ ghl_contact_id: ghlContactId })
         .eq('id', event.id);
