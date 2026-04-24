@@ -275,7 +275,7 @@ async function handleTranscribeOnly(audioUrl: string) {
     // Fetch the audio file and convert to base64
     const audioResponse = await fetch(audioUrl);
     const audioBlob = await audioResponse.arrayBuffer();
-    const base64Audio = base64Encode(new Uint8Array(audioBlob));
+    const base64Audio = base64Encode(audioBlob);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -351,7 +351,7 @@ async function handleExtractTaskDetails(
     // Fetch the audio file and convert to base64
     const audioResponse = await fetch(audioUrl);
     const audioBlob = await audioResponse.arrayBuffer();
-    const base64Audio = base64Encode(new Uint8Array(audioBlob));
+    const base64Audio = base64Encode(audioBlob);
 
     // Step 1: Transcribe
     const transcribeResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
