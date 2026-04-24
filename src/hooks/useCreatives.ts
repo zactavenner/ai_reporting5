@@ -199,9 +199,24 @@ export function useCreateCreative() {
       
       return data;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: async (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['creatives', variables.client_id] });
       toast.success('Creative uploaded successfully');
+      // Notify Slack channel when creative is sent for client approval (status === 'pending')
+      try {
+        const { data: latest } = await supabase
+          .from('creatives')
+          .select('status')
+          .eq('id', data.id)
+          .single();
+        if (latest?.status === 'pending') {
+          supabase.functions.invoke('notify-creative-approval', {
+            body: { creativeId: data.id },
+          }).catch((e) => console.warn('Slack notify failed:', e));
+        }
+      } catch (e) {
+        console.warn('Failed to check creative status for Slack notify:', e);
+      }
     },
     onError: (error: Error) => {
       toast.error('Failed to upload creative: ' + error.message);
@@ -238,6 +253,12 @@ export function useUpdateCreativeStatus() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['creatives', variables.clientId] });
       toast.success(`Creative ${variables.status}`);
+      // Notify Slack channel when sending to client for approval
+      if (variables.status === 'pending') {
+        supabase.functions.invoke('notify-creative-approval', {
+          body: { creativeId: variables.id },
+        }).catch((e) => console.warn('Slack notify failed:', e));
+      }
     },
     onError: (error: Error) => {
       toast.error('Failed to update status: ' + error.message);
