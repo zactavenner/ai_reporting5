@@ -646,6 +646,7 @@ export function DraggableClientTable({
                         const hasCalls = (m.totalCalls || 0) > 0;
                         const hasGHL = !!(client.ghl_api_key && client.ghl_location_id);
                         const hasCalendars = (fullSettings[client.id]?.tracked_calendar_ids || []).length > 0;
+                        if (!hasCalls && hasAdSpend && !hasGHL) return 'text-destructive font-semibold';
                         if (!hasCalls && hasAdSpend && hasGHL && !hasCalendars) return 'text-destructive font-semibold';
                         if (!hasCalls && hasAdSpend && syncInfo.status !== 'healthy') return 'text-yellow-600 dark:text-yellow-500';
                         if (!hasCalls && (m.crmLeads || 0) > 0) return 'text-yellow-600 dark:text-yellow-500';
@@ -654,16 +655,31 @@ export function DraggableClientTable({
                     )}>
                       <span className="flex items-center justify-end gap-0.5">
                         {m.totalCalls || 0}
-                        {(m.totalCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && !!(client.ghl_api_key && client.ghl_location_id) && (fullSettings[client.id]?.tracked_calendar_ids || []).length === 0 && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Calendar className="h-2.5 w-2.5 text-destructive shrink-0" />
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs max-w-[220px]">
-                              No tracked calendars configured — add calendar IDs in client settings to sync booked/show calls
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
+                        {(m.totalCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && (() => {
+                          const hasGHL = !!(client.ghl_api_key && client.ghl_location_id);
+                          const hasCalendars = (fullSettings[client.id]?.tracked_calendar_ids || []).length > 0;
+                          if (!hasGHL) return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Calendar className="h-2.5 w-2.5 text-destructive shrink-0" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs max-w-[220px]">
+                                No GHL credentials configured — add GHL API key &amp; location ID in settings to sync booked/show calls
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                          if (!hasCalendars) return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Calendar className="h-2.5 w-2.5 text-destructive shrink-0" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs max-w-[220px]">
+                                No tracked calendars configured — add calendar IDs in client settings to sync booked/show calls from GHL
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                          return null;
+                        })()}
                       </span>
                     </TableCell>
 

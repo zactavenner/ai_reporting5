@@ -107,13 +107,14 @@ function buildSingleClientMetrics(
 
 /**
  * Converts RPC results + daily_metrics into per-client SourceAggregatedMetrics.
- * Ensures every client with ad spend in daily_metrics gets an entry, even if the
- * RPC returned no lead/call data for them (e.g. GHL not configured).
+ * Ensures every client with ad spend in daily_metrics OR with CRM data from
+ * the RPC gets an entry — covers clients with Meta-only, GHL-only, or both.
  */
 export function buildClientMetricsFromRPC(
   rpcData: ClientSourceMetricsRow[],
   dailyMetrics: DailyMetric[],
-  clientFullSettings: Record<string, any>
+  clientFullSettings: Record<string, any>,
+  clientIds?: string[]
 ): Record<string, SourceAggregatedMetrics> {
   const result: Record<string, SourceAggregatedMetrics> = {};
 
@@ -130,7 +131,7 @@ export function buildClientMetricsFromRPC(
     rpcByClient[row.client_id] = row;
   }
 
-  // Process all clients from RPC data (should include every client)
+  // Process all clients from RPC data (CRM leads, calls, funded)
   for (const row of rpcData) {
     const clientDailyMetrics = dailyByClient[row.client_id] || [];
     const dailyTotals = aggregateDailyTotals(clientDailyMetrics);
@@ -138,13 +139,28 @@ export function buildClientMetricsFromRPC(
     result[row.client_id] = buildSingleClientMetrics(dailyTotals, row, defaultPipelineValue);
   }
 
-  // Defensive: include any clients that have daily_metrics (ad spend) but were
-  // missing from the RPC results — ensures ad spend always shows on the dashboard
+  // Include any clients that have daily_metrics (ad spend) but were
+  // missing from the RPC results — ensures ad spend always shows
   for (const clientId of Object.keys(dailyByClient)) {
     if (!result[clientId]) {
       const dailyTotals = aggregateDailyTotals(dailyByClient[clientId]);
       const defaultPipelineValue = clientFullSettings[clientId]?.default_lead_pipeline_value || 0;
       result[clientId] = buildSingleClientMetrics(dailyTotals, null, defaultPipelineValue);
+    }
+  }
+
+  // Ensure every known client gets a metrics entry even if they have
+  // neither daily_metrics nor RPC data yet (e.g. newly onboarded)
+  if (clientIds) {
+    for (const clientId of clientIds) {
+      if (!result[clientId]) {
+        const defaultPipelineValue = clientFullSettings[clientId]?.default_lead_pipeline_value || 0;
+        result[clientId] = buildSingleClientMetrics(
+          { totalAdSpend: 0, totalClicks: 0, totalImpressions: 0, totalCommitments: 0, commitmentDollars: 0 },
+          rpcByClient[clientId] || null,
+          defaultPipelineValue
+        );
+      }
     }
   }
 

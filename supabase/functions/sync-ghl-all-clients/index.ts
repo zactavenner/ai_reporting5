@@ -73,20 +73,26 @@ Deno.serve(async (req) => {
 
       await new Promise(resolve => setTimeout(resolve, 10000));
 
-      // 2. Sync calendar appointments
+      // 2. Sync calendar appointments (skip gracefully if no calendars configured)
       try {
         const calendarBody: Record<string, unknown> = { clientId: client.id };
         if (sinceDateDays) calendarBody.sinceDateDays = sinceDateDays;
-        
+
         const res = await fetch(`${supabaseUrl}/functions/v1/sync-calendar-appointments`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseKey}` },
           body: JSON.stringify(calendarBody),
         });
         const data = await res.json();
-        clientResult.calendar = !data.error;
-        if (data.error) clientResult.errors.push(`calendar: ${data.error}`);
-        else console.log(`[sync-ghl-all-clients] ✓ ${client.name} calendar synced`);
+        if (data.error && (data.error.includes("No calendars configured") || data.error.includes("no GHL credentials"))) {
+          console.log(`[sync-ghl-all-clients] ⊘ ${client.name} calendar skipped (no calendars configured)`);
+          clientResult.calendar = true; // Not an error, just unconfigured
+        } else if (data.error) {
+          clientResult.errors.push(`calendar: ${data.error}`);
+        } else {
+          clientResult.calendar = true;
+          console.log(`[sync-ghl-all-clients] ✓ ${client.name} calendar synced (${data.created || 0} created, ${data.updated || 0} updated)`);
+        }
       } catch (err) {
         clientResult.errors.push(`calendar: ${err instanceof Error ? err.message : "Unknown"}`);
       }
@@ -106,6 +112,21 @@ Deno.serve(async (req) => {
         else console.log(`[sync-ghl-all-clients] ✓ ${client.name} pipelines synced`);
       } catch (err) {
         clientResult.errors.push(`pipelines: ${err instanceof Error ? err.message : "Unknown"}`);
+      }
+
+      // Update client sync status after all steps
+      const hasRealErrors = clientResult.errors.length > 0;
+      try {
+        await supabase
+          .from("clients")
+          .update({
+            ghl_sync_status: hasRealErrors ? "error" : "healthy",
+            ghl_sync_error: hasRealErrors ? clientResult.errors.join("; ") : null,
+            last_ghl_sync_at: new Date().toISOString(),
+          })
+          .eq("id", client.id);
+      } catch (e) {
+        console.error(`[sync-ghl-all-clients] Failed to update sync status for ${client.name}:`, e);
       }
 
       results.push(clientResult);
