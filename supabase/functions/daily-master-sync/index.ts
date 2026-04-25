@@ -101,6 +101,38 @@ Deno.serve(async (req) => {
       await new Promise(r => setTimeout(r, 10000));
     }
 
+    // ── Step 1b: GHL Ads Reporting (unified Meta/Google via GHL) ──
+    if (!skipSteps.includes("ghl_ads")) {
+      const start = Date.now();
+      console.log(`[daily-master-sync] Step 1b: sync-ghl-ads (all clients)`);
+      // Get all clients with GHL credentials
+      const { data: ghlClients } = await supabase
+        .from("clients")
+        .select("id")
+        .not("ghl_api_key", "is", null)
+        .not("ghl_location_id", "is", null)
+        .in("status", ["active", "onboarding"]);
+
+      let ghlAdsSucceeded = 0;
+      let ghlAdsFailed = 0;
+      for (const c of ghlClients || []) {
+        const res = await callFunction(supabaseUrl, supabaseKey, "sync-ghl-ads", {
+          clientId: c.id,
+          syncAccounts: true,
+        });
+        if (res.success) ghlAdsSucceeded++; else ghlAdsFailed++;
+      }
+      const duration = Date.now() - start;
+      results.push({
+        step: "sync-ghl-ads",
+        success: ghlAdsFailed === 0,
+        duration_ms: duration,
+        details: `${ghlAdsSucceeded} succeeded, ${ghlAdsFailed} failed out of ${(ghlClients || []).length} clients`,
+        error: ghlAdsFailed > 0 ? `${ghlAdsFailed} client(s) failed` : undefined,
+      });
+      await new Promise(r => setTimeout(r, 5000));
+    }
+
     // ── Step 2: GHL All Clients (contacts, calendar, pipelines) ──
     if (!skipSteps.includes("ghl")) {
       const start = Date.now();
@@ -121,6 +153,25 @@ Deno.serve(async (req) => {
         );
       }
       await new Promise(r => setTimeout(r, 10000));
+    }
+
+    // ── Step 2b: Process GHL enrichment queue (durable sync-back) ──
+    if (!skipSteps.includes("ghl_enrich")) {
+      const start = Date.now();
+      console.log(`[daily-master-sync] Step 2b: ghl-lead-enrich-sync (process queue)`);
+      const res = await callFunction(supabaseUrl, supabaseKey, "ghl-lead-enrich-sync", {
+        processQueue: true,
+        limit: 50,
+      });
+      const duration = Date.now() - start;
+      results.push({
+        step: "ghl-lead-enrich-sync",
+        success: res.success,
+        duration_ms: duration,
+        details: `Processed ${res.data?.processed || 0} jobs (${res.data?.succeeded || 0} succeeded, ${res.data?.failed || 0} failed)`,
+        error: res.error,
+      });
+      await new Promise(r => setTimeout(r, 5000));
     }
 
     // ── Step 3: HubSpot All Clients ──
