@@ -71,6 +71,7 @@ function PublicReportContent() {
   const { data: fundedInvestors = [], error: fundedError } = useFundedInvestors(client?.id, startDate, endDate);
   const { data: leads = [], isLoading: leadsLoading, error: leadsError } = useLeads(client?.id, startDate, endDate);
   const { data: calls = [], error: callsError } = useCalls(client?.id, false, startDate, endDate);
+  const { data: scheduledShowedCalls = [] } = useCalls(client?.id, true, startDate, endDate);
   const { data: customTabs = [], error: tabsError } = useCustomTabs(client?.id);
   const { data: funnelSteps = [], error: funnelError } = useFunnelSteps(client?.id);
   const { data: clientTasks = [], error: tasksError } = useTasks(client?.id);
@@ -109,7 +110,7 @@ function PublicReportContent() {
   };
 
   // Calculate KPIs directly from source data (leads, calls, funded_investors)
-  const metrics = useSourceAggregatedMetrics(leads, calls, fundedInvestors, dailyMetrics, (clientSettings as any)?.default_lead_pipeline_value || 0);
+  const metrics = useSourceAggregatedMetrics(leads, calls, fundedInvestors, dailyMetrics, (clientSettings as any)?.default_lead_pipeline_value || 0, scheduledShowedCalls);
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['daily-metrics'] });

@@ -654,13 +654,16 @@ export function DraggableClientTable({
                     )}>
                       <span className="flex items-center justify-end gap-0.5">
                         {m.totalCalls || 0}
-                        {(m.totalCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && !!(client.ghl_api_key && client.ghl_location_id) && (fullSettings[client.id]?.tracked_calendar_ids || []).length === 0 && (
+                        {(m.totalCalls || 0) === 0 && (m.totalAdSpend || 0) > 0 && !!(client.ghl_api_key && client.ghl_location_id) && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Calendar className="h-2.5 w-2.5 text-destructive shrink-0" />
                             </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs max-w-[220px]">
-                              No tracked calendars configured — add calendar IDs in client settings to sync booked/show calls
+                            <TooltipContent side="top" className="text-xs max-w-[250px]">
+                              {(fullSettings[client.id]?.tracked_calendar_ids || []).length === 0
+                                ? 'No tracked calendars configured — add calendar IDs in client settings to sync booked/show calls'
+                                : `${(fullSettings[client.id]?.tracked_calendar_ids || []).length} calendar(s) configured but 0 booked calls — check GHL calendar sync or appointment status mapping`
+                              }
                             </TooltipContent>
                           </Tooltip>
                         )}

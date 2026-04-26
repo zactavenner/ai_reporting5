@@ -128,6 +128,7 @@ const Index = () => {
   const { data: fundedInvestors = [] } = useFundedInvestors(undefined, startDate, endDate);
   const { data: allLeads = [] } = useLeads(undefined, startDate, endDate);
   const { data: allCalls = [] } = useCalls(undefined, false, startDate, endDate);
+  const { data: allShowedCalls = [] } = useCalls(undefined, true, startDate, endDate);
   const { data: rpcMetrics = [] } = useClientSourceMetrics(startDate, endDate);
   
   const clientIds = useMemo(() => clients.map(c => c.id), [clients]);
@@ -151,7 +152,7 @@ const Index = () => {
   const aggregatedMetrics = useMemo(() => {
     const allClientMetrics = Object.values(clientMetrics);
     if (allClientMetrics.length === 0) {
-      return aggregateFromSourceData(allLeads, allCalls, fundedInvestors, dailyMetrics);
+      return aggregateFromSourceData(allLeads, allCalls, fundedInvestors, dailyMetrics, undefined, allShowedCalls);
     }
     
     const totals = allClientMetrics.reduce(

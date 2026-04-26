@@ -118,6 +118,7 @@ export default function ClientDetail() {
   const { data: priorMetrics } = usePriorPeriodMetrics(clientId, startDate, endDate);
   const { data: leads = [], isLoading: leadsLoading } = useLeads(clientId, startDate, endDate);
   const { data: calls = [] } = useCalls(clientId, false, startDate, endDate);
+  const { data: scheduledShowedCalls = [] } = useCalls(clientId, true, startDate, endDate);
   const { data: settings } = useClientSettings(clientId);
   const { data: customTabs = [] } = useCustomTabs(clientId);
   const { data: allTasks = [] } = useAllTasks();
@@ -153,7 +154,8 @@ export default function ClientDetail() {
     hasSourceFilter ? filteredCalls : calls,
     hasSourceFilter ? filteredFundedInvestors : fundedInvestors,
     dailyMetrics,
-    (settings as any)?.default_lead_pipeline_value || 0
+    (settings as any)?.default_lead_pipeline_value || 0,
+    scheduledShowedCalls
   );
 
   const thresholds = useMemo(() => getThresholdsFromSettings(settings), [settings]);
