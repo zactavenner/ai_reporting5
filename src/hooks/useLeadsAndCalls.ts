@@ -111,29 +111,33 @@ export function useCalls(clientId?: string, showedOnly?: boolean, startDate?: st
   return useQuery({
     queryKey: ['calls', clientId, showedOnly, startDate, endDate],
     queryFn: async () => {
+      // When filtering showed calls, use scheduled_at (the actual appointment date)
+      // When filtering booked calls, use booked_at (the date the call was created)
+      const dateColumn = showedOnly ? 'scheduled_at' : 'booked_at';
+
       const data = await fetchAllRows((sb) => {
         let query = sb
           .from('calls')
           .select('*')
-          .order('booked_at', { ascending: false });
-        
+          .order(dateColumn, { ascending: false });
+
         if (clientId) {
           query = query.eq('client_id', clientId);
         }
-        
+
         if (showedOnly) {
           query = query.eq('showed', true);
         }
 
         if (startDate) {
-          query = query.gte('booked_at', startDate + 'T00:00:00.000Z');
+          query = query.gte(dateColumn, startDate + 'T00:00:00.000Z');
         }
         if (endDate) {
           const endNext = new Date(endDate + 'T00:00:00.000Z');
           endNext.setUTCDate(endNext.getUTCDate() + 1);
-          query = query.lt('booked_at', endNext.toISOString());
+          query = query.lt(dateColumn, endNext.toISOString());
         }
-        
+
         return query;
       });
 
