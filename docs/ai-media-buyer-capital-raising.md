@@ -138,15 +138,42 @@ N net-new concepts plus M variants **in total** (4/5/6/8 prepared assets), and p
 
 ## Data honesty rules enforced in the adapter
 
-- Timezone comes only from a verified bound `meta_ad_accounts.timezone_name` or `client_settings.stats_report_timezone`. With
-  neither, nothing is dated and the client is DATA BLOCKED.
+- Timezone comes ONLY from a verified bound `meta_ad_accounts.timezone_name`. `client_settings.stats_report_timezone` is NOT a
+  fallback — a reporting timezone may legitimately differ from the ad account's and would mis-bucket days. Without the
+  ad-account timezone nothing is dated and the client is DATA BLOCKED.
+- `daily_metrics.date_account_tz` is authoritative for grouping. `date` is only used to bound the query; a row without an
+  account-local date is undated and blocks the window.
+- `daily_metrics.clicks` is a generic click count and is never mapped to Meta outbound clicks, so the outbound-CTR diagnostic
+  stays unavailable.
 - Rows missing an account-local date block; nulls, NaN and negatives never sum to zero.
 - Month-to-date spans the first of the month through yesterday. If that range is incomplete, duplicated, truncated or errored,
   month-to-date spend and commitments are reported **unavailable** rather than as a partial sum.
 - `daily_metrics.funded_dollars` is unreconciled reported funding. It is shown separately as unverified and is never passed as
   cleared capital.
 - `meta_ads` holds lifetime aggregates with no per-day rows and no budget column, so per-ad windows, budget owners and change
-  history are unavailable — which is why no numeric scale proposal can be produced yet.
+  history are unavailable.
+- `meta_ad_daily_insights` EXISTS (`client_id, meta_ad_id, date, spend, impressions, clicks, leads, updated_at`) but is
+  deliberately NOT wired in yet: it has no account-local date column, no outbound-click metric and no qualified-lead
+  definition. It is the intended future source for per-ad windows once those are verified.
+- `leads` EXISTS (`ad_id, created_at, current_disposition, opportunity_stage_id, disposition_updated_at, ghl_synced_at`) but the
+  qualification definition and event semantics per client are unmapped, so the matured qualified-lead cohort still blocks.
+
+## Numeric budget proposals are disabled in this preview
+
+`buildDraftActions` emits NO `increase_object_daily_budget` at all. A safe increase must reserve every budget-owning object's
+baseline spend against the remaining monthly budget and apply the approved daily cap to the CLIENT total, not separately per
+owner. Neither the account-wide baseline nor the total current budget is connected, so any number would be invented. Scale
+candidates are still returned as inert `no_action` entries carrying the blocker
+`verified_client_wide_baseline_and_total_current_budget_not_connected` plus the specific missing gates. Pausing an ad proposes
+no number and claims no saving.
+
+## Test coverage of the endpoint contract
+
+`handleSopReview` in `supabase/functions/_shared/mediaBuyerSopReview.ts` is a pure injectable handler, so the ordering that
+matters is genuinely exercised: unauthorized callers perform ZERO privileged reads, non-POST and malformed JSON are rejected
+before authorization runs, a missing `client_id` never sweeps the portfolio, and a client-scoped caller asking about another
+client is refused before any read. The real `authorizeOperator` implementation against live auth is still only verifiable
+after deployment — that remains untested here and is not claimed as covered.
 
 ## Remaining deployment steps (none performed)
 

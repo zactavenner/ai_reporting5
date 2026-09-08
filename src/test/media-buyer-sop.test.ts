@@ -24,7 +24,8 @@ import {
   type Window,
 } from '../../supabase/functions/_shared/mediaBuyerSop';
 import { validateRequestShape, validateClientId } from '../../supabase/functions/_shared/mediaBuyerSopRequest';
-import { loadClientSopReport, sumStrict, normalizeAdAccountId, type DailyRow } from '../../supabase/functions/_shared/mediaBuyerSopRead';
+import { DAILY_METRICS_COLUMNS, loadClientSopReport, normalizeAdAccountId, rowDate, sumStrict, type DailyRow } from '../../supabase/functions/_shared/mediaBuyerSopRead';
+import { handleSopReview } from '../../supabase/functions/_shared/mediaBuyerSopReview';
 
 const CLIENT = '11111111-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
@@ -239,13 +240,23 @@ describe('timezone resolution', () => {
   it('blocks and calculates no dates when no timezone source exists', () => {
     const r = resolveTimezone({ adAccountBound: true, adAccountTimezone: null, reportTimezone: null });
     expect(r.timezone).toBeNull();
-    expect(r.blockers.length).toBeGreaterThan(0);
+    expect(r.blockers).toContain('meta_ad_account_timezone_unavailable');
     expect(validateWindow(makeWindow(CUR), { ...VALID_OPTS(CUR), timezone: null }).blockers).toContain('timezone_unresolved');
+  });
+
+  it('NEVER falls back to the client reporting timezone: it may differ from Meta', () => {
+    const r = resolveTimezone({ adAccountBound: true, adAccountTimezone: null, reportTimezone: 'America/Chicago' });
+    expect(r.timezone).toBeNull();
+    expect(r.source).toBeNull();
+    expect(r.blockers).toContain('meta_ad_account_timezone_unavailable');
+    expect(r.blockers).toContain('timezone_unresolved');
+    expect(r.notes.join(' ')).toContain('NOT used');
   });
 
   it('rejects an invalid timezone string', () => {
     const r = resolveTimezone({ adAccountBound: true, adAccountTimezone: 'Not/AZone', reportTimezone: null });
     expect(r.timezone).toBeNull();
+    expect(r.blockers).toContain('ad_account_timezone_invalid');
   });
 });
 
@@ -575,28 +586,33 @@ describe('draft actions', () => {
     expect(total_monthly_impact_usd).toBe(0);
   });
 
-  it('never targets an ad with a numeric budget change — proposals name the owning object', () => {
+  it('emits NO numeric budget increase at all in this preview, even with a fully verified owner', () => {
     const a = ad({ current: makeWindow(CUR, cohort(500, 12)) });
     const assessment = classifyAd(a, ctx());
-    const { actions } = buildDraftActions([assessment], [a], draftCtx);
-    const inc = actions.find((x) => x.kind === 'increase_object_daily_budget')!;
-    expect(inc.budget_object).toEqual({ level: 'adset', object_id: 'as-1' });
-    expect(inc.current_daily_budget_usd).toBe(350);
-    expect(inc.proposed_daily_budget_usd).toBe(420);
-    expect(inc.delta_usd).toBe(70);
-    expect(inc.monthly_impact_usd).toBe(1400); // delta x actual remaining days, never x30
-    expect(inc.projected_baseline_remaining_usd).toBe(6800);
-    expect(inc.inert).toBe(true);
-    expect(inc.requires_human_approval).toBe(true);
+    const { actions, total_delta_usd, total_monthly_impact_usd } = buildDraftActions([assessment], [a], draftCtx);
+    expect(actions.some((x) => x.kind === 'increase_object_daily_budget')).toBe(false);
+    const na = actions.find((x) => x.kind === 'no_action')!;
+    expect(na.budget_object).toEqual({ level: 'adset', object_id: 'as-1' });
+    expect(na.proposed_daily_budget_usd).toBeNull();
+    expect(na.current_daily_budget_usd).toBeNull();
+    expect(na.delta_usd).toBeNull();
+    expect(na.monthly_impact_usd).toBeNull();
+    expect(na.projected_baseline_remaining_usd).toBeNull();
+    expect(na.blockers).toContain('verified_client_wide_baseline_and_total_current_budget_not_connected');
+    expect(na.inert).toBe(true);
+    expect(na.requires_human_approval).toBe(true);
+    expect(total_delta_usd).toBe(0);
+    expect(total_monthly_impact_usd).toBe(0);
   });
 
-  it('withholds any number when the budget owner, baseline, cap or remaining days are unknown', () => {
+  it('still reports the specific missing gates on the scale candidate', () => {
     const cases: Array<[Partial<AdInput>, Partial<typeof draftCtx>, string]> = [
       [{ budget_owner: null }, {}, 'budget_owner_unknown_ads_do_not_own_budget'],
       [{ budget_owner: { level: 'adset', object_id: 'as-1', daily_budget_usd: 350, verified: false, baseline_daily_spend_usd: 340 } }, {}, 'budget_owner_unverified'],
       [{ budget_owner: { level: 'adset', object_id: 'as-1', daily_budget_usd: 350, verified: true, baseline_daily_spend_usd: null } }, {}, 'owner_baseline_daily_spend_unavailable'],
       [{}, { approved_daily_cap_usd: null }, 'approved_client_daily_cap_unknown'],
       [{}, { days_remaining_including_today: null }, 'remaining_days_unknown'],
+      [{}, { monthly_headroom_usd: null }, 'monthly_headroom_unknown'],
     ];
     for (const [adOver, ctxOver, blocker] of cases) {
       const a = ad({ current: makeWindow(CUR, cohort(500, 12)), ...adOver });
@@ -609,27 +625,28 @@ describe('draft actions', () => {
     }
   });
 
-  it('enforces the approved client daily cap and never stacks proposals per object', () => {
+  it('groups scale candidates one explanation per budget-owning object, never per ad', () => {
     const a1 = ad({ ad_id: 'ad-1', current: makeWindow(CUR, cohort(500, 12)) });
     const a2 = ad({ ad_id: 'ad-2', current: makeWindow(CUR, cohort(500, 12)) });
     const assessments = [classifyAd(a1, ctx()), classifyAd(a2, ctx())];
     const { actions } = buildDraftActions(assessments, [a1, a2], draftCtx);
-    expect(actions.filter((x) => x.kind === 'increase_object_daily_budget')).toHaveLength(1);
+    expect(actions).toHaveLength(1);
+    expect(actions[0].kind).toBe('no_action');
     expect(actions[0].ad_ids).toEqual(['ad-1', 'ad-2']);
-
-    const capped = ad({ current: makeWindow(CUR, cohort(500, 12)), budget_owner: { level: 'campaign', object_id: 'c-1', daily_budget_usd: 500, verified: true, baseline_daily_spend_usd: 500 } });
-    const cappedActions = buildDraftActions([classifyAd(capped, ctx())], [capped], draftCtx).actions;
-    expect(cappedActions[0].kind).toBe('no_action');
-    expect(cappedActions[0].blockers).toContain('approved_client_daily_cap_reached');
   });
 
-  it('never inflates monthly headroom: an increase beyond remaining headroom is withheld', () => {
+
+
+  it('never inflates monthly headroom: no increase is sized at all, whatever the headroom', () => {
     const a = ad({ current: makeWindow(CUR, cohort(500, 12)) });
     const assessment = classifyAd(a, ctx());
-    const { actions } = buildDraftActions([assessment], [a], { ...draftCtx, monthly_headroom_usd: 100 });
-    expect(actions[0].kind).toBe('no_action');
-    expect(actions[0].blockers).toContain('monthly_headroom_insufficient');
-    expect(actions[0].monthly_impact_usd).toBeNull();
+    for (const headroom of [100, 5000, null]) {
+      const { actions, total_monthly_impact_usd } = buildDraftActions([assessment], [a], { ...draftCtx, monthly_headroom_usd: headroom });
+      expect(actions[0].kind).toBe('no_action');
+      expect(actions[0].blockers).toContain('verified_client_wide_baseline_and_total_current_budget_not_connected');
+      expect(actions[0].monthly_impact_usd).toBeNull();
+      expect(total_monthly_impact_usd).toBe(0);
+    }
   });
 });
 
@@ -881,5 +898,113 @@ describe('shared read adapter', () => {
     expect(loaded.report?.draft_actions).toEqual([]);
     expect(loaded.connection_gaps.join(' ')).toContain('Matured qualified-lead cohort');
     expect(loaded.connection_gaps.join(' ')).toContain('tracking');
+  });
+});
+
+/* ------------------- endpoint contract: auth before reads ---------------- */
+
+describe('media-buyer-sop-review request handler (auth precedes every privileged read)', () => {
+  const okLoaded = {
+    report: null, fatal: null,
+    timezone: { timezone: null, source: null, blockers: ['timezone_unresolved'], notes: [] },
+    month: null, expectedCurrent: null, expectedPrior: null,
+    source_blockers: [], connection_gaps: [],
+  } as never;
+
+  const CID = '11111111-2222-3333-4444-555555555555';
+
+  function deps(over: Record<string, unknown> = {}) {
+    const calls = { authorize: 0, load: 0 };
+    const base = {
+      method: 'POST',
+      rawBody: JSON.stringify({ client_id: CID }),
+      nowIso: '2026-03-20T10:00:00Z',
+      startedAtMs: 0,
+      elapsedMs: () => 1,
+      authorize: async () => { calls.authorize++; return { ok: true, via: 'admin' }; },
+      load: async () => { calls.load++; return okLoaded; },
+      ...over,
+    };
+    return { base: base as never, calls };
+  }
+
+  it('performs ZERO privileged reads when the caller is unauthorized', async () => {
+    const { base, calls } = deps({ authorize: async () => ({ ok: false, status: 401, error: 'missing token', code: 'missing_token' }) });
+    const r = await handleSopReview(base);
+    expect(r.status).toBe(401);
+    expect(calls.load).toBe(0);
+  });
+
+  it('rejects a non-POST method before authorizing or reading anything', async () => {
+    const { base, calls } = deps({ method: 'GET' });
+    const r = await handleSopReview(base);
+    expect(r.status).toBe(405);
+    expect(calls.authorize).toBe(0);
+    expect(calls.load).toBe(0);
+  });
+
+  it('rejects malformed JSON explicitly, with no authorization or read', async () => {
+    const { base, calls } = deps({ rawBody: '{not json' });
+    const r = await handleSopReview(base);
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('malformed_json');
+    expect(calls.authorize).toBe(0);
+    expect(calls.load).toBe(0);
+  });
+
+  it('requires a client_id and never sweeps the whole portfolio', async () => {
+    const { base, calls } = deps({ rawBody: JSON.stringify({}) });
+    const r = await handleSopReview(base);
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('client_id_required');
+    expect(calls.load).toBe(0);
+  });
+
+  it('refuses a client-scoped caller asking about another client, before reading', async () => {
+    const { base, calls } = deps({ authorize: async () => ({ ok: true, via: 'client_token', clientId: '99999999-2222-3333-4444-555555555555' }) });
+    const r = await handleSopReview(base);
+    expect(r.status).toBe(403);
+    expect(r.body.code).toBe('client_scope_mismatch');
+    expect(calls.load).toBe(0);
+  });
+
+  it('authorizes first, then reads once, and reports that nothing executes', async () => {
+    const { base, calls } = deps();
+    const r = await handleSopReview(base);
+    expect(r.status).toBe(200);
+    expect(calls.authorize).toBe(1);
+    expect(calls.load).toBe(1);
+    expect(r.body.executes_nothing).toBe(true);
+    expect(r.body.narration).toBe('disabled_in_preview');
+    expect(r.body.numeric_budget_proposals).toBe('disabled_in_preview');
+  });
+
+  it('serves the exportable operating instructions without any privileged read', async () => {
+    const { base, calls } = deps({ rawBody: JSON.stringify({ action: 'operating_instructions' }) });
+    const r = await handleSopReview(base);
+    expect(r.status).toBe(200);
+    expect(calls.load).toBe(0);
+    expect(String(r.body.instructions)).toContain('DAILY');
+  });
+});
+
+/* ----------------------------- read adapter ------------------------------ */
+
+describe('read adapter date and metric mapping', () => {
+  it('treats the account-local date as authoritative and never falls back to date', () => {
+    expect(rowDate({ date_account_tz: '2026-03-10', date: '2026-03-09' } as never)).toBe('2026-03-10');
+    expect(rowDate({ date_account_tz: null, date: '2026-03-09' } as never)).toBeNull();
+  });
+
+  it('never lets a null, NaN or negative value contribute zero to a sum', () => {
+    expect(sumStrict([{ ad_spend: 10 }, { ad_spend: 5 }] as never, 'ad_spend')).toBe(15);
+    expect(sumStrict([{ ad_spend: 10 }, { ad_spend: null }] as never, 'ad_spend')).toBeNull();
+    expect(sumStrict([{ ad_spend: -1 }] as never, 'ad_spend')).toBeNull();
+    expect(sumStrict([{ ad_spend: Number.NaN }] as never, 'ad_spend')).toBeNull();
+  });
+
+  it('selects only real daily_metrics columns', () => {
+    expect(DAILY_METRICS_COLUMNS).toContain('date_account_tz');
+    expect(DAILY_METRICS_COLUMNS).not.toContain('*');
   });
 });

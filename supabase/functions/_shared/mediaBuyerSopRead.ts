@@ -13,7 +13,9 @@
  *  - client_kpi_targets(client_id, max_daily_budget, autonomy_mode, guardrails)
  *  - meta_ad_accounts(ad_account_id, timezone_name, account_name, assets_synced_at)
  *  - daily_metrics(client_id, date, date_account_tz, ad_spend, impressions,
- *    clicks, leads, funded_dollars, commitment_dollars)
+ *    clicks, leads, funded_dollars, commitment_dollars). date_account_tz is
+ *    authoritative; `date` is only used to bound the query, never to group.
+ *    `clicks` is generic and is never mapped to outbound clicks.
  *  - meta_ads: has NO daily_budget and NO per-day rows (lifetime aggregates
  *    only), so no ad-level window can be built from it. Reported as a gap.
  */
@@ -76,8 +78,13 @@ export function sumStrict(rows: DailyRow[], key: keyof DailyRow): number | null 
   return Math.round(acc * 100) / 100;
 }
 
+/**
+ * The account-local date is authoritative. `date` is NOT a fallback: without a
+ * verified account-local date a row cannot be placed in the ad account's day, so
+ * it is treated as undated and the window blocks.
+ */
 export function rowDate(r: DailyRow): string | null {
-  const d = r.date_account_tz ?? r.date;
+  const d = r.date_account_tz;
   return typeof d === 'string' && d.length >= 10 ? d.slice(0, 10) : null;
 }
 
@@ -166,6 +173,7 @@ export async function loadClientSopReport(
   const timezone = resolveTimezone({
     adAccountBound: !!adAccountId,
     adAccountTimezone,
+    // Diagnostics only — a reporting timezone is NEVER used as the ad-account timezone.
     reportTimezone: (settingsRes.data as any)?.stats_report_timezone ?? null,
   });
 
@@ -182,6 +190,9 @@ export async function loadClientSopReport(
   gaps.push('Matured qualified-lead cohort (spend + qualified leads for the same acquisition cohort) has no source table — CPQL cannot be computed.');
   gaps.push('Attribution/tracking freshness and coverage have no source table — tracking health is unknown.');
   gaps.push('meta_ads stores lifetime aggregates with no per-day rows and no budget column — per-ad windows, budget owners and change history are unavailable.');
+  gaps.push('meta_ad_daily_insights EXISTS (client_id, meta_ad_id, date, spend, impressions, clicks, leads, updated_at) but is NOT wired into this review: it carries no account-local date column, no outbound-click metric and no qualified-lead definition, so per-ad windows stay unavailable until those are verified.');
+  gaps.push('leads EXISTS (ad_id, created_at, current_disposition, opportunity_stage_id, disposition_updated_at, ghl_synced_at) but the qualification definition and event semantics per client are not mapped, so a matured qualified-lead cohort cannot be derived from it yet.');
+  gaps.push('Verified Meta outbound clicks have no connected source — the outbound-CTR diagnostic stays unavailable and cannot be substituted with daily_metrics.clicks.');
   gaps.push('Campaign/ad set budget ownership, baseline daily spend and budget/creative change history are not connected — no numeric scale proposal is possible.');
   gaps.push('Sales capacity headroom has no source — scale capacity gate stays unknown.');
 
@@ -266,7 +277,9 @@ export async function loadClientSopReport(
       dates,
       spend_usd: sumStrict(rows, 'ad_spend'),
       impressions: sumStrict(rows, 'impressions'),
-      clicks_outbound: sumStrict(rows, 'clicks'),
+      // daily_metrics.clicks is a generic click count, NOT verified Meta outbound
+      // clicks. It is never mapped to the outbound diagnostic.
+      clicks_outbound: null,
       leads: sumStrict(rows, 'leads'),
       frequency: UNAVAILABLE_FREQUENCY,
       // No matured acquisition cohort source exists — never synthesised.

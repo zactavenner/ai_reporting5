@@ -160,7 +160,8 @@ export function computeTestDays(
 
 export interface TimezoneResolution {
   timezone: string | null;
-  source: 'meta_ad_account' | 'client_report_setting' | null;
+  /** Only the verified Meta ad account can supply a timezone. */
+  source: 'meta_ad_account' | null;
   blockers: string[];
   notes: string[];
 }
@@ -176,14 +177,20 @@ export function isValidTimezone(tz: unknown): tz is string {
 }
 
 /**
- * Timezone comes only from the VERIFIED bound Meta ad account
- * (meta_ad_accounts.timezone_name), or failing that the client's own reporting
- * timezone setting. `clients.timezone` does not exist and is never consulted.
- * When neither resolves, dates are not calculated at all — the review blocks.
+ * Timezone comes ONLY from the verified bound Meta ad account
+ * (meta_ad_accounts.timezone_name). The client's reporting timezone is NOT a
+ * fallback: a reporting timezone may legitimately differ from the ad account's,
+ * and using it would silently mis-bucket ad-account days. `clients.timezone`
+ * does not exist and is never consulted. When the ad-account timezone does not
+ * resolve, no dates are calculated at all — the review blocks.
  */
 export function resolveTimezone(input: {
   adAccountBound: boolean;
   adAccountTimezone?: string | null;
+  /**
+   * Accepted for reporting/diagnostics only. It is NEVER used to resolve the
+   * timezone, even when the ad-account timezone is missing.
+   */
   reportTimezone?: string | null;
 }): TimezoneResolution {
   const blockers: string[] = [];
@@ -195,13 +202,15 @@ export function resolveTimezone(input: {
     blockers.push('ad_account_timezone_invalid');
   }
   if (isValidTimezone(input.reportTimezone)) {
-    notes.push('Ad-account timezone unavailable — using the client reporting timezone. Verify it matches the ad account before acting.');
-    return { timezone: input.reportTimezone, source: 'client_report_setting', blockers, notes };
+    notes.push('A client reporting timezone exists but is NOT used: it may differ from the Meta ad account timezone. Connect meta_ad_accounts.timezone_name.');
+  } else if (input.reportTimezone != null) {
+    blockers.push('report_timezone_invalid');
   }
-  if (input.reportTimezone != null && !isValidTimezone(input.reportTimezone)) blockers.push('report_timezone_invalid');
+  blockers.push('meta_ad_account_timezone_unavailable');
   blockers.push('timezone_unresolved');
   return { timezone: null, source: null, blockers, notes };
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Configuration resolution (client_kpi_targets)                       */
@@ -1010,7 +1019,7 @@ export function buildDraftActions(
   }
   const byId = new Map(ads.map((a) => [a.ad_id, a]));
   const actions: DraftAction[] = [];
-  let headroom = ctx.monthly_headroom_usd;
+  
 
   // One proposal per budget-owning object, even with several scaling ads on it.
   const scaleGroups = new Map<string, { owner: BudgetOwner | null; adIds: string[]; ads: AdInput[]; reason: string }>();
@@ -1048,9 +1057,17 @@ export function buildDraftActions(
     }
   }
 
+  // NUMERIC BUDGET-CHANGE PROPOSALS ARE DISABLED IN THIS PREVIEW.
+  //
+  // A safe increase would have to reserve the client-wide BASELINE spend of every
+  // budget-owning object against the remaining monthly budget, and apply the
+  // approved client daily cap to the client total rather than separately to each
+  // owner. Neither the client-wide current total budget nor per-owner baselines
+  // are connected, so any number here would be invented. The scale-candidate
+  // analysis is preserved and returned as an inert no_action explanation.
   for (const [, g] of scaleGroups) {
     const owner = g.owner;
-    const blockers: string[] = [];
+    const blockers: string[] = ['verified_client_wide_baseline_and_total_current_budget_not_connected'];
     if (!owner) blockers.push('budget_owner_unknown_ads_do_not_own_budget');
     else {
       if (owner.verified !== true) blockers.push('budget_owner_unverified');
@@ -1064,63 +1081,18 @@ export function buildDraftActions(
       if (!ad.change_history || ad.change_history.available !== true) blockers.push('change_history_unavailable');
     }
 
-    if (blockers.length) {
-      actions.push({
-        kind: 'no_action', ad_ids: g.adIds,
-        budget_object: owner?.object_id ? { level: owner.level, object_id: owner.object_id } : null,
-        current_daily_budget_usd: owner && isPositiveFinite(owner.daily_budget_usd) ? owner.daily_budget_usd : null,
-        proposed_daily_budget_usd: null, delta_usd: null,
-        projected_baseline_remaining_usd: null, projected_remaining_with_change_usd: null,
-        monthly_impact_usd: null, savings_claimed: false, blockers: [...new Set(blockers)],
-        requires_human_approval: true, inert: true,
-        rationale: 'Scale candidate displayed, but no numeric proposal: ' + [...new Set(blockers)].join(', ') + '.',
-      });
-      continue;
-    }
-
-    const o = owner as BudgetOwner;
-    const cap = ctx.approved_daily_cap_usd as number;
-    const days = ctx.days_remaining_including_today as number;
-    const current = o.daily_budget_usd as number;
-    const baseline = o.baseline_daily_spend_usd as number;
-    const rawDelta = round2(current * (SCALE_MAX_INCREASE_PCT / 100));
-    const proposed = round2(Math.min(current + rawDelta, cap));
-    const delta = round2(proposed - current);
-    if (delta <= 0) {
-      actions.push({
-        kind: 'no_action', ad_ids: g.adIds, budget_object: { level: o.level, object_id: o.object_id },
-        current_daily_budget_usd: current, proposed_daily_budget_usd: null, delta_usd: null,
-        projected_baseline_remaining_usd: round2(baseline * days), projected_remaining_with_change_usd: null,
-        monthly_impact_usd: null, savings_claimed: false,
-        blockers: ['approved_client_daily_cap_reached'], requires_human_approval: true, inert: true,
-        rationale: `No increase: the owning ${o.level} is already at the approved client daily cap $${cap}.`,
-      });
-      continue;
-    }
-    const monthlyImpact = round2(delta * days);
-    const projectedBaseline = round2(baseline * days);
-    const projectedWith = round2(projectedBaseline + monthlyImpact);
-    if (headroom != null && monthlyImpact > headroom) {
-      actions.push({
-        kind: 'no_action', ad_ids: g.adIds, budget_object: { level: o.level, object_id: o.object_id },
-        current_daily_budget_usd: current, proposed_daily_budget_usd: null, delta_usd: null,
-        projected_baseline_remaining_usd: projectedBaseline, projected_remaining_with_change_usd: null,
-        monthly_impact_usd: null, savings_claimed: false,
-        blockers: ['monthly_headroom_insufficient'], requires_human_approval: true, inert: true,
-        rationale: `Increase withheld: +$${monthlyImpact} over the remaining ${days} day(s) exceeds remaining monthly headroom $${headroom}.`,
-      });
-      continue;
-    }
-    if (headroom != null) headroom = round2(headroom - monthlyImpact);
     actions.push({
-      kind: 'increase_object_daily_budget', ad_ids: g.adIds,
-      budget_object: { level: o.level, object_id: o.object_id },
-      current_daily_budget_usd: current, proposed_daily_budget_usd: proposed, delta_usd: delta,
-      projected_baseline_remaining_usd: projectedBaseline,
-      projected_remaining_with_change_usd: projectedWith,
-      monthly_impact_usd: monthlyImpact, savings_claimed: false, blockers: [],
+      kind: 'no_action', ad_ids: g.adIds,
+      budget_object: owner?.object_id ? { level: owner.level, object_id: owner.object_id } : null,
+      current_daily_budget_usd: null,
+      proposed_daily_budget_usd: null, delta_usd: null,
+      projected_baseline_remaining_usd: null, projected_remaining_with_change_usd: null,
+      monthly_impact_usd: null, savings_claimed: false, blockers: [...new Set(blockers)],
       requires_human_approval: true, inert: true,
-      rationale: `Single +${SCALE_MAX_INCREASE_PCT}% step on the owning ${o.level} (capped at the approved client daily cap $${cap}), no stacking. ${g.reason}`.trim(),
+      rationale: 'Scale candidate displayed for human review, but NO numeric budget proposal is produced: '
+        + 'the verified client-wide baseline spend and total current budget are not connected, so a safe increase '
+        + 'cannot be sized or checked against the monthly budget and the approved client daily cap. '
+        + [...new Set(blockers)].join(', ') + '.',
     });
   }
 
@@ -1128,6 +1100,7 @@ export function buildDraftActions(
   const monthly = round2(actions.reduce((s, a) => s + (a.monthly_impact_usd ?? 0), 0));
   return { actions, total_delta_usd: total, total_monthly_impact_usd: monthly, blocked: false };
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Creative briefs & client report                                     */
