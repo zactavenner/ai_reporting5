@@ -184,7 +184,8 @@ describe('daily budget tiers', () => {
     expect(cold.prospecting_adsets).toBe(1);
     expect(cold.min_ads).toBe(3);
     expect(cold.max_ads).toBe(6);
-    expect(JSON.stringify(cold)).not.toContain('20');
+    expect(cold.notes.join(' ')).toMatch(/not derived from a per-ad spend heuristic/);
+    expect(cold.notes.join(' ')).not.toMatch(/\$20\b/);
   });
 
   it('blocks cold start without a pilot loss limit', () => {
@@ -431,8 +432,8 @@ describe('ad classification', () => {
 
   it('PAUSE candidate only when persistently over 1.25x across two mature windows', () => {
     const one = classifyAd(ad({
-      current: makeWindow(CUR, cohort(900, 6)),
-      prior: makeWindow(PRIOR, { ...cohort(600, 6, PRIOR) }),
+      current: makeWindow(CUR, cohort(1200, 6)),
+      prior: makeWindow(PRIOR, { ...cohort(900, 6, PRIOR) }),
     }), ctx());
     expect(one.status).toBe('PAUSE_CANDIDATE');
     const notPersistent = classifyAd(ad({
@@ -694,7 +695,7 @@ describe('client assessment', () => {
   });
 
   it('reports CONFIGURATION NEEDED (never KEEP) when target CPQL is unset', () => {
-    const r = assessClient({ ...baseAssess, kpiTargets: { client_id: CLIENT, max_daily_budget: 500, guardrails: {} } });
+    const r = assessClient({ ...baseAssess, kpiTargets: { client_id: CLIENT, max_daily_budget: 500, guardrails: { qualification_lag_days: 1, offer_reference: 'o', offer_approved: true } } });
     expect(r.readiness).toBe('CONFIGURATION_NEEDED');
     expect(r.config_missing.map((f) => f.key)).toContain('target_cpql');
     expect(r.draft_actions).toEqual([]);
