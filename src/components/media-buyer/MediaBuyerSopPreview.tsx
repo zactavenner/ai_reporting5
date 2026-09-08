@@ -1,10 +1,11 @@
 /**
  * Capital Raising SOP — REVIEWABLE PREVIEW (read-only).
  *
- * This panel never calls the review endpoint: `media-buyer-sop-review` is
- * prepared in source but NOT deployed. Readiness is computed here from existing
- * read-only data through the SAME shared adapter the endpoint uses, so the two
- * cannot disagree.
+ * This panel never calls the review endpoint. The endpoint `media-buyer-sop-review`
+ * IS reachable, but authenticated per-client review and deployed-version
+ * verification are still pending, so nothing here is produced by it. Readiness is
+ * computed locally from existing read-only data through the SAME shared adapter the
+ * endpoint uses, so the two cannot disagree.
  *
  * Budgets shown are PER DAY. Illustrative calculator output is kept separate
  * from observed results and is never saved. No fake client data is rendered.
