@@ -30,7 +30,7 @@ import {
   todayInTz,
   addDays,
   buildOperatingInstructions,
-  type ClientReport,
+  type ClientSopReport,
   type Window,
 } from '@/lib/mediaBuyerSop';
 
@@ -106,7 +106,7 @@ export default function MediaBuyerSopPreview() {
   const [calcPilotLoss, setCalcPilotLoss] = useState('2000');
   const [calcLag, setCalcLag] = useState('3');
 
-  const reports = useMemo<ClientReport[]>(() => {
+  const reports = useMemo<ClientSopReport[]>(() => {
     if (!data) return [];
     const nowIso = new Date().toISOString();
     return data.clients.map((client) => {
@@ -170,7 +170,7 @@ export default function MediaBuyerSopPreview() {
           meta_ad_account_id: (client as { meta_ad_account_id?: string | null }).meta_ad_account_id ?? null,
           timezone,
         },
-        kpiTargets: targets,
+        kpiTargets: targets ? { ...targets, guardrails: (targets.guardrails ?? {}) as Record<string, unknown> } : null,
         currentWindow: buildWindow(curStart, curEnd),
         priorWindow: buildWindow(priorStart, priorEnd),
         tracking: null,
