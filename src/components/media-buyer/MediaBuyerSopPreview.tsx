@@ -1,10 +1,11 @@
 /**
  * Capital Raising SOP — REVIEWABLE PREVIEW (read-only).
  *
- * This panel never calls the review endpoint: `media-buyer-sop-review` is
- * prepared in source but NOT deployed. Readiness is computed here from existing
- * read-only data through the SAME shared adapter the endpoint uses, so the two
- * cannot disagree.
+ * This panel never calls the review endpoint. The endpoint `media-buyer-sop-review`
+ * IS reachable, but authenticated per-client review and deployed-version
+ * verification are still pending, so nothing here is produced by it. Readiness is
+ * computed locally from existing read-only data through the SAME shared adapter the
+ * endpoint uses, so the two cannot disagree.
  *
  * Budgets shown are PER DAY. Illustrative calculator output is kept separate
  * from observed results and is never saved. No fake client data is rendered.
@@ -105,14 +106,20 @@ export default function MediaBuyerSopPreview() {
     <div className="space-y-4">
       <Alert className="border-amber-500/40 bg-amber-500/10">
         <ShieldAlert className="h-4 w-4" />
-        <AlertTitle>Preview only — review endpoint is not deployed</AlertTitle>
+        <AlertTitle>
+          Review preview. Endpoint reachable; authenticated client review and deployed-version verification pending. New SOP
+          scheduler not activated. No Meta execution.
+        </AlertTitle>
         <AlertDescription className="text-xs leading-relaxed">
-          The SOP review service (<code>media-buyer-sop-review</code>) exists in source but has not been deployed, so nothing
-          below was produced by it and no run was started. Readiness is calculated here from existing read-only data using the
-          same shared read adapter. Runs in the other tabs came from the previous review logic and are <strong>not</strong>{' '}
-          evidence for this SOP. Nothing here pauses, scales or edits an ad, and no narrative model is called.
+          The review service (<code>media-buyer-sop-review</code>) answers requests, but no authenticated per-client review has
+          been proven and the deployed version is not confirmed to match this source, so nothing below was produced by it and no
+          run was started. Readiness is calculated here from existing read-only data using the same shared read adapter, with no
+          background calls to the endpoint. Runs in the other tabs came from the previous review logic and are <strong>not</strong>{' '}
+          evidence for this SOP. The existing four scheduled jobs are unchanged, nothing here pauses, scales or edits an ad, and
+          no narrative model is called.
         </AlertDescription>
       </Alert>
+
 
       <div className="flex items-center gap-2 flex-wrap">
         <Select value={selected} onValueChange={setSelected}>
