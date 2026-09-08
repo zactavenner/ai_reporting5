@@ -48,6 +48,8 @@ export interface BatchVideoConfig {
   avatarImageUrl?: string;
   avatarDescription?: string;
   offerDescription?: string;
+  /** Chosen opening image — used as the first frame of the first scene's video */
+  firstFrameImageUrl?: string;
   // Brand context
   brandColors?: string[];
   brandFonts?: string[];
