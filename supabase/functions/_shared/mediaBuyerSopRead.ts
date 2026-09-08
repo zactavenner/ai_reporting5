@@ -265,26 +265,50 @@ export async function loadClientSopReport(
   };
 
   const mtdRows = inRange(month.month_start, month.mtd_end);
-  const mtdDates = new Set(mtdRows.map(rowDate).filter((d): d is string => d !== null));
+  const mtdRowDates = mtdRows.map(rowDate).filter((d): d is string => d !== null);
+  const mtdDates = new Set(mtdRowDates);
+  let mtdUsable = !dailyErr && !dailyTruncated && !missingAccountLocalDates;
+  if (mtdDates.size !== mtdRowDates.length) {
+    sourceBlockers.push('month_to_date_duplicate_dates');
+    mtdUsable = false;
+  }
   if (month.mtd_expected_days > 0 && mtdDates.size !== month.mtd_expected_days) {
     sourceBlockers.push(`month_to_date_incomplete_${mtdDates.size}_of_${month.mtd_expected_days}_days`);
+    mtdUsable = false;
   }
   if (month.mtd_expected_days > 0 && daysBetween(month.month_start, month.mtd_end) + 1 !== month.mtd_expected_days) {
     sourceBlockers.push('month_to_date_range_inconsistent');
+    mtdUsable = false;
   }
+
+  // An incomplete, duplicated, truncated or errored month must never surface a
+  // partial sum as if it were valid pacing — it is reported as unavailable.
+  const mtdSpendUsd = mtdUsable ? sumStrict(mtdRows, 'ad_spend') : null;
+  const commitmentsUsd = mtdUsable ? sumStrict(mtdRows, 'commitment_dollars') : null;
+
+  // daily_metrics.funded_dollars has NOT been reconciled to cleared receipts, so
+  // it is never presented as cleared capital. It is surfaced separately as a
+  // reported, unverified figure, and only when the month is usable.
+  const reportedFundingMtdUsd = mtdUsable ? sumStrict(mtdRows, 'funded_dollars') : null;
+  gaps.push('daily_metrics.funded_dollars is reported funding that has not been reconciled to cleared receipts — it is shown as unverified and never counted as cleared capital.');
 
   const report = assessClient(buildAssessInput({
     client, timezone, kpiTargets, nowIso, month,
     expectedCurrent, expectedPrior,
     currentWindow: buildWindow(curStart, curEnd),
     priorWindow: buildWindow(priorStart, priorEnd),
-    mtdSpendUsd: sumStrict(mtdRows, 'ad_spend'),
-    funded: sumStrict(mtdRows, 'funded_dollars'),
-    commitments: sumStrict(mtdRows, 'commitment_dollars'),
+    mtdSpendUsd,
+    funded: null,
+    commitments: commitmentsUsd,
     adAccountVerified, sourceBlockers, gaps,
   }));
 
-  return { report, fatal: null, timezone, month, expectedCurrent, expectedPrior, source_blockers: sourceBlockers, connection_gaps: gaps };
+  return {
+    report, fatal: null, timezone, month, expectedCurrent, expectedPrior,
+    source_blockers: sourceBlockers, connection_gaps: gaps,
+    month_to_date_usable: mtdUsable,
+    reported_funding_mtd_usd_unverified: reportedFundingMtdUsd,
+  };
 }
 
 function buildAssessInput(args: {
