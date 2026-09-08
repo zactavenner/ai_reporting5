@@ -34,6 +34,7 @@
     "supabase/functions/_shared/linqDelivery.ts",
     "supabase/functions/_shared/mediaBuyerSop.ts",
     "supabase/functions/_shared/mediaBuyerSopRead.ts",
-    "supabase/functions/_shared/mediaBuyerSopRequest.ts"
+    "supabase/functions/_shared/mediaBuyerSopRequest.ts",
+    "supabase/functions/_shared/mediaBuyerSopReview.ts"
   ]
 }
