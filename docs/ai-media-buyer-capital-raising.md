@@ -24,8 +24,8 @@ applies manually.
 | --- | --- | --- |
 | Deterministic rules (authoritative) | `supabase/functions/_shared/mediaBuyerSop.ts` | Pure functions: budget tiers, cold start, test duration, evidence validation, classification, pacing, draft actions, creative briefs, operating instructions, narrator prompt. No network, no Deno APIs. |
 | Frontend re-export | `src/lib/mediaBuyerSop.ts` | Re-exports the same module so UI, edge function and tests evaluate identical logic. |
-| Review endpoint (prepared, undeployed) | `supabase/functions/media-buyer-sop-review/index.ts` | One client per request, read-only, authorization before any privileged read. |
-| Read-only preview UI | `src/components/media-buyer/MediaBuyerSopPreview.tsx` (tab on `src/pages/MediaBuyerPage.tsx`) | Calculates readiness locally from existing data. Never calls the undeployed endpoint. |
+| Review endpoint (reachable; authenticated review pending) | `supabase/functions/media-buyer-sop-review/index.ts` | One client per request, read-only, authorization before any privileged read. |
+| Read-only preview UI | `src/components/media-buyer/MediaBuyerSopPreview.tsx` (tab on `src/pages/MediaBuyerPage.tsx`) | Calculates readiness locally from existing data. Never calls the endpoint, on load or in the background. |
 | Tests | `src/test/media-buyer-sop.test.ts` | 46 tests. `npx vitest run src/test/media-buyer-sop.test.ts` |
 
 ## Platform roles
@@ -120,7 +120,7 @@ Until both exist, readiness cannot reach READY and no spend proposal is produced
 
 | | Preview (now) | Live (after cutover) |
 | --- | --- | --- |
-| Endpoint | source only, undeployed | deployed, operator-authenticated |
+| Endpoint | reachable; authenticated per-client review and deployed-version verification pending | verified deployed build, operator-authenticated per client |
 | Trigger | none; UI computes locally | existing media-buyer cron, SOP mode |
 | Writes | none | still none in review mode |
 | Actions | inert JSON | human-applied after review |
@@ -132,7 +132,7 @@ Until both exist, readiness cannot reach READY and no spend proposal is produced
 | `supabase/functions/_shared/mediaBuyerSop.ts` | Pure SOP rules (daily budget tiers, cold start, evidence validation, classification, pacing, inert draft actions, briefs, exportable instructions) | source only |
 | `supabase/functions/_shared/mediaBuyerSopRead.ts` | Shared read adapter — whitelisted columns, truncation detection on every source, timezone resolution, window/MTD construction | source only |
 | `supabase/functions/_shared/mediaBuyerSopRequest.ts` | POST-only / malformed-JSON / client_id contract | source only |
-| `supabase/functions/media-buyer-sop-review/index.ts` | Review endpoint, authorization before any privileged read, one client per request | **not deployed** |
+| `supabase/functions/media-buyer-sop-review/index.ts` | Review endpoint, authorization before any privileged read, one client per request | reachable; deployed version not verified against this source |
 | `src/components/media-buyer/MediaBuyerSopPreview.tsx` | Read-only preview tab; never calls the endpoint | in app |
 | `src/test/media-buyer-sop.test.ts` | 79 tests | passing |
 
