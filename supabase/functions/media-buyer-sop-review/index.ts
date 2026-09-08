@@ -20,6 +20,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.58.0';
 import { authorizeOperator } from '../_shared/operatorAuth.ts';
 import { loadClientSopReport } from '../_shared/mediaBuyerSopRead.ts';
+import { validateClientId, validateRequestShape } from '../_shared/mediaBuyerSopRequest.ts';
 import { SOP_NARRATOR_SYSTEM_PROMPT, buildOperatingInstructions } from '../_shared/mediaBuyerSop.ts';
 
 const corsHeaders = {
@@ -33,25 +34,6 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
-}
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** Exported for tests: request-shape validation with no side effects. */
-export function validateRequestShape(method: string, rawBody: string): { ok: true; body: Record<string, unknown> } | { ok: false; status: number; error: string; code: string } {
-  if (method === 'OPTIONS') return { ok: false, status: 204, error: 'preflight', code: 'preflight' };
-  if (method !== 'POST') return { ok: false, status: 405, error: 'Method not allowed — POST only', code: 'method_not_allowed' };
-  if (!rawBody.trim()) return { ok: false, status: 400, error: 'Request body required', code: 'missing_body' };
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(rawBody);
-  } catch {
-    return { ok: false, status: 400, error: 'Malformed JSON body', code: 'malformed_json' };
-  }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    return { ok: false, status: 400, error: 'Body must be a JSON object', code: 'malformed_json' };
-  }
-  return { ok: true, body: parsed as Record<string, unknown> };
 }
 
 Deno.serve(async (req) => {
@@ -81,10 +63,9 @@ Deno.serve(async (req) => {
     });
   }
 
-  const clientId = typeof body.client_id === 'string' ? body.client_id.trim() : '';
-  if (!clientId || !UUID_RE.test(clientId)) {
-    return json({ success: false, error: 'client_id (uuid) is required — this endpoint has no portfolio mode', code: 'client_id_required' }, 400);
-  }
+  const idCheck = validateClientId(body.client_id);
+  if (!idCheck.ok) return json({ success: false, error: idCheck.error, code: idCheck.code }, 400);
+  const clientId = idCheck.clientId;
   // Client-scoped identities may only read their own client. Service/scheduler
   // callers must still authenticate explicitly (handled by authorizeOperator).
   const scopedClientId = typeof (auth as { clientId?: string }).clientId === 'string' ? (auth as { clientId?: string }).clientId : null;
