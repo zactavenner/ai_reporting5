@@ -71,16 +71,17 @@ export function useBatchVideo() {
   }, []);
 
   // Initialize scenes from segments
-  const initializeScenes = useCallback((visualType: 'avatar' | 'broll' | 'mixed', avatarId?: string, avatarImageUrl?: string) => {
+  const initializeScenes = useCallback((visualType: 'avatar' | 'broll' | 'mixed', avatarId?: string, avatarImageUrl?: string, firstFrameImageUrl?: string) => {
     setState(prev => {
-      const scenes: BatchVideoScene[] = prev.segments.map(segment => ({
+      const scenes: BatchVideoScene[] = prev.segments.map((segment, i) => ({
         id: `scene-${segment.id}`,
         order: segment.order,
         segment,
         visualType,
         avatarId,
         avatarImageUrl,
-        status: 'pending',
+        status: i === 0 && firstFrameImageUrl ? 'image_completed' : 'pending',
+        generatedImageUrl: i === 0 && firstFrameImageUrl ? firstFrameImageUrl : undefined,
         // For mixed mode, default to avatar if available
         useAvatar: visualType === 'mixed' ? !!avatarId : visualType === 'avatar',
       }));
@@ -93,6 +94,7 @@ export function useBatchVideo() {
           visualType,
           avatarId,
           avatarImageUrl,
+          firstFrameImageUrl,
         },
       };
     });

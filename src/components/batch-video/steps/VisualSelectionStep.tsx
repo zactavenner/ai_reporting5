@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, ArrowRight, User, Film, Check, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, User, Film, Check, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { FirstFrameDialog } from '../FirstFrameDialog';
 import { useAllAvatars } from '@/hooks/useAvatars';
 import { cn } from '@/lib/utils';
 import type { VoiceTone, BackgroundStyle, VisualQuality } from '@/types/batch-video';
@@ -43,12 +44,21 @@ interface VisualSelectionStepProps {
     speakingPace?: number,
     backgroundStyle?: BackgroundStyle,
     visualQuality?: VisualQuality,
+    firstFrameImageUrl?: string,
   ) => void;
   onBack: () => void;
   defaultAspectRatio?: '16:9' | '9:16' | '1:1';
+  scriptContent?: string;
+  clientId?: string;
+  projectId?: string;
+  offerDescription?: string;
 }
 
-export function VisualSelectionStep({ onComplete, onBack, defaultAspectRatio }: VisualSelectionStepProps) {
+export function VisualSelectionStep({
+  onComplete, onBack, defaultAspectRatio, scriptContent, clientId, projectId, offerDescription,
+}: VisualSelectionStepProps) {
+  const [firstFrameOpen, setFirstFrameOpen] = useState(false);
+  const [firstFrameUrl, setFirstFrameUrl] = useState<string | undefined>(undefined);
   const [visualType, setVisualType] = useState<'avatar' | 'broll' | 'mixed'>('avatar');
   const [selectedAvatarId, setSelectedAvatarId] = useState('');
   const [selectedRatio, setSelectedRatio] = useState<'16:9' | '9:16' | '1:1'>(defaultAspectRatio || '16:9');
@@ -75,7 +85,7 @@ export function VisualSelectionStep({ onComplete, onBack, defaultAspectRatio }: 
       needsAvatar ? selectedAvatarId : undefined,
       needsAvatar ? selectedAvatar?.image_url : undefined,
       needsAvatar ? avatarDescription : undefined,
-      voiceTone, speakingPace, backgroundStyle, visualQuality,
+      voiceTone, speakingPace, backgroundStyle, visualQuality, firstFrameUrl,
     );
   };
 
@@ -231,6 +241,46 @@ export function VisualSelectionStep({ onComplete, onBack, defaultAspectRatio }: 
             )}
           </div>
         </div>
+
+        {/* Opening frame */}
+        <div className="flex items-center gap-3 p-3 border border-dashed border-border rounded-lg">
+          {firstFrameUrl ? (
+            <img src={firstFrameUrl} alt="Chosen opening frame" className="h-14 w-24 rounded-md object-cover border" />
+          ) : (
+            <div className="h-14 w-24 rounded-md bg-muted grid place-items-center">
+              <ImageIcon className="h-4 w-4 text-muted-foreground" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">Opening frame {firstFrameUrl ? '— selected' : '(optional)'}</p>
+            <p className="text-xs text-muted-foreground">
+              {selectedAvatar
+                ? 'Built from the script, this avatar and the style you picked.'
+                : 'No avatar picked — a new presenter is created from your prompt.'}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => setFirstFrameOpen(true)}>
+            <ImageIcon className="h-4 w-4" />{firstFrameUrl ? 'Change' : 'Generate first frame'}
+          </Button>
+        </div>
+
+        <FirstFrameDialog
+          open={firstFrameOpen}
+          onOpenChange={setFirstFrameOpen}
+          scriptContent={scriptContent}
+          avatarImageUrl={needsAvatar ? selectedAvatar?.image_url : undefined}
+          avatarDescription={selectedAvatar
+            ? `${selectedAvatar.name}${selectedAvatar.gender ? `, ${selectedAvatar.gender}` : ''}${selectedAvatar.age_range ? `, ${selectedAvatar.age_range}` : ''}${selectedAvatar.description ? `. ${selectedAvatar.description}` : ''}`
+            : undefined}
+          backgroundStyle={backgroundStyle}
+          visualQuality={visualQuality}
+          aspectRatio={selectedRatio}
+          clientId={clientId}
+          projectId={projectId}
+          offerDescription={offerDescription}
+          selectedUrl={firstFrameUrl}
+          onSelect={setFirstFrameUrl}
+        />
 
         {/* Navigation */}
         <div className="flex justify-between pt-4">
