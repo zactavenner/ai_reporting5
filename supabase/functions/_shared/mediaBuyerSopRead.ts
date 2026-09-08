@@ -228,6 +228,11 @@ export async function loadClientSopReport(
   if (adList.some((a) => a.client_id !== clientId)) sourceBlockers.push('meta_ads_returned_foreign_client_rows');
   if (adList.length) gaps.push(`${adList.length} ad row(s) exist for this client but cannot be assessed without per-day ad metrics.`);
 
+  // Account-local dates are what every window is expressed in. A row without one
+  // cannot be placed in the client's day, so it blocks rather than being guessed.
+  const missingAccountLocalDates = daily.some((r) => !(typeof r.date_account_tz === 'string' && r.date_account_tz.length >= 10));
+  if (missingAccountLocalDates) sourceBlockers.push('daily_metrics_missing_account_local_dates');
+
   const inRange = (from: string, to: string) =>
     daily.filter((r) => {
       const d = rowDate(r);
