@@ -160,7 +160,8 @@ export function computeTestDays(
 
 export interface TimezoneResolution {
   timezone: string | null;
-  source: 'meta_ad_account' | 'client_report_setting' | null;
+  /** Only the verified Meta ad account can supply a timezone. */
+  source: 'meta_ad_account' | null;
   blockers: string[];
   notes: string[];
 }
