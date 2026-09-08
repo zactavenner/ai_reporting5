@@ -10,6 +10,8 @@ import { Loader2, TrendingUp, RefreshCw } from "lucide-react";
 import { useClients } from "@/hooks/useClients";
 import ReactMarkdown from "react-markdown";
 import { formatDistanceToNow } from "date-fns";
+import MediaBuyerSopPreview from "@/components/media-buyer/MediaBuyerSopPreview";
+
 
 type RunType = "account_audit" | "daily_review" | "weekly_review" | "creative_intel" | "fatigue_scan" | "pixel_audit" | "launch_plan";
 
@@ -147,12 +149,19 @@ export default function MediaBuyerPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="board" className="space-y-4">
+      <Tabs defaultValue="sop" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="board">Classifications</TabsTrigger>
+          <TabsTrigger value="sop">Capital Raising SOP (preview)</TabsTrigger>
+          <TabsTrigger value="board">Classifications (legacy)</TabsTrigger>
           <TabsTrigger value="intel">Creative Intel</TabsTrigger>
-          <TabsTrigger value="history">Run History</TabsTrigger>
+          <TabsTrigger value="history">Run History (legacy)</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="sop">
+          <MediaBuyerSopPreview />
+        </TabsContent>
+
+
 
         <TabsContent value="board" className="space-y-3">
           {classifications.length === 0 ? (
