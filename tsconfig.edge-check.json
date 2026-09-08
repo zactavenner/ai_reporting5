@@ -31,6 +31,9 @@
     "supabase/functions/_shared/meetgeekReplayInvoke.ts",
     "supabase/functions/_shared/generationAuth.ts",
     "supabase/functions/_shared/linqBridge.ts",
-    "supabase/functions/_shared/linqDelivery.ts"
+    "supabase/functions/_shared/linqDelivery.ts",
+    "supabase/functions/_shared/mediaBuyerSop.ts",
+    "supabase/functions/_shared/mediaBuyerSopRead.ts",
+    "supabase/functions/_shared/mediaBuyerSopRequest.ts"
   ]
 }

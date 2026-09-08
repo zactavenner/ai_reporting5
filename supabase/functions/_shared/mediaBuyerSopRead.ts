@@ -91,6 +91,13 @@ export interface LoadedClientSop {
   expectedPrior: { start: string; end: string } | null;
   source_blockers: string[];
   connection_gaps: string[];
+  /** False when the month's data is incomplete/duplicated/truncated/errored. */
+  month_to_date_usable?: boolean;
+  /**
+   * Reported funding for the month from daily_metrics.funded_dollars. NOT
+   * reconciled to cleared receipts, so it is never cleared capital.
+   */
+  reported_funding_mtd_usd_unverified?: number | null;
 }
 
 /** Normalizes `act_123` / `123` to the stored ad_account_id form. */
@@ -120,12 +127,14 @@ export async function loadClientSopReport(
     return {
       report: null, fatal: 'client_read_failed', timezone: { timezone: null, source: null, blockers: ['timezone_unresolved'], notes: [] },
       month: null, expectedCurrent: null, expectedPrior: null, source_blockers: ['clients_read_failed'], connection_gaps: gaps,
+      month_to_date_usable: false, reported_funding_mtd_usd_unverified: null,
     };
   }
   if (!client) {
     return {
       report: null, fatal: 'client_not_found', timezone: { timezone: null, source: null, blockers: ['timezone_unresolved'], notes: [] },
       month: null, expectedCurrent: null, expectedPrior: null, source_blockers: [], connection_gaps: gaps,
+      month_to_date_usable: false, reported_funding_mtd_usd_unverified: null,
     };
   }
 
@@ -185,7 +194,11 @@ export async function loadClientSopReport(
       mtdSpendUsd: null, funded: null, commitments: null,
       adAccountVerified, sourceBlockers, gaps,
     }));
-    return { report, fatal: null, timezone, month: null, expectedCurrent: null, expectedPrior: null, source_blockers: sourceBlockers, connection_gaps: gaps };
+    return {
+      report, fatal: null, timezone, month: null, expectedCurrent: null, expectedPrior: null,
+      source_blockers: sourceBlockers, connection_gaps: gaps,
+      month_to_date_usable: false, reported_funding_mtd_usd_unverified: null,
+    };
   }
 
   const today = todayInTz(nowIso, timezone.timezone);
@@ -228,6 +241,11 @@ export async function loadClientSopReport(
   if (adList.some((a) => a.client_id !== clientId)) sourceBlockers.push('meta_ads_returned_foreign_client_rows');
   if (adList.length) gaps.push(`${adList.length} ad row(s) exist for this client but cannot be assessed without per-day ad metrics.`);
 
+  // Account-local dates are what every window is expressed in. A row without one
+  // cannot be placed in the client's day, so it blocks rather than being guessed.
+  const missingAccountLocalDates = daily.some((r) => !(typeof r.date_account_tz === 'string' && r.date_account_tz.length >= 10));
+  if (missingAccountLocalDates) sourceBlockers.push('daily_metrics_missing_account_local_dates');
+
   const inRange = (from: string, to: string) =>
     daily.filter((r) => {
       const d = rowDate(r);
@@ -253,33 +271,57 @@ export async function loadClientSopReport(
       frequency: UNAVAILABLE_FREQUENCY,
       // No matured acquisition cohort source exists — never synthesised.
       matured_cohort: null,
-      source_complete: !dailyErr && !dailyTruncated && unique.size === expectedLen && unique.size === dates.length,
+      source_complete: !dailyErr && !dailyTruncated && !missingAccountLocalDates && unique.size === expectedLen && unique.size === dates.length,
       source_error: dailyErr ? 'daily_metrics_read_failed' : null,
       truncated: dailyTruncated,
     };
   };
 
   const mtdRows = inRange(month.month_start, month.mtd_end);
-  const mtdDates = new Set(mtdRows.map(rowDate).filter((d): d is string => d !== null));
+  const mtdRowDates = mtdRows.map(rowDate).filter((d): d is string => d !== null);
+  const mtdDates = new Set(mtdRowDates);
+  let mtdUsable = !dailyErr && !dailyTruncated && !missingAccountLocalDates;
+  if (mtdDates.size !== mtdRowDates.length) {
+    sourceBlockers.push('month_to_date_duplicate_dates');
+    mtdUsable = false;
+  }
   if (month.mtd_expected_days > 0 && mtdDates.size !== month.mtd_expected_days) {
     sourceBlockers.push(`month_to_date_incomplete_${mtdDates.size}_of_${month.mtd_expected_days}_days`);
+    mtdUsable = false;
   }
   if (month.mtd_expected_days > 0 && daysBetween(month.month_start, month.mtd_end) + 1 !== month.mtd_expected_days) {
     sourceBlockers.push('month_to_date_range_inconsistent');
+    mtdUsable = false;
   }
+
+  // An incomplete, duplicated, truncated or errored month must never surface a
+  // partial sum as if it were valid pacing — it is reported as unavailable.
+  const mtdSpendUsd = mtdUsable ? sumStrict(mtdRows, 'ad_spend') : null;
+  const commitmentsUsd = mtdUsable ? sumStrict(mtdRows, 'commitment_dollars') : null;
+
+  // daily_metrics.funded_dollars has NOT been reconciled to cleared receipts, so
+  // it is never presented as cleared capital. It is surfaced separately as a
+  // reported, unverified figure, and only when the month is usable.
+  const reportedFundingMtdUsd = mtdUsable ? sumStrict(mtdRows, 'funded_dollars') : null;
+  gaps.push('daily_metrics.funded_dollars is reported funding that has not been reconciled to cleared receipts — it is shown as unverified and never counted as cleared capital.');
 
   const report = assessClient(buildAssessInput({
     client, timezone, kpiTargets, nowIso, month,
     expectedCurrent, expectedPrior,
     currentWindow: buildWindow(curStart, curEnd),
     priorWindow: buildWindow(priorStart, priorEnd),
-    mtdSpendUsd: sumStrict(mtdRows, 'ad_spend'),
-    funded: sumStrict(mtdRows, 'funded_dollars'),
-    commitments: sumStrict(mtdRows, 'commitment_dollars'),
+    mtdSpendUsd,
+    funded: null,
+    commitments: commitmentsUsd,
     adAccountVerified, sourceBlockers, gaps,
   }));
 
-  return { report, fatal: null, timezone, month, expectedCurrent, expectedPrior, source_blockers: sourceBlockers, connection_gaps: gaps };
+  return {
+    report, fatal: null, timezone, month, expectedCurrent, expectedPrior,
+    source_blockers: sourceBlockers, connection_gaps: gaps,
+    month_to_date_usable: mtdUsable,
+    reported_funding_mtd_usd_unverified: reportedFundingMtdUsd,
+  };
 }
 
 function buildAssessInput(args: {

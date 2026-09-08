@@ -118,3 +118,42 @@ Until both exist, readiness cannot reach READY and no spend proposal is produced
 | Trigger | none; UI computes locally | existing media-buyer cron, SOP mode |
 | Writes | none | still none in review mode |
 | Actions | inert JSON | human-applied after review |
+
+## Source files (preview state)
+
+| File | Role | State |
+| --- | --- | --- |
+| `supabase/functions/_shared/mediaBuyerSop.ts` | Pure SOP rules (daily budget tiers, cold start, evidence validation, classification, pacing, inert draft actions, briefs, exportable instructions) | source only |
+| `supabase/functions/_shared/mediaBuyerSopRead.ts` | Shared read adapter — whitelisted columns, truncation detection on every source, timezone resolution, window/MTD construction | source only |
+| `supabase/functions/_shared/mediaBuyerSopRequest.ts` | POST-only / malformed-JSON / client_id contract | source only |
+| `supabase/functions/media-buyer-sop-review/index.ts` | Review endpoint, authorization before any privileged read, one client per request | **not deployed** |
+| `src/components/media-buyer/MediaBuyerSopPreview.tsx` | Read-only preview tab; never calls the endpoint | in app |
+| `src/test/media-buyer-sop.test.ts` | 79 tests | passing |
+
+## Budgets are per day
+
+All tier figures are DAILY ad spend: 200 → 160/40/0, 300 → 210/60/30, 500 → 350/100/50, 1000 → 700/200/100. Any other daily
+budget reports `custom_daily_budget_requires_custom_plan` — it is never floored to a lower tier. Weekly creative delivery is
+N net-new concepts plus M variants **in total** (4/5/6/8 prepared assets), and prepared assets are inventory, not a launch quota.
+
+## Data honesty rules enforced in the adapter
+
+- Timezone comes only from a verified bound `meta_ad_accounts.timezone_name` or `client_settings.stats_report_timezone`. With
+  neither, nothing is dated and the client is DATA BLOCKED.
+- Rows missing an account-local date block; nulls, NaN and negatives never sum to zero.
+- Month-to-date spans the first of the month through yesterday. If that range is incomplete, duplicated, truncated or errored,
+  month-to-date spend and commitments are reported **unavailable** rather than as a partial sum.
+- `daily_metrics.funded_dollars` is unreconciled reported funding. It is shown separately as unverified and is never passed as
+  cleared capital.
+- `meta_ads` holds lifetime aggregates with no per-day rows and no budget column, so per-ad windows, budget owners and change
+  history are unavailable — which is why no numeric scale proposal can be produced yet.
+
+## Remaining deployment steps (none performed)
+
+1. Add `[functions.media-buyer-sop-review] verify_jwt = false` to `supabase/config.toml`.
+2. Deploy only `media-buyer-sop-review`.
+3. Populate the guardrail keys per client (`target_cpql` first — 23 rows exist and none has one).
+4. Connect the matured qualified-lead cohort source and the tracking freshness/coverage source; without them no client can be Ready.
+5. Verify per client as a signed-in agency admin.
+6. Only then point the EXISTING media-buyer cron at SOP mode. Do not add a second schedule; keep the job's lease/idempotency and
+   reconcile behaviour as documented above.
