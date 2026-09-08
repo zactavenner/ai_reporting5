@@ -223,18 +223,21 @@ export default function MediaBuyerSopPreview() {
                 <Badge variant="outline" className={`text-[10px] ${READINESS_TONE[report.readiness]}`}>{READINESS_LABEL[report.readiness]}</Badge>
                 <span className="font-medium text-sm">{report.client_name}</span>
                 <span className="text-muted-foreground">
-                  Timezone {report.timezone ?? 'unresolved'}{report.timezone_source ? ` (from ${report.timezone_source.replace(/_/g, ' ')})` : ''}
+                  Timezone {report.timezone ?? 'unresolved — the ad account timezone is required'}{report.timezone_source ? ` (from ${report.timezone_source.replace(/_/g, ' ')})` : ''}
                 </span>
               </div>
 
               <div>
-                <div className="font-semibold mb-1">Evidence windows (client timezone, current day excluded)</div>
+                <div className="font-semibold mb-1">Evidence windows (ad account timezone, current day excluded)</div>
                 {report.windows.current && report.windows.prior ? (
                   <div className="text-muted-foreground">
                     Current {report.windows.current.start} → {report.windows.current.end} · prior {report.windows.prior.start} → {report.windows.prior.end}
                   </div>
                 ) : (
-                  <div className="text-muted-foreground">Not calculated — the timezone could not be resolved, so no dates are derived.</div>
+                  <div className="text-muted-foreground">
+                    Not calculated — the ad account's own timezone is not available, so no dates are derived. A client
+                    reporting timezone is never used in its place, because it can differ from the ad account.
+                  </div>
                 )}
               </div>
 
@@ -305,10 +308,14 @@ export default function MediaBuyerSopPreview() {
 
               <div>
                 <div className="font-semibold mb-1">Draft actions (inert — recommendations only)</div>
+                <div className="text-muted-foreground mb-1">
+                  Budget-change numbers are switched off in this preview: the verified account-wide baseline spend and total
+                  current budget are not connected, so no increase can be sized safely. Scale candidates are still shown for
+                  a person to judge. Pausing an ad never claims a saving, because a shared budget can move that spend elsewhere.
+                </div>
                 {report.draft_actions.length === 0 ? (
                   <div className="text-muted-foreground">
-                    No action proposals. Nothing can be proposed while data is blocked or configuration is missing, and no
-                    numeric budget change is possible without a verified campaign/ad set budget owner, baseline and change history.
+                    No action proposals. Nothing can be proposed while data is blocked or configuration is missing.
                   </div>
                 ) : (
                   <pre className="bg-muted/50 rounded p-2 overflow-x-auto text-[10px]">{JSON.stringify(report.draft_actions, null, 2)}</pre>
