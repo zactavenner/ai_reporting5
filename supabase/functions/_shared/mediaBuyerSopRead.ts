@@ -258,7 +258,7 @@ export async function loadClientSopReport(
       frequency: UNAVAILABLE_FREQUENCY,
       // No matured acquisition cohort source exists — never synthesised.
       matured_cohort: null,
-      source_complete: !dailyErr && !dailyTruncated && unique.size === expectedLen && unique.size === dates.length,
+      source_complete: !dailyErr && !dailyTruncated && !missingAccountLocalDates && unique.size === expectedLen && unique.size === dates.length,
       source_error: dailyErr ? 'daily_metrics_read_failed' : null,
       truncated: dailyTruncated,
     };
