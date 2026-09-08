@@ -744,7 +744,8 @@ describe('review endpoint request contract', () => {
     for (const m of ['GET', 'PUT', 'DELETE', 'PATCH']) {
       const r = validateRequestShape(m, '{}');
       expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.status).toBe(405);
+      if (r.ok) continue;
+      expect(r.status).toBe(405);
     }
   });
 
@@ -752,7 +753,8 @@ describe('review endpoint request contract', () => {
     for (const b of ['{oops', '[]', '"str"', '']) {
       const r = validateRequestShape('POST', b);
       expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.status).toBe(400);
+      if (r.ok) continue;
+      expect(r.status).toBe(400);
     }
   });
 
