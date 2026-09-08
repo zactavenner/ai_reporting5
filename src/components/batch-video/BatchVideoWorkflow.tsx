@@ -66,9 +66,10 @@ export function BatchVideoWorkflow({ projectId: propProjectId, clientId: propCli
     avatarId?: string, avatarImageUrl?: string, avatarDescription?: string,
     voiceTone?: VoiceTone, speakingPace?: number,
     backgroundStyle?: BackgroundStyle, visualQuality?: VisualQuality,
+    firstFrameImageUrl?: string,
   ) => {
-    updateConfig({ visualType, aspectRatio, avatarId, avatarImageUrl, avatarDescription, voiceTone, speakingPace, backgroundStyle, visualQuality });
-    initializeScenes(visualType, avatarId, avatarImageUrl);
+    updateConfig({ visualType, aspectRatio, avatarId, avatarImageUrl, avatarDescription, voiceTone, speakingPace, backgroundStyle, visualQuality, firstFrameImageUrl });
+    initializeScenes(visualType, avatarId, avatarImageUrl, firstFrameImageUrl);
     setStep('scenes');
   };
 
@@ -186,6 +187,10 @@ export function BatchVideoWorkflow({ projectId: propProjectId, clientId: propCli
                 onComplete={handleVisualComplete}
                 onBack={handleBack}
                 defaultAspectRatio={state.config.aspectRatio}
+                scriptContent={state.config.scriptContent}
+                clientId={state.config.clientId}
+                projectId={state.config.projectId}
+                offerDescription={state.config.offerDescription}
               />
             )}
             {state.step === 'scenes' && (
