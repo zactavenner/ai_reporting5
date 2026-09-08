@@ -10,6 +10,8 @@ import { Loader2, TrendingUp, RefreshCw } from "lucide-react";
 import { useClients } from "@/hooks/useClients";
 import ReactMarkdown from "react-markdown";
 import { formatDistanceToNow } from "date-fns";
+import MediaBuyerSopPreview from "@/components/media-buyer/MediaBuyerSopPreview";
+
 
 type RunType = "account_audit" | "daily_review" | "weekly_review" | "creative_intel" | "fatigue_scan" | "pixel_audit" | "launch_plan";
 
