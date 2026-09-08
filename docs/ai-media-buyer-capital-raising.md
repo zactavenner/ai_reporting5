@@ -3,11 +3,17 @@
 This document describes an upgrade of the **existing** Media Buyer agent for Zac's
 capital-raising agency. No new agent record, app or database was created.
 
-**Current state: PREVIEW.** The rules module and the review endpoint exist in
-source only. `media-buyer-sop-review` is **not deployed**, no migration was
-applied, no agent/cron/config record was changed, no notification was sent, no
-Meta write was made and the frontend was not published. The live
-`media-buyer-agent` function and its existing schedules are untouched.
+**Current state: Review preview. Endpoint reachable; authenticated client review
+and deployed-version verification pending. New SOP scheduler not activated. No
+Meta execution.** The `media-buyer-sop-review` endpoint answers requests (GET →
+405 `method_not_allowed`, malformed POST → 400 `malformed_json`, unauthenticated
+POST → 401 `missing_token`), but it is **not** claimed that the deployed build
+matches the latest source, and no authenticated per-client review has been
+proven. No migration was applied, no agent/cron/config record was changed, no
+notification was sent, no Meta write was made and the frontend was not
+published. Build authorization did not include live spend: the existing four
+cron jobs remain unchanged and the live `media-buyer-agent` function and its
+schedules are untouched.
 
 This agent is **not autonomous**. Every output is a recommendation that a human
 applies manually.
