@@ -325,8 +325,16 @@ export default function MediaBuyerSopPreview() {
                 <ul className="text-muted-foreground list-disc pl-4">{report.next_checks.map((n) => <li key={n}>{n}</li>)}</ul>
               </div>
 
-              <div className="text-muted-foreground">
-                Cleared capital {money(report.capital.funded_cleared_usd)} · commitments {money(report.capital.commitments_usd)} — {report.capital.note}
+              <div className="text-muted-foreground space-y-1">
+                <div>
+                  Cleared capital {report.capital.funded_cleared_usd == null ? 'unavailable' : money(report.capital.funded_cleared_usd)} · commitments{' '}
+                  {report.capital.commitments_usd == null ? 'unavailable' : money(report.capital.commitments_usd)} — {report.capital.note}
+                </div>
+                <div>
+                  Reported funding this month (unverified, not reconciled to cleared receipts):{' '}
+                  {loaded?.reported_funding_mtd_usd_unverified == null ? 'unavailable' : money(loaded.reported_funding_mtd_usd_unverified)}
+                  {loaded?.month_to_date_usable === false ? ' — the month\u2019s daily records are incomplete, so month figures are withheld.' : ''}
+                </div>
               </div>
             </div>
           ) : null}

@@ -91,6 +91,13 @@ export interface LoadedClientSop {
   expectedPrior: { start: string; end: string } | null;
   source_blockers: string[];
   connection_gaps: string[];
+  /** False when the month's data is incomplete/duplicated/truncated/errored. */
+  month_to_date_usable?: boolean;
+  /**
+   * Reported funding for the month from daily_metrics.funded_dollars. NOT
+   * reconciled to cleared receipts, so it is never cleared capital.
+   */
+  reported_funding_mtd_usd_unverified?: number | null;
 }
 
 /** Normalizes `act_123` / `123` to the stored ad_account_id form. */
@@ -120,12 +127,14 @@ export async function loadClientSopReport(
     return {
       report: null, fatal: 'client_read_failed', timezone: { timezone: null, source: null, blockers: ['timezone_unresolved'], notes: [] },
       month: null, expectedCurrent: null, expectedPrior: null, source_blockers: ['clients_read_failed'], connection_gaps: gaps,
+      month_to_date_usable: false, reported_funding_mtd_usd_unverified: null,
     };
   }
   if (!client) {
     return {
       report: null, fatal: 'client_not_found', timezone: { timezone: null, source: null, blockers: ['timezone_unresolved'], notes: [] },
       month: null, expectedCurrent: null, expectedPrior: null, source_blockers: [], connection_gaps: gaps,
+      month_to_date_usable: false, reported_funding_mtd_usd_unverified: null,
     };
   }
 
@@ -185,7 +194,11 @@ export async function loadClientSopReport(
       mtdSpendUsd: null, funded: null, commitments: null,
       adAccountVerified, sourceBlockers, gaps,
     }));
-    return { report, fatal: null, timezone, month: null, expectedCurrent: null, expectedPrior: null, source_blockers: sourceBlockers, connection_gaps: gaps };
+    return {
+      report, fatal: null, timezone, month: null, expectedCurrent: null, expectedPrior: null,
+      source_blockers: sourceBlockers, connection_gaps: gaps,
+      month_to_date_usable: false, reported_funding_mtd_usd_unverified: null,
+    };
   }
 
   const today = todayInTz(nowIso, timezone.timezone);
