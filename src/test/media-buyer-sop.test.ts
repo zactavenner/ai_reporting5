@@ -744,8 +744,7 @@ describe('review endpoint request contract', () => {
     for (const m of ['GET', 'PUT', 'DELETE', 'PATCH']) {
       const r = validateRequestShape(m, '{}');
       expect(r.ok).toBe(false);
-      if (r.ok) continue;
-      expect(r.status).toBe(405);
+      expect(r).toMatchObject({ status: 405, code: 'method_not_allowed' });
     }
   });
 
@@ -753,8 +752,7 @@ describe('review endpoint request contract', () => {
     for (const b of ['{oops', '[]', '"str"', '']) {
       const r = validateRequestShape('POST', b);
       expect(r.ok).toBe(false);
-      if (r.ok) continue;
-      expect(r.status).toBe(400);
+      expect(r).toMatchObject({ status: 400 });
     }
   });
 
