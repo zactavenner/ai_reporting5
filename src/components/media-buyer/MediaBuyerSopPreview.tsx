@@ -106,7 +106,7 @@ export default function MediaBuyerSopPreview() {
   const [calcPilotLoss, setCalcPilotLoss] = useState('2000');
   const [calcLag, setCalcLag] = useState('3');
 
-  const reports = useMemo<ClientSopReport[]>(() => {
+  const rows = useMemo<Array<{ report: ClientSopReport; window: Window }>>(() => {
     if (!data) return [];
     const nowIso = new Date().toISOString();
     return data.clients.map((client) => {
@@ -162,7 +162,8 @@ export default function MediaBuyerSopPreview() {
       const [y, m] = today.split('-').map(Number);
       const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
 
-      return assessClient({
+      const currentWindow = buildWindow(curStart, curEnd);
+      const report = assessClient({
         client: {
           id: client.id,
           name: client.name,
@@ -171,7 +172,7 @@ export default function MediaBuyerSopPreview() {
           timezone,
         },
         kpiTargets: targets ? { ...targets, guardrails: (targets.guardrails ?? {}) as Record<string, unknown> } : null,
-        currentWindow: buildWindow(curStart, curEnd),
+        currentWindow,
         priorWindow: buildWindow(priorStart, priorEnd),
         tracking: null,
         ads: [],
@@ -184,8 +185,11 @@ export default function MediaBuyerSopPreview() {
         commitmentsUsd: sum(mtd, 'commitment_dollars'),
         nowIso,
       });
+      return { report, window: currentWindow };
     });
   }, [data]);
+
+  const reports = useMemo(() => rows.map((r) => r.report), [rows]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { READY: 0, CONFIGURATION_NEEDED: 0, DATA_BLOCKED: 0, INADEQUATE_EVIDENCE: 0 };
@@ -310,7 +314,7 @@ export default function MediaBuyerSopPreview() {
           ) : reports.length === 0 ? (
             <div className="text-sm text-muted-foreground p-4">No active clients found.</div>
           ) : (
-            reports.map((r) => (
+            rows.map(({ report: r, window: w }) => (
               <details key={r.client_id} className="border rounded-lg bg-card">
                 <summary className="cursor-pointer p-3 flex items-center gap-2 flex-wrap">
                   <Badge variant="outline" className={`text-[10px] ${READINESS_TONE[r.readiness]}`}>{READINESS_LABEL[r.readiness]}</Badge>
@@ -324,7 +328,7 @@ export default function MediaBuyerSopPreview() {
                   <div>
                     <div className="font-semibold mb-1">Evidence window (client timezone, current day excluded)</div>
                     <div className="text-muted-foreground">
-                      {r.window_summary.start_date} → {r.window_summary.end_date} · {r.window_summary.complete_days}/7 complete days
+                      {w.start_date} → {w.end_date} · {w.complete_days}/7 complete days
                     </div>
                   </div>
 
@@ -332,7 +336,7 @@ export default function MediaBuyerSopPreview() {
                     <div>
                       <div className="font-semibold mb-1">Missing configuration (with source field)</div>
                       <ul className="space-y-0.5 text-muted-foreground">
-                        {r.config_fields.filter((f) => f.value === null || f.value === undefined).map((f) => (
+                        {r.config_missing.map((f) => (
                           <li key={f.key}><span className="text-foreground">{f.key}</span> — not set at <code>{f.source_field}</code></li>
                         ))}
                       </ul>
@@ -351,7 +355,7 @@ export default function MediaBuyerSopPreview() {
                     <div className="text-muted-foreground">
                       {r.pacing.status === 'unknown'
                         ? 'Unknown — monthly media budget not configured.'
-                        : `MTD $${(r.pacing.mtd_spend_usd ?? 0).toFixed(0)} of $${(r.pacing.monthly_budget_usd ?? 0).toFixed(0)} · implied daily $${(r.pacing.implied_daily_usd ?? 0).toFixed(0)} · ${r.pacing.status.replace('_', ' ')}`}
+                        : `MTD $${(r.pacing.month_to_date_spend_usd ?? 0).toFixed(0)} of $${(r.pacing.monthly_media_budget_usd ?? 0).toFixed(0)} · implied daily $${(r.pacing.implied_daily_usd ?? 0).toFixed(0)} · ${r.pacing.status.replace('_', ' ')}`}
                     </div>
                   </div>
 
@@ -361,7 +365,9 @@ export default function MediaBuyerSopPreview() {
                       <div className="text-muted-foreground">None — resolve configuration and evidence first.</div>
                     ) : (
                       <ul className="text-muted-foreground list-disc pl-4">
-                        {r.creative_briefs.map((b, i) => <li key={i}>{b.concept}: {b.rationale}</li>)}
+                        {r.creative_briefs.map((b) => (
+                          <li key={b.concept_slot}>Concept {b.concept_slot} · {b.variants} variants — {b.angle_hint}</li>
+                        ))}
                       </ul>
                     )}
                   </div>
