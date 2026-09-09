@@ -214,18 +214,26 @@ export function ScriptRenderCard(props: Props) {
       </div>
 
       {/* Avatar */}
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex items-center gap-1.5">
         <span className="text-[10px] uppercase tracking-wide text-muted-foreground w-14">Avatar</span>
-        <button type="button" onClick={() => setAvatarId(null)} className={pill(!avatarId)}>
-          None
-        </button>
-        {avatars.map((a) => (
-          <button key={a.id} type="button" onClick={() => setAvatarId(a.id)} className={`${pill(avatarId === a.id)} inline-flex items-center gap-1`}>
-            {a.image_url ? <img src={a.image_url} alt="" className="h-3 w-3 rounded-full object-cover" /> : null}
-            {a.name}
-          </button>
-        ))}
+        <div className="relative flex-1 min-w-0">
+          {avatar?.image_url ? (
+            <img src={avatar.image_url} alt="" className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full object-cover" />
+          ) : null}
+          <select
+            value={avatarId ?? ""}
+            onChange={(e) => setAvatarId(e.target.value || null)}
+            className={`h-7 w-full appearance-none rounded-full border border-border/60 bg-background/70 ${avatar?.image_url ? "pl-8" : "pl-3"} pr-7 text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/40`}
+          >
+            <option value="">No avatar (new presenter)</option>
+            {selectableAvatars.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        </div>
       </div>
+
 
       {/* Opening frame */}
       <div className="rounded-xl border border-border/50 bg-background/60 p-2 space-y-2">
