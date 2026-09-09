@@ -20,6 +20,11 @@ export type ScriptRenderRequest = {
 
 type ModelOption = { value: string; label: string; hint?: string };
 
+const IMAGE_MODELS = [
+  { value: "openai/gpt-image-2", label: "GPT Image 2" },
+  { value: "google/gemini-3.1-flash-image-preview", label: "Nano Banana Pro 2" },
+] as const;
+
 interface Props {
   title: string;
   script: string;
