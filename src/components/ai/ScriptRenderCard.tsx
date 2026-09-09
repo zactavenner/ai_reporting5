@@ -274,6 +274,21 @@ export function ScriptRenderCard(props: Props) {
                 <RefreshCw className="h-3 w-3" /> Rebuild from script
               </button>
             </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground w-14">Image</span>
+              <div className="relative flex-1 min-w-0">
+                <select
+                  value={imageModel}
+                  onChange={(e) => setImageModel(e.target.value)}
+                  className="h-7 w-full appearance-none rounded-full border border-border/60 bg-background/70 pl-3 pr-7 text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/40"
+                >
+                  {IMAGE_MODELS.map((im) => (
+                    <option key={im.value} value={im.value}>{im.label}</option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+            </div>
             <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4} className="text-xs" />
             <button
               type="button"
