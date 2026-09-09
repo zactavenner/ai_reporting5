@@ -108,6 +108,7 @@ export function ScriptRenderCard(props: Props) {
   const [duration, setDuration] = useState<number>(autoSeconds);
 
   const [frameOpen, setFrameOpen] = useState(false);
+  const [imageModel, setImageModel] = useState<string>(IMAGE_MODELS[0].value);
   const [prompt, setPrompt] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [chosen, setChosen] = useState<string | undefined>(undefined);
