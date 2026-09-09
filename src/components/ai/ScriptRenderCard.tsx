@@ -144,6 +144,7 @@ export function ScriptRenderCard(props: Props) {
         headers: dashboardAuthHeaders(),
         body: {
           prompt: prompt.trim(),
+          imageModel,
           aspectRatio: aspect,
           projectId: "ai-studio-first-frame",
           clientId: clientId || "default",
