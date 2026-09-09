@@ -1844,7 +1844,17 @@ export function AIStudioTab({ clientId, clientName }: Props) {
           // Hard-lock block — forces the LLM to call generators with the exact
           // model / resolution / frames the user pre-selected in the composer.
           const lockLines: string[] = [];
-          if (!videoAllowed && selectedAgentMode === "video") {
+          if (!videoAllowed && selectedAgentMode === "video" && videoIntent === "image") {
+            lockLines.push(
+              [
+                "🖼 IMAGE MODE — the user asked for still images in this turn. Call generate_static_ad (or compare_image_models when several image models are locked) with the locked image model, style, avatar and aspect ratio, and put the result on the canvas.",
+                selectedAvatar
+                  ? `🔒 AVATAR LOCK: the person in the image must be avatar "${selectedAvatar.name}"${selectedAvatar.image_url ? ` — pass reference_image_url="${selectedAvatar.image_url}"` : ""}. Do not invent a different person.`
+                  : "",
+                "Never call any video generation tool in this turn.",
+              ].filter(Boolean).join("\n"),
+            );
+          } else if (!videoAllowed && selectedAgentMode === "video") {
             lockLines.push(
               "💬 SCRIPT MODE (Chat) — the user has NOT switched on Produce. Never call any video generation tool in this turn. Work the creative with them instead: write/refine the script beat by beat, propose hooks, set the visual direction, note the shot list, and end by telling them to hit “Produce video” when the script is locked.",
             );
