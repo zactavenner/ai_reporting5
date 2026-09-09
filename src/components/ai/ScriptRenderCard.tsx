@@ -78,8 +78,15 @@ export function ScriptRenderCard(props: Props) {
   const [aspect, setAspect] = useState<"9:16" | "16:9">(defaultAspect);
   const resList = resolutionsFor(model);
   const [resolution, setResolution] = useState(resList.includes(defaultResolution) ? defaultResolution : resList[resList.length - 1]);
-  const [avatarId, setAvatarId] = useState<string | null>(defaultAvatarId ?? null);
-  const avatar = avatars.find((a) => a.id === avatarId) || null;
+  const selectableAvatars = useMemo(
+    () => avatars.filter((a) => typeof a.image_url === "string" && a.image_url.trim().length > 0),
+    [avatars],
+  );
+  const [avatarId, setAvatarId] = useState<string | null>(
+    defaultAvatarId && avatars.some((a) => a.id === defaultAvatarId && a.image_url) ? defaultAvatarId : null,
+  );
+  const avatar = selectableAvatars.find((a) => a.id === avatarId) || null;
+
 
   const cap = maxSecondsFor(model);
   const min = minSecondsFor(model);
