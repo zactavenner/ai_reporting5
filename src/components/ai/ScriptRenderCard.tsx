@@ -1,0 +1,309 @@
+import { useMemo, useState } from "react";
+import { Clapperboard, ImageIcon, Loader2, Check, RefreshCw, Sparkles, ChevronDown } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
+import { dashboardAuthHeaders } from "@/lib/dashboardAuthHeaders";
+import { toast } from "sonner";
+
+export type ScriptRenderAvatar = { id: string; name: string; image_url?: string | null };
+
+export type ScriptRenderRequest = {
+  title: string;
+  script: string;
+  model: string;
+  resolution: string;
+  aspect: "9:16" | "16:9";
+  duration: number;
+  firstFrameUrl?: string;
+  avatarId?: string | null;
+};
+
+type ModelOption = { value: string; label: string; hint?: string };
+
+interface Props {
+  title: string;
+  script: string;
+  index: number;
+  total: number;
+  models: ModelOption[];
+  resolutionsFor: (model: string) => string[];
+  maxSecondsFor: (model: string) => number;
+  minSecondsFor: (model: string) => number;
+  defaultModel: string;
+  defaultResolution: string;
+  defaultAspect: "9:16" | "16:9";
+  wordsPerMinute: number;
+  avatars: ScriptRenderAvatar[];
+  defaultAvatarId?: string | null;
+  clientId?: string;
+  offerDescription?: string;
+  busy?: boolean;
+  onGenerate: (req: ScriptRenderRequest) => void;
+}
+
+function buildFramePrompt(script: string, avatarName?: string | null, offer?: string) {
+  const hook = script
+    .replace(/```[\s\S]*?```/g, " ")
+    .split(/\n+/)
+    .map((l) => l.replace(/^\s*(?:[-*#>]+|\d+[.)])\s*/, "").replace(/\*\*/g, "").trim())
+    .filter((l) => l.length > 25)
+    .slice(0, 2)
+    .join(" ");
+  return [
+    "Opening frame of a short-form video ad.",
+    avatarName
+      ? "Feature the EXACT presenter from the reference image — match face, skin tone, hair and outfit precisely. Mid-shot, direct eye contact with the camera, natural expression as they begin speaking."
+      : "Create a brand-new, believable on-camera presenter. Mid-shot, direct eye contact with the camera, natural expression as they begin speaking.",
+    hook ? `The moment matches this opening line: "${hook.slice(0, 240)}".` : "",
+    offer ? `Context: ${offer.slice(0, 300)}.` : "",
+    "Photorealistic, cinematic lighting, shallow depth of field.",
+    "No on-image text, no logos, no watermarks.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+/**
+ * One script = one production box: pick renderer/format/length, build an opening
+ * frame with (or without) an avatar, then render just that script.
+ */
+export function ScriptRenderCard(props: Props) {
+  const {
+    title, script, index, total, models, resolutionsFor, maxSecondsFor, minSecondsFor,
+    defaultModel, defaultResolution, defaultAspect, wordsPerMinute, avatars,
+    defaultAvatarId, clientId, offerDescription, busy, onGenerate,
+  } = props;
+
+  const [model, setModel] = useState(defaultModel || models[0]?.value || "");
+  const [aspect, setAspect] = useState<"9:16" | "16:9">(defaultAspect);
+  const resList = resolutionsFor(model);
+  const [resolution, setResolution] = useState(resList.includes(defaultResolution) ? defaultResolution : resList[resList.length - 1]);
+  const [avatarId, setAvatarId] = useState<string | null>(defaultAvatarId ?? null);
+  const avatar = avatars.find((a) => a.id === avatarId) || null;
+
+  const cap = maxSecondsFor(model);
+  const min = minSecondsFor(model);
+  const choices = [5, 8, 10, 15, 20, 25, 30].filter((s) => s >= min && s <= cap);
+  const words = useMemo(
+    () =>
+      script
+        .replace(/```[\s\S]*?```/g, " ")
+        .replace(/^\s*(?:[-*#>]+|\d+[.)])\s*/gm, " ")
+        .replace(/\*\*/g, "")
+        .split(/\s+/)
+        .filter((w) => /[a-z0-9']/i.test(w)).length,
+    [script],
+  );
+  const rawAuto = Math.round((words / wordsPerMinute) * 60);
+  const autoSeconds = choices.length
+    ? choices.reduce((best, s) => (Math.abs(s - rawAuto) < Math.abs(best - rawAuto) ? s : best), choices[0])
+    : Math.min(cap, Math.max(min, rawAuto));
+  const [duration, setDuration] = useState<number>(autoSeconds);
+
+  const [frameOpen, setFrameOpen] = useState(false);
+  const [prompt, setPrompt] = useState("");
+  const [images, setImages] = useState<string[]>([]);
+  const [chosen, setChosen] = useState<string | undefined>(undefined);
+  const [genImg, setGenImg] = useState(false);
+
+  const openFrame = () => {
+    setFrameOpen((o) => {
+      if (!o && !prompt.trim()) setPrompt(buildFramePrompt(script, avatar?.name, offerDescription));
+      return !o;
+    });
+  };
+
+  const pickModel = (v: string) => {
+    setModel(v);
+    const rs = resolutionsFor(v);
+    if (!rs.includes(resolution)) setResolution(rs[rs.length - 1]);
+    const c = maxSecondsFor(v);
+    const m = minSecondsFor(v);
+    if (duration > c) setDuration(c);
+    if (duration < m) setDuration(m);
+  };
+
+  const generateImage = async () => {
+    if (!prompt.trim()) { toast.error("Add an image prompt first"); return; }
+    setGenImg(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-static-ad", {
+        headers: dashboardAuthHeaders(),
+        body: {
+          prompt: prompt.trim(),
+          aspectRatio: aspect,
+          projectId: "ai-studio-first-frame",
+          clientId: clientId || "default",
+          productDescription: offerDescription,
+          characterImageUrl: avatar?.image_url || undefined,
+          referenceImages: avatar?.image_url ? [avatar.image_url] : [],
+        },
+      });
+      if (error) throw error;
+      const url: string | undefined = data?.imageUrl;
+      if (!url) throw new Error("no image");
+      setImages((prev) => [url, ...prev]);
+      setChosen(url);
+    } catch {
+      toast.error("Could not create that opening frame — try adjusting the prompt");
+    } finally {
+      setGenImg(false);
+    }
+  };
+
+  const pill = (active: boolean) =>
+    `px-2.5 py-1 rounded-full border text-[10px] transition ${active ? "border-primary bg-primary text-primary-foreground" : "border-border/60 text-muted-foreground hover:bg-muted"}`;
+
+  return (
+    <div className="ml-1 rounded-2xl border border-border/60 bg-muted/20 p-2.5 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="shrink-0 h-5 w-5 grid place-items-center rounded-full bg-primary/15 text-primary text-[10px] font-semibold">
+            {index + 1}
+          </span>
+          <span className="text-xs font-medium truncate">{title}</span>
+        </div>
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+          Script {index + 1} of {total} · {words} words
+        </span>
+      </div>
+
+      {/* Model */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground w-14">Model</span>
+        {models.map((vm) => (
+          <button key={vm.value} type="button" title={vm.hint} onClick={() => pickModel(vm.value)} className={pill(model === vm.value)}>
+            {vm.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Format + resolution */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground w-14">Format</span>
+        {(["9:16", "16:9"] as const).map((a) => (
+          <button key={a} type="button" onClick={() => setAspect(a)} className={pill(aspect === a)}>
+            {a}
+          </button>
+        ))}
+        <span className="mx-1 h-3 w-px bg-border/70" />
+        {resList.map((r) => (
+          <button key={r} type="button" onClick={() => setResolution(r)} className={`${pill(resolution === r)} uppercase`}>
+            {r}
+          </button>
+        ))}
+      </div>
+
+      {/* Length */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground w-14">Length</span>
+        <button
+          type="button"
+          onClick={() => setDuration(autoSeconds)}
+          title={`${words} spoken words ≈ ${rawAuto}s`}
+          className={`${pill(duration === autoSeconds)} tabular-nums`}
+        >
+          Auto {autoSeconds}s
+        </button>
+        <span className="mx-1 h-3 w-px bg-border/70" />
+        {choices.map((s) => (
+          <button key={s} type="button" onClick={() => setDuration(s)} className={`${pill(duration === s)} tabular-nums`}>
+            {s}s
+          </button>
+        ))}
+      </div>
+
+      {/* Avatar */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] uppercase tracking-wide text-muted-foreground w-14">Avatar</span>
+        <button type="button" onClick={() => setAvatarId(null)} className={pill(!avatarId)}>
+          None
+        </button>
+        {avatars.map((a) => (
+          <button key={a.id} type="button" onClick={() => setAvatarId(a.id)} className={`${pill(avatarId === a.id)} inline-flex items-center gap-1`}>
+            {a.image_url ? <img src={a.image_url} alt="" className="h-3 w-3 rounded-full object-cover" /> : null}
+            {a.name}
+          </button>
+        ))}
+      </div>
+
+      {/* Opening frame */}
+      <div className="rounded-xl border border-border/50 bg-background/60 p-2 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <button type="button" onClick={openFrame} className="inline-flex items-center gap-1.5 text-[11px] font-medium">
+            <ImageIcon className="h-3.5 w-3.5 text-primary" />
+            Opening frame {chosen ? "· selected" : images.length ? `· ${images.length} option${images.length === 1 ? "" : "s"}` : "· optional"}
+            <ChevronDown className={`h-3 w-3 transition ${frameOpen ? "rotate-180" : ""}`} />
+          </button>
+          {chosen && <img src={chosen} alt="Chosen opening frame" className="h-8 w-8 rounded object-cover border border-primary" />}
+        </div>
+
+        {frameOpen && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-muted-foreground">
+                {avatar ? `Uses avatar "${avatar.name}" as the presenter` : "New presenter from the prompt"}
+              </span>
+              <button
+                type="button"
+                onClick={() => { setPrompt(buildFramePrompt(script, avatar?.name, offerDescription)); toast.success("Prompt rebuilt from this script"); }}
+                className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+              >
+                <RefreshCw className="h-3 w-3" /> Rebuild from script
+              </button>
+            </div>
+            <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4} className="text-xs" />
+            <button
+              type="button"
+              onClick={generateImage}
+              disabled={genImg}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border/60 hover:bg-muted disabled:opacity-40 px-3 py-1.5 text-[11px] transition"
+            >
+              {genImg ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {genImg ? "Generating…" : images.length ? "Generate another option" : "Generate opening frame"}
+            </button>
+            {images.length > 0 && (
+              <div className="grid grid-cols-4 gap-1.5">
+                {images.map((url) => (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => setChosen(chosen === url ? undefined : url)}
+                    className={`relative rounded-lg overflow-hidden border-2 transition ${chosen === url ? "border-primary" : "border-transparent hover:border-muted-foreground/40"}`}
+                  >
+                    <img src={url} alt="Opening frame option" className="w-full aspect-square object-cover" />
+                    {chosen === url && (
+                      <span className="absolute top-1 right-1 h-4 w-4 rounded-full bg-primary grid place-items-center">
+                        <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Render */}
+      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+        <button
+          type="button"
+          disabled={!model || !!busy}
+          onClick={() =>
+            onGenerate({ title, script, model, resolution, aspect, duration, firstFrameUrl: chosen, avatarId })
+          }
+          className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed text-primary px-3 py-1.5 text-[11px] font-medium transition"
+        >
+          <Clapperboard className="h-3.5 w-3.5" />
+          Generate this video
+        </button>
+        <span className="text-[10px] text-muted-foreground">
+          {models.find((m) => m.value === model)?.label || model} · {resolution} · {duration}s · {aspect}
+          {chosen ? " · from your opening frame" : ""}
+          {avatar ? ` · ${avatar.name}` : ""}
+        </span>
+      </div>
+    </div>
+  );
+}
