@@ -293,7 +293,12 @@ export function ScriptRenderCard(props: Props) {
               </span>
               <button
                 type="button"
-                onClick={() => { setPrompt(buildFramePrompt(script, avatar?.name, offerDescription)); toast.success("Prompt rebuilt from this script"); }}
+                onClick={() => {
+                  const auto = buildFramePrompt(script, avatar?.name, offerDescription);
+                  setPrompt(auto);
+                  setAutoPrompt(auto);
+                  toast.success("Prompt rebuilt from this script");
+                }}
                 className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
               >
                 <RefreshCw className="h-3 w-3" /> Rebuild from script
