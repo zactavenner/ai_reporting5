@@ -1942,7 +1942,10 @@ export function AIStudioTab({ clientId, clientName }: Props) {
           return chatModel;
         })(),
         compareModels: compareModels.length ? compareModels : undefined,
-        imageModels,
+        // Image models travel when the agent is a static one, or when the Video Ads
+        // composer is explicitly in "Generate image" mode. Chat-script and Produce-video
+        // turns never enable the image tools.
+        imageModels: selectedAgentMode === "video" && videoIntent !== "image" ? [] : imageModels,
         // Video params travel ONLY from the Video Ads agent — other agents never render video.
         ...(selectedAgentMode === "video" && produceNow && videoModel ? { videoModel, videoModels, videoFrames, videoResolution, videoDuration: videoTotalDuration, speechPace } : {}),
         avatarId: selectedAvatarId,
