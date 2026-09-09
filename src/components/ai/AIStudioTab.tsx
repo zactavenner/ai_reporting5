@@ -2555,41 +2555,29 @@ export function AIStudioTab({ clientId, clientName }: Props) {
             {messages.map((m, i) => {
               const isEmptyAssistant = m.role === "assistant" && !m.content && (!m.tools || m.tools.length === 0);
               if (isEmptyAssistant && !m.streaming) return null;
+              // One production box per generated script. Script artifacts (one per
+              // script) win; otherwise the whole reply is treated as a single script.
               const scriptReady =
                 selectedAgentMode === "video" &&
                 m.role === "assistant" &&
                 !m.streaming &&
                 !!(m.content && m.content.trim().length > 40);
-              const modelLabel = VIDEO_MODELS.find((vm) => vm.value === videoModel)?.label || videoModel;
-              const capSeconds = VIDEO_MODEL_MAX_SECONDS[videoModel] ?? 15;
-              const minSeconds = videoModel === WAN_VIDEO_MODEL ? 2 : 4;
-              const durationChoices = [5, 8, 10, 15, 20, 25, 30].filter((s) => s >= minSeconds && s <= capSeconds);
-              const lockedAspectLabel = videoAspectForAdFormat(adFormat);
-              const activeRes = VIDEO_MODEL_RES[videoModel || ""]?.includes(videoResolution)
-                ? videoResolution
-                : (VIDEO_MODEL_RES[videoModel || ""] || ["720p"]).slice(-1)[0];
-              // Auto length: read the spoken words out of the script and turn them
-              // into seconds at the selected pace, snapped to a supported choice.
-              const scriptWords = (m.content || "")
-                .replace(/```[\s\S]*?```/g, " ")
-                .replace(/^\s*(?:[-*#>]+|\d+[.)])\s*/gm, " ")
-                .replace(/\*\*/g, "")
-                .split(/\s+/)
-                .filter((w) => /[a-z0-9']/i.test(w)).length;
-              const wpm = SPEECH_PACES.find((p) => p.value === speechPace)?.wpm ?? 158;
-              const rawAuto = Math.round((scriptWords / wpm) * 60);
-              const autoSeconds = durationChoices.length
-                ? durationChoices.reduce((best, s) => (Math.abs(s - rawAuto) < Math.abs(best - rawAuto) ? s : best), durationChoices[0])
-                : Math.min(capSeconds, Math.max(minSeconds, rawAuto));
-              const pickModel = (value: string) => {
-                setVideoModels([value]);
-                const res = VIDEO_MODEL_RES[value] || ["720p"];
-                if (!res.includes(videoResolution)) setVideoResolution(res[res.length - 1]);
-                const cap = VIDEO_MODEL_MAX_SECONDS[value] ?? 15;
-                const min = value === WAN_VIDEO_MODEL ? 2 : 4;
-                if (videoTotalDuration > cap) setVideoTotalDuration(cap);
-                if (videoTotalDuration < min) setVideoTotalDuration(min);
-              };
+              const artifactScripts: { title: string; content: string }[] = (m.tools || [])
+                .filter((t: any) => (t?.name || t?.function?.name) === "create_text_artifact")
+                .map((t: any) => {
+                  let args = t?.args ?? t?.arguments ?? t?.function?.arguments ?? {};
+                  if (typeof args === "string") { try { args = JSON.parse(args); } catch { args = {}; } }
+                  return { title: String(args?.title || "Script"), content: String(args?.content || "") };
+                })
+                .filter((s) => s.content.trim().length > 40);
+              const scriptCards =
+                selectedAgentMode === "video" && m.role === "assistant" && !m.streaming
+                  ? artifactScripts.length
+                    ? artifactScripts
+                    : scriptReady
+                      ? [{ title: "Generated script", content: (m.content || "").trim() }]
+                      : []
+                  : [];
               return (
                 <div key={m.id || i} className="space-y-1.5">
                 <ChatMessage
