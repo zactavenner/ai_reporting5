@@ -47,26 +47,39 @@ interface Props {
 }
 
 function buildFramePrompt(script: string, avatarName?: string | null, offer?: string) {
-  const hook = script
+  const lines = script
     .replace(/```[\s\S]*?```/g, " ")
     .split(/\n+/)
     .map((l) => l.replace(/^\s*(?:[-*#>]+|\d+[.)])\s*/, "").replace(/\*\*/g, "").trim())
-    .filter((l) => l.length > 25)
-    .slice(0, 2)
-    .join(" ");
+    .filter((l) => l.length > 25);
+  const hook = lines.slice(0, 2).join(" ");
+
+  const identity = avatarName
+    ? [
+        "SUBJECT: use the EXACT person in the reference image as the on-camera presenter.",
+        "Clone their identity pixel-faithfully: face shape, bone structure, eye colour and spacing, eyebrows, nose, lips, jawline, skin tone and undertone, freckles/moles, hairline, hair colour, texture and cut, facial hair, and wardrobe.",
+        "Do not beautify, slim, age, de-age or restyle them. Same person, new photograph.",
+      ].join(" ")
+    : [
+        "SUBJECT: cast one brand-new, completely believable real human presenter — a credible investor-facing professional, not a model and not a stock-photo type.",
+        "Give them specific, imperfect real features: natural asymmetry, real skin texture, subtle under-eye shadow, individual stray hairs.",
+      ].join(" ");
+
   return [
-    "Opening frame of a short-form video ad.",
-    avatarName
-      ? "Feature the EXACT presenter from the reference image — match face, skin tone, hair and outfit precisely. Mid-shot, direct eye contact with the camera, natural expression as they begin speaking."
-      : "Create a brand-new, believable on-camera presenter. Mid-shot, direct eye contact with the camera, natural expression as they begin speaking.",
-    hook ? `The moment matches this opening line: "${hook.slice(0, 240)}".` : "",
-    offer ? `Context: ${offer.slice(0, 300)}.` : "",
-    "Photorealistic, cinematic lighting, shallow depth of field.",
-    "No on-image text, no logos, no watermarks.",
+    "PHOTOREAL PORTRAIT-GRADE OPENING FRAME for a short-form direct-response video ad. It must be indistinguishable from a real photograph taken on set — not an illustration, not a render, not AI-looking.",
+    identity,
+    "FRAMING: mid-shot / chest-up, presenter centred, direct eye contact into the lens, mouth slightly open mid-word as they deliver the first line, alive and mid-thought — never a stiff posed smile.",
+    hook ? `MOMENT: the expression and energy match this opening line — "${hook.slice(0, 260)}".` : "",
+    offer ? `CONTEXT (dress, setting and tone must fit this business): ${offer.slice(0, 400)}.` : "",
+    "WARDROBE + SETTING: authentic to that context and to the presenter — real fabric with wrinkles and drape, believable environment with depth (not a flat backdrop), practical lights visible in the background bokeh.",
+    "CAMERA: full-frame mirrorless, 85mm f/1.8, ISO 200, 1/250s, shallow depth of field with creamy natural bokeh, soft key light plus gentle rim light, colour-graded like a premium commercial.",
+    "SKIN + DETAIL: visible pores, fine peach fuzz, real specular highlights, catchlights in both eyes, natural sub-surface scattering, individual eyelashes and hair strands, micro-imperfections kept.",
+    "HARD NEGATIVES: no plastic or waxy skin, no airbrushed uncanny faces, no symmetrical CGI look, no dead or glassy eyes, no extra or malformed fingers, no warped ears or teeth, no duplicated features, no on-image text, captions, logos, watermarks, UI overlays, borders or collage, no cartoon, anime, 3D render or painting.",
   ]
     .filter(Boolean)
     .join(" ");
 }
+
 
 /**
  * One script = one production box: pick renderer/format/length, build an opening
