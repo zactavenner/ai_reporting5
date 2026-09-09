@@ -1134,10 +1134,10 @@ export function AIStudioTab({ clientId, clientName }: Props) {
   }, [speechPace]);
   // Video Ads agent has two intents: "chat" (script/strategy only — no renders,
   // no spend) and "produce" (renders with the locked composer settings).
-  const [videoIntent, setVideoIntent] = useState<"chat" | "produce">(() => {
+  const [videoIntent, setVideoIntent] = useState<"chat" | "produce" | "image">(() => {
     try {
       const v = localStorage.getItem("ai-studio:video-intent");
-      return v === "produce" ? "produce" : "chat";
+      return v === "produce" ? "produce" : v === "image" ? "image" : "chat";
     } catch { return "chat"; }
   });
   useEffect(() => {
