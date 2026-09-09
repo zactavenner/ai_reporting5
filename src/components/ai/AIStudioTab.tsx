@@ -3032,7 +3032,7 @@ export function AIStudioTab({ clientId, clientName }: Props) {
                     </div>
                   </PopoverContent>
                 </Popover>
-                {selectedAgentMode === "static" && (
+                {(selectedAgentMode === "static" || (selectedAgentMode === "video" && videoIntent === "image")) && (
                 <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
                   <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Image:</span>
                   {IMAGE_MODELS.map(m => {
