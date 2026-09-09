@@ -1745,19 +1745,41 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     return { inTok, outTok, cost, model: chatModel };
   })();
 
-  async function send(text: string, opts?: { videoApproved?: boolean; forceProduce?: boolean }) {
+  async function send(
+    text: string,
+    opts?: {
+      videoApproved?: boolean;
+      forceProduce?: boolean;
+      /** Per-script render settings from a script card — override the composer for this turn only. */
+      videoOverride?: {
+        model?: string;
+        resolution?: string;
+        duration?: number;
+        aspect?: "9:16" | "16:9";
+        firstFrameUrl?: string;
+        avatarId?: string | null;
+      };
+    },
+  ) {
     if (!text.trim()) return;
     // A "Generate video with this script" click in chat renders this turn even
     // while the composer is still in Chat-script intent.
     const produceNow = !!opts?.forceProduce || videoIntent === "produce";
+    const ov = opts?.videoOverride;
+    const effVideoModel = ov?.model || videoModel;
+    const effVideoResolution = ov?.resolution || videoResolution;
+    const effVideoDuration = ov?.duration || videoTotalDuration;
+    const effVideoFrames = ov?.firstFrameUrl ? { ...videoFrames, firstFrameUrl: ov.firstFrameUrl } : videoFrames;
+    const effAvatarId = ov ? (ov.avatarId ?? null) : selectedAvatarId;
+    const effAvatar = studioAvatars.find((a) => a.id === effAvatarId) || null;
     if (pendingAttachments.some(a => a.uploading)) { toast.error("Attachments still uploading"); return; }
     setFollowups([]);
     // Auto-detect intended aspect from the prompt so the user doesn't need to
     // click the Format select. Video mode is locked to 9:16 / 16:9; static mode
     // may additionally resolve to 1:1. Only override when the prompt is
     // unambiguous — otherwise keep the currently selected adFormat.
-    let effectiveAdFormat = adFormat;
-    {
+    let effectiveAdFormat = ov?.aspect ? (ov.aspect === "9:16" ? "reel_9x16" : "video_16x9") : adFormat;
+    if (!ov?.aspect) {
       const detected = detectAdFormatFromPrompt(text);
       if (detected) {
         if (selectedAgentMode === "video") {
@@ -1863,28 +1885,28 @@ export function AIStudioTab({ clientId, clientName }: Props) {
               "🚫 VIDEO DISABLED for this agent. Never call any video generation tool here — video production happens only in the Video Ads agent. If the user asks for a video, tell them to switch to the Video Ads agent.",
             );
           }
-          if (videoAllowed && videoModel) {
+          if (videoAllowed && effVideoModel) {
             const lockedAspect = videoAspectForAdFormat(effectiveAdFormat);
-            const lockedModel = videoModel;
+            const lockedModel = effVideoModel;
             const modelMeta = VIDEO_MODELS.find((m) => m.value === lockedModel);
             // Respect the composer's resolution pick, clamped to what the
             // selected renderer actually supports.
             const supportedResList = VIDEO_MODEL_RES[lockedModel] || ["720p"];
-            const lockedRes = supportedResList.includes(videoResolution)
-              ? videoResolution
+            const lockedRes = (supportedResList as string[]).includes(effVideoResolution)
+              ? effVideoResolution
               : supportedResList[supportedResList.length - 1];
             lockLines.push(
-              `🔒 VIDEO HARD-LOCK: model="${lockedModel}"${modelMeta ? ` (${modelMeta.label})` : ""} — only the approved renderers ${VIDEO_MODELS.map((m) => `"${m.value}"`).join(", ")} may be used; Grok, HappyHorse, Kling and Veo are retired and must never be requested. resolution="${lockedRes}" (supported: ${supportedResList.join(", ")}), duration=${videoTotalDuration}s, format="${lockedAspect}", audio=on. Pass model/resolution/duration/aspect_ratio="${lockedAspect}" EXACTLY to generate_seedance_video. Do NOT substitute models, resolutions, durations, or formats.`,
+              `🔒 VIDEO HARD-LOCK: model="${lockedModel}"${modelMeta ? ` (${modelMeta.label})` : ""} — only the approved renderers ${VIDEO_MODELS.map((m) => `"${m.value}"`).join(", ")} may be used; Grok, HappyHorse, Kling and Veo are retired and must never be requested. resolution="${lockedRes}" (supported: ${supportedResList.join(", ")}), duration=${effVideoDuration}s, format="${lockedAspect}", audio=on. Pass model/resolution/duration/aspect_ratio="${lockedAspect}" EXACTLY to generate_seedance_video. Do NOT substitute models, resolutions, durations, or formats.`,
             );
 
-            if (videoFrames?.firstFrameUrl) lockLines.push(`🔒 first_frame_url="${videoFrames.firstFrameUrl}"`);
-            if (videoFrames?.lastFrameUrl) lockLines.push(`🔒 last_frame_url="${videoFrames.lastFrameUrl}"`);
-            if (videoFrames?.ingredientUrl) lockLines.push(`🔒 ingredient_url="${videoFrames.ingredientUrl}"`);
-            const extraIngredients = (videoFrames?.ingredientUrls || []).filter((u) => u && u !== videoFrames?.ingredientUrl);
+            if (effVideoFrames?.firstFrameUrl) lockLines.push(`🔒 first_frame_url="${videoFrames.firstFrameUrl}"`);
+            if (effVideoFrames?.lastFrameUrl) lockLines.push(`🔒 last_frame_url="${videoFrames.lastFrameUrl}"`);
+            if (effVideoFrames?.ingredientUrl) lockLines.push(`🔒 ingredient_url="${videoFrames.ingredientUrl}"`);
+            const extraIngredients = (effVideoFrames?.ingredientUrls || []).filter((u) => u && u !== effVideoFrames?.ingredientUrl);
             if (extraIngredients.length) lockLines.push(`🔒 additional_ingredient_urls=${extraIngredients.map((u) => `"${u}"`).join(", ")} (all sent to Seedance as reference images)`);
-            if (selectedAvatarId && selectedAvatar) {
+            if (effAvatarId && effAvatar) {
               lockLines.push(
-                `🔒 AVATAR LOCK: use avatar "${selectedAvatar.name}" (id="${selectedAvatarId}"${selectedAvatar.image_url ? `, image_url="${selectedAvatar.image_url}"` : ""}) as the on-camera talent for every clip. Do NOT invent a different person or swap wardrobe between clips.`,
+                `🔒 AVATAR LOCK: use avatar "${effAvatar.name}" (id="${effAvatarId}"${effAvatar.image_url ? `, image_url="${effAvatar.image_url}"` : ""}) as the on-camera talent for every clip. Do NOT invent a different person or swap wardrobe between clips.`,
               );
             }
             if (videoStyles?.selected?.name) {
@@ -1902,18 +1924,18 @@ export function AIStudioTab({ clientId, clientName }: Props) {
                   : speechPace === "fast"
                     ? "Write and direct the VO fast and tight: minimal pauses, punchy lines. Add \"speaks quickly and energetically, tight pacing, no dead air\" to every render prompt."
                     : "Conversational delivery at a natural pace."
-              } The script must fit ~${paceWordBudget(videoTotalDuration, speechPace)} words total for ${videoTotalDuration}s at this pace — never write more.`,
+              } The script must fit ~${paceWordBudget(effVideoDuration, speechPace)} words total for ${effVideoDuration}s at this pace — never write more.`,
             );
-            if (videoTotalDuration > perClipCap) {
-              const clips = Math.ceil(videoTotalDuration / perClipCap);
-              const identityUrl = videoFrames?.firstFrameUrl || videoFrames?.ingredientUrl || "";
+            if (effVideoDuration > perClipCap) {
+              const clips = Math.ceil(effVideoDuration / perClipCap);
+              const identityUrl = effVideoFrames?.firstFrameUrl || effVideoFrames?.ingredientUrl || "";
               lockLines.push(
-                `🔒 TOTAL LENGTH = ${videoTotalDuration}s and "${lockedModel}" caps at ${perClipCap}s per clip → emit EXACTLY ${clips} generate_seedance_video tool_calls IN THE SAME assistant turn (parallel), with durations summing to ${videoTotalDuration}s. Every call uses model="${lockedModel}", resolution="${lockedRes}", aspect_ratio="${lockedAspect}"${identityUrl ? `, image_url="${identityUrl}"` : ""}${videoFrames?.ingredientUrl ? `, and preserve the ingredient reference` : ""}. Clip 1 = opening beat; the last clip = the payoff. Keep the SAME subject, wardrobe, camera framing and lighting across clips for character consistency. Never emit more than ${clips} calls.`,
+                `🔒 TOTAL LENGTH = ${effVideoDuration}s and "${lockedModel}" caps at ${perClipCap}s per clip → emit EXACTLY ${clips} generate_seedance_video tool_calls IN THE SAME assistant turn (parallel), with durations summing to ${effVideoDuration}s. Every call uses model="${lockedModel}", resolution="${lockedRes}", aspect_ratio="${lockedAspect}"${identityUrl ? `, image_url="${identityUrl}"` : ""}${effVideoFrames?.ingredientUrl ? `, and preserve the ingredient reference` : ""}. Clip 1 = opening beat; the last clip = the payoff. Keep the SAME subject, wardrobe, camera framing and lighting across clips for character consistency. Never emit more than ${clips} calls.`,
               );
             } else {
-              const identityUrl = videoFrames?.firstFrameUrl || videoFrames?.ingredientUrl || "";
+              const identityUrl = effVideoFrames?.firstFrameUrl || effVideoFrames?.ingredientUrl || "";
               lockLines.push(
-                `🔒 TOTAL LENGTH = ${videoTotalDuration}s → emit ONE generate_seedance_video tool_call with duration=${videoTotalDuration}, model="${lockedModel}", resolution="${lockedRes}", aspect_ratio="${lockedAspect}"${identityUrl ? `, image_url="${identityUrl}"` : ""}. "${lockedModel}" renders this length in a single clip — do NOT split it.`,
+                `🔒 TOTAL LENGTH = ${effVideoDuration}s → emit ONE generate_seedance_video tool_call with duration=${effVideoDuration}, model="${lockedModel}", resolution="${lockedRes}", aspect_ratio="${lockedAspect}"${identityUrl ? `, image_url="${identityUrl}"` : ""}. "${lockedModel}" renders this length in a single clip — do NOT split it.`,
               );
             }
           }
@@ -1947,8 +1969,17 @@ export function AIStudioTab({ clientId, clientName }: Props) {
         // turns never enable the image tools.
         imageModels: selectedAgentMode === "video" && videoIntent !== "image" ? [] : imageModels,
         // Video params travel ONLY from the Video Ads agent — other agents never render video.
-        ...(selectedAgentMode === "video" && produceNow && videoModel ? { videoModel, videoModels, videoFrames, videoResolution, videoDuration: videoTotalDuration, speechPace } : {}),
-        avatarId: selectedAvatarId,
+        ...(selectedAgentMode === "video" && produceNow && effVideoModel
+          ? {
+              videoModel: effVideoModel,
+              videoModels: ov?.model ? [ov.model] : videoModels,
+              videoFrames: effVideoFrames,
+              videoResolution: effVideoResolution,
+              videoDuration: effVideoDuration,
+              speechPace,
+            }
+          : {}),
+        avatarId: effAvatarId,
         adFormat: effectiveAdFormat || undefined,
         agentSlug: selectedAgentId.startsWith("slug:")
           ? selectedAgentId.slice("slug:".length)
@@ -2584,100 +2615,58 @@ export function AIStudioTab({ clientId, clientName }: Props) {
                     );
                   }}
                 />
-                {scriptReady && (
-                  <div className="ml-1 rounded-2xl border border-border/60 bg-muted/20 p-2.5 space-y-2">
-                    {/* Model */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground w-14">Model</span>
-                      {VIDEO_MODELS.map((vm) => (
-                        <button
-                          key={vm.value}
-                          type="button"
-                          title={vm.hint}
-                          onClick={() => pickModel(vm.value)}
-                          className={`px-2.5 py-1 rounded-full border text-[10px] transition ${videoModel === vm.value ? "border-primary bg-primary text-primary-foreground" : "border-border/60 text-muted-foreground hover:bg-muted"}`}
-                        >
-                          {vm.label}
-                        </button>
-                      ))}
-                    </div>
-                    {/* Aspect + resolution */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground w-14">Format</span>
-                      {(["9:16", "16:9"] as const).map((a) => (
-                        <button
-                          key={a}
-                          type="button"
-                          onClick={() => setAdFormat(a === "9:16" ? "reel_9x16" : "video_16x9")}
-                          className={`px-2.5 py-1 rounded-full border text-[10px] transition ${lockedAspectLabel === a ? "border-primary bg-primary text-primary-foreground" : "border-border/60 text-muted-foreground hover:bg-muted"}`}
-                        >
-                          {a}
-                        </button>
-                      ))}
-                      <span className="mx-1 h-3 w-px bg-border/70" />
-                      {(VIDEO_MODEL_RES[videoModel || ""] || ["720p"]).map((r) => (
-                        <button
-                          key={r}
-                          type="button"
-                          onClick={() => setVideoResolution(r)}
-                          className={`px-2.5 py-1 rounded-full border text-[10px] uppercase transition ${activeRes === r ? "border-primary bg-primary text-primary-foreground" : "border-border/60 text-muted-foreground hover:bg-muted"}`}
-                        >
-                          {r}
-                        </button>
-                      ))}
-                    </div>
-                    {/* Length — auto from script */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground w-14">Length</span>
-                      <button
-                        type="button"
-                        onClick={() => setVideoTotalDuration(autoSeconds)}
-                        title={`${scriptWords} spoken words at ${speechPace} pace ≈ ${rawAuto}s`}
-                        className={`px-2.5 py-1 rounded-full border text-[10px] tabular-nums transition ${videoTotalDuration === autoSeconds ? "border-primary bg-primary text-primary-foreground" : "border-border/60 text-muted-foreground hover:bg-muted"}`}
-                      >
-                        Auto {autoSeconds}s
-                      </button>
-                      <span className="mx-1 h-3 w-px bg-border/70" />
-                      {durationChoices.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => setVideoTotalDuration(s)}
-                          className={`px-2.5 py-1 rounded-full border text-[10px] tabular-nums transition ${videoTotalDuration === s ? "border-primary bg-primary text-primary-foreground" : "border-border/60 text-muted-foreground hover:bg-muted"}`}
-                        >
-                          {s}s
-                        </button>
-                      ))}
-                    </div>
-                    {/* Generate */}
-                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                      <button
-                        type="button"
-                        disabled={!videoModel || loading > 0}
-                        onClick={() => {
-                          setVideoIntent("produce");
-                          send(
-                            [
-                              "Produce the video from the script in your previous message.",
-                              "Turn that script into ONE optimized render prompt: subject + wardrobe, setting, camera move, lighting, on-screen action beat by beat, and the spoken VO lines verbatim.",
-                              "Then call generate_seedance_video with the locked composer settings below. Do not rewrite the script's message or ask follow-up questions first.",
-                            ].join(" "),
-                            { forceProduce: true, videoApproved: true },
-                          );
-                        }}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed text-primary px-3 py-1.5 text-[11px] font-medium transition"
-                      >
-                        <Clapperboard className="h-3.5 w-3.5" />
-                        Generate video with this script
-                      </button>
-                      <span className="text-[10px] text-muted-foreground">
-                        {videoModel
-                          ? `${modelLabel} · ${activeRes} · ${videoTotalDuration}s · ${lockedAspectLabel} → chat + canvas`
-                          : "Pick a video model to render"}
-                      </span>
-                    </div>
-                  </div>
-                )}
+                {scriptCards.map((sc, si) => (
+                  <ScriptRenderCard
+                    key={`${m.id || i}-script-${si}`}
+                    title={sc.title}
+                    script={sc.content}
+                    index={si}
+                    total={scriptCards.length}
+                    models={VIDEO_MODELS.map((vm) => ({ value: vm.value, label: vm.label, hint: vm.hint }))}
+                    resolutionsFor={(mv) => (VIDEO_MODEL_RES[mv] || ["720p"]) as unknown as string[]}
+                    maxSecondsFor={(mv) => VIDEO_MODEL_MAX_SECONDS[mv] ?? 15}
+                    minSecondsFor={(mv) => (mv === WAN_VIDEO_MODEL ? 2 : 4)}
+                    defaultModel={videoModel}
+                    defaultResolution={videoResolution}
+                    defaultAspect={videoAspectForAdFormat(adFormat) === "16:9" ? "16:9" : "9:16"}
+                    wordsPerMinute={SPEECH_PACES.find((p) => p.value === speechPace)?.wpm ?? 158}
+                    avatars={studioAvatars.map((a) => ({ id: a.id, name: a.name, image_url: a.image_url }))}
+                    defaultAvatarId={selectedAvatarId}
+                    clientId={clientId}
+                    offerDescription={offerContextText || undefined}
+                    busy={loading > 0}
+                    onGenerate={(req) => {
+                      setVideoIntent("produce");
+                      send(
+                        [
+                          `Produce the video for the script titled "${req.title}" below. Ignore every other script in this conversation.`,
+                          "Turn it into ONE optimized render prompt: subject + wardrobe, setting, camera move, lighting, on-screen action beat by beat, and the spoken VO lines verbatim.",
+                          req.firstFrameUrl
+                            ? "Start the render from the supplied first frame image — keep that exact person, wardrobe and setting."
+                            : "",
+                          "Then call generate_seedance_video with the locked settings. Do not rewrite the script or ask follow-up questions first.",
+                          "",
+                          "SCRIPT:",
+                          req.script,
+                        ]
+                          .filter(Boolean)
+                          .join("\n"),
+                        {
+                          forceProduce: true,
+                          videoApproved: true,
+                          videoOverride: {
+                            model: req.model,
+                            resolution: req.resolution,
+                            duration: req.duration,
+                            aspect: req.aspect,
+                            firstFrameUrl: req.firstFrameUrl,
+                            avatarId: req.avatarId,
+                          },
+                        },
+                      );
+                    }}
+                  />
+                ))}
                 </div>
               );
             })}
