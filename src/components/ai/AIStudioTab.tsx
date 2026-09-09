@@ -110,7 +110,7 @@ const VIDEO_MODELS: { value: string; label: string; hint: string; maxSeconds: nu
   { value: "alibaba/wan-3.0",             label: "Wan 3.0",         hint: "Alibaba Wan 3.0 — 2–30s in ONE clip, 480p / 720p / 1080p, first frame + reference images, native audio. Cheapest long-form renderer.", maxSeconds: 30, pricePerSecond: 0.034 },
 ];
 export const WAN_VIDEO_MODEL = "alibaba/wan-3.0";
-export const ONLY_VIDEO_MODEL = "minimax/hailuo-3";
+export const ONLY_VIDEO_MODEL = "alibaba/wan-3.0";
 export const SEEDANCE_VIDEO_MODEL = "bytedance/seedance-2.0";
 export const SEEDANCE_25_VIDEO_MODEL = "bytedance/seedance-2.5";
 // Resolution caps per model. 4K has been removed from the UI.

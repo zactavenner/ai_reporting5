@@ -8,7 +8,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 export const FALLBACK_CHAT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free";
 export const FALLBACK_IMAGE_MODEL = "google/gemini-3.1-flash-image";
-export const FALLBACK_VIDEO_MODEL = "bytedance/seedance-2.0-fast";
+export const FALLBACK_VIDEO_MODEL = "alibaba/wan-3.0";
 
 export type AgencyDefaults = {
   chat: string;
