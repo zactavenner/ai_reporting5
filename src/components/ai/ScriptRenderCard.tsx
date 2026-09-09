@@ -135,7 +135,11 @@ export function ScriptRenderCard(props: Props) {
 
   const openFrame = () => {
     setFrameOpen((o) => {
-      if (!o && !prompt.trim()) setPrompt(buildFramePrompt(script, avatar?.name, offerDescription));
+      if (!o && !prompt.trim()) {
+        const auto = buildFramePrompt(script, avatar?.name, offerDescription);
+        setPrompt(auto);
+        setAutoPrompt(auto);
+      }
       return !o;
     });
   };
