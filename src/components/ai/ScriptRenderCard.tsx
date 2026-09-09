@@ -249,7 +249,14 @@ export function ScriptRenderCard(props: Props) {
           ) : null}
           <select
             value={avatarId ?? ""}
-            onChange={(e) => setAvatarId(e.target.value || null)}
+            onChange={(e) => {
+              const id = e.target.value || null;
+              setAvatarId(id);
+              const nextName = selectableAvatars.find((a) => a.id === id)?.name;
+              const auto = buildFramePrompt(script, nextName, offerDescription);
+              setPrompt((p) => (!p.trim() || p === autoPrompt ? auto : p));
+              setAutoPrompt(auto);
+            }}
             className={`h-7 w-full appearance-none rounded-full border border-border/60 bg-background/70 ${avatar?.image_url ? "pl-8" : "pl-3"} pr-7 text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/40`}
           >
             <option value="">No avatar (new presenter)</option>
