@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { ScriptRenderCard } from "@/components/ai/ScriptRenderCard";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -2621,7 +2622,7 @@ export function AIStudioTab({ clientId, clientName }: Props) {
                     avatars={studioAvatars.map((a) => ({ id: a.id, name: a.name, image_url: a.image_url }))}
                     defaultAvatarId={selectedAvatarId}
                     clientId={clientId}
-                    offerDescription={offerContextText || undefined}
+                    offerDescription={goalOfferContext || undefined}
                     busy={loading > 0}
                     onGenerate={(req) => {
                       setVideoIntent("produce");
