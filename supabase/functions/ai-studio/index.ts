@@ -4625,7 +4625,9 @@ Deno.serve(async (req) => {
             } else if (agentToolPolicy === "static_only") {
               if (VIDEO_TOOL_NAMES.has(n) || n === "image_to_reel") return false;
             } else if (agentToolPolicy === "video_only") {
-              if (IMAGE_TOOL_NAMES.has(n)) return false;
+              // The Video Ads composer can switch to "Generate image" mode, which sends
+              // image models. Only block the image tools when no image model is locked.
+              if (IMAGE_TOOL_NAMES.has(n) && !hasImage) return false;
             }
             if (n === "image_to_reel") return hasImage && videoAuthorized;
             if (IMAGE_TOOL_NAMES.has(n)) return hasImage;

@@ -1134,10 +1134,10 @@ export function AIStudioTab({ clientId, clientName }: Props) {
   }, [speechPace]);
   // Video Ads agent has two intents: "chat" (script/strategy only — no renders,
   // no spend) and "produce" (renders with the locked composer settings).
-  const [videoIntent, setVideoIntent] = useState<"chat" | "produce">(() => {
+  const [videoIntent, setVideoIntent] = useState<"chat" | "produce" | "image">(() => {
     try {
       const v = localStorage.getItem("ai-studio:video-intent");
-      return v === "produce" ? "produce" : "chat";
+      return v === "produce" ? "produce" : v === "image" ? "image" : "chat";
     } catch { return "chat"; }
   });
   useEffect(() => {
@@ -1844,7 +1844,17 @@ export function AIStudioTab({ clientId, clientName }: Props) {
           // Hard-lock block — forces the LLM to call generators with the exact
           // model / resolution / frames the user pre-selected in the composer.
           const lockLines: string[] = [];
-          if (!videoAllowed && selectedAgentMode === "video") {
+          if (!videoAllowed && selectedAgentMode === "video" && videoIntent === "image") {
+            lockLines.push(
+              [
+                "🖼 IMAGE MODE — the user asked for still images in this turn. Call generate_static_ad (or compare_image_models when several image models are locked) with the locked image model, style, avatar and aspect ratio, and put the result on the canvas.",
+                selectedAvatar
+                  ? `🔒 AVATAR LOCK: the person in the image must be avatar "${selectedAvatar.name}"${selectedAvatar.image_url ? ` — pass reference_image_url="${selectedAvatar.image_url}"` : ""}. Do not invent a different person.`
+                  : "",
+                "Never call any video generation tool in this turn.",
+              ].filter(Boolean).join("\n"),
+            );
+          } else if (!videoAllowed && selectedAgentMode === "video") {
             lockLines.push(
               "💬 SCRIPT MODE (Chat) — the user has NOT switched on Produce. Never call any video generation tool in this turn. Work the creative with them instead: write/refine the script beat by beat, propose hooks, set the visual direction, note the shot list, and end by telling them to hit “Produce video” when the script is locked.",
             );
@@ -1932,7 +1942,10 @@ export function AIStudioTab({ clientId, clientName }: Props) {
           return chatModel;
         })(),
         compareModels: compareModels.length ? compareModels : undefined,
-        imageModels,
+        // Image models travel when the agent is a static one, or when the Video Ads
+        // composer is explicitly in "Generate image" mode. Chat-script and Produce-video
+        // turns never enable the image tools.
+        imageModels: selectedAgentMode === "video" && videoIntent !== "image" ? [] : imageModels,
         // Video params travel ONLY from the Video Ads agent — other agents never render video.
         ...(selectedAgentMode === "video" && produceNow && videoModel ? { videoModel, videoModels, videoFrames, videoResolution, videoDuration: videoTotalDuration, speechPace } : {}),
         avatarId: selectedAvatarId,
@@ -3032,7 +3045,7 @@ export function AIStudioTab({ clientId, clientName }: Props) {
                     </div>
                   </PopoverContent>
                 </Popover>
-                {selectedAgentMode === "static" && (
+                {(selectedAgentMode === "static" || (selectedAgentMode === "video" && videoIntent === "image")) && (
                 <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
                   <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Image:</span>
                   {IMAGE_MODELS.map(m => {
@@ -3067,6 +3080,7 @@ export function AIStudioTab({ clientId, clientName }: Props) {
                   <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Mode:</span>
                   {([
                     { value: "chat" as const, label: "Chat script", hint: "Talk through the script, hooks and shot list — no renders, no spend." },
+                    { value: "image" as const, label: "Generate image", hint: "Create still images right here — pick the image model, style and avatar below. No video spend." },
                     { value: "produce" as const, label: "Produce video", hint: "Render with the locked model, resolution, length, format and frames below." },
                   ]).map((m) => {
                     const active = videoIntent === m.value;
@@ -3074,7 +3088,12 @@ export function AIStudioTab({ clientId, clientName }: Props) {
                       <button
                         key={m.value}
                         type="button"
-                        onClick={() => setVideoIntent(m.value)}
+                        onClick={() => {
+                          setVideoIntent(m.value);
+                          // Image mode needs at least one image model picked, otherwise
+                          // the image tools stay disabled server-side.
+                          if (m.value === "image" && imageModels.length === 0) setImageModels(["nano-banana"]);
+                        }}
                         title={m.hint}
                         className={`px-2 py-1 rounded-lg text-[10px] border transition leading-tight ${active ? "bg-primary text-primary-foreground border-primary" : "bg-muted/40 hover:bg-muted border-border/60 text-muted-foreground"}`}
                       >
@@ -3209,7 +3228,7 @@ export function AIStudioTab({ clientId, clientName }: Props) {
                     </span>
                   </div>
                 )}
-                {selectedAgentMode === "static" && (
+                {(selectedAgentMode === "static" || (selectedAgentMode === "video" && videoIntent === "image")) && (
                   <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
                     <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Image Style:</span>
                     <ImageStylesPopover
