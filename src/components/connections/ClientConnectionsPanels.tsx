@@ -416,9 +416,7 @@ export function MetaPanel({ clientId, source }: { clientId: string; source: Sett
             )}
           </>
         ) : (
-          <div className="text-muted-foreground">
-            {canEdit ? 'Loading connection status…' : 'Sign in as an agency operator to see connection status.'}
-          </div>
+          <ConnectionStatusMessage view={statusView} onRetry={() => integrationsQuery.refetch()} />
         )}
       </div>
 
