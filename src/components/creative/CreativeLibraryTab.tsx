@@ -347,17 +347,37 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((ad) => {
+          {filtered.slice(0, visibleCount).map((ad) => {
             const kind = mediaKind(ad);
             const thumb = ad.video_thumbnail_url || ad.full_image_url || ad.image_url;
+            const downloadUrl =
+              kind === 'video'
+                ? ad.video_source_url || thumb
+                : ad.full_image_url || ad.image_url;
+            const hovering = hoveredId === ad.id;
             return (
-              <Card key={ad.id} className="overflow-hidden flex flex-col">
+              <Card
+                key={ad.id}
+                className="group overflow-hidden flex flex-col"
+                onMouseEnter={() => setHoveredId(ad.id)}
+                onMouseLeave={() => setHoveredId((c) => (c === ad.id ? null : c))}
+              >
                 <button
                   type="button"
                   className="relative aspect-square w-full bg-muted"
                   onClick={() => setDetailAd(ad)}
                 >
-                  {thumb ? (
+                  {kind === 'video' && hovering && ad.video_source_url ? (
+                    <video
+                      src={ad.video_source_url}
+                      poster={thumb || undefined}
+                      className="h-full w-full object-cover"
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                    />
+                  ) : thumb ? (
                     <img
                       src={thumb}
                       alt={ad.name || 'Ad creative'}
@@ -381,6 +401,9 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
                 <CardContent className="flex flex-1 flex-col gap-2 p-3">
                   <p className="line-clamp-2 text-sm font-medium">{ad.name || 'Untitled ad'}</p>
                   <p className="text-xs text-muted-foreground">{clientName(ad.client_id)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Added {shortDate(ad.created_at)}
+                  </p>
                   <div className="grid grid-cols-3 gap-1 text-center text-xs">
                     <div>
                       <p className="font-semibold">{money(ad.cost_per_lead)}</p>
@@ -395,19 +418,37 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
                       <p className="text-muted-foreground">Spend</p>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-auto min-h-[40px]"
-                    onClick={() => {
-                      setRecreateAd(ad);
-                      setResult(null);
-                      setNotes('');
-                      setTargetClient('');
-                    }}
-                  >
-                    <Copy className="mr-2 h-4 w-4" /> Copy & recreate
-                  </Button>
+                  <div className="mt-auto flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 min-h-[40px]"
+                      onClick={() => {
+                        setRecreateAd(ad);
+                        setResult(null);
+                        setNotes('');
+                        setTargetClient('');
+                      }}
+                    >
+                      <Copy className="mr-2 h-4 w-4" /> Copy & recreate
+                    </Button>
+                    {downloadUrl && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="min-h-[40px]"
+                        aria-label="Download creative"
+                        onClick={() =>
+                          downloadAsset(
+                            downloadUrl,
+                            `${(ad.name || 'creative').replace(/[^\w.-]+/g, '-')}.${kind === 'video' ? 'mp4' : 'jpg'}`,
+                          )
+                        }
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );
