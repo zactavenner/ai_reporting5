@@ -121,6 +121,29 @@ const STATE_LABELS: Record<string, string> = {
   failed: 'Failed',
 };
 
+/**
+ * Terminal state renderer for connection status. Loaded is handled by the
+ * caller; every other outcome (unauthorized, unavailable, sanitized error)
+ * ends here so no panel can spin forever.
+ */
+function ConnectionStatusMessage({ view, onRetry }: { view: ConnectionStatusView; onRetry?: () => void }) {
+  if (view.kind === 'loaded') return null;
+  const failed = view.kind === 'unavailable' || view.kind === 'error';
+  return (
+    <div className={cn('text-xs flex items-center gap-2 flex-wrap', failed ? 'text-amber-600' : 'text-muted-foreground')}>
+      {view.kind === 'loading' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+      {failed && <AlertTriangle className="h-3.5 w-3.5" />}
+      <span>{view.message}</span>
+      {failed && onRetry && (
+        <Button size="sm" variant="outline" className="h-6 text-[11px] gap-1" onClick={onRetry}>
+          <RefreshCw className="h-3 w-3" /> Retry
+        </Button>
+      )}
+    </div>
+  );
+}
+
+
 /* ────────────────────────────── Roll-up card ────────────────────────────── */
 
 export function RollupSummaryCard({ rollup }: { rollup: RollupSummary }) {
