@@ -130,7 +130,7 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
       const { data, error } = await supabase
         .from('meta_ads')
         .select(
-          'id, client_id, meta_ad_id, name, media_type, image_url, full_image_url, video_thumbnail_url, video_source_url, spend, impressions, clicks, attributed_leads, cost_per_lead, ctr, headline, body, transcript, transcript_status, generation_prompt, generation_source, status',
+          'id, client_id, meta_ad_id, name, media_type, image_url, full_image_url, video_thumbnail_url, video_source_url, spend, impressions, clicks, attributed_leads, cost_per_lead, ctr, headline, body, transcript, transcript_status, generation_prompt, generation_source, status, created_at, updated_at',
         )
         .order('spend', { ascending: false })
         .limit(1000);
