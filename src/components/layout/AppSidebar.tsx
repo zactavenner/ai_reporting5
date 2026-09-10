@@ -72,30 +72,6 @@ const navStructure = [
     icon: LayoutDashboard,
   },
   {
-    title: 'Approvals',
-    value: 'approvals',
-    icon: Inbox,
-    href: '/approvals',
-  },
-  {
-    title: 'Media Buyer',
-    value: 'media-buyer',
-    icon: TrendingUp,
-    href: '/media-buyer',
-  },
-  {
-    title: 'Lead Quality',
-    value: 'lead-quality',
-    icon: UserCheck,
-    href: '/lead-quality',
-  },
-  {
-    title: 'Weekly Report (Parity)',
-    value: 'weekly-parity',
-    icon: FileText,
-    href: '/weekly-parity',
-  },
-  {
     title: 'Daily Huddle',
     value: 'huddle',
     icon: Timer,
@@ -114,18 +90,6 @@ const navStructure = [
     href: '/whatsapp',
   },
   {
-    title: 'Call Bridge',
-    value: 'call-bridge',
-    icon: PhoneForwarded,
-    href: '/call-bridge',
-  },
-  {
-    title: 'Data Health',
-    value: 'data-health',
-    icon: Activity,
-    href: '/data-health',
-  },
-  {
     title: 'Agent Infrastructure',
     value: 'agent-infrastructure',
     icon: Cpu,
@@ -135,21 +99,6 @@ const navStructure = [
     title: 'Tasks',
     value: 'tasks',
     icon: ClipboardCheck,
-  },
-  {
-    title: 'Email',
-    value: 'email',
-    icon: MessageSquare,
-  },
-  {
-    title: 'Onboarding',
-    value: 'onboarding',
-    icon: Users,
-  },
-  {
-    title: 'AM Workspace',
-    value: 'am-workspace',
-    icon: Sparkles,
   },
   {
     title: 'AI Studio',
