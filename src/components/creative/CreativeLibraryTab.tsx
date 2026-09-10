@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { dashboardAuthHeaders } from '@/lib/dashboardAuthHeaders';
@@ -32,6 +32,7 @@ import {
   Loader2,
   FileText,
   Sparkles,
+  Download,
 } from 'lucide-react';
 
 interface LibraryAd {
@@ -57,10 +58,36 @@ interface LibraryAd {
   generation_prompt: string | null;
   generation_source: string | null;
   status: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+const PAGE_SIZE = 24;
+
+const shortDate = (v: string | null | undefined) =>
+  v
+    ? new Date(v).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : '—';
+
+async function downloadAsset(url: string, filename: string) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(href);
+  } catch {
+    window.open(url, '_blank', 'noopener');
+  }
 }
 
 type MediaFilter = 'all' | 'video' | 'image';
-type SortKey = 'cpl_asc' | 'cpl_desc' | 'spend_desc' | 'leads_desc';
+type SortKey = 'cpl_asc' | 'cpl_desc' | 'spend_desc' | 'leads_desc' | 'newest';
 
 const money = (v: number | null | undefined) =>
   v == null ? '—' : `$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
@@ -81,6 +108,8 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
   const [search, setSearch] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [detailAd, setDetailAd] = useState<LibraryAd | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const [recreateAd, setRecreateAd] = useState<LibraryAd | null>(null);
   const [targetClient, setTargetClient] = useState('');
@@ -102,7 +131,7 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
       const { data, error } = await supabase
         .from('meta_ads')
         .select(
-          'id, client_id, meta_ad_id, name, media_type, image_url, full_image_url, video_thumbnail_url, video_source_url, spend, impressions, clicks, attributed_leads, cost_per_lead, ctr, headline, body, transcript, transcript_status, generation_prompt, generation_source, status',
+          'id, client_id, meta_ad_id, name, media_type, image_url, full_image_url, video_thumbnail_url, video_source_url, spend, impressions, clicks, attributed_leads, cost_per_lead, ctr, headline, body, transcript, transcript_status, generation_prompt, generation_source, status, created_at, updated_at',
         )
         .order('spend', { ascending: false })
         .limit(1000);
@@ -143,12 +172,21 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
           return (b.cost_per_lead ?? -1) - (a.cost_per_lead ?? -1);
         case 'leads_desc':
           return (b.attributed_leads ?? 0) - (a.attributed_leads ?? 0);
+        case 'newest':
+          return (
+            new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+          );
         default:
           return (b.spend ?? 0) - (a.spend ?? 0);
       }
     });
     return sorted;
   }, [ads, clientFilter, mediaFilter, maxCpl, minSpend, search, sortKey]);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [clientFilter, mediaFilter, maxCpl, minSpend, search, sortKey]);
+
 
   const runSync = async () => {
     setSyncing(true);
@@ -260,6 +298,7 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
                 <SelectItem value="cpl_desc">Worst cost per lead</SelectItem>
                 <SelectItem value="spend_desc">Most spend</SelectItem>
                 <SelectItem value="leads_desc">Most leads</SelectItem>
+                <SelectItem value="newest">Newest added</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -309,17 +348,37 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((ad) => {
+          {filtered.slice(0, visibleCount).map((ad) => {
             const kind = mediaKind(ad);
             const thumb = ad.video_thumbnail_url || ad.full_image_url || ad.image_url;
+            const downloadUrl =
+              kind === 'video'
+                ? ad.video_source_url || thumb
+                : ad.full_image_url || ad.image_url;
+            const hovering = hoveredId === ad.id;
             return (
-              <Card key={ad.id} className="overflow-hidden flex flex-col">
+              <Card
+                key={ad.id}
+                className="group overflow-hidden flex flex-col"
+                onMouseEnter={() => setHoveredId(ad.id)}
+                onMouseLeave={() => setHoveredId((c) => (c === ad.id ? null : c))}
+              >
                 <button
                   type="button"
                   className="relative aspect-square w-full bg-muted"
                   onClick={() => setDetailAd(ad)}
                 >
-                  {thumb ? (
+                  {kind === 'video' && hovering && ad.video_source_url ? (
+                    <video
+                      src={ad.video_source_url}
+                      poster={thumb || undefined}
+                      className="h-full w-full object-cover"
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                    />
+                  ) : thumb ? (
                     <img
                       src={thumb}
                       alt={ad.name || 'Ad creative'}
@@ -343,6 +402,9 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
                 <CardContent className="flex flex-1 flex-col gap-2 p-3">
                   <p className="line-clamp-2 text-sm font-medium">{ad.name || 'Untitled ad'}</p>
                   <p className="text-xs text-muted-foreground">{clientName(ad.client_id)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Added {shortDate(ad.created_at)}
+                  </p>
                   <div className="grid grid-cols-3 gap-1 text-center text-xs">
                     <div>
                       <p className="font-semibold">{money(ad.cost_per_lead)}</p>
@@ -357,25 +419,56 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
                       <p className="text-muted-foreground">Spend</p>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-auto min-h-[40px]"
-                    onClick={() => {
-                      setRecreateAd(ad);
-                      setResult(null);
-                      setNotes('');
-                      setTargetClient('');
-                    }}
-                  >
-                    <Copy className="mr-2 h-4 w-4" /> Copy & recreate
-                  </Button>
+                  <div className="mt-auto flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 min-h-[40px]"
+                      onClick={() => {
+                        setRecreateAd(ad);
+                        setResult(null);
+                        setNotes('');
+                        setTargetClient('');
+                      }}
+                    >
+                      <Copy className="mr-2 h-4 w-4" /> Copy & recreate
+                    </Button>
+                    {downloadUrl && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="min-h-[40px]"
+                        aria-label="Download creative"
+                        onClick={() =>
+                          downloadAsset(
+                            downloadUrl,
+                            `${(ad.name || 'creative').replace(/[^\w.-]+/g, '-')}.${kind === 'video' ? 'mp4' : 'jpg'}`,
+                          )
+                        }
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );
           })}
         </div>
       )}
+
+      {!isLoading && filtered.length > visibleCount && (
+        <div className="flex justify-center pt-2">
+          <Button
+            variant="outline"
+            className="min-h-[44px]"
+            onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+          >
+            Load more ({filtered.length - visibleCount} left)
+          </Button>
+        </div>
+      )}
+
 
       {/* Detail */}
       <Dialog open={!!detailAd} onOpenChange={(o) => !o && setDetailAd(null)}>
