@@ -297,6 +297,7 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
                 <SelectItem value="cpl_desc">Worst cost per lead</SelectItem>
                 <SelectItem value="spend_desc">Most spend</SelectItem>
                 <SelectItem value="leads_desc">Most leads</SelectItem>
+                <SelectItem value="newest">Newest added</SelectItem>
               </SelectContent>
             </Select>
           </div>
