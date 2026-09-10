@@ -15,6 +15,7 @@ import {
   computeRollup,
   type RollupSummary,
 } from '../../supabase/functions/_shared/clientConnections';
+import { CONNECTION_TIMEOUT_MS, countVisibleOffers, withTimeout } from '@/lib/connectionsDisplay';
 
 export type SettingsSource = 'huddle' | 'client_settings' | 'agent_api';
 
@@ -183,7 +184,9 @@ export function useConnectionsSummary(clientId?: string) {
   const rollup = computeRollup((accounts.data || []) as any);
   return {
     isLoading: accounts.isLoading || offers.isLoading,
-    offersActive: (offers.data || []).filter((o) => o.status === 'active').length,
+    // Same records the Offers panel renders: everything not archived, legacy
+    // rows with no status included.
+    offersActive: countVisibleOffers(offers.data || []),
     rollup,
     accounts: accounts.data || [],
     offers: offers.data || [],
