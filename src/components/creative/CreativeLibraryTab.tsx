@@ -110,6 +110,9 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
   const [detailAd, setDetailAd] = useState<LibraryAd | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [brokenIds, setBrokenIds] = useState<Set<string>>(new Set());
+  const markBroken = (id: string) =>
+    setBrokenIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
 
   const [recreateAd, setRecreateAd] = useState<LibraryAd | null>(null);
   const [targetClient, setTargetClient] = useState('');
@@ -144,6 +147,12 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
 
   const filtered = useMemo(() => {
     let rows = ads || [];
+    // Hide creatives with no usable media and ones whose media failed to load
+    rows = rows.filter(
+      (a) =>
+        !brokenIds.has(a.id) &&
+        !!(a.video_thumbnail_url || a.full_image_url || a.image_url || a.video_source_url),
+    );
     if (clientFilter !== 'all') rows = rows.filter((a) => a.client_id === clientFilter);
     if (mediaFilter !== 'all') rows = rows.filter((a) => mediaKind(a) === mediaFilter);
     const cplCap = parseFloat(maxCpl);
@@ -181,7 +190,7 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
       }
     });
     return sorted;
-  }, [ads, clientFilter, mediaFilter, maxCpl, minSpend, search, sortKey]);
+  }, [ads, brokenIds, clientFilter, mediaFilter, maxCpl, minSpend, search, sortKey]);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -384,6 +393,7 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
                       alt={ad.name || 'Ad creative'}
                       loading="lazy"
                       className="h-full w-full object-cover"
+                      onError={() => markBroken(ad.id)}
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center text-muted-foreground">
