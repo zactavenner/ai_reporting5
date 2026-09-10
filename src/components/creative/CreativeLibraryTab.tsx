@@ -144,6 +144,12 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
 
   const filtered = useMemo(() => {
     let rows = ads || [];
+    // Hide creatives with no usable media and ones whose media failed to load
+    rows = rows.filter(
+      (a) =>
+        !brokenIds.has(a.id) &&
+        !!(a.video_thumbnail_url || a.full_image_url || a.image_url || a.video_source_url),
+    );
     if (clientFilter !== 'all') rows = rows.filter((a) => a.client_id === clientFilter);
     if (mediaFilter !== 'all') rows = rows.filter((a) => mediaKind(a) === mediaFilter);
     const cplCap = parseFloat(maxCpl);
