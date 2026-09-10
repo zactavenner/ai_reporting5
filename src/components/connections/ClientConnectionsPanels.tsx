@@ -166,8 +166,8 @@ export function OffersPanel({ clientId, source }: { clientId: string; source: Se
   const canEdit = useCanEditConnections();
   const { data: offers = [], isLoading } = useConnectionOffers(clientId);
   const [editing, setEditing] = useState<ConnectionOffer | 'new' | null>(null);
-  const active = offers.filter((o) => o.status !== 'archived');
-  const archived = offers.filter((o) => o.status === 'archived');
+  const active = visibleOffers(offers);
+  const archived = archivedOffers(offers);
 
   return (
     <Card className="p-4 space-y-3">
