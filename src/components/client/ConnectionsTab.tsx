@@ -189,7 +189,7 @@ export default function ConnectionsTab({ clientId }: { clientId: string }) {
       </div>
 
       {/* Canonical offers / ad accounts / GHL panels, shared with the Huddle */}
-      <ClientConnectionsPanelGroup clientId={clientId} source="client_settings" />
+      <ClientConnectionsPanelGroup clientId={clientId} source="client_settings" showApiCopy />
 
       <div className="pt-2">
         <h3 className="text-sm font-semibold">Other integrations</h3>

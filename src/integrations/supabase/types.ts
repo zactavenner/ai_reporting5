@@ -1736,6 +1736,68 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_api_idempotency: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          endpoint: string
+          id: string
+          idempotency_key: string
+          request_fingerprint: string
+          response_body: Json
+          response_status: number
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          endpoint: string
+          id?: string
+          idempotency_key: string
+          request_fingerprint: string
+          response_body: Json
+          response_status: number
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          endpoint?: string
+          id?: string
+          idempotency_key?: string
+          request_fingerprint?: string
+          response_body?: Json
+          response_status?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_api_idempotency_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "agent_api_idempotency_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_api_idempotency_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "agent_api_idempotency_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       agent_channels: {
         Row: {
           agent_id: string | null
