@@ -103,8 +103,8 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>('all');
   const [sortKey, setSortKey] = useState<SortKey>('cpl_asc');
-  const [maxCpl, setMaxCpl] = useState('');
-  const [minSpend, setMinSpend] = useState('');
+  const [maxCpl, setMaxCpl] = useState('150');
+  const [minSpend, setMinSpend] = useState('200');
   const [search, setSearch] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [detailAd, setDetailAd] = useState<LibraryAd | null>(null);
@@ -157,7 +157,10 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
     if (mediaFilter !== 'all') rows = rows.filter((a) => mediaKind(a) === mediaFilter);
     const cplCap = parseFloat(maxCpl);
     if (!Number.isNaN(cplCap)) {
-      rows = rows.filter((a) => a.cost_per_lead != null && a.cost_per_lead <= cplCap);
+      // Exclude statics whose cost per lead exceeds the cap; videos are unaffected.
+      rows = rows.filter(
+        (a) => mediaKind(a) === 'video' || (a.cost_per_lead != null && a.cost_per_lead <= cplCap),
+      );
     }
     const spendFloor = parseFloat(minSpend);
     if (!Number.isNaN(spendFloor)) rows = rows.filter((a) => (a.spend || 0) >= spendFloor);
@@ -312,11 +315,11 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
             </Select>
           </div>
           <div>
-            <Label className="text-xs">Max cost/lead</Label>
+            <Label className="text-xs">Max cost/lead (statics)</Label>
             <Input
               className="min-h-[44px]"
               inputMode="decimal"
-              placeholder="e.g. 60"
+              placeholder="e.g. 150"
               value={maxCpl}
               onChange={(e) => setMaxCpl(e.target.value)}
             />
@@ -326,7 +329,7 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
             <Input
               className="min-h-[44px]"
               inputMode="decimal"
-              placeholder="e.g. 250"
+              placeholder="e.g. 200"
               value={minSpend}
               onChange={(e) => setMinSpend(e.target.value)}
             />
