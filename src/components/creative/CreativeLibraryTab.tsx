@@ -393,6 +393,7 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
                       alt={ad.name || 'Ad creative'}
                       loading="lazy"
                       className="h-full w-full object-cover"
+                      onError={() => markBroken(ad.id)}
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center text-muted-foreground">
