@@ -72,30 +72,6 @@ const navStructure = [
     icon: LayoutDashboard,
   },
   {
-    title: 'Approvals',
-    value: 'approvals',
-    icon: Inbox,
-    href: '/approvals',
-  },
-  {
-    title: 'Media Buyer',
-    value: 'media-buyer',
-    icon: TrendingUp,
-    href: '/media-buyer',
-  },
-  {
-    title: 'Lead Quality',
-    value: 'lead-quality',
-    icon: UserCheck,
-    href: '/lead-quality',
-  },
-  {
-    title: 'Weekly Report (Parity)',
-    value: 'weekly-parity',
-    icon: FileText,
-    href: '/weekly-parity',
-  },
-  {
     title: 'Daily Huddle',
     value: 'huddle',
     icon: Timer,
@@ -114,18 +90,6 @@ const navStructure = [
     href: '/whatsapp',
   },
   {
-    title: 'Call Bridge',
-    value: 'call-bridge',
-    icon: PhoneForwarded,
-    href: '/call-bridge',
-  },
-  {
-    title: 'Data Health',
-    value: 'data-health',
-    icon: Activity,
-    href: '/data-health',
-  },
-  {
     title: 'Agent Infrastructure',
     value: 'agent-infrastructure',
     icon: Cpu,
@@ -135,21 +99,6 @@ const navStructure = [
     title: 'Tasks',
     value: 'tasks',
     icon: ClipboardCheck,
-  },
-  {
-    title: 'Email',
-    value: 'email',
-    icon: MessageSquare,
-  },
-  {
-    title: 'Onboarding',
-    value: 'onboarding',
-    icon: Users,
-  },
-  {
-    title: 'AM Workspace',
-    value: 'am-workspace',
-    icon: Sparkles,
   },
   {
     title: 'AI Studio',
@@ -184,6 +133,7 @@ const navStructure = [
     value: 'creatives-group',
     icon: Palette,
     children: [
+      { title: 'Creative Library', value: 'creative-library', icon: Megaphone },
       { title: 'Ads Generator', value: 'ads-generator-ext', icon: ExternalLink, externalUrl: 'https://id-preview--b57a79c0-3e59-4a78-be94-340c58fe824e.lovable.app' },
       { title: 'Top Performers', value: 'top-performers', icon: TrendingUp },
     ],
@@ -192,22 +142,6 @@ const navStructure = [
     title: 'Offers',
     value: 'offers',
     icon: FileText,
-  },
-  {
-    title: 'Funnel Builder',
-    value: 'funnel-group',
-    icon: Smartphone,
-    children: [
-      { title: 'Funnel Overview', value: 'funnel-builder', icon: Globe },
-      { title: 'Quiz Builder', value: 'funnel-quiz', icon: HelpCircle },
-      { title: 'Booking Pages', value: 'funnel-booking', icon: Calendar },
-      { title: 'Sales Deck', value: 'funnel-deck', icon: BookOpen },
-      { title: 'Investment Page', value: 'funnel-invest', icon: DollarSign },
-      { title: 'Onboarding', value: 'funnel-onboarding', icon: Users },
-      { title: 'Fulfillment', value: 'funnel-fulfillment', icon: CheckCircle2 },
-      { title: 'Kickoff', value: 'funnel-kickoff', icon: Zap },
-      { title: 'Funnel Analytics', value: 'funnel-analytics', icon: BarChart2 },
-    ],
   },
   {
     title: 'Settings',
