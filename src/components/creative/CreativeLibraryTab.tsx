@@ -107,6 +107,8 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
   const [search, setSearch] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [detailAd, setDetailAd] = useState<LibraryAd | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const [recreateAd, setRecreateAd] = useState<LibraryAd | null>(null);
   const [targetClient, setTargetClient] = useState('');
