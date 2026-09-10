@@ -86,7 +86,7 @@ async function downloadAsset(url: string, filename: string) {
 }
 
 type MediaFilter = 'all' | 'video' | 'image';
-type SortKey = 'cpl_asc' | 'cpl_desc' | 'spend_desc' | 'leads_desc';
+type SortKey = 'cpl_asc' | 'cpl_desc' | 'spend_desc' | 'leads_desc' | 'newest';
 
 const money = (v: number | null | undefined) =>
   v == null ? '—' : `$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
