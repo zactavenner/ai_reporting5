@@ -774,9 +774,7 @@ export function GhlPanel({ clientId, source }: { clientId: string; source: Setti
           {canEdit && <div className="pt-1"><RevokeButton clientId={clientId} source={source} integration="ghl" /></div>}
         </div>
       ) : (
-        <div className="text-xs text-muted-foreground">
-          {canEdit ? 'Loading connection status…' : 'Sign in as an agency operator to see connection status.'}
-        </div>
+        <ConnectionStatusMessage view={statusView} onRetry={() => integrationsQuery.refetch()} />
       )}
 
       <CredentialDialog clientId={clientId} source={source} integration="ghl" open={credential} onOpenChange={setCredential} />
