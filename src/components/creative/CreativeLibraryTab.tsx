@@ -315,11 +315,11 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
             </Select>
           </div>
           <div>
-            <Label className="text-xs">Max cost/lead</Label>
+            <Label className="text-xs">Max cost/lead (statics)</Label>
             <Input
               className="min-h-[44px]"
               inputMode="decimal"
-              placeholder="e.g. 60"
+              placeholder="e.g. 150"
               value={maxCpl}
               onChange={(e) => setMaxCpl(e.target.value)}
             />
@@ -329,7 +329,7 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
             <Input
               className="min-h-[44px]"
               inputMode="decimal"
-              placeholder="e.g. 250"
+              placeholder="e.g. 200"
               value={minSpend}
               onChange={(e) => setMinSpend(e.target.value)}
             />
