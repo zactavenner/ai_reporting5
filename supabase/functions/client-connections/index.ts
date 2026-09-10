@@ -169,10 +169,17 @@ Deno.serve(async (req) => {
   const auth = await authorizeOperator(req, supabase, createClient, body);
   if (!auth.ok) return json({ error: auth.error, code: auth.code }, auth.status);
 
+  // A trusted server-side caller (the agent API) may pass through the acting
+  // identity for the audit trail. Any other caller's label is ignored.
+  const delegatedLabel =
+    auth.via === 'service_role' && typeof body?.actor_label === 'string'
+      ? String(body.actor_label).slice(0, 120)
+      : null;
   const actor: Actor = {
-    label: auth.memberName || (auth.via === 'service_role' ? 'service' : auth.userId || auth.via),
+    label: delegatedLabel || auth.memberName || (auth.via === 'service_role' ? 'service' : auth.userId || auth.via),
     userId: auth.userId,
   };
+
   const source = normalizeAuditSource(body?.source);
   const action = String(body?.action || '');
   const clientId = body?.client_id ? String(body.client_id) : '';
