@@ -110,6 +110,9 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
   const [detailAd, setDetailAd] = useState<LibraryAd | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [brokenIds, setBrokenIds] = useState<Set<string>>(new Set());
+  const markBroken = (id: string) =>
+    setBrokenIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
 
   const [recreateAd, setRecreateAd] = useState<LibraryAd | null>(null);
   const [targetClient, setTargetClient] = useState('');
