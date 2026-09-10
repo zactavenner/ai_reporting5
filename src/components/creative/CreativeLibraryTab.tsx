@@ -57,6 +57,32 @@ interface LibraryAd {
   generation_prompt: string | null;
   generation_source: string | null;
   status: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+const PAGE_SIZE = 24;
+
+const shortDate = (v: string | null | undefined) =>
+  v
+    ? new Date(v).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : '—';
+
+async function downloadAsset(url: string, filename: string) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(href);
+  } catch {
+    window.open(url, '_blank', 'noopener');
+  }
 }
 
 type MediaFilter = 'all' | 'video' | 'image';
