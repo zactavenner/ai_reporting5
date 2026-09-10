@@ -85,6 +85,7 @@ import { AvatarAdWizard } from '@/components/avatar-ad/AvatarAdWizard';
 const StaticCreativesInline = lazy(() => import('@/pages/StaticCreativesPage'));
 const AvatarAdGenInline = lazy(() => Promise.resolve({ default: () => <AvatarAdProvider><AvatarAdWizard /></AvatarAdProvider> }));
 import { TopPerformersSection } from '@/components/creative/TopPerformersSection';
+import { CreativeLibraryTab } from '@/components/creative/CreativeLibraryTab';
 import { TopPerformerUploadsSection } from '@/components/creative/TopPerformerUploadsSection';
 
 const Index = () => {
@@ -619,6 +620,16 @@ const Index = () => {
                 </Suspense>
               </SectionErrorBoundary>
             )}
+
+            {/* Creative Library */}
+            {activeTab === 'creative-library' && (
+              <SectionErrorBoundary sectionName="Creative Library">
+                <Suspense fallback={<div className="animate-pulse h-64 bg-muted/30 rounded-lg" />}>
+                  <CreativeLibraryTab clients={clients} />
+                </Suspense>
+              </SectionErrorBoundary>
+            )}
+
 
             {/* Top Performers */}
             {activeTab === 'top-performers' && (
