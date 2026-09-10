@@ -457,6 +457,19 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
         </div>
       )}
 
+      {!isLoading && filtered.length > visibleCount && (
+        <div className="flex justify-center pt-2">
+          <Button
+            variant="outline"
+            className="min-h-[44px]"
+            onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+          >
+            Load more ({filtered.length - visibleCount} left)
+          </Button>
+        </div>
+      )}
+
+
       {/* Detail */}
       <Dialog open={!!detailAd} onOpenChange={(o) => !o && setDetailAd(null)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
