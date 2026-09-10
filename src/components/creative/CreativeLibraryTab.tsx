@@ -171,12 +171,21 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
           return (b.cost_per_lead ?? -1) - (a.cost_per_lead ?? -1);
         case 'leads_desc':
           return (b.attributed_leads ?? 0) - (a.attributed_leads ?? 0);
+        case 'newest':
+          return (
+            new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+          );
         default:
           return (b.spend ?? 0) - (a.spend ?? 0);
       }
     });
     return sorted;
   }, [ads, clientFilter, mediaFilter, maxCpl, minSpend, search, sortKey]);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [clientFilter, mediaFilter, maxCpl, minSpend, search, sortKey]);
+
 
   const runSync = async () => {
     setSyncing(true);
