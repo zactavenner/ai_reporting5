@@ -9402,6 +9402,68 @@ export type Database = {
           },
         ]
       }
+      creative_recreations: {
+        Row: {
+          angle_notes: string | null
+          created_at: string
+          created_by: string | null
+          error: string | null
+          id: string
+          image_prompt: string | null
+          image_url: string | null
+          model: string | null
+          script: string | null
+          source_ad_name: string | null
+          source_client_id: string | null
+          source_meta_ad_id: string | null
+          status: string
+          target_client_id: string
+          updated_at: string
+        }
+        Insert: {
+          angle_notes?: string | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          image_prompt?: string | null
+          image_url?: string | null
+          model?: string | null
+          script?: string | null
+          source_ad_name?: string | null
+          source_client_id?: string | null
+          source_meta_ad_id?: string | null
+          status?: string
+          target_client_id: string
+          updated_at?: string
+        }
+        Update: {
+          angle_notes?: string | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          image_prompt?: string | null
+          image_url?: string | null
+          model?: string | null
+          script?: string | null
+          source_ad_name?: string | null
+          source_client_id?: string | null
+          source_meta_ad_id?: string | null
+          status?: string
+          target_client_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_recreations_source_meta_ad_id_fkey"
+            columns: ["source_meta_ad_id"]
+            isOneToOne: false
+            referencedRelation: "meta_ads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creative_video_jobs: {
         Row: {
           aspect_ratio: string
@@ -17191,6 +17253,8 @@ export type Database = {
           ctr: number | null
           effective_status: string | null
           full_image_url: string | null
+          generation_prompt: string | null
+          generation_source: string | null
           headline: string | null
           id: string
           image_url: string | null
@@ -17211,6 +17275,10 @@ export type Database = {
           status: string | null
           synced_at: string | null
           thumbnail_url: string | null
+          transcript: string | null
+          transcript_error: string | null
+          transcript_status: string | null
+          transcript_updated_at: string | null
           updated_at: string | null
           video_source_url: string | null
           video_thumbnail_url: string | null
@@ -17239,6 +17307,8 @@ export type Database = {
           ctr?: number | null
           effective_status?: string | null
           full_image_url?: string | null
+          generation_prompt?: string | null
+          generation_source?: string | null
           headline?: string | null
           id?: string
           image_url?: string | null
@@ -17259,6 +17329,10 @@ export type Database = {
           status?: string | null
           synced_at?: string | null
           thumbnail_url?: string | null
+          transcript?: string | null
+          transcript_error?: string | null
+          transcript_status?: string | null
+          transcript_updated_at?: string | null
           updated_at?: string | null
           video_source_url?: string | null
           video_thumbnail_url?: string | null
@@ -17287,6 +17361,8 @@ export type Database = {
           ctr?: number | null
           effective_status?: string | null
           full_image_url?: string | null
+          generation_prompt?: string | null
+          generation_source?: string | null
           headline?: string | null
           id?: string
           image_url?: string | null
@@ -17307,6 +17383,10 @@ export type Database = {
           status?: string | null
           synced_at?: string | null
           thumbnail_url?: string | null
+          transcript?: string | null
+          transcript_error?: string | null
+          transcript_status?: string | null
+          transcript_updated_at?: string | null
           updated_at?: string | null
           video_source_url?: string | null
           video_thumbnail_url?: string | null
