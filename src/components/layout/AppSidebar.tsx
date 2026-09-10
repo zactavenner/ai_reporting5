@@ -133,6 +133,7 @@ const navStructure = [
     value: 'creatives-group',
     icon: Palette,
     children: [
+      { title: 'Creative Library', value: 'creative-library', icon: Megaphone },
       { title: 'Ads Generator', value: 'ads-generator-ext', icon: ExternalLink, externalUrl: 'https://id-preview--b57a79c0-3e59-4a78-be94-340c58fe824e.lovable.app' },
       { title: 'Top Performers', value: 'top-performers', icon: TrendingUp },
     ],
@@ -141,22 +142,6 @@ const navStructure = [
     title: 'Offers',
     value: 'offers',
     icon: FileText,
-  },
-  {
-    title: 'Funnel Builder',
-    value: 'funnel-group',
-    icon: Smartphone,
-    children: [
-      { title: 'Funnel Overview', value: 'funnel-builder', icon: Globe },
-      { title: 'Quiz Builder', value: 'funnel-quiz', icon: HelpCircle },
-      { title: 'Booking Pages', value: 'funnel-booking', icon: Calendar },
-      { title: 'Sales Deck', value: 'funnel-deck', icon: BookOpen },
-      { title: 'Investment Page', value: 'funnel-invest', icon: DollarSign },
-      { title: 'Onboarding', value: 'funnel-onboarding', icon: Users },
-      { title: 'Fulfillment', value: 'funnel-fulfillment', icon: CheckCircle2 },
-      { title: 'Kickoff', value: 'funnel-kickoff', icon: Zap },
-      { title: 'Funnel Analytics', value: 'funnel-analytics', icon: BarChart2 },
-    ],
   },
   {
     title: 'Settings',
