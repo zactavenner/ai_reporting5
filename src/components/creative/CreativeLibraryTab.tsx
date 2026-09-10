@@ -190,7 +190,7 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
       }
     });
     return sorted;
-  }, [ads, clientFilter, mediaFilter, maxCpl, minSpend, search, sortKey]);
+  }, [ads, brokenIds, clientFilter, mediaFilter, maxCpl, minSpend, search, sortKey]);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
