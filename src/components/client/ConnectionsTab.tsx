@@ -30,6 +30,8 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { ClientConnectionsPanelGroup } from '@/components/connections/ClientConnectionsSection';
+
 
 type PlatformId = 'meta' | 'ghl' | 'hubspot' | 'meetgeek' | 'fathom';
 
@@ -178,12 +180,23 @@ export default function ConnectionsTab({ clientId }: { clientId: string }) {
       <div>
         <h2 className="text-2xl font-bold flex items-center gap-2">
           <Plug className="h-5 w-5" />
-          Connections
+          Connections &amp; Settings
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Single source of truth for every integration on this client. Edit once — everything else (dashboards, syncs, ad manager) reads from here.
+          Single source of truth for this client's offers, Meta ad accounts and integrations. The Daily Huddle shows the
+          exact same records — a change saved in either place appears in the other.
         </p>
       </div>
+
+      {/* Canonical offers / ad accounts / GHL panels, shared with the Huddle */}
+      <ClientConnectionsPanelGroup clientId={clientId} source="client_settings" />
+
+      <div className="pt-2">
+        <h3 className="text-sm font-semibold">Other integrations</h3>
+        <p className="text-xs text-muted-foreground">Credential fields below are stored server-side.</p>
+      </div>
+
+
 
       <div className="grid gap-3">
         {PLATFORMS.map((p) => {
