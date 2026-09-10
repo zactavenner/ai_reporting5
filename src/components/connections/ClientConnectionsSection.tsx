@@ -20,6 +20,8 @@ import {
   RollupSummaryCard,
 } from './ClientConnectionsPanels';
 import { useConnectionsSummary, type SettingsSource } from '@/hooks/useClientConnections';
+import { AgentApiPanel } from './AgentApiPanel';
+
 
 function SummaryChips({ clientId }: { clientId: string }) {
   const { offersActive, rollup, accounts } = useConnectionsSummary(clientId);
@@ -46,10 +48,12 @@ export function ClientConnectionsPanelGroup({
   clientId,
   source,
   showAudit = true,
+  showApiCopy = false,
 }: {
   clientId: string;
   source: SettingsSource;
   showAudit?: boolean;
+  showApiCopy?: boolean;
 }) {
   const { rollup } = useConnectionsSummary(clientId);
   return (
@@ -61,9 +65,11 @@ export function ClientConnectionsPanelGroup({
       </div>
       <MetaPanel clientId={clientId} source={source} />
       {showAudit && <ConnectionAuditPanel clientId={clientId} />}
+      {showApiCopy && <AgentApiPanel />}
     </div>
   );
 }
+
 
 export function ClientConnectionsSection({
   clientId,
