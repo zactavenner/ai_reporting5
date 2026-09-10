@@ -32,6 +32,7 @@ import {
   Loader2,
   FileText,
   Sparkles,
+  Download,
 } from 'lucide-react';
 
 interface LibraryAd {
