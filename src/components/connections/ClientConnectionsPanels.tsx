@@ -53,6 +53,12 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
+  archivedOffers,
+  resolveConnectionStatusView,
+  visibleOffers,
+  type ConnectionStatusView,
+} from '@/lib/connectionsDisplay';
+import {
   useAddAdAccount,
   useClientAdAccounts,
   useClientIntegrations,
