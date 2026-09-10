@@ -146,7 +146,13 @@ export function useConnectionOffers(clientId?: string) {
 export function useClientIntegrations(clientId?: string, enabled = true) {
   return useQuery({
     queryKey: ['client-integrations', clientId],
-    queryFn: () => callConnections<IntegrationMetadata>({ action: 'get_integrations', client_id: clientId }),
+    // Hard timeout: a hung edge call must surface as an error state, never as
+    // an indefinite "Loading connection status…" spinner.
+    queryFn: () =>
+      withTimeout(
+        callConnections<IntegrationMetadata>({ action: 'get_integrations', client_id: clientId }),
+        CONNECTION_TIMEOUT_MS,
+      ),
     enabled: !!clientId && enabled,
     staleTime: 60_000,
     retry: false,
