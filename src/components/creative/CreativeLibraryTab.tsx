@@ -103,8 +103,8 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>('all');
   const [sortKey, setSortKey] = useState<SortKey>('cpl_asc');
-  const [maxCpl, setMaxCpl] = useState('');
-  const [minSpend, setMinSpend] = useState('');
+  const [maxCpl, setMaxCpl] = useState('150');
+  const [minSpend, setMinSpend] = useState('200');
   const [search, setSearch] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [detailAd, setDetailAd] = useState<LibraryAd | null>(null);
