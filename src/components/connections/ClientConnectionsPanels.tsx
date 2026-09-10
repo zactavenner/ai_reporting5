@@ -53,6 +53,12 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
+  archivedOffers,
+  resolveConnectionStatusView,
+  visibleOffers,
+  type ConnectionStatusView,
+} from '@/lib/connectionsDisplay';
+import {
   useAddAdAccount,
   useClientAdAccounts,
   useClientIntegrations,
@@ -115,6 +121,29 @@ const STATE_LABELS: Record<string, string> = {
   failed: 'Failed',
 };
 
+/**
+ * Terminal state renderer for connection status. Loaded is handled by the
+ * caller; every other outcome (unauthorized, unavailable, sanitized error)
+ * ends here so no panel can spin forever.
+ */
+function ConnectionStatusMessage({ view, onRetry }: { view: ConnectionStatusView; onRetry?: () => void }) {
+  if (view.kind === 'loaded') return null;
+  const failed = view.kind === 'unavailable' || view.kind === 'error';
+  return (
+    <div className={cn('text-xs flex items-center gap-2 flex-wrap', failed ? 'text-amber-600' : 'text-muted-foreground')}>
+      {view.kind === 'loading' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+      {failed && <AlertTriangle className="h-3.5 w-3.5" />}
+      <span>{view.message}</span>
+      {failed && onRetry && (
+        <Button size="sm" variant="outline" className="h-6 text-[11px] gap-1" onClick={onRetry}>
+          <RefreshCw className="h-3 w-3" /> Retry
+        </Button>
+      )}
+    </div>
+  );
+}
+
+
 /* ────────────────────────────── Roll-up card ────────────────────────────── */
 
 export function RollupSummaryCard({ rollup }: { rollup: RollupSummary }) {
@@ -160,8 +189,8 @@ export function OffersPanel({ clientId, source }: { clientId: string; source: Se
   const canEdit = useCanEditConnections();
   const { data: offers = [], isLoading } = useConnectionOffers(clientId);
   const [editing, setEditing] = useState<ConnectionOffer | 'new' | null>(null);
-  const active = offers.filter((o) => o.status !== 'archived');
-  const archived = offers.filter((o) => o.status === 'archived');
+  const active = visibleOffers(offers);
+  const archived = archivedOffers(offers);
 
   return (
     <Card className="p-4 space-y-3">
@@ -326,7 +355,15 @@ function OfferDialog({
 export function MetaPanel({ clientId, source }: { clientId: string; source: SettingsSource }) {
   const canEdit = useCanEditConnections();
   const { data: accounts = [], isLoading } = useClientAdAccounts(clientId);
-  const { data: integrations } = useClientIntegrations(clientId, canEdit);
+  const integrationsQuery = useClientIntegrations(clientId, canEdit);
+  const integrations = integrationsQuery.data;
+  const statusView = resolveConnectionStatusView({
+    canEdit,
+    hasData: !!integrations,
+    isPending: integrationsQuery.isPending || integrationsQuery.isFetching,
+    isError: integrationsQuery.isError,
+    error: integrationsQuery.error,
+  });
   const patch = usePatchAdAccount(clientId, source);
   const disconnect = useDisconnectAdAccount(clientId, source);
   const test = useTestConnection(clientId, source);
@@ -379,9 +416,7 @@ export function MetaPanel({ clientId, source }: { clientId: string; source: Sett
             )}
           </>
         ) : (
-          <div className="text-muted-foreground">
-            {canEdit ? 'Loading connection status…' : 'Sign in as an agency operator to see connection status.'}
-          </div>
+          <ConnectionStatusMessage view={statusView} onRetry={() => integrationsQuery.refetch()} />
         )}
       </div>
 
@@ -688,10 +723,17 @@ function CredentialDialog({
 
 export function GhlPanel({ clientId, source }: { clientId: string; source: SettingsSource }) {
   const canEdit = useCanEditConnections();
-  const { data: integrations } = useClientIntegrations(clientId, canEdit);
+  const integrationsQuery = useClientIntegrations(clientId, canEdit);
   const test = useTestConnection(clientId, source);
   const [credential, setCredential] = useState(false);
-  const ghl = integrations?.ghl;
+  const ghl = integrationsQuery.data?.ghl;
+  const statusView = resolveConnectionStatusView({
+    canEdit,
+    hasData: !!ghl,
+    isPending: integrationsQuery.isPending || integrationsQuery.isFetching,
+    isError: integrationsQuery.isError,
+    error: integrationsQuery.error,
+  });
 
   return (
     <Card className="p-4 space-y-3">
@@ -732,9 +774,7 @@ export function GhlPanel({ clientId, source }: { clientId: string; source: Setti
           {canEdit && <div className="pt-1"><RevokeButton clientId={clientId} source={source} integration="ghl" /></div>}
         </div>
       ) : (
-        <div className="text-xs text-muted-foreground">
-          {canEdit ? 'Loading connection status…' : 'Sign in as an agency operator to see connection status.'}
-        </div>
+        <ConnectionStatusMessage view={statusView} onRetry={() => integrationsQuery.refetch()} />
       )}
 
       <CredentialDialog clientId={clientId} source={source} integration="ghl" open={credential} onOpenChange={setCredential} />

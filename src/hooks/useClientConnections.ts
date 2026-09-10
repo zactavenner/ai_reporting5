@@ -15,6 +15,7 @@ import {
   computeRollup,
   type RollupSummary,
 } from '../../supabase/functions/_shared/clientConnections';
+import { CONNECTION_TIMEOUT_MS, countVisibleOffers, withTimeout } from '@/lib/connectionsDisplay';
 
 export type SettingsSource = 'huddle' | 'client_settings' | 'agent_api';
 
@@ -146,7 +147,13 @@ export function useConnectionOffers(clientId?: string) {
 export function useClientIntegrations(clientId?: string, enabled = true) {
   return useQuery({
     queryKey: ['client-integrations', clientId],
-    queryFn: () => callConnections<IntegrationMetadata>({ action: 'get_integrations', client_id: clientId }),
+    // Hard timeout: a hung edge call must surface as an error state, never as
+    // an indefinite "Loading connection status…" spinner.
+    queryFn: () =>
+      withTimeout(
+        callConnections<IntegrationMetadata>({ action: 'get_integrations', client_id: clientId }),
+        CONNECTION_TIMEOUT_MS,
+      ),
     enabled: !!clientId && enabled,
     staleTime: 60_000,
     retry: false,
@@ -177,7 +184,9 @@ export function useConnectionsSummary(clientId?: string) {
   const rollup = computeRollup((accounts.data || []) as any);
   return {
     isLoading: accounts.isLoading || offers.isLoading,
-    offersActive: (offers.data || []).filter((o) => o.status === 'active').length,
+    // Same records the Offers panel renders: everything not archived, legacy
+    // rows with no status included.
+    offersActive: countVisibleOffers(offers.data || []),
     rollup,
     accounts: accounts.data || [],
     offers: offers.data || [],
