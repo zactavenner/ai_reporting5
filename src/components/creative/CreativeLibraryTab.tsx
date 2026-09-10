@@ -157,7 +157,10 @@ export function CreativeLibraryTab({ clients }: { clients: Array<{ id: string; n
     if (mediaFilter !== 'all') rows = rows.filter((a) => mediaKind(a) === mediaFilter);
     const cplCap = parseFloat(maxCpl);
     if (!Number.isNaN(cplCap)) {
-      rows = rows.filter((a) => a.cost_per_lead != null && a.cost_per_lead <= cplCap);
+      // Exclude statics whose cost per lead exceeds the cap; videos are unaffected.
+      rows = rows.filter(
+        (a) => mediaKind(a) === 'video' || (a.cost_per_lead != null && a.cost_per_lead <= cplCap),
+      );
     }
     const spendFloor = parseFloat(minSpend);
     if (!Number.isNaN(spendFloor)) rows = rows.filter((a) => (a.spend || 0) >= spendFloor);
