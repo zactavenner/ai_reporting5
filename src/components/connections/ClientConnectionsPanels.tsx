@@ -723,10 +723,17 @@ function CredentialDialog({
 
 export function GhlPanel({ clientId, source }: { clientId: string; source: SettingsSource }) {
   const canEdit = useCanEditConnections();
-  const { data: integrations } = useClientIntegrations(clientId, canEdit);
+  const integrationsQuery = useClientIntegrations(clientId, canEdit);
   const test = useTestConnection(clientId, source);
   const [credential, setCredential] = useState(false);
-  const ghl = integrations?.ghl;
+  const ghl = integrationsQuery.data?.ghl;
+  const statusView = resolveConnectionStatusView({
+    canEdit,
+    hasData: !!ghl,
+    isPending: integrationsQuery.isPending || integrationsQuery.isFetching,
+    isError: integrationsQuery.isError,
+    error: integrationsQuery.error,
+  });
 
   return (
     <Card className="p-4 space-y-3">
