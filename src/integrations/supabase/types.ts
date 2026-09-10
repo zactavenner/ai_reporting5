@@ -5422,6 +5422,125 @@ export type Database = {
           },
         ]
       }
+      client_ad_accounts: {
+        Row: {
+          account_name: string | null
+          ads_active: number | null
+          ads_paused: number | null
+          ads_total: number | null
+          adsets_count: number | null
+          business_id: string | null
+          campaigns_count: number | null
+          client_id: string
+          connection_state: string
+          counts_updated_at: string | null
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          id: string
+          is_primary: boolean
+          last_sync_at: string | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          last_verified_at: string | null
+          provider: string
+          provider_account_id: string
+          rollup_enabled: boolean
+          status: string
+          timezone_name: string | null
+          token_source: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          account_name?: string | null
+          ads_active?: number | null
+          ads_paused?: number | null
+          ads_total?: number | null
+          adsets_count?: number | null
+          business_id?: string | null
+          campaigns_count?: number | null
+          client_id: string
+          connection_state?: string
+          counts_updated_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          id?: string
+          is_primary?: boolean
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          last_verified_at?: string | null
+          provider?: string
+          provider_account_id: string
+          rollup_enabled?: boolean
+          status?: string
+          timezone_name?: string | null
+          token_source?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          account_name?: string | null
+          ads_active?: number | null
+          ads_paused?: number | null
+          ads_total?: number | null
+          adsets_count?: number | null
+          business_id?: string | null
+          campaigns_count?: number | null
+          client_id?: string
+          connection_state?: string
+          counts_updated_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          id?: string
+          is_primary?: boolean
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          last_verified_at?: string | null
+          provider?: string
+          provider_account_id?: string
+          rollup_enabled?: boolean
+          status?: string
+          timezone_name?: string | null
+          token_source?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_ad_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_ad_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_ad_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_ad_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       client_ad_assignments: {
         Row: {
           assigned_at: string | null
@@ -7152,11 +7271,13 @@ export type Database = {
           id: string
           industry_focus: string | null
           investment_range: string | null
+          is_primary: boolean
           logo_url: string | null
           meta_ad_account_id: string | null
           meta_page_id: string | null
           meta_pixel_id: string | null
           min_investment: string | null
+          notes: string | null
           offer_review_notes: string | null
           offer_reviewed_at: string | null
           offer_reviewed_by: string | null
@@ -7173,6 +7294,7 @@ export type Database = {
           timeline: string | null
           title: string
           updated_at: string
+          updated_by: string | null
           uploaded_by: string | null
           website_url: string | null
         }
@@ -7201,11 +7323,13 @@ export type Database = {
           id?: string
           industry_focus?: string | null
           investment_range?: string | null
+          is_primary?: boolean
           logo_url?: string | null
           meta_ad_account_id?: string | null
           meta_page_id?: string | null
           meta_pixel_id?: string | null
           min_investment?: string | null
+          notes?: string | null
           offer_review_notes?: string | null
           offer_reviewed_at?: string | null
           offer_reviewed_by?: string | null
@@ -7222,6 +7346,7 @@ export type Database = {
           timeline?: string | null
           title: string
           updated_at?: string
+          updated_by?: string | null
           uploaded_by?: string | null
           website_url?: string | null
         }
@@ -7250,11 +7375,13 @@ export type Database = {
           id?: string
           industry_focus?: string | null
           investment_range?: string | null
+          is_primary?: boolean
           logo_url?: string | null
           meta_ad_account_id?: string | null
           meta_page_id?: string | null
           meta_pixel_id?: string | null
           min_investment?: string | null
+          notes?: string | null
           offer_review_notes?: string | null
           offer_reviewed_at?: string | null
           offer_reviewed_by?: string | null
@@ -7271,6 +7398,7 @@ export type Database = {
           timeline?: string | null
           title?: string
           updated_at?: string
+          updated_by?: string | null
           uploaded_by?: string | null
           website_url?: string | null
         }
@@ -8041,6 +8169,74 @@ export type Database = {
           weekly_sync_timezone?: string | null
         }
         Relationships: []
+      }
+      client_settings_audit: {
+        Row: {
+          action: string
+          actor_label: string | null
+          actor_user_id: string | null
+          changes: Json
+          client_id: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          source: string
+        }
+        Insert: {
+          action: string
+          actor_label?: string | null
+          actor_user_id?: string | null
+          changes?: Json
+          client_id: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          source?: string
+        }
+        Update: {
+          action?: string
+          actor_label?: string | null
+          actor_user_id?: string | null
+          changes?: Json
+          client_id?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_settings_audit_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_settings_audit_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_settings_audit_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_settings_audit_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+        ]
       }
       client_team_members: {
         Row: {

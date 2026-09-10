@@ -7,6 +7,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { embedSheetUrl } from '@/lib/huddle/sheet';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import type { Client } from '@/hooks/useClients';
+import { ClientConnectionsSection } from '@/components/connections/ClientConnectionsSection';
+
 
 const CreativesSection = lazy(() =>
   import('@/components/creative/CreativesSection').then((m) => ({ default: m.CreativesSection })),
@@ -169,7 +171,11 @@ export function ClientReviewCard({ client }: { client: Client }) {
         </div>
       )}
 
+      {/* Connections & Settings — same records/components as the client Settings tab */}
+      <ClientConnectionsSection clientId={client.id} source="huddle" />
+
       {/* Scorecard iframe — zoomed out so more of the sheet is visible at once */}
+
       <Card className="p-0 overflow-hidden">
         <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/40">
           <div className="text-sm font-medium">Scorecard</div>
