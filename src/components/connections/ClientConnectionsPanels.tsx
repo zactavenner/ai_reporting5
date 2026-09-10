@@ -355,7 +355,15 @@ function OfferDialog({
 export function MetaPanel({ clientId, source }: { clientId: string; source: SettingsSource }) {
   const canEdit = useCanEditConnections();
   const { data: accounts = [], isLoading } = useClientAdAccounts(clientId);
-  const { data: integrations } = useClientIntegrations(clientId, canEdit);
+  const integrationsQuery = useClientIntegrations(clientId, canEdit);
+  const integrations = integrationsQuery.data;
+  const statusView = resolveConnectionStatusView({
+    canEdit,
+    hasData: !!integrations,
+    isPending: integrationsQuery.isPending || integrationsQuery.isFetching,
+    isError: integrationsQuery.isError,
+    error: integrationsQuery.error,
+  });
   const patch = usePatchAdAccount(clientId, source);
   const disconnect = useDisconnectAdAccount(clientId, source);
   const test = useTestConnection(clientId, source);
