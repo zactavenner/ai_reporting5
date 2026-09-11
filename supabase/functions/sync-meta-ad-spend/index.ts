@@ -64,6 +64,29 @@ async function loadAccounts(sb: any, clientId?: string): Promise<AccountRow[]> {
   if (clientId) q.eq('id', clientId); else q.eq('status', 'active');
   const { data, error } = await q;
   if (error) throw error;
+
+  // Canonical multi-account roster (Client Connections). Any rollup-enabled,
+  // non-archived account here is synced in addition to the legacy columns so
+  // clients with several ad accounts report the full spend.
+  const rosterByClient = new Map<string, string[]>();
+  {
+    const rq = sb.from('client_ad_accounts')
+      .select('client_id, provider, provider_account_id, rollup_enabled, status')
+      .eq('provider', 'meta');
+    if (clientId) rq.eq('client_id', clientId);
+    const { data: roster, error: rErr } = await rq;
+    if (rErr) console.warn(`client_ad_accounts read failed: ${rErr.message}`);
+    for (const r of roster ?? []) {
+      const row = r as any;
+      if (row.rollup_enabled === false) continue;
+      if (String(row.status ?? '') === 'archived') continue;
+      if (!row.provider_account_id) continue;
+      const list = rosterByClient.get(row.client_id) ?? [];
+      list.push(String(row.provider_account_id));
+      rosterByClient.set(row.client_id, list);
+    }
+  }
+
   const shared = Deno.env.get('META_SHARED_ACCESS_TOKEN') ?? '';
   const out: AccountRow[] = [];
   for (const c of data ?? []) {
@@ -72,13 +95,14 @@ async function loadAccounts(sb: any, clientId?: string): Promise<AccountRow[]> {
     const seen = new Set<string>();
     const push = (aid?: string | null) => {
       if (!aid) return;
-      const norm = aid.startsWith('act_') ? aid : `act_${aid}`;
+      const norm = String(aid).startsWith('act_') ? String(aid) : `act_${aid}`;
       if (seen.has(norm)) return;
       seen.add(norm);
       out.push({ client_id: c.id, client_name: c.name, ad_account_id: norm, token });
     };
     push(c.meta_ad_account_id);
     for (const a of c.meta_ad_account_ids ?? []) push(a);
+    for (const a of rosterByClient.get(c.id) ?? []) push(a);
   }
   return out;
 }
