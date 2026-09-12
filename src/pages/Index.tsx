@@ -448,7 +448,19 @@ const Index = () => {
                   <AISheetSummaryButton />
                 </div>
 
+                <SectionErrorBoundary sectionName="Reporting Headline">
+                  <ReportingHeadline
+                    scope={reportingScope}
+                    dailyRows={scopedDailyRows}
+                    onSourceChange={setReportingSource}
+                    sheetAvailable={sheetConfiguredCount > 0}
+                    databaseAvailable
+                    clientNameById={clientNameById}
+                  />
+                </SectionErrorBoundary>
+
                 <SectionErrorBoundary sectionName="Client Summary">
+
                   <section>
                     <div className="flex items-center justify-between mb-2">
                       <div>
