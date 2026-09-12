@@ -55,7 +55,21 @@ type IntelRow = {
 
 export default function MediaBuyerPage() {
   const { data: clients = [] } = useClients();
-  const [clientId, setClientId] = useState<string>("portfolio");
+  // One client context for the whole page, deep-linkable via ?client_id=...
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlClientId = searchParams.get('client_id') ?? '';
+  const [clientId, setClientIdState] = useState<string>(urlClientId || "portfolio");
+  useEffect(() => {
+    if (urlClientId && urlClientId !== clientId) setClientIdState(urlClientId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlClientId]);
+  const setClientId = (next: string) => {
+    setClientIdState(next);
+    const params = new URLSearchParams(searchParams);
+    if (next && next !== 'portfolio') params.set('client_id', next);
+    else params.delete('client_id');
+    setSearchParams(params, { replace: true });
+  };
   const [runningType, setRunningType] = useState<RunType | null>(null);
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [classifications, setClassifications] = useState<ClsRow[]>([]);
@@ -66,6 +80,7 @@ export default function MediaBuyerPage() {
   const clientOptions = useMemo(() => [{ id: "portfolio", name: "Portfolio (all active clients)" }, ...clients.map((c) => ({ id: c.id, name: c.name }))], [clients]);
   const clientNameById = useMemo(() => new Map(clients.map((c) => [c.id, c.name])), [clients]);
   const filterClient = clientId === "portfolio" ? null : clientId;
+
 
   async function loadAll() {
     setLoading(true);
