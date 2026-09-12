@@ -58,6 +58,9 @@ import { SourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
 import { useClientSourceMetrics, buildClientMetricsFromRPC } from '@/hooks/useClientSourceMetrics';
 import { useAllClientSettings, useAllClientFullSettings } from '@/hooks/useAllClientSettings';
 import { useSheetClientMetrics } from '@/hooks/useSheetClientMetrics';
+import { ReportingHeadline } from '@/components/dashboard/ReportingHeadline';
+import { resolveReportingScope, type ReportingSource } from '@/lib/reportingScope';
+
 import { useAllClientMRR } from '@/hooks/useClientMRR';
 import { useMeetings, usePendingMeetingTasks, useSyncMeetings } from '@/hooks/useMeetings';
 import { useApiConnectionTest } from '@/hooks/useApiConnectionTest';
@@ -163,14 +166,15 @@ const Index = () => {
   const { data: clientFullSettings = {} } = useAllClientFullSettings(clientIds);
   const { data: clientMRRSettings = {} } = useAllClientMRR(clientIds);
 
-  // Per-client KPI Google Sheet metrics (powers the dashboard table).
-  // Clients without a configured kpi_google_sheet_url are omitted, leaving their row blank.
-  const { data: sheetClientMetrics } = useSheetClientMetrics(
+  // Per-client KPI Google Sheet metrics. `sheetStatuses` tells us which clients are
+  // loading / failed / not configured so they can be excluded rather than zeroed.
+  const { data: sheetClientMetrics, statuses: sheetStatuses } = useSheetClientMetrics(
     clientIds,
     clientFullSettings as any,
     startDate,
     endDate,
   );
+
   
   const { data: meetings = [] } = useMeetings();
   const { data: pendingTasks = [] } = usePendingMeetingTasks();
