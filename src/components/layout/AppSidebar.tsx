@@ -237,10 +237,13 @@ export function AppSidebar({
                                   onClick={() => {
                                     if ('externalUrl' in child && (child as any).externalUrl) {
                                       window.open((child as any).externalUrl, '_blank');
+                                    } else if ((child as any).href) {
+                                      navigate((child as any).href);
                                     } else {
                                       onTabChange(child.value);
                                     }
                                   }}
+
                                 >
                                   <child.icon className="h-3.5 w-3.5" />
                                   <span>{child.title}</span>
