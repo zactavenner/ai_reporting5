@@ -65,6 +65,8 @@ interface AppSidebarProps {
   onTabChange: (tab: string) => void;
 }
 
+// Reporting-first navigation: the everyday reporting surfaces sit at the top level,
+// every secondary tool keeps its exact destination but lives under "More tools".
 const navStructure = [
   {
     title: 'Dashboard',
@@ -78,34 +80,6 @@ const navStructure = [
     href: '/huddle',
   },
   {
-    title: 'Setter',
-    value: 'setter',
-    icon: Zap,
-    href: '/setter',
-  },
-  {
-    title: 'WhatsApp',
-    value: 'whatsapp',
-    icon: MessageCircle,
-    href: '/whatsapp',
-  },
-  {
-    title: 'Agent Infrastructure',
-    value: 'agent-infrastructure',
-    icon: Cpu,
-    href: '/agent-infrastructure',
-  },
-  {
-    title: 'Tasks',
-    value: 'tasks',
-    icon: ClipboardCheck,
-  },
-  {
-    title: 'AI Studio',
-    value: 'ai-studio',
-    icon: Bot,
-  },
-  {
     title: 'Reporting',
     value: 'reporting',
     icon: BarChart3,
@@ -117,16 +91,6 @@ const navStructure = [
       { title: 'Deals', value: 'deals', icon: Handshake },
       { title: 'Outreach', value: 'outreach', icon: MessageSquare },
     ],
-  },
-  {
-    title: 'Agents',
-    value: 'agents',
-    icon: Cpu,
-  },
-  {
-    title: 'Enrichment',
-    value: 'enrichment',
-    icon: Sparkles,
   },
   {
     title: 'Creatives',
@@ -144,6 +108,24 @@ const navStructure = [
     icon: FileText,
   },
   {
+    title: 'Tasks',
+    value: 'tasks',
+    icon: ClipboardCheck,
+  },
+  {
+    title: 'More tools',
+    value: 'more-tools',
+    icon: Wrench,
+    children: [
+      { title: 'AI Studio', value: 'ai-studio', icon: Bot },
+      { title: 'Setter', value: 'setter', icon: Zap, href: '/setter' },
+      { title: 'WhatsApp', value: 'whatsapp', icon: MessageCircle, href: '/whatsapp' },
+      { title: 'Agents', value: 'agents', icon: Cpu },
+      { title: 'Agent Infrastructure', value: 'agent-infrastructure', icon: Cpu, href: '/agent-infrastructure' },
+      { title: 'Enrichment', value: 'enrichment', icon: Sparkles },
+    ],
+  },
+  {
     title: 'Settings',
     value: 'settings-group',
     icon: Settings,
@@ -154,6 +136,7 @@ const navStructure = [
     ],
   },
 ];
+
 
 export function AppSidebar({
   pendingTaskCount = 0,
