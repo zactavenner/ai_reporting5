@@ -6,8 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, TrendingUp, RefreshCw } from "lucide-react";
+import { Loader2, TrendingUp, RefreshCw, Wrench } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { useClients } from "@/hooks/useClients";
+
 import ReactMarkdown from "react-markdown";
 import { formatDistanceToNow } from "date-fns";
 import MediaBuyerSopPreview from "@/components/media-buyer/MediaBuyerSopPreview";
