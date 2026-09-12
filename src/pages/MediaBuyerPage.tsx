@@ -262,8 +262,11 @@ export default function MediaBuyerPage() {
           ))}
         </TabsContent>
       </Tabs>
+        </div>
+      </details>
     </div>
   );
+
 }
 
 function fmt(v: number | undefined | null, digits = 2) {
