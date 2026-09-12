@@ -50,8 +50,18 @@ function money(v: number | null | undefined) {
   return v == null ? '—' : `$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
-export default function MediaBuyerSopPreview() {
-  const [selected, setSelected] = useState<string>('');
+interface MediaBuyerSopPreviewProps {
+  /** Client chosen in the page header. When provided, this panel shows no selector. */
+  clientId?: string;
+  /** Names for the shared selector so the page and this panel cannot disagree. */
+  clientOptions?: Array<{ id: string; name: string }>;
+}
+
+export default function MediaBuyerSopPreview({ clientId, clientOptions }: MediaBuyerSopPreviewProps = {}) {
+  const controlled = clientId !== undefined;
+  const [localSelected, setLocalSelected] = useState<string>('');
+  const selected = controlled ? (clientId ?? '') : localSelected;
+  const setSelected = setLocalSelected;
   const [calcBudget, setCalcBudget] = useState('500');
   const [calcTargetCpql, setCalcTargetCpql] = useState('100');
   const [calcPilotLoss, setCalcPilotLoss] = useState('2000');
@@ -60,6 +70,7 @@ export default function MediaBuyerSopPreview() {
   const clientsQuery = useQuery({
     queryKey: ['sop-preview-clients'],
     staleTime: 300_000,
+    enabled: !controlled,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('clients')
@@ -77,6 +88,7 @@ export default function MediaBuyerSopPreview() {
     staleTime: 60_000,
     queryFn: async () => loadClientSopReport(supabase as never, selected, new Date().toISOString()),
   });
+
 
   const calc = useMemo(() => {
     const tier = planDailyBudgetTier(Number(calcBudget) || null, false);
@@ -122,17 +134,28 @@ export default function MediaBuyerSopPreview() {
 
 
       <div className="flex items-center gap-2 flex-wrap">
-        <Select value={selected} onValueChange={setSelected}>
-          <SelectTrigger className="w-[320px]"><SelectValue placeholder="Select one client to review" /></SelectTrigger>
-          <SelectContent>
-            {(clientsQuery.data ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <span className="text-xs text-muted-foreground">One client per review — there is no portfolio sweep.</span>
+        {controlled ? (
+          <span className="text-xs text-muted-foreground">
+            {selected
+              ? `Reviewing ${clientOptions?.find((c) => c.id === selected)?.name ?? 'the selected client'} — chosen at the top of this page.`
+              : 'Choose a client at the top of this page to run the readiness check.'}
+          </span>
+        ) : (
+          <>
+            <Select value={selected} onValueChange={setSelected}>
+              <SelectTrigger className="w-[320px]"><SelectValue placeholder="Select one client to review" /></SelectTrigger>
+              <SelectContent>
+                {(clientsQuery.data ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <span className="text-xs text-muted-foreground">One client per review — there is no portfolio sweep.</span>
+          </>
+        )}
         <Button size="sm" variant="outline" className="ml-auto" onClick={exportInstructions}>
           <Download className="h-3.5 w-3.5 mr-1.5" /> Export operating instructions
         </Button>
       </div>
+
 
       <Card>
         <CardHeader className="pb-3">

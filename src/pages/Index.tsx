@@ -58,6 +58,9 @@ import { SourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
 import { useClientSourceMetrics, buildClientMetricsFromRPC } from '@/hooks/useClientSourceMetrics';
 import { useAllClientSettings, useAllClientFullSettings } from '@/hooks/useAllClientSettings';
 import { useSheetClientMetrics } from '@/hooks/useSheetClientMetrics';
+import { ReportingHeadline } from '@/components/dashboard/ReportingHeadline';
+import { resolveReportingScope, type ReportingSource } from '@/lib/reportingScope';
+
 import { useAllClientMRR } from '@/hooks/useClientMRR';
 import { useMeetings, usePendingMeetingTasks, useSyncMeetings } from '@/hooks/useMeetings';
 import { useApiConnectionTest } from '@/hooks/useApiConnectionTest';
@@ -163,14 +166,15 @@ const Index = () => {
   const { data: clientFullSettings = {} } = useAllClientFullSettings(clientIds);
   const { data: clientMRRSettings = {} } = useAllClientMRR(clientIds);
 
-  // Per-client KPI Google Sheet metrics (powers the dashboard table).
-  // Clients without a configured kpi_google_sheet_url are omitted, leaving their row blank.
-  const { data: sheetClientMetrics } = useSheetClientMetrics(
+  // Per-client KPI Google Sheet metrics. `sheetStatuses` tells us which clients are
+  // loading / failed / not configured so they can be excluded rather than zeroed.
+  const { data: sheetClientMetrics, statuses: sheetStatuses } = useSheetClientMetrics(
     clientIds,
     clientFullSettings as any,
     startDate,
     endDate,
   );
+
   
   const { data: meetings = [] } = useMeetings();
   const { data: pendingTasks = [] } = usePendingMeetingTasks();
@@ -194,102 +198,116 @@ const Index = () => {
     return buildClientMetricsFromRPC(rpcMetrics, dailyMetrics, clientFullSettings);
   }, [rpcMetrics, dailyMetrics, clientFullSettings]);
 
-  const aggregatedMetrics = useMemo(() => {
-    const allClientMetrics = Object.values(clientMetrics);
-    if (allClientMetrics.length === 0) {
-      const dailyTotals = dailyMetrics.reduce(
-        (acc, day) => ({
-          totalAdSpend: acc.totalAdSpend + Number(day.ad_spend || 0),
-          totalClicks: acc.totalClicks + (day.clicks || 0),
-          totalImpressions: acc.totalImpressions + (day.impressions || 0),
-          totalCommitments: acc.totalCommitments + (day.commitments || 0),
-          commitmentDollars: acc.commitmentDollars + Number(day.commitment_dollars || 0),
-        }),
-        { totalAdSpend: 0, totalClicks: 0, totalImpressions: 0, totalCommitments: 0, commitmentDollars: 0 }
-      );
-
-      return {
-        totalAdSpend: dailyTotals.totalAdSpend,
-        totalLeads: 0,
-        spamLeads: 0,
-        totalCalls: 0,
-        showedCalls: 0,
-        reconnectCalls: 0,
-        reconnectShowed: 0,
-        fundedInvestors: 0,
-        fundedDollars: 0,
-        totalCommitments: dailyTotals.totalCommitments,
-        commitmentDollars: dailyTotals.commitmentDollars,
-        pipelineValue: 0,
-        ctr: dailyTotals.totalImpressions > 0 ? (dailyTotals.totalClicks / dailyTotals.totalImpressions) * 100 : 0,
-        costPerLead: 0,
-        costPerCall: 0,
-        showedPercent: 0,
-        costPerShow: 0,
-        costPerInvestor: 0,
-        costOfCapital: 0,
-        avgTimeToFund: 0,
-        avgCallsToFund: 0,
-        leadToBookedPercent: 0,
-        closeRate: 0,
-        costPerReconnectCall: 0,
-        costPerReconnectShowed: 0,
-      } as SourceAggregatedMetrics;
+  // ---- ONE reporting scope: one source, one client set ----------------------
+  // The headline totals and every client row below are built from this object, so
+  // they cannot disagree. Sources are never merged and missing clients are never
+  // counted as zero.
+  const sheetConfiguredCount = useMemo(
+    () => clientIds.filter((id) => !!(clientFullSettings as any)?.[id]?.kpi_google_sheet_url).length,
+    [clientIds, clientFullSettings],
+  );
+  const [reportingSource, setReportingSource] = useState<ReportingSource>(() => {
+    try {
+      const saved = localStorage.getItem('dashboard.reportingSource');
+      return saved === 'database' || saved === 'sheet' ? saved : 'sheet';
+    } catch {
+      return 'sheet';
     }
-    
-    const totals = allClientMetrics.reduce(
+  });
+  useEffect(() => {
+    try { localStorage.setItem('dashboard.reportingSource', reportingSource); } catch {}
+  }, [reportingSource]);
+  // If no client has a KPI sheet, the sheet source is not actually available.
+  useEffect(() => {
+    if (reportingSource === 'sheet' && clientIds.length > 0 && sheetConfiguredCount === 0) {
+      setReportingSource('database');
+    }
+  }, [reportingSource, clientIds.length, sheetConfiguredCount]);
+
+  const visibleClientIds = useMemo(() => visibleClients.map((c) => c.id), [visibleClients]);
+  const dashboardMetricsLoadingRaw = metricsLoading || sourceMetricsLoading;
+
+  const reportingScope = useMemo(() => {
+    const databaseStatuses: Record<string, 'loading'> | undefined = dashboardMetricsLoadingRaw
+      ? Object.fromEntries(visibleClientIds.map((id) => [id, 'loading' as const]))
+      : undefined;
+    return resolveReportingScope({
+      source: reportingSource,
+      visibleClientIds,
+      databaseMetrics: clientMetrics,
+      sheetMetrics: sheetClientMetrics,
+      sheetStatuses,
+      databaseStatuses,
+    });
+  }, [reportingSource, visibleClientIds, clientMetrics, sheetClientMetrics, sheetStatuses, dashboardMetricsLoadingRaw]);
+
+  const scopedDailyRows = useMemo(() => {
+    const allowed = new Set(reportingScope.includedClientIds);
+    return dailyMetrics.filter((d) => allowed.has(d.client_id));
+  }, [dailyMetrics, reportingScope.includedClientIds]);
+
+  const clientNameById = useMemo(
+    () => Object.fromEntries(clients.map((c) => [c.id, c.name])),
+    [clients],
+  );
+
+  // Legacy consumer (AI Hub) still expects a flat numeric metric object. Derive it
+  // from the same scope so it matches what the dashboard shows.
+  const aggregatedMetrics = useMemo(() => {
+    const rows = reportingScope.includedClientIds.map((id) => reportingScope.metricsByClient[id] as any);
+    const t = rows.reduce(
       (acc, m) => ({
-        totalAdSpend: acc.totalAdSpend + m.totalAdSpend,
-        totalLeads: acc.totalLeads + m.totalLeads,
-        spamLeads: acc.spamLeads + m.spamLeads,
-        totalCalls: acc.totalCalls + m.totalCalls,
-        showedCalls: acc.showedCalls + m.showedCalls,
-        reconnectCalls: acc.reconnectCalls + m.reconnectCalls,
-        reconnectShowed: acc.reconnectShowed + m.reconnectShowed,
-        fundedInvestors: acc.fundedInvestors + m.fundedInvestors,
-        fundedDollars: acc.fundedDollars + m.fundedDollars,
-        totalCommitments: acc.totalCommitments + m.totalCommitments,
-        commitmentDollars: acc.commitmentDollars + m.commitmentDollars,
-        pipelineValue: acc.pipelineValue + m.pipelineValue,
+        totalAdSpend: acc.totalAdSpend + (Number(m.totalAdSpend) || 0),
+        totalLeads: acc.totalLeads + (Number(m.totalLeads) || 0),
+        spamLeads: acc.spamLeads + (Number(m.spamLeads) || 0),
+        totalCalls: acc.totalCalls + (Number(m.totalCalls) || 0),
+        showedCalls: acc.showedCalls + (Number(m.showedCalls) || 0),
+        reconnectCalls: acc.reconnectCalls + (Number(m.reconnectCalls) || 0),
+        reconnectShowed: acc.reconnectShowed + (Number(m.reconnectShowed) || 0),
+        fundedInvestors: acc.fundedInvestors + (Number(m.fundedInvestors) || 0),
+        fundedDollars: acc.fundedDollars + (Number(m.fundedDollars) || 0),
+        totalCommitments: acc.totalCommitments + (Number(m.totalCommitments) || 0),
+        commitmentDollars: acc.commitmentDollars + (Number(m.commitmentDollars) || 0),
+        pipelineValue: acc.pipelineValue + (Number(m.pipelineValue) || 0),
       }),
       {
         totalAdSpend: 0, totalLeads: 0, spamLeads: 0, totalCalls: 0,
         showedCalls: 0, reconnectCalls: 0, reconnectShowed: 0,
         fundedInvestors: 0, fundedDollars: 0, totalCommitments: 0,
         commitmentDollars: 0, pipelineValue: 0,
-      }
+      },
     );
-
-    const dailyTotals = dailyMetrics.reduce(
+    const dailyTotals = scopedDailyRows.reduce(
       (acc, day) => ({
         totalClicks: acc.totalClicks + (day.clicks || 0),
         totalImpressions: acc.totalImpressions + (day.impressions || 0),
       }),
-      { totalClicks: 0, totalImpressions: 0 }
+      { totalClicks: 0, totalImpressions: 0 },
     );
-
     return {
-      ...totals,
+      ...t,
       ctr: dailyTotals.totalImpressions > 0 ? (dailyTotals.totalClicks / dailyTotals.totalImpressions) * 100 : 0,
-      costPerLead: totals.totalLeads > 0 ? totals.totalAdSpend / totals.totalLeads : 0,
-      costPerCall: totals.totalCalls > 0 ? totals.totalAdSpend / totals.totalCalls : 0,
-      showedPercent: totals.totalCalls > 0 ? (totals.showedCalls / totals.totalCalls) * 100 : 0,
-      costPerShow: totals.showedCalls > 0 ? totals.totalAdSpend / totals.showedCalls : 0,
-      costPerInvestor: totals.fundedInvestors > 0 ? totals.totalAdSpend / totals.fundedInvestors : 0,
-      costOfCapital: totals.fundedDollars > 0 ? (totals.totalAdSpend / totals.fundedDollars) * 100 : 0,
+      costPerLead: t.totalLeads > 0 ? t.totalAdSpend / t.totalLeads : 0,
+      costPerCall: t.totalCalls > 0 ? t.totalAdSpend / t.totalCalls : 0,
+      showedPercent: t.totalCalls > 0 ? (t.showedCalls / t.totalCalls) * 100 : 0,
+      costPerShow: t.showedCalls > 0 ? t.totalAdSpend / t.showedCalls : 0,
+      costPerInvestor: t.fundedInvestors > 0 ? t.totalAdSpend / t.fundedInvestors : 0,
+      costOfCapital: t.fundedDollars > 0 ? (t.totalAdSpend / t.fundedDollars) * 100 : 0,
       avgTimeToFund: 0,
       avgCallsToFund: 0,
-      leadToBookedPercent: totals.totalLeads > 0 ? (totals.totalCalls / totals.totalLeads) * 100 : 0,
-      closeRate: totals.showedCalls > 0 ? (totals.fundedInvestors / totals.showedCalls) * 100 : 0,
-      costPerReconnectCall: totals.reconnectCalls > 0 ? totals.totalAdSpend / totals.reconnectCalls : 0,
-      costPerReconnectShowed: totals.reconnectShowed > 0 ? totals.totalAdSpend / totals.reconnectShowed : 0,
+      leadToBookedPercent: t.totalLeads > 0 ? (t.totalCalls / t.totalLeads) * 100 : 0,
+      closeRate: t.showedCalls > 0 ? (t.fundedInvestors / t.showedCalls) * 100 : 0,
+      costPerReconnectCall: t.reconnectCalls > 0 ? t.totalAdSpend / t.reconnectCalls : 0,
+      costPerReconnectShowed: t.reconnectShowed > 0 ? t.totalAdSpend / t.reconnectShowed : 0,
     } as SourceAggregatedMetrics;
-  }, [clientMetrics, dailyMetrics]);
+  }, [reportingScope, scopedDailyRows]);
 
-  const tableMetrics = useMemo(() => ({
-    ...clientMetrics,
-    ...sheetClientMetrics,
-  }), [clientMetrics, sheetClientMetrics]);
+  // Client rows use the SAME selected source and client set as the headline.
+  const tableMetrics = useMemo(
+    () => reportingScope.metricsByClient as Record<string, AggregatedMetrics>,
+    [reportingScope],
+  );
+
 
   const clientAdSpends = useMemo(() => {
     const spends: Record<string, number> = {};
@@ -430,7 +448,19 @@ const Index = () => {
                   <AISheetSummaryButton />
                 </div>
 
+                <SectionErrorBoundary sectionName="Reporting Headline">
+                  <ReportingHeadline
+                    scope={reportingScope}
+                    dailyRows={scopedDailyRows}
+                    onSourceChange={setReportingSource}
+                    sheetAvailable={sheetConfiguredCount > 0}
+                    databaseAvailable
+                    clientNameById={clientNameById}
+                  />
+                </SectionErrorBoundary>
+
                 <SectionErrorBoundary sectionName="Client Summary">
+
                   <section>
                     <div className="flex items-center justify-between mb-2">
                       <div>

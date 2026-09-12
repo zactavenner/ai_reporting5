@@ -2,6 +2,8 @@ import { useQueries } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { AggregatedMetrics } from '@/hooks/useMetrics';
 import type { ClientSettings } from '@/hooks/useClientSettings';
+import type { ClientMetricStatus } from '@/lib/reportingScope';
+
 
 function parseSheetUrl(url?: string | null): { sheet_id: string; gid?: string } | null {
   if (!url) return null;
@@ -38,7 +40,8 @@ export function useSheetClientMetrics(
   settings: Record<string, ClientSettings>,
   startDate?: string,
   endDate?: string,
-): { data: Record<string, AggregatedMetrics>; isLoading: boolean } {
+): { data: Record<string, AggregatedMetrics>; statuses: Record<string, ClientMetricStatus>; isLoading: boolean } {
+
   const targets = clientIds
     .map((id) => {
       const url = (settings[id] as any)?.kpi_google_sheet_url as string | undefined;
@@ -80,9 +83,22 @@ export function useSheetClientMetrics(
   });
 
   const map: Record<string, AggregatedMetrics> = {};
-  queries.forEach((q) => {
+  // Per-client load state so the dashboard can show loading / failed / not
+  // configured instead of silently treating a missing sheet as zero.
+  const statuses: Record<string, ClientMetricStatus> = {};
+  for (const id of clientIds) statuses[id] = 'not_configured';
+
+  queries.forEach((q, i) => {
+    const id = targets[i]?.id;
+    if (!id) return;
+    if (q.isLoading || q.isFetching) statuses[id] = 'loading';
+    else if (q.isError) statuses[id] = 'error';
+    else if (q.data?.aggregated) statuses[id] = 'ok';
+    else statuses[id] = 'error';
+
     if (q.data?.aggregated) map[q.data.id] = q.data.aggregated;
   });
   const isLoading = queries.some((q) => q.isLoading);
-  return { data: map, isLoading };
+  return { data: map, statuses, isLoading };
 }
+
