@@ -134,17 +134,28 @@ export default function MediaBuyerSopPreview({ clientId, clientOptions }: MediaB
 
 
       <div className="flex items-center gap-2 flex-wrap">
-        <Select value={selected} onValueChange={setSelected}>
-          <SelectTrigger className="w-[320px]"><SelectValue placeholder="Select one client to review" /></SelectTrigger>
-          <SelectContent>
-            {(clientsQuery.data ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <span className="text-xs text-muted-foreground">One client per review — there is no portfolio sweep.</span>
+        {controlled ? (
+          <span className="text-xs text-muted-foreground">
+            {selected
+              ? `Reviewing ${clientOptions?.find((c) => c.id === selected)?.name ?? 'the selected client'} — chosen at the top of this page.`
+              : 'Choose a client at the top of this page to run the readiness check.'}
+          </span>
+        ) : (
+          <>
+            <Select value={selected} onValueChange={setSelected}>
+              <SelectTrigger className="w-[320px]"><SelectValue placeholder="Select one client to review" /></SelectTrigger>
+              <SelectContent>
+                {(clientsQuery.data ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <span className="text-xs text-muted-foreground">One client per review — there is no portfolio sweep.</span>
+          </>
+        )}
         <Button size="sm" variant="outline" className="ml-auto" onClick={exportInstructions}>
           <Download className="h-3.5 w-3.5 mr-1.5" /> Export operating instructions
         </Button>
       </div>
+
 
       <Card>
         <CardHeader className="pb-3">
