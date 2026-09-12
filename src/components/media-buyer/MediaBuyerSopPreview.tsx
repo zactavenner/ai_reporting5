@@ -50,8 +50,18 @@ function money(v: number | null | undefined) {
   return v == null ? '—' : `$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
-export default function MediaBuyerSopPreview() {
-  const [selected, setSelected] = useState<string>('');
+interface MediaBuyerSopPreviewProps {
+  /** Client chosen in the page header. When provided, this panel shows no selector. */
+  clientId?: string;
+  /** Names for the shared selector so the page and this panel cannot disagree. */
+  clientOptions?: Array<{ id: string; name: string }>;
+}
+
+export default function MediaBuyerSopPreview({ clientId, clientOptions }: MediaBuyerSopPreviewProps = {}) {
+  const controlled = clientId !== undefined;
+  const [localSelected, setLocalSelected] = useState<string>('');
+  const selected = controlled ? (clientId ?? '') : localSelected;
+  const setSelected = setLocalSelected;
   const [calcBudget, setCalcBudget] = useState('500');
   const [calcTargetCpql, setCalcTargetCpql] = useState('100');
   const [calcPilotLoss, setCalcPilotLoss] = useState('2000');
@@ -60,6 +70,7 @@ export default function MediaBuyerSopPreview() {
   const clientsQuery = useQuery({
     queryKey: ['sop-preview-clients'],
     staleTime: 300_000,
+    enabled: !controlled,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('clients')
@@ -77,6 +88,7 @@ export default function MediaBuyerSopPreview() {
     staleTime: 60_000,
     queryFn: async () => loadClientSopReport(supabase as never, selected, new Date().toISOString()),
   });
+
 
   const calc = useMemo(() => {
     const tier = planDailyBudgetTier(Number(calcBudget) || null, false);
