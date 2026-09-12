@@ -118,11 +118,14 @@ export default function MediaBuyerPage() {
           <h1 className="text-2xl md:text-3xl font-bold font-display flex items-center gap-2">
             <TrendingUp className="h-6 w-6 text-emerald-600" /> Media Buyer
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">Autonomous audit, fatigue monitoring, creative intelligence. All proposals route to /approvals.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Readiness check for one client at a time. Everything here is a recommendation for a person to act on — nothing
+            changes an ad, a budget or a schedule.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Select value={clientId} onValueChange={setClientId}>
-            <SelectTrigger className="w-[280px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-[280px]"><SelectValue placeholder="Choose a client" /></SelectTrigger>
             <SelectContent>{clientOptions.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
           </Select>
           <Button size="icon" variant="outline" onClick={loadAll} disabled={loading} aria-label="Refresh">
@@ -131,35 +134,42 @@ export default function MediaBuyerPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-base">Run controls</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
-            {RUN_TYPES.map((r) => (
-              <Button key={r.key} variant="outline" size="sm" className="h-auto py-2 px-2 flex-col items-start text-left"
-                onClick={() => trigger(r.key)} disabled={runningType !== null}>
-                <div className="flex items-center gap-1.5 text-xs font-semibold w-full">
-                  {runningType === r.key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                  <span>{r.label}</span>
-                </div>
-                <span className="text-[10px] text-muted-foreground font-normal mt-0.5 leading-tight">{r.blurb}</span>
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <MediaBuyerSopPreview clientId={filterClient ?? ''} clientOptions={clientOptions} />
 
-      <Tabs defaultValue="sop" className="space-y-4">
+      <details className="border rounded-lg bg-card">
+        <summary className="cursor-pointer p-3 text-sm font-semibold flex items-center gap-2">
+          <Wrench className="h-4 w-4" /> Advanced / legacy tools
+          <span className="text-xs font-normal text-muted-foreground">
+            Previous review runs, classifications and creative intel — kept as-is, not the recommended starting point
+          </span>
+        </summary>
+        <div className="p-3 pt-0 space-y-4">
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-base">Legacy run controls</CardTitle></CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+                {RUN_TYPES.map((r) => (
+                  <Button key={r.key} variant="outline" size="sm" className="h-auto py-2 px-2 flex-col items-start text-left"
+                    onClick={() => trigger(r.key)} disabled={runningType !== null}>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold w-full">
+                      {runningType === r.key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                      <span>{r.label}</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground font-normal mt-0.5 leading-tight">{r.blurb}</span>
+                  </Button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+      <Tabs defaultValue="board" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="sop">Capital Raising SOP (preview)</TabsTrigger>
           <TabsTrigger value="board">Classifications (legacy)</TabsTrigger>
           <TabsTrigger value="intel">Creative Intel</TabsTrigger>
           <TabsTrigger value="history">Run History (legacy)</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="sop">
-          <MediaBuyerSopPreview />
-        </TabsContent>
+
 
 
 
