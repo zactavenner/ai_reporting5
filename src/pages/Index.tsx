@@ -663,17 +663,30 @@ const Index = () => {
             {/* AI Review */}
             {activeTab === 'ai' && (
               <SectionErrorBoundary sectionName="AI Review">
-                {!aiDataComplete && (
-                  <div className="mb-4 rounded-md border border-dashed border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    Numbers for the selected source are not complete: {aiBlockReason} Anything the AI says here can only
-                    cover the clients that did load — treat it as partial until the source finishes loading.
+                {aiDataComplete ? (
+                  <>
+                    <div className="mb-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                      Reviewing {aiScopedClients.length} client{aiScopedClients.length === 1 ? '' : 's'} from{' '}
+                      {sourceLabel(reportingSource)} for {startDate} to {endDate}.
+                    </div>
+                    <AIHubTab
+                      clients={aiScopedClients}
+                      clientMetrics={reportingScope.metricsByClient as Record<string, AggregatedMetrics>}
+                      agencyMetrics={aggregatedMetrics}
+                    />
+                  </>
+                ) : (
+                  <div className="rounded-md border border-dashed border-border bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">AI review is unavailable right now.</p>
+                    <p className="mt-1">
+                      The numbers for {sourceLabel(reportingSource)} are not complete: {aiBlockReason}
+                    </p>
+                    <p className="mt-2">
+                      An AI conclusion drawn from a partly loaded or partly failed set of clients would be wrong, so it is
+                      withheld until every client in view has data for the selected source and dates.
+                    </p>
                   </div>
                 )}
-                <AIHubTab
-                  clients={clients}
-                  clientMetrics={reportingScope.metricsByClient as Record<string, AggregatedMetrics>}
-                  agencyMetrics={aggregatedMetrics}
-                />
               </SectionErrorBoundary>
             )}
 
