@@ -76,9 +76,26 @@ Screen copy: **Know what we spent, what it produced, and what needs attention.**
   own Cloud database. `ORIGINAL_SUPABASE_URL` / `ORIGINAL_SUPABASE_SERVICE_ROLE_KEY` are
   not set, so there is no alternate SQL target and no ambiguity. No raw source records
   were changed.
-- Not done: no Edge Function was deployed in this pass. The edited `run-agent` source is
-  therefore **not** live; the deployed copy still has the old behaviour.
+- Applied: the patched `run-agent` Edge Function was deployed. Deployment was verified by
+  a reachability probe only (a bodyless request is rejected before any agent work); no
+  production agent run was invoked.
 - Not done: frontend is unpublished, no production sync, agent run, notification, campaign
   or budget change was performed.
 - Checks run: app and edge typechecks pass; `reporting-scope` and `connections-display`
-  suites pass (33 tests); production build succeeds.
+  suites pass (35 tests); production build succeeds.
+
+## Scope enforcement in AI Review and the table (latest pass)
+
+- Any EXPLICIT per-client status other than `ok` (including `not_configured`) is
+  authoritative: a cached or stale value can never re-include that client, and AI stays
+  blocked while the scope is incomplete.
+- Cost/ratio cells are denominator-aware: unknown or zero denominator renders an em dash;
+  a positive denominator with zero spend renders a real 0.
+- AI Review passes the explicit reporting scope (source, dates, included client IDs) into
+  the chat. In this scoped mode the full-portfolio context endpoint — which refetches its
+  own portfolio and dates — is disabled; the request goes to `ai-analysis`, which uses only
+  the context supplied to it. The chat resets when the scope changes, so answers about
+  older clients or dates cannot carry over. Full-portfolio context remains available in the
+  legacy (unscoped) AI tools.
+- CSV: sheet-sourced leads export as `leads_as_reported_in_sheet`; only stored CRM counts
+  export as `contactable_crm_leads`.
