@@ -109,51 +109,65 @@ serve(async (req) => {
 
         // ── DATABASE connector: gather comprehensive data ──
         if (connectors.includes('database')) {
+          // Core reporting reads must FAIL LOUDLY. A failed query is unknown data,
+          // never zero — otherwise the model reasons about a fabricated empty day.
+          const requireOk = (label: string, error: any) => {
+            if (error) throw new Error(`Core reporting query failed (${label}): ${error.message || error}`);
+          };
+
           // Core metrics
-          const { count: leadsCount } = await prodDb
+          const { count: leadsCount, error: leadsErr } = await prodDb
             .from('leads')
             .select('*', { count: 'exact', head: true })
             .eq('client_id', client.id)
             .gte('created_at', yesterdayStr)
             .lt('created_at', todayStr);
+          requireOk('leads', leadsErr);
 
-          const { count: spamCount } = await prodDb
+          const { count: spamCount, error: spamErr } = await prodDb
             .from('leads')
             .select('*', { count: 'exact', head: true })
             .eq('client_id', client.id)
             .eq('is_spam', true)
             .gte('created_at', yesterdayStr)
             .lt('created_at', todayStr);
+          requireOk('spam leads', spamErr);
 
-          const { data: calls } = await prodDb
+          const { data: calls, error: callsErr } = await prodDb
             .from('calls')
             .select('id, showed, is_reconnect, booked_at, scheduled_at, outcome, quality_score, appointment_status')
             .eq('client_id', client.id)
             .gte('booked_at', yesterdayStr)
             .lt('booked_at', todayStr);
+          requireOk('calls', callsErr);
 
-          const { data: metrics } = await prodDb
+          const { data: metrics, error: metricsErr } = await prodDb
             .from('daily_metrics')
             .select('*')
             .eq('client_id', client.id)
             .eq('date', yesterdayStr)
             .maybeSingle();
+          requireOk('daily_metrics', metricsErr);
 
-          // 7-day metrics trend
-          const { data: weekMetrics } = await prodDb
+          // 7-day metrics trend. NOTE: daily_metrics has no `funded` column —
+          // the funded columns are funded_investors and funded_dollars.
+          const { data: weekMetrics, error: weekErr } = await prodDb
             .from('daily_metrics')
-            .select('date, leads, calls, showed_calls, funded, ad_spend')
+            .select('date, leads, calls, showed_calls, funded_investors, funded_dollars, ad_spend')
             .eq('client_id', client.id)
             .gte('date', weekAgoStr)
             .lte('date', yesterdayStr)
             .order('date', { ascending: true });
+          requireOk('daily_metrics trend', weekErr);
 
-          const { data: funded } = await prodDb
+          const { data: funded, error: fundedErr } = await prodDb
             .from('funded_investors')
             .select('id, funded_amount, commitment_amount, funded_at, time_to_fund_days, calls_to_fund')
             .eq('client_id', client.id)
             .gte('funded_at', yesterdayStr)
             .lt('funded_at', todayStr);
+          requireOk('funded_investors', fundedErr);
+
 
           // Ad spend reports
           const { data: adSpend } = await prodDb

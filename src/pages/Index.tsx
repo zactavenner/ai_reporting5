@@ -379,7 +379,7 @@ const Index = () => {
     queryClient.invalidateQueries({ queryKey: ['outreach-campaigns'] });
     queryClient.invalidateQueries({ queryKey: ['outreach-messages'] });
     queryClient.invalidateQueries({ queryKey: ['outreach-stats'] });
-    toast.success('Refreshed dashboard data');
+    toast.success('Reloaded saved data (no Meta / CRM / sheet sync was run)');
   };
 
   const handleReorder = (orderedIds: string[]) => {
