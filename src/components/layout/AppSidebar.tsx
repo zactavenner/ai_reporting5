@@ -67,47 +67,14 @@ interface AppSidebarProps {
   onTabChange: (tab: string) => void;
 }
 
-// Reporting-first navigation: the everyday reporting surfaces sit at the top level,
-// every secondary tool keeps its exact destination but lives under "More tools".
+// Five everyday choices sit at the top level. Every other capability keeps its
+// exact destination (same tab value / href / external URL) but lives under
+// "More tools", so deep links and permissions are unchanged.
 const navStructure = [
   {
-    title: 'Dashboard',
+    title: 'Clients',
     value: 'dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    title: 'Daily Huddle',
-    value: 'huddle',
-    icon: Timer,
-    href: '/huddle',
-  },
-  {
-    title: 'Reporting',
-    value: 'reporting',
-    icon: BarChart3,
-    children: [
-      { title: 'AI Hub', value: 'ai', icon: Bot },
-      { title: 'Meetings', value: 'meetings', icon: Video },
-      { title: 'AI Meetings', value: 'ai-meetings', icon: Sparkles },
-      { title: 'Call Transcripts', value: 'call-transcripts', icon: Phone },
-      { title: 'Deals', value: 'deals', icon: Handshake },
-      { title: 'Outreach', value: 'outreach', icon: MessageSquare },
-    ],
-  },
-  {
-    title: 'Creatives',
-    value: 'creatives-group',
-    icon: Palette,
-    children: [
-      { title: 'Creative Library', value: 'creative-library', icon: Megaphone },
-      { title: 'Ads Generator', value: 'ads-generator-ext', icon: ExternalLink, externalUrl: 'https://id-preview--b57a79c0-3e59-4a78-be94-340c58fe824e.lovable.app' },
-      { title: 'Top Performers', value: 'top-performers', icon: TrendingUp },
-    ],
-  },
-  {
-    title: 'Offers',
-    value: 'offers',
-    icon: FileText,
+    icon: Users,
   },
   {
     title: 'Tasks',
@@ -115,10 +82,34 @@ const navStructure = [
     icon: ClipboardCheck,
   },
   {
+    title: 'AI Review',
+    value: 'ai',
+    icon: Bot,
+  },
+  {
+    title: 'Top Creatives',
+    value: 'top-performers',
+    icon: TrendingUp,
+  },
+  {
+    title: 'Connections',
+    value: 'integrations',
+    icon: Plug,
+  },
+  {
     title: 'More tools',
     value: 'more-tools',
     icon: Wrench,
     children: [
+      { title: 'Daily Huddle', value: 'huddle', icon: Timer, href: '/huddle' },
+      { title: 'Meetings', value: 'meetings', icon: Video },
+      { title: 'AI Meetings', value: 'ai-meetings', icon: Sparkles },
+      { title: 'Call Transcripts', value: 'call-transcripts', icon: Phone },
+      { title: 'Deals', value: 'deals', icon: Handshake },
+      { title: 'Outreach', value: 'outreach', icon: MessageSquare },
+      { title: 'Offers', value: 'offers', icon: FileText },
+      { title: 'Creative Library', value: 'creative-library', icon: Megaphone },
+      { title: 'Ads Generator', value: 'ads-generator-ext', icon: ExternalLink, externalUrl: 'https://id-preview--b57a79c0-3e59-4a78-be94-340c58fe824e.lovable.app' },
       { title: 'AI Studio', value: 'ai-studio', icon: Bot },
       { title: 'Setter', value: 'setter', icon: Zap, href: '/setter' },
       { title: 'WhatsApp', value: 'whatsapp', icon: MessageCircle, href: '/whatsapp' },
