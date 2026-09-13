@@ -160,6 +160,7 @@ export function DraggableClientTable({
   onDeleteClient,
   onReorder,
   isAdmin = false,
+  metricsSource = 'database',
   apiTestResults = {},
 }: DraggableClientTableProps) {
   const navigate = useNavigate();
@@ -878,12 +879,14 @@ export function DraggableClientTable({
 function SortableHeader({
   column,
   label,
+  tooltip,
   sortConfig,
   onSort,
   align = 'right',
 }: {
   column: string;
   label: string;
+  tooltip?: string;
   sortConfig: SortConfig;
   onSort: (column: string) => void;
   align?: 'right' | 'center' | 'left';
@@ -907,7 +910,7 @@ function SortableHeader({
         align === 'center' && 'justify-center',
         align === 'left' && 'justify-start',
       )}>
-        <span>{label}</span>
+        <span title={tooltip}>{label}</span>
         {direction === 'asc' ? (
           <ArrowUp className="h-2.5 w-2.5" />
         ) : direction === 'desc' ? (
