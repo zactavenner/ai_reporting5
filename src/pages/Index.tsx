@@ -158,8 +158,32 @@ const Index = () => {
     () => (showPaused ? clients : clients.filter(c => c.status !== 'paused' && c.status !== 'on_hold')),
     [clients, showPaused],
   );
-  const { data: dailyMetrics = [], isLoading: metricsLoading } = useAllDailyMetrics(startDate, endDate);
-  const { data: rpcMetrics = [], isLoading: sourceMetricsLoading } = useClientSourceMetrics(startDate, endDate);
+  // Both queries are REQUIRED for the "CRM + Meta" source: daily_metrics supplies
+  // spend, the RPC supplies the CRM aggregate. A failure or a stale cache being
+  // refetched must be visible, never silently treated as zero.
+  const {
+    data: dailyMetricsData,
+    isLoading: metricsLoading,
+    isError: metricsError,
+    isRefetching: metricsRefetching,
+  } = useAllDailyMetrics(startDate, endDate);
+  const {
+    data: rpcMetricsData,
+    isLoading: sourceMetricsLoading,
+    isError: sourceMetricsError,
+    isRefetching: sourceMetricsRefetching,
+  } = useClientSourceMetrics(startDate, endDate);
+  const dailyMetrics = dailyMetricsData ?? [];
+  const rpcMetrics = rpcMetricsData ?? [];
+  // A failed refetch leaves stale cached rows behind — treat that as an error too.
+  const databaseReadFailed = metricsError || sourceMetricsError;
+  const databaseReadPending =
+    metricsLoading ||
+    sourceMetricsLoading ||
+    metricsRefetching ||
+    sourceMetricsRefetching ||
+    (!metricsError && dailyMetricsData === undefined) ||
+    (!sourceMetricsError && rpcMetricsData === undefined);
   
   const clientIds = useMemo(() => clients.map(c => c.id), [clients]);
   const { data: clientThresholds = {} } = useAllClientSettings(clientIds);
