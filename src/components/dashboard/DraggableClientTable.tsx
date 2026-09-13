@@ -45,6 +45,7 @@ import { useMetaAccountAssets } from '@/components/ads-manager/shared/useMetaAcc
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { leadLabels, type ReportingSource } from '@/lib/reportingScope';
 import { SortConfig } from './SortableTableHeader';
 import { formatDistanceToNow } from 'date-fns';
 import { ClientApiStatus } from '@/hooks/useApiConnectionTest';
@@ -62,6 +63,8 @@ interface DraggableClientTableProps {
   onReorder?: (orderedClientIds: string[]) => void;
   isAdmin?: boolean;
   apiTestResults?: ClientApiStatus;
+  /** Which source the numbers came from, so lead columns are labelled honestly. */
+  metricsSource?: ReportingSource;
 }
 
 // Helper function to get CRM sync status from client data
@@ -158,10 +161,20 @@ export function DraggableClientTable({
   onDeleteClient,
   onReorder,
   isAdmin = false,
+  metricsSource = 'database',
   apiTestResults = {},
 }: DraggableClientTableProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  // Column labels state which source the lead count came from. A contactable CRM
+  // count is never called a Meta lead, and a sheet-mapped count never claims the
+  // contactable definition.
+  const labels = useMemo(() => {
+    const full = leadLabels(metricsSource);
+    return metricsSource === 'sheet'
+      ? { ...full, shortLeads: 'Leads (sheet)', shortCostPerLead: 'CPL (sheet)' }
+      : { ...full, shortLeads: 'CRM leads', shortCostPerLead: 'CRM CPL' };
+  }, [metricsSource]);
   const { dateRange } = useDateFilter();
   const numberOfDays = useMemo(() => differenceInDays(dateRange.to, dateRange.from) + 1, [dateRange]);
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -525,8 +538,8 @@ export function DraggableClientTable({
               <SortableHeader column="adSpend" label="Monthly $" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="dailyTarget" label="$/Day" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="rollupSpend" label="Spend" sortConfig={sortConfig} onSort={handleSort} />
-              <SortableHeader column="rollupLeads" label="Leads" sortConfig={sortConfig} onSort={handleSort} />
-              <SortableHeader column="rollupCPL" label="CPL" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="rollupLeads" label={labels.shortLeads} tooltip={labels.leadsHint} sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="rollupCPL" label={labels.shortCostPerLead} tooltip={labels.costPerLead} sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="rollupCalls" label="Calls" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="rollupShowed" label="Showed" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="rollupCPBC" label="CPBC" sortConfig={sortConfig} onSort={handleSort} />
@@ -695,10 +708,11 @@ export function DraggableClientTable({
 
                     {/* Rollup: Spend / Leads / CPL / Calls / CPBC / Funded / $ / CoC% — respects DateFilter (defaults to yesterday) */}
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {(m.totalAdSpend || 0) > 0 ? formatCurrency(m.totalAdSpend) : <span className="text-muted-foreground">-</span>}
+                      {typeof m.totalAdSpend === 'number' ? formatCurrency(m.totalAdSpend) : <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {(m.totalLeads || 0) > 0 ? m.totalLeads.toLocaleString() : <span className="text-muted-foreground">-</span>}
+                      {/* A real zero count is shown as 0; only an unknown value is a dash. */}
+                      {typeof m.totalLeads === 'number' ? m.totalLeads.toLocaleString() : <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
                       {(m.costPerLead || 0) > 0 ? formatCurrency(m.costPerLead) : <span className="text-muted-foreground">-</span>}
@@ -875,12 +889,14 @@ export function DraggableClientTable({
 function SortableHeader({
   column,
   label,
+  tooltip,
   sortConfig,
   onSort,
   align = 'right',
 }: {
   column: string;
   label: string;
+  tooltip?: string;
   sortConfig: SortConfig;
   onSort: (column: string) => void;
   align?: 'right' | 'center' | 'left';
@@ -904,7 +920,7 @@ function SortableHeader({
         align === 'center' && 'justify-center',
         align === 'left' && 'justify-start',
       )}>
-        <span>{label}</span>
+        <span title={tooltip}>{label}</span>
         {direction === 'asc' ? (
           <ArrowUp className="h-2.5 w-2.5" />
         ) : direction === 'desc' ? (

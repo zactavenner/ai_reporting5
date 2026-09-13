@@ -180,14 +180,27 @@ export function aggregateScopeTotals(scope: ReportingScope): ReportingTotals {
   };
 }
 
-export interface MetaPlatformTotals {
-  metaLeads: number;
+/**
+ * Totals summed from stored `daily_metrics` rows.
+ *
+ * PROVENANCE (verified by reading the writers):
+ *  - `recalculate-daily-metrics` materialises daily_metrics from
+ *    public.v_daily_funnel_day, so `daily_metrics.leads` is a CRM lead count
+ *    bucketed by America/Los_Angeles — it is NOT a Meta-attributed count and
+ *    must never be labelled "Meta leads".
+ *  - `sync-meta-ad-spend` supplies the ad-platform figures (spend, impressions,
+ *    clicks) from the Meta API, so those three are ad-platform provenance.
+ *  - Meta's own lead count is written to `ad_spend_daily`, which this dashboard
+ *    does not read, so no Meta lead figure is available here at all.
+ */
+export interface StoredDailyTotals {
+  /** CRM-derived lead count materialised into daily_metrics. Provenance: CRM. */
+  storedLeads: number;
+  /** Ad-platform provenance (Meta sync). */
   impressions: number;
   clicks: number;
   adSpend: number;
   ctr: number | null;
-  /** Meta cost per platform-reported lead — deliberately NOT the CRM cost per lead. */
-  costPerMetaLead: number | null;
 }
 
 interface DailyRow {
@@ -199,30 +212,29 @@ interface DailyRow {
 }
 
 /**
- * Ad-platform (Meta) totals for the SAME client set as the selected scope.
- * Kept separate from CRM leads on purpose — the two definitions differ.
+ * Stored daily totals for the SAME client set as the selected scope.
+ * No Meta lead count is derived here — see the provenance note above.
  */
-export function aggregateMetaTotals(dailyRows: DailyRow[], includedClientIds: string[]): MetaPlatformTotals {
+export function aggregateStoredDailyTotals(dailyRows: DailyRow[], includedClientIds: string[]): StoredDailyTotals {
   const allowed = new Set(includedClientIds);
-  let metaLeads = 0;
+  let storedLeads = 0;
   let impressions = 0;
   let clicks = 0;
   let adSpend = 0;
   for (const row of dailyRows) {
     if (!allowed.has(row.client_id)) continue;
-    metaLeads += Number(row.leads ?? 0) || 0;
+    storedLeads += Number(row.leads ?? 0) || 0;
     impressions += Number(row.impressions ?? 0) || 0;
     clicks += Number(row.clicks ?? 0) || 0;
     adSpend += Number(row.ad_spend ?? 0) || 0;
   }
   const ctr = ratio(clicks, impressions);
   return {
-    metaLeads,
+    storedLeads,
     impressions,
     clicks,
     adSpend,
     ctr: ctr == null ? null : ctr * 100,
-    costPerMetaLead: ratio(adSpend, metaLeads),
   };
 }
 
@@ -240,16 +252,30 @@ export function coverageLabel(scope: ReportingScope): string {
  * Metric labels.
  *
  * The CRM count is "contactable, non-spam leads that have BOTH an email and a
- * phone". That is NOT a Meta-attributed count and NOT an accredited/qualified
- * investor count, so it must never be labelled "Meta Leads" or "qualified".
- * Only ad-platform reported counts may be labelled "Meta leads".
+ * phone" — that definition is proven by the CRM aggregators only. Sheet numbers
+ * come from a per-client column mapping, so a sheet lead count may be anything
+ * the sheet owner mapped and must NOT claim the contactable definition.
+ *
+ * No count on this dashboard may be labelled "Meta leads": the only lead column
+ * available here (daily_metrics.leads) is CRM-derived. Nothing may be labelled
+ * qualified or accredited either — no such mapping is stored.
  * ------------------------------------------------------------------------- */
 export const CRM_LEADS_LABEL = 'Contactable CRM leads';
 export const CRM_LEADS_HINT = 'Non-spam CRM records with both an email and a phone. Not Meta-attributed, not qualified/accredited.';
 export const CRM_COST_PER_LEAD_LABEL = 'Cost per contactable CRM lead';
-export const META_LEADS_LABEL = 'Meta leads (platform reported)';
-export const META_LEADS_HINT = 'Leads Meta itself reports for the ad accounts. Counted differently from CRM records.';
-export const META_COST_PER_LEAD_LABEL = 'Meta cost per Meta lead';
+export const SHEET_LEADS_LABEL = 'Leads (as mapped in sheet)';
+export const SHEET_LEADS_HINT = 'Whatever the client KPI sheet maps to leads. The contactable email+phone definition is not proven for sheets.';
+export const SHEET_COST_PER_LEAD_LABEL = 'Cost per lead (sheet)';
+export const STORED_LEADS_LABEL = 'Stored daily leads (CRM-derived)';
+export const STORED_LEADS_HINT = 'daily_metrics.leads is materialised from CRM lead records, not reported by Meta.';
+
+/** Source-accurate lead labels — never claims Meta or the contactable definition for sheets. */
+export function leadLabels(source: ReportingSource): { leads: string; leadsHint: string; costPerLead: string } {
+  if (source === 'sheet') {
+    return { leads: SHEET_LEADS_LABEL, leadsHint: SHEET_LEADS_HINT, costPerLead: SHEET_COST_PER_LEAD_LABEL };
+  }
+  return { leads: CRM_LEADS_LABEL, leadsHint: CRM_LEADS_HINT, costPerLead: CRM_COST_PER_LEAD_LABEL };
+}
 
 /**
  * True when the selected source is fully loaded, error-free and complete enough

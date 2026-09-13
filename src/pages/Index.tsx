@@ -55,11 +55,11 @@ import { AccountManagerPage } from '@/pages/AccountManagerPage';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, AggregatedMetrics } from '@/hooks/useMetrics';
 import { SourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
-import { useClientSourceMetrics, buildClientMetricsFromRPC } from '@/hooks/useClientSourceMetrics';
+import { useClientSourceMetrics, buildClientMetricsFromRPC, rpcCoveredClientIds } from '@/hooks/useClientSourceMetrics';
 import { useAllClientSettings, useAllClientFullSettings } from '@/hooks/useAllClientSettings';
 import { useSheetClientMetrics } from '@/hooks/useSheetClientMetrics';
 import { ReportingHeadline } from '@/components/dashboard/ReportingHeadline';
-import { resolveReportingScope, scopeIsCompleteForAI, scopeBlockReason, type ReportingSource } from '@/lib/reportingScope';
+import { resolveReportingScope, scopeIsCompleteForAI, scopeBlockReason, sourceLabel, type ReportingSource, type ClientMetricStatus } from '@/lib/reportingScope';
 
 import { useAllClientMRR } from '@/hooks/useClientMRR';
 import { useMeetings, usePendingMeetingTasks, useSyncMeetings } from '@/hooks/useMeetings';
@@ -158,8 +158,32 @@ const Index = () => {
     () => (showPaused ? clients : clients.filter(c => c.status !== 'paused' && c.status !== 'on_hold')),
     [clients, showPaused],
   );
-  const { data: dailyMetrics = [], isLoading: metricsLoading } = useAllDailyMetrics(startDate, endDate);
-  const { data: rpcMetrics = [], isLoading: sourceMetricsLoading } = useClientSourceMetrics(startDate, endDate);
+  // Both queries are REQUIRED for the "CRM + Meta" source: daily_metrics supplies
+  // spend, the RPC supplies the CRM aggregate. A failure or a stale cache being
+  // refetched must be visible, never silently treated as zero.
+  const {
+    data: dailyMetricsData,
+    isLoading: metricsLoading,
+    isError: metricsError,
+    isRefetching: metricsRefetching,
+  } = useAllDailyMetrics(startDate, endDate);
+  const {
+    data: rpcMetricsData,
+    isLoading: sourceMetricsLoading,
+    isError: sourceMetricsError,
+    isRefetching: sourceMetricsRefetching,
+  } = useClientSourceMetrics(startDate, endDate);
+  const dailyMetrics = dailyMetricsData ?? [];
+  const rpcMetrics = rpcMetricsData ?? [];
+  // A failed refetch leaves stale cached rows behind — treat that as an error too.
+  const databaseReadFailed = metricsError || sourceMetricsError;
+  const databaseReadPending =
+    metricsLoading ||
+    sourceMetricsLoading ||
+    metricsRefetching ||
+    sourceMetricsRefetching ||
+    (!metricsError && dailyMetricsData === undefined) ||
+    (!sourceMetricsError && rpcMetricsData === undefined);
   
   const clientIds = useMemo(() => clients.map(c => c.id), [clients]);
   const { data: clientThresholds = {} } = useAllClientSettings(clientIds);
@@ -225,12 +249,24 @@ const Index = () => {
   }, [reportingSource, clientIds.length, sheetConfiguredCount]);
 
   const visibleClientIds = useMemo(() => visibleClients.map((c) => c.id), [visibleClients]);
-  const dashboardMetricsLoadingRaw = metricsLoading || sourceMetricsLoading;
+  const dashboardMetricsLoadingRaw = databaseReadPending;
 
   const reportingScope = useMemo(() => {
-    const databaseStatuses: Record<string, 'loading'> | undefined = dashboardMetricsLoadingRaw
-      ? Object.fromEntries(visibleClientIds.map((id) => [id, 'loading' as const]))
-      : undefined;
+    // Per-client status for the "CRM + Meta" source:
+    //  - either required query failed  → every client is `error` (nothing is zeroed)
+    //  - either required query pending → every client is `loading`
+    //  - client has no CRM aggregate row → `not_configured` (unknown, not zero)
+    const databaseStatuses: Record<string, ClientMetricStatus> = {};
+    if (databaseReadFailed) {
+      for (const id of visibleClientIds) databaseStatuses[id] = 'error';
+    } else if (databaseReadPending) {
+      for (const id of visibleClientIds) databaseStatuses[id] = 'loading';
+    } else {
+      const covered = rpcCoveredClientIds(rpcMetrics);
+      for (const id of visibleClientIds) {
+        if (!covered.has(id)) databaseStatuses[id] = 'not_configured';
+      }
+    }
     return resolveReportingScope({
       source: reportingSource,
       visibleClientIds,
@@ -239,7 +275,16 @@ const Index = () => {
       sheetStatuses,
       databaseStatuses,
     });
-  }, [reportingSource, visibleClientIds, clientMetrics, sheetClientMetrics, sheetStatuses, dashboardMetricsLoadingRaw]);
+  }, [
+    reportingSource,
+    visibleClientIds,
+    clientMetrics,
+    sheetClientMetrics,
+    sheetStatuses,
+    databaseReadFailed,
+    databaseReadPending,
+    rpcMetrics,
+  ]);
 
   const scopedDailyRows = useMemo(() => {
     const allowed = new Set(reportingScope.includedClientIds);
@@ -404,6 +449,12 @@ const Index = () => {
 
   // AI features must never summarise a partially loaded or partially failed scope.
   const aiDataComplete = scopeIsCompleteForAI(reportingScope);
+  // The AI only ever sees the clients whose numbers actually loaded for the
+  // selected source, so its context matches what is on screen.
+  const aiScopedClients = useMemo(() => {
+    const included = new Set(reportingScope.includedClientIds);
+    return clients.filter((c) => included.has(c.id));
+  }, [clients, reportingScope.includedClientIds]);
   const aiBlockReason = scopeBlockReason(reportingScope) ?? '';
 
   return (
@@ -477,15 +528,17 @@ const Index = () => {
                   <DailyAISummaryCard onTaskClick={handleNotificationTaskClick} />
                 </SectionErrorBoundary>
 
-                <div className="flex justify-end">
-                  {aiDataComplete ? (
-                    <AISheetSummaryButton />
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      AI summary paused — {aiBlockReason}
-                    </p>
-                  )}
-                </div>
+                {/*
+                  The all-clients "AI Summary" button was removed from this scoped
+                  reporting view on purpose. Its backend (ai-sheet-summary) always
+                  reads KPI Google Sheets and picks its OWN client set (every active /
+                  onboarding / paused client that has a sheet, capped at 25). It cannot
+                  honour the selected source, the paused-client toggle, or the excluded
+                  clients, so it would contradict the numbers on this screen. The
+                  per-client version stays on the client detail page, where the scope is
+                  unambiguous.
+                */}
+
 
                 <SectionErrorBoundary sectionName="Reporting Headline">
                   <ReportingHeadline
@@ -582,6 +635,7 @@ const Index = () => {
                           onDeleteClient={(c) => setDeleteClient(c)}
                           onReorder={handleReorder}
                           isAdmin={currentMember?.role === 'admin'}
+                          metricsSource={reportingSource}
                           apiTestResults={testResults}
                         />
                       </>
@@ -616,17 +670,30 @@ const Index = () => {
             {/* AI Review */}
             {activeTab === 'ai' && (
               <SectionErrorBoundary sectionName="AI Review">
-                {!aiDataComplete && (
-                  <div className="mb-4 rounded-md border border-dashed border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    Numbers for the selected source are not complete: {aiBlockReason} Anything the AI says here can only
-                    cover the clients that did load — treat it as partial until the source finishes loading.
+                {aiDataComplete ? (
+                  <>
+                    <div className="mb-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                      Reviewing {aiScopedClients.length} client{aiScopedClients.length === 1 ? '' : 's'} from{' '}
+                      {sourceLabel(reportingSource)} for {startDate} to {endDate}.
+                    </div>
+                    <AIHubTab
+                      clients={aiScopedClients}
+                      clientMetrics={reportingScope.metricsByClient as Record<string, AggregatedMetrics>}
+                      agencyMetrics={aggregatedMetrics}
+                    />
+                  </>
+                ) : (
+                  <div className="rounded-md border border-dashed border-border bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">AI review is unavailable right now.</p>
+                    <p className="mt-1">
+                      The numbers for {sourceLabel(reportingSource)} are not complete: {aiBlockReason}
+                    </p>
+                    <p className="mt-2">
+                      An AI conclusion drawn from a partly loaded or partly failed set of clients would be wrong, so it is
+                      withheld until every client in view has data for the selected source and dates.
+                    </p>
                   </div>
                 )}
-                <AIHubTab
-                  clients={clients}
-                  clientMetrics={reportingScope.metricsByClient as Record<string, AggregatedMetrics>}
-                  agencyMetrics={aggregatedMetrics}
-                />
               </SectionErrorBoundary>
             )}
 
