@@ -36,6 +36,10 @@ interface ClientSourceMetricsRow {
 /**
  * Fetches per-client aggregated metrics via a database RPC function.
  * This bypasses the 1000-row Supabase limit by aggregating in the database.
+ *
+ * A failed or timed-out read REJECTS. It must never resolve to an empty array,
+ * because an empty array is indistinguishable from "every client had zero" and
+ * would silently publish fabricated zeros.
  */
 export function useClientSourceMetrics(startDate?: string, endDate?: string) {
   return useQuery({
@@ -48,21 +52,24 @@ export function useClientSourceMetrics(startDate?: string, endDate?: string) {
         p_end_date: endDate || null,
       };
 
-      try {
-        const { data, error } = await withTimeout<{ data: ClientSourceMetricsRow[] | null; error: unknown }>(
-          supabase.rpc('get_client_source_metrics', params) as PromiseLike<{ data: ClientSourceMetricsRow[] | null; error: unknown }>,
-          'Client source metrics'
-        );
-        if (error) throw error;
-        return (data || []) as ClientSourceMetricsRow[];
-      } catch (error) {
-        console.error('[dashboard] Client source metrics unavailable', error);
-        return [];
+      const { data, error } = await withTimeout<{ data: ClientSourceMetricsRow[] | null; error: unknown }>(
+        supabase.rpc('get_client_source_metrics', params) as PromiseLike<{ data: ClientSourceMetricsRow[] | null; error: unknown }>,
+        'Client source metrics'
+      );
+      if (error) {
+        console.error('[dashboard] Client source metrics failed', error);
+        throw error instanceof Error ? error : new Error('Client source metrics failed');
       }
+      return (data || []) as ClientSourceMetricsRow[];
     },
     retry: 0,
     staleTime: 60 * 1000,
   });
+}
+
+/** Client ids the CRM aggregate actually returned a row for. */
+export function rpcCoveredClientIds(rpcData: ClientSourceMetricsRow[]): Set<string> {
+  return new Set(rpcData.map((r) => r.client_id));
 }
 
 /**
