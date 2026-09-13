@@ -92,10 +92,12 @@ export function DateRangeFilter({
     if (isToday && from.getTime() === today.getTime()) return 'today';
     if (from.getTime() === yesterday.getTime() && isYesterday) return 'yesterday';
     
-    if (isYesterday && daysDiff === 7) return 'last7';
-    if (isYesterday && daysDiff === 14) return 'last14';
-    if (isYesterday && daysDiff === 30) return 'last30';
-    if (isYesterday && daysDiff === 90) return 'last90';
+    // "Last N days" ends yesterday and is inclusive, so the span between the two
+    // dates is N - 1 days (Last 7 = yesterday-6 .. yesterday).
+    if (isYesterday && daysDiff === 6) return 'last7';
+    if (isYesterday && daysDiff === 13) return 'last14';
+    if (isYesterday && daysDiff === 29) return 'last30';
+    if (isYesterday && daysDiff === 89) return 'last90';
     
     const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
     if (from.getTime() === thisMonthStart.getTime() && isYesterday) return 'thisMonth';
@@ -313,9 +315,15 @@ export function DateRangeFilter({
         </Popover>
 
         {onRefresh && (
-          <Button variant="outline" size={compact ? 'sm' : 'default'} className={compact ? 'h-8 text-xs' : ''} onClick={onRefresh}>
+          <Button
+            variant="outline"
+            size={compact ? 'sm' : 'default'}
+            className={compact ? 'h-8 text-xs' : ''}
+            onClick={onRefresh}
+            title="Re-reads the numbers already saved in this app. It does not sync Meta, the CRM or the KPI sheet — use Sync Yesterday for that."
+          >
             <RefreshCw className={compact ? 'mr-1.5 h-3.5 w-3.5' : 'mr-2 h-4 w-4'} />
-            Refresh
+            Reload saved data
           </Button>
         )}
 

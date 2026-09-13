@@ -109,51 +109,65 @@ serve(async (req) => {
 
         // ── DATABASE connector: gather comprehensive data ──
         if (connectors.includes('database')) {
+          // Core reporting reads must FAIL LOUDLY. A failed query is unknown data,
+          // never zero — otherwise the model reasons about a fabricated empty day.
+          const requireOk = (label: string, error: any) => {
+            if (error) throw new Error(`Core reporting query failed (${label}): ${error.message || error}`);
+          };
+
           // Core metrics
-          const { count: leadsCount } = await prodDb
+          const { count: leadsCount, error: leadsErr } = await prodDb
             .from('leads')
             .select('*', { count: 'exact', head: true })
             .eq('client_id', client.id)
             .gte('created_at', yesterdayStr)
             .lt('created_at', todayStr);
+          requireOk('leads', leadsErr);
 
-          const { count: spamCount } = await prodDb
+          const { count: spamCount, error: spamErr } = await prodDb
             .from('leads')
             .select('*', { count: 'exact', head: true })
             .eq('client_id', client.id)
             .eq('is_spam', true)
             .gte('created_at', yesterdayStr)
             .lt('created_at', todayStr);
+          requireOk('spam leads', spamErr);
 
-          const { data: calls } = await prodDb
+          const { data: calls, error: callsErr } = await prodDb
             .from('calls')
             .select('id, showed, is_reconnect, booked_at, scheduled_at, outcome, quality_score, appointment_status')
             .eq('client_id', client.id)
             .gte('booked_at', yesterdayStr)
             .lt('booked_at', todayStr);
+          requireOk('calls', callsErr);
 
-          const { data: metrics } = await prodDb
+          const { data: metrics, error: metricsErr } = await prodDb
             .from('daily_metrics')
             .select('*')
             .eq('client_id', client.id)
             .eq('date', yesterdayStr)
             .maybeSingle();
+          requireOk('daily_metrics', metricsErr);
 
-          // 7-day metrics trend
-          const { data: weekMetrics } = await prodDb
+          // 7-day metrics trend. NOTE: daily_metrics has no `funded` column —
+          // the funded columns are funded_investors and funded_dollars.
+          const { data: weekMetrics, error: weekErr } = await prodDb
             .from('daily_metrics')
-            .select('date, leads, calls, showed_calls, funded, ad_spend')
+            .select('date, leads, calls, showed_calls, funded_investors, funded_dollars, ad_spend')
             .eq('client_id', client.id)
             .gte('date', weekAgoStr)
             .lte('date', yesterdayStr)
             .order('date', { ascending: true });
+          requireOk('daily_metrics trend', weekErr);
 
-          const { data: funded } = await prodDb
+          const { data: funded, error: fundedErr } = await prodDb
             .from('funded_investors')
             .select('id, funded_amount, commitment_amount, funded_at, time_to_fund_days, calls_to_fund')
             .eq('client_id', client.id)
             .gte('funded_at', yesterdayStr)
             .lt('funded_at', todayStr);
+          requireOk('funded_investors', fundedErr);
+
 
           // Ad spend reports
           const { data: adSpend } = await prodDb
@@ -210,8 +224,11 @@ serve(async (req) => {
             daily_metrics: metrics,
             weekly_trend: weekMetrics || [],
             funded_investors: funded || [],
-            funded_count: funded?.length || 0,
-            funded_total: funded?.reduce((s: number, f: any) => s + (f.funded_amount || f.commitment_amount || 0), 0) || 0,
+            // Received funding only. A pledged commitment is NEVER substituted for a
+            // missing funded amount; commitments are reported as their own figure.
+            funded_count: (funded || []).filter((f: any) => Number(f.funded_amount || 0) > 0).length,
+            funded_total: (funded || []).reduce((s: number, f: any) => s + (Number(f.funded_amount) > 0 ? Number(f.funded_amount) : 0), 0),
+            commitment_total: (funded || []).reduce((s: number, f: any) => s + (Number(f.commitment_amount) || 0), 0),
             ad_spend_reports: adSpend || [],
             total_ad_spend: adSpend?.reduce((s: number, a: any) => s + (a.spend || 0), 0) || 0,
             call_analysis: callAnalysis || [],
@@ -491,19 +508,30 @@ serve(async (req) => {
           const cleaned = aiOutput.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
           const parsed = JSON.parse(cleaned);
 
-          // Apply corrections to daily_metrics
-          if (parsed.corrections && Object.keys(parsed.corrections).length > 0 && connectors.includes('database') && !shadowMode) {
-            await prodDb
-              .from('daily_metrics')
-              .upsert({
+          // Model-proposed metric corrections are REVIEW PROPOSALS ONLY. Model output
+          // is never written into daily_metrics — a human approves it in the queue.
+          if (parsed.corrections && Object.keys(parsed.corrections).length > 0 && connectors.includes('database')) {
+            if (shadowMode) {
+              actionsTaken.push({ type: 'shadow.daily_metrics_correction_proposal', corrections: parsed.corrections });
+            } else {
+              const { error: proposalErr } = await cloudDb.from('approval_queue').insert({
+                queue_type: 'daily_metrics_correction',
                 client_id: client.id,
-                date: yesterdayStr,
-                ...parsed.corrections,
-                updated_at: new Date().toISOString(),
-              }, { onConflict: 'client_id,date' });
-            actionsTaken.push({ type: 'daily_metrics_update', corrections: parsed.corrections });
-          } else if (parsed.corrections && Object.keys(parsed.corrections).length > 0 && shadowMode) {
-            actionsTaken.push({ type: 'shadow.daily_metrics_update', corrections: parsed.corrections });
+                status: 'pending',
+                priority: 2,
+                title: `Proposed metric correction — ${client.name} (${yesterdayStr})`,
+                summary: `${agent.name} proposes corrections to daily_metrics for ${yesterdayStr}. Not applied.`,
+                agent_reasoning: typeof parsed.reasoning === 'string' ? parsed.reasoning : null,
+                preview_payload: { client_id: client.id, date: yesterdayStr, corrections: parsed.corrections },
+              });
+              actionsTaken.push({
+                type: 'daily_metrics_correction_proposal',
+                applied: false,
+                queued: !proposalErr,
+                error: proposalErr ? String(proposalErr.message || proposalErr) : undefined,
+                corrections: parsed.corrections,
+              });
+            }
           }
 
           // Handle escalations

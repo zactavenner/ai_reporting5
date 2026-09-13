@@ -3,16 +3,24 @@
  * the exact same client set as the table below it. Missing or failed clients are
  * excluded and named, never counted as zero.
  */
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { AlertCircle, Database, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { AlertCircle, ChevronDown, Database, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   aggregateMetaTotals,
   aggregateScopeTotals,
   coverageLabel,
   sourceLabel,
+  scopeBlockReason,
+  CRM_LEADS_LABEL,
+  CRM_LEADS_HINT,
+  CRM_COST_PER_LEAD_LABEL,
+  META_LEADS_LABEL,
+  META_LEADS_HINT,
+  META_COST_PER_LEAD_LABEL,
   type ReportingScope,
   type ReportingSource,
 } from '@/lib/reportingScope';
@@ -57,8 +65,10 @@ export function ReportingHeadline({
   databaseAvailable,
   clientNameById,
 }: ReportingHeadlineProps) {
+  const [detailOpen, setDetailOpen] = useState(false);
   const totals = aggregateScopeTotals(scope);
   const meta = aggregateMetaTotals(dailyRows, scope.includedClientIds);
+  const blockReason = scopeBlockReason(scope);
 
   const excluded = scope.excludedClientIds.map((id) => ({
     id,
@@ -66,19 +76,27 @@ export function ReportingHeadline({
     status: scope.statusByClient[id],
   }));
 
-  const tiles: Array<{ label: string; value: string; hint?: string }> = [
+  // Core KPIs stay visible; the longer diagnostic list is behind "More metrics".
+  const coreTiles: Array<{ label: string; value: string; hint?: string }> = [
     { label: 'Ad spend', value: money(totals.adSpend), hint: 'What we spent' },
-    { label: 'CRM leads', value: count(totals.crmLeads), hint: 'Leads recorded in the CRM' },
-    { label: 'Meta leads', value: count(meta.metaLeads), hint: 'Leads reported by the ad platform' },
-    { label: 'Cost per CRM lead', value: money(totals.costPerLead) },
+    { label: CRM_LEADS_LABEL, value: count(totals.crmLeads), hint: CRM_LEADS_HINT },
+    { label: CRM_COST_PER_LEAD_LABEL, value: money(totals.costPerLead) },
     { label: 'Booked calls', value: count(totals.calls) },
+    { label: 'Received funding', value: money(totals.fundedDollars), hint: 'Money actually recorded as funded. Commitments are not included.' },
+    { label: 'Cost of capital', value: percent(totals.costOfCapital) },
+  ];
+
+  const detailTiles: Array<{ label: string; value: string; hint?: string }> = [
+    { label: META_LEADS_LABEL, value: count(meta.metaLeads), hint: META_LEADS_HINT },
+    { label: META_COST_PER_LEAD_LABEL, value: money(meta.costPerMetaLead) },
     { label: 'Showed calls', value: count(totals.showedCalls) },
     { label: 'Show rate', value: percent(totals.showRate) },
     { label: 'Cost per show', value: money(totals.costPerShow) },
-    { label: 'Funded', value: count(totals.fundedInvestors) },
-    { label: 'Funded $', value: money(totals.fundedDollars) },
-    { label: 'Cost of capital', value: percent(totals.costOfCapital) },
+    { label: 'Funded investors', value: count(totals.fundedInvestors), hint: 'Investors with a positive recorded funded amount.' },
+    { label: 'Commitments $', value: money(totals.commitmentDollars), hint: 'Pledged, not received. Never added to received funding.' },
     { label: 'Close rate', value: percent(totals.closeRate) },
+    { label: 'Cost per funded investor', value: money(totals.costPerInvestor) },
+    { label: 'Spam CRM records', value: count(totals.spamLeads) },
   ];
 
   return (
@@ -134,8 +152,15 @@ export function ReportingHeadline({
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
-        {tiles.map((t) => (
+      {blockReason && (
+        <p className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          These totals are incomplete: {blockReason} Nothing missing is counted as zero, and AI summaries are held back
+          until the selected source has loaded for every client in view.
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        {coreTiles.map((t) => (
           <Card key={t.label} className="border-2">
             <CardContent className="p-3">
               <p className="text-xl font-bold tabular-nums">{t.value}</p>
@@ -145,6 +170,26 @@ export function ReportingHeadline({
           </Card>
         ))}
       </div>
+
+      <Collapsible open={detailOpen} onOpenChange={setDetailOpen}>
+        <CollapsibleTrigger className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">
+          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', detailOpen && 'rotate-180')} />
+          {detailOpen ? 'Hide' : 'More'} metrics &amp; ad-platform detail
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="mt-3 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-3">
+            {detailTiles.map((t) => (
+              <Card key={t.label} className="border">
+                <CardContent className="p-3">
+                  <p className="text-lg font-bold tabular-nums">{t.value}</p>
+                  <p className="text-xs text-muted-foreground">{t.label}</p>
+                  {t.hint && <p className="text-[10px] text-muted-foreground/70 mt-0.5">{t.hint}</p>}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {excluded.length > 0 && (
         <details className="text-xs text-muted-foreground">

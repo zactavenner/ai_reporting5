@@ -59,7 +59,7 @@ import { useClientSourceMetrics, buildClientMetricsFromRPC } from '@/hooks/useCl
 import { useAllClientSettings, useAllClientFullSettings } from '@/hooks/useAllClientSettings';
 import { useSheetClientMetrics } from '@/hooks/useSheetClientMetrics';
 import { ReportingHeadline } from '@/components/dashboard/ReportingHeadline';
-import { resolveReportingScope, type ReportingSource } from '@/lib/reportingScope';
+import { resolveReportingScope, scopeIsCompleteForAI, scopeBlockReason, type ReportingSource } from '@/lib/reportingScope';
 
 import { useAllClientMRR } from '@/hooks/useClientMRR';
 import { useMeetings, usePendingMeetingTasks, useSyncMeetings } from '@/hooks/useMeetings';
@@ -329,8 +329,37 @@ const Index = () => {
     setSettingsOpen(true);
   };
 
+  // The export uses the SAME selected source, dates and client population as the
+  // headline and the table — one client per row, excluded clients are not zeroed.
   const handleExportCSV = () => {
-    exportToCSV(dailyMetrics, 'all-clients-metrics', {
+    const rows = reportingScope.includedClientIds.map((id) => {
+      const m = (reportingScope.metricsByClient[id] ?? {}) as any;
+      return {
+        client: clientNameById[id] ?? id,
+        source: reportingScope.source === 'sheet' ? 'Client KPI sheet' : 'CRM + Meta (stored)',
+        ad_spend: m.totalAdSpend ?? '',
+        contactable_crm_leads: m.totalLeads ?? '',
+        spam_crm_records: m.spamLeads ?? '',
+        booked_calls: m.totalCalls ?? '',
+        showed_calls: m.showedCalls ?? '',
+        received_funding: m.fundedDollars ?? '',
+        funded_investors: m.fundedInvestors ?? '',
+        commitment_dollars: m.commitmentDollars ?? '',
+      };
+    });
+    const excludedRows = reportingScope.excludedClientIds.map((id) => ({
+      client: clientNameById[id] ?? id,
+      source: reportingScope.source === 'sheet' ? 'Client KPI sheet' : 'CRM + Meta (stored)',
+      ad_spend: 'excluded',
+      contactable_crm_leads: `excluded (${reportingScope.statusByClient[id]})`,
+      spam_crm_records: '',
+      booked_calls: '',
+      showed_calls: '',
+      received_funding: '',
+      funded_investors: '',
+      commitment_dollars: '',
+    }));
+    exportToCSV([...rows, ...excludedRows], 'clients-reporting', {
       startDate: startDate ? String(startDate).split('T')[0] : undefined,
       endDate: endDate ? String(endDate).split('T')[0] : undefined,
     });
@@ -350,7 +379,7 @@ const Index = () => {
     queryClient.invalidateQueries({ queryKey: ['outreach-campaigns'] });
     queryClient.invalidateQueries({ queryKey: ['outreach-messages'] });
     queryClient.invalidateQueries({ queryKey: ['outreach-stats'] });
-    toast.success('Refreshed dashboard data');
+    toast.success('Reloaded saved data (no Meta / CRM / sheet sync was run)');
   };
 
   const handleReorder = (orderedIds: string[]) => {
@@ -372,6 +401,10 @@ const Index = () => {
   };
 
   const dashboardMetricsLoading = metricsLoading || sourceMetricsLoading;
+
+  // AI features must never summarise a partially loaded or partially failed scope.
+  const aiDataComplete = scopeIsCompleteForAI(reportingScope);
+  const aiBlockReason = scopeBlockReason(reportingScope) ?? '';
 
   return (
     <SidebarProvider>
@@ -445,7 +478,13 @@ const Index = () => {
                 </SectionErrorBoundary>
 
                 <div className="flex justify-end">
-                  <AISheetSummaryButton />
+                  {aiDataComplete ? (
+                    <AISheetSummaryButton />
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      AI summary paused — {aiBlockReason}
+                    </p>
+                  )}
                 </div>
 
                 <SectionErrorBoundary sectionName="Reporting Headline">
@@ -574,12 +613,18 @@ const Index = () => {
               </SectionErrorBoundary>
             )}
 
-            {/* AI Hub */}
+            {/* AI Review */}
             {activeTab === 'ai' && (
-              <SectionErrorBoundary sectionName="AI Hub">
+              <SectionErrorBoundary sectionName="AI Review">
+                {!aiDataComplete && (
+                  <div className="mb-4 rounded-md border border-dashed border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    Numbers for the selected source are not complete: {aiBlockReason} Anything the AI says here can only
+                    cover the clients that did load — treat it as partial until the source finishes loading.
+                  </div>
+                )}
                 <AIHubTab
                   clients={clients}
-                  clientMetrics={clientMetrics as Record<string, AggregatedMetrics>}
+                  clientMetrics={reportingScope.metricsByClient as Record<string, AggregatedMetrics>}
                   agencyMetrics={aggregatedMetrics}
                 />
               </SectionErrorBoundary>
