@@ -92,10 +92,12 @@ export function DateRangeFilter({
     if (isToday && from.getTime() === today.getTime()) return 'today';
     if (from.getTime() === yesterday.getTime() && isYesterday) return 'yesterday';
     
-    if (isYesterday && daysDiff === 7) return 'last7';
-    if (isYesterday && daysDiff === 14) return 'last14';
-    if (isYesterday && daysDiff === 30) return 'last30';
-    if (isYesterday && daysDiff === 90) return 'last90';
+    // "Last N days" ends yesterday and is inclusive, so the span between the two
+    // dates is N - 1 days (Last 7 = yesterday-6 .. yesterday).
+    if (isYesterday && daysDiff === 6) return 'last7';
+    if (isYesterday && daysDiff === 13) return 'last14';
+    if (isYesterday && daysDiff === 29) return 'last30';
+    if (isYesterday && daysDiff === 89) return 'last90';
     
     const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
     if (from.getTime() === thisMonthStart.getTime() && isYesterday) return 'thisMonth';

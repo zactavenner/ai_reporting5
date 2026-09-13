@@ -235,3 +235,89 @@ export function coverageLabel(scope: ReportingScope): string {
   if (!scope.isPartial) return `All ${scope.totalClients} clients in view included`;
   return `${scope.includedClients} of ${scope.totalClients} clients in view included`;
 }
+
+/* ------------------------------------------------------------------------- *
+ * Metric labels.
+ *
+ * The CRM count is "contactable, non-spam leads that have BOTH an email and a
+ * phone". That is NOT a Meta-attributed count and NOT an accredited/qualified
+ * investor count, so it must never be labelled "Meta Leads" or "qualified".
+ * Only ad-platform reported counts may be labelled "Meta leads".
+ * ------------------------------------------------------------------------- */
+export const CRM_LEADS_LABEL = 'Contactable CRM leads';
+export const CRM_LEADS_HINT = 'Non-spam CRM records with both an email and a phone. Not Meta-attributed, not qualified/accredited.';
+export const CRM_COST_PER_LEAD_LABEL = 'Cost per contactable CRM lead';
+export const META_LEADS_LABEL = 'Meta leads (platform reported)';
+export const META_LEADS_HINT = 'Leads Meta itself reports for the ad accounts. Counted differently from CRM records.';
+export const META_COST_PER_LEAD_LABEL = 'Meta cost per Meta lead';
+
+/**
+ * True when the selected source is fully loaded, error-free and complete enough
+ * for an AI summary or an export to be drawn from. Incomplete scopes must not be
+ * handed to the AI, otherwise it draws conclusions from partial data.
+ */
+export function scopeIsCompleteForAI(scope: ReportingScope): boolean {
+  return (
+    scope.totalClients > 0 &&
+    !scope.isLoading &&
+    !scope.hasError &&
+    !scope.isPartial
+  );
+}
+
+export function scopeBlockReason(scope: ReportingScope): string | null {
+  if (scope.totalClients === 0) return 'No clients are in view for the selected filters.';
+  if (scope.isLoading) return 'Some clients for the selected source are still loading.';
+  if (scope.hasError) return 'Some clients failed to load from the selected source.';
+  if (scope.isPartial) return `Only ${scope.includedClients} of ${scope.totalClients} clients in view have numbers for the selected source.`;
+  return null;
+}
+
+export interface FundingTotals {
+  /** Money actually recorded as received. Commitments are NEVER folded in. */
+  receivedFundingDollars: number;
+  /** Investors with a positive recorded funded amount. */
+  fundedInvestors: number;
+  /** Pledged but not received. Reported separately, never added to funding. */
+  commitmentDollars: number;
+  commitments: number;
+  /** Received funding per funded investor; null when nobody funded. */
+  averageFundingPerInvestor: number | null;
+}
+
+interface FundingRow {
+  funded_amount?: number | null;
+  commitment_amount?: number | null;
+}
+
+/**
+ * Received funding excludes commitments entirely: a row with a pledge but no
+ * recorded funded amount contributes to `commitmentDollars` only.
+ */
+export function aggregateFundingTotals(rows: FundingRow[]): FundingTotals {
+  let receivedFundingDollars = 0;
+  let fundedInvestors = 0;
+  let commitmentDollars = 0;
+  let commitments = 0;
+
+  for (const row of rows) {
+    const funded = Number(row.funded_amount ?? 0) || 0;
+    const commitment = Number(row.commitment_amount ?? 0) || 0;
+    if (funded > 0) {
+      receivedFundingDollars += funded;
+      fundedInvestors += 1;
+    }
+    if (commitment > 0) {
+      commitmentDollars += commitment;
+      commitments += 1;
+    }
+  }
+
+  return {
+    receivedFundingDollars,
+    fundedInvestors,
+    commitmentDollars,
+    commitments,
+    averageFundingPerInvestor: ratio(receivedFundingDollars, fundedInvestors),
+  };
+}
