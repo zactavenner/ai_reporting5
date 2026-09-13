@@ -584,12 +584,18 @@ const Index = () => {
               </SectionErrorBoundary>
             )}
 
-            {/* AI Hub */}
+            {/* AI Review */}
             {activeTab === 'ai' && (
-              <SectionErrorBoundary sectionName="AI Hub">
+              <SectionErrorBoundary sectionName="AI Review">
+                {!aiDataComplete && (
+                  <div className="mb-4 rounded-md border border-dashed border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    Numbers for the selected source are not complete: {aiBlockReason} Anything the AI says here can only
+                    cover the clients that did load — treat it as partial until the source finishes loading.
+                  </div>
+                )}
                 <AIHubTab
                   clients={clients}
-                  clientMetrics={clientMetrics as Record<string, AggregatedMetrics>}
+                  clientMetrics={reportingScope.metricsByClient as Record<string, AggregatedMetrics>}
                   agencyMetrics={aggregatedMetrics}
                 />
               </SectionErrorBoundary>
