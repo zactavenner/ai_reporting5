@@ -72,10 +72,14 @@ export function resolveReportingScope(input: ResolveScopeInput): ReportingScope 
   for (const id of visibleClientIds) {
     const explicit = statuses[id];
     const values = raw[id];
+    // Any EXPLICIT non-ok status is authoritative — including `not_configured`.
+    // Cached/stale values must never override it, or a client whose source is
+    // unavailable would be silently counted from an old fetch.
     let status: ClientMetricStatus;
-    if (explicit === 'loading' || explicit === 'error') status = explicit;
+    if (explicit && explicit !== 'ok') status = explicit;
     else if (values) status = 'ok';
     else status = explicit ?? 'not_configured';
+
 
     statusByClient[id] = status;
     if (status === 'ok' && values) {
