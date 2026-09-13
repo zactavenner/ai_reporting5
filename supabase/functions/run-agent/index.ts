@@ -508,19 +508,30 @@ serve(async (req) => {
           const cleaned = aiOutput.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
           const parsed = JSON.parse(cleaned);
 
-          // Apply corrections to daily_metrics
-          if (parsed.corrections && Object.keys(parsed.corrections).length > 0 && connectors.includes('database') && !shadowMode) {
-            await prodDb
-              .from('daily_metrics')
-              .upsert({
+          // Model-proposed metric corrections are REVIEW PROPOSALS ONLY. Model output
+          // is never written into daily_metrics — a human approves it in the queue.
+          if (parsed.corrections && Object.keys(parsed.corrections).length > 0 && connectors.includes('database')) {
+            if (shadowMode) {
+              actionsTaken.push({ type: 'shadow.daily_metrics_correction_proposal', corrections: parsed.corrections });
+            } else {
+              const { error: proposalErr } = await cloudDb.from('approval_queue').insert({
+                queue_type: 'daily_metrics_correction',
                 client_id: client.id,
-                date: yesterdayStr,
-                ...parsed.corrections,
-                updated_at: new Date().toISOString(),
-              }, { onConflict: 'client_id,date' });
-            actionsTaken.push({ type: 'daily_metrics_update', corrections: parsed.corrections });
-          } else if (parsed.corrections && Object.keys(parsed.corrections).length > 0 && shadowMode) {
-            actionsTaken.push({ type: 'shadow.daily_metrics_update', corrections: parsed.corrections });
+                status: 'pending',
+                priority: 2,
+                title: `Proposed metric correction — ${client.name} (${yesterdayStr})`,
+                summary: `${agent.name} proposes corrections to daily_metrics for ${yesterdayStr}. Not applied.`,
+                agent_reasoning: typeof parsed.reasoning === 'string' ? parsed.reasoning : null,
+                preview_payload: { client_id: client.id, date: yesterdayStr, corrections: parsed.corrections },
+              });
+              actionsTaken.push({
+                type: 'daily_metrics_correction_proposal',
+                applied: false,
+                queued: !proposalErr,
+                error: proposalErr ? String(proposalErr.message || proposalErr) : undefined,
+                corrections: parsed.corrections,
+              });
+            }
           }
 
           // Handle escalations
