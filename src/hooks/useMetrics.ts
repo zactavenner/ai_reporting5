@@ -108,30 +108,30 @@ export function useDailyMetrics(clientId: string | undefined, startDate?: string
   });
 }
 
+/**
+ * A failed or timed-out read REJECTS instead of resolving to `[]`. An empty array
+ * would be read downstream as "zero spend everywhere", which is a fabricated
+ * number; the dashboard must show the failure and exclude the affected clients.
+ */
 export function useAllDailyMetrics(startDate?: string, endDate?: string) {
   return useQuery({
     queryKey: ['all-daily-metrics', startDate, endDate],
     queryFn: async () => {
-      try {
-        return await withTimeout(fetchAllRows<DailyMetric>((sb) => {
-          let query = sb
-            .from('daily_metrics')
-            .select('*')
-            .order('date', { ascending: false });
-          
-          if (startDate) {
-            query = query.gte('date', startDate);
-          }
-          if (endDate) {
-            query = query.lte('date', endDate);
-          }
-          
-          return query;
-        }), 'Daily metrics');
-      } catch (error) {
-        console.error('[dashboard] Daily metrics unavailable', error);
-        return [];
-      }
+      return await withTimeout(fetchAllRows<DailyMetric>((sb) => {
+        let query = sb
+          .from('daily_metrics')
+          .select('*')
+          .order('date', { ascending: false });
+
+        if (startDate) {
+          query = query.gte('date', startDate);
+        }
+        if (endDate) {
+          query = query.lte('date', endDate);
+        }
+
+        return query;
+      }), 'Daily metrics');
     },
     retry: 0,
     staleTime: 60 * 1000,
