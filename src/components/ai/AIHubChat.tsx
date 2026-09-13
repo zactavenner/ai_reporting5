@@ -29,12 +29,27 @@ import { AIToolsMenu, TOOL_MODES, ToolMode } from './AIToolsMenu';
 import { TokenUsageBar, FULL_MODEL_OPTIONS, MODEL_LIMITS } from './TokenUsageBar';
 import { cn } from '@/lib/utils';
 
+/**
+ * Explicit reporting scope for the scoped review route. When present the chat is
+ * CONSTRAINED to it: the full-portfolio context endpoint (which refetches its own
+ * portfolio + dates) is disabled, only the included clients can be selected, and
+ * the request carries just the supplied metrics for the selected source/dates.
+ */
+export interface AIReportingScopeContext {
+  source: string;
+  sourceLabel: string;
+  startDate: string;
+  endDate: string;
+  includedClientIds: string[];
+}
+
 interface AIHubChatProps {
   selectedGPT: CustomGPT | null;
   onClearGPT: () => void;
   clients: Client[];
   clientMetrics: Record<string, AggregatedMetrics>;
   agencyMetrics: AggregatedMetrics;
+  reportingScope?: AIReportingScopeContext;
 }
 
 interface Message {
@@ -50,7 +65,8 @@ const QUICK_ACTIONS = [
   { label: 'Budget recommendations', prompt: 'Based on current metrics, provide budget optimization recommendations for all clients.' },
 ];
 
-export function AIHubChat({ selectedGPT, onClearGPT, clients, clientMetrics, agencyMetrics }: AIHubChatProps) {
+export function AIHubChat({ selectedGPT, onClearGPT, clients, clientMetrics, agencyMetrics, reportingScope }: AIHubChatProps) {
+  const scoped = !!reportingScope;
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
@@ -60,7 +76,7 @@ export function AIHubChat({ selectedGPT, onClearGPT, clients, clientMetrics, age
   const [attachments, setAttachments] = useState<File[]>([]);
   const [activeTool, setActiveTool] = useState<ToolMode | null>(null);
   const [selectedClientFilter, setSelectedClientFilter] = useState<string>('all');
-  const [fullPortfolioMode, setFullPortfolioMode] = useState(true);
+  const [fullPortfolioMode, setFullPortfolioMode] = useState(!reportingScope);
   const [tokenUsage, setTokenUsage] = useState({ used: 0, system: 0 });
   
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -91,6 +107,20 @@ export function AIHubChat({ selectedGPT, onClearGPT, clients, clientMetrics, age
       setLocalMessages([]);
     }
   }, [dbMessages]);
+
+  // A scope change starts a clean conversation so older client/date answers can
+  // never contaminate the new review.
+  const scopeKey = reportingScope
+    ? `${reportingScope.source}|${reportingScope.startDate}|${reportingScope.endDate}|${[...reportingScope.includedClientIds].sort().join(',')}`
+    : '';
+  useEffect(() => {
+    if (!scoped) return;
+    setFullPortfolioMode(false);
+    setSelectedConversationId(null);
+    setLocalMessages([]);
+    setSelectedClientFilter('all');
+    setTokenUsage({ used: 0, system: 0 });
+  }, [scopeKey, scoped]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -148,6 +178,14 @@ export function AIHubChat({ selectedGPT, onClearGPT, clients, clientMetrics, age
           prompt += `\n- ${doc.name}: ${doc.website_url}\n`;
         }
       });
+    }
+
+    if (reportingScope) {
+      prompt += `\n\n[REPORTING SCOPE — AUTHORITATIVE]
+Source: ${reportingScope.sourceLabel}
+Date range: ${reportingScope.startDate} to ${reportingScope.endDate}
+Clients in scope (${reportingScope.includedClientIds.length}): ${clients.map(c => c.name).join(', ') || 'none'}
+Use ONLY the metrics supplied in this prompt. Do not assume any other client, date range or data source exists. If a number is not supplied, say it is unavailable.`;
     }
 
     if (selectedClientFilter !== 'all') {
@@ -219,7 +257,7 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
 
       let response: Response;
 
-      if (fullPortfolioMode && !selectedGPT) {
+      if (fullPortfolioMode && !selectedGPT && !scoped) {
         // Use the full-context edge function
         response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent-full-context`,
@@ -261,6 +299,14 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
                 isAgencyLevel: true,
                 clientFilter: selectedClientFilter !== 'all' ? selectedClientFilter : undefined,
                 toolMode: activeTool?.id,
+                ...(reportingScope
+                  ? {
+                      reportingSource: reportingScope.sourceLabel,
+                      startDate: reportingScope.startDate,
+                      endDate: reportingScope.endDate,
+                      clientIds: reportingScope.includedClientIds,
+                    }
+                  : {}),
               },
               model: modelMap[model] || 'gemini',
               files: fileContents,
@@ -451,7 +497,12 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
                   <Bot className="h-4 w-4 text-primary" />
                 </div>
                 <span className="font-semibold text-sm">Agency AI</span>
-                {fullPortfolioMode && (
+                {scoped ? (
+                  <Badge variant="secondary" className="text-[10px] gap-1">
+                    <Database className="h-3 w-3" />
+                    Scoped: {reportingScope!.sourceLabel}
+                  </Badge>
+                ) : fullPortfolioMode && (
                   <Badge variant="secondary" className="text-[10px] gap-1">
                     <Database className="h-3 w-3" />
                     Full Portfolio
@@ -462,7 +513,7 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
           </div>
           <div className="flex items-center gap-2">
             {/* Full Portfolio Toggle */}
-            {!selectedGPT && (
+            {!selectedGPT && !scoped && (
               <div className="flex items-center gap-1.5">
                 <Switch
                   id="full-portfolio"
