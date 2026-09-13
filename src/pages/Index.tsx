@@ -329,8 +329,37 @@ const Index = () => {
     setSettingsOpen(true);
   };
 
+  // The export uses the SAME selected source, dates and client population as the
+  // headline and the table — one client per row, excluded clients are not zeroed.
   const handleExportCSV = () => {
-    exportToCSV(dailyMetrics, 'all-clients-metrics', {
+    const rows = reportingScope.includedClientIds.map((id) => {
+      const m = (reportingScope.metricsByClient[id] ?? {}) as any;
+      return {
+        client: clientNameById[id] ?? id,
+        source: reportingScope.source === 'sheet' ? 'Client KPI sheet' : 'CRM + Meta (stored)',
+        ad_spend: m.totalAdSpend ?? '',
+        contactable_crm_leads: m.totalLeads ?? '',
+        spam_crm_records: m.spamLeads ?? '',
+        booked_calls: m.totalCalls ?? '',
+        showed_calls: m.showedCalls ?? '',
+        received_funding: m.fundedDollars ?? '',
+        funded_investors: m.fundedInvestors ?? '',
+        commitment_dollars: m.commitmentDollars ?? '',
+      };
+    });
+    const excludedRows = reportingScope.excludedClientIds.map((id) => ({
+      client: clientNameById[id] ?? id,
+      source: reportingScope.source === 'sheet' ? 'Client KPI sheet' : 'CRM + Meta (stored)',
+      ad_spend: 'excluded',
+      contactable_crm_leads: `excluded (${reportingScope.statusByClient[id]})`,
+      spam_crm_records: '',
+      booked_calls: '',
+      showed_calls: '',
+      received_funding: '',
+      funded_investors: '',
+      commitment_dollars: '',
+    }));
+    exportToCSV([...rows, ...excludedRows], 'clients-reporting', {
       startDate: startDate ? String(startDate).split('T')[0] : undefined,
       endDate: endDate ? String(endDate).split('T')[0] : undefined,
     });
