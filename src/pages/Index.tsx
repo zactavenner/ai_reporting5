@@ -55,11 +55,11 @@ import { AccountManagerPage } from '@/pages/AccountManagerPage';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAllDailyMetrics, AggregatedMetrics } from '@/hooks/useMetrics';
 import { SourceAggregatedMetrics } from '@/hooks/useSourceMetrics';
-import { useClientSourceMetrics, buildClientMetricsFromRPC } from '@/hooks/useClientSourceMetrics';
+import { useClientSourceMetrics, buildClientMetricsFromRPC, rpcCoveredClientIds } from '@/hooks/useClientSourceMetrics';
 import { useAllClientSettings, useAllClientFullSettings } from '@/hooks/useAllClientSettings';
 import { useSheetClientMetrics } from '@/hooks/useSheetClientMetrics';
 import { ReportingHeadline } from '@/components/dashboard/ReportingHeadline';
-import { resolveReportingScope, scopeIsCompleteForAI, scopeBlockReason, type ReportingSource } from '@/lib/reportingScope';
+import { resolveReportingScope, scopeIsCompleteForAI, scopeBlockReason, type ReportingSource, type ClientMetricStatus } from '@/lib/reportingScope';
 
 import { useAllClientMRR } from '@/hooks/useClientMRR';
 import { useMeetings, usePendingMeetingTasks, useSyncMeetings } from '@/hooks/useMeetings';
