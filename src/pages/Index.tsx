@@ -59,7 +59,7 @@ import { useClientSourceMetrics, buildClientMetricsFromRPC } from '@/hooks/useCl
 import { useAllClientSettings, useAllClientFullSettings } from '@/hooks/useAllClientSettings';
 import { useSheetClientMetrics } from '@/hooks/useSheetClientMetrics';
 import { ReportingHeadline } from '@/components/dashboard/ReportingHeadline';
-import { resolveReportingScope, type ReportingSource } from '@/lib/reportingScope';
+import { resolveReportingScope, scopeIsCompleteForAI, scopeBlockReason, type ReportingSource } from '@/lib/reportingScope';
 
 import { useAllClientMRR } from '@/hooks/useClientMRR';
 import { useMeetings, usePendingMeetingTasks, useSyncMeetings } from '@/hooks/useMeetings';
@@ -445,7 +445,13 @@ const Index = () => {
                 </SectionErrorBoundary>
 
                 <div className="flex justify-end">
-                  <AISheetSummaryButton />
+                  {aiDataComplete ? (
+                    <AISheetSummaryButton />
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      AI summary paused — {aiBlockReason}
+                    </p>
+                  )}
                 </div>
 
                 <SectionErrorBoundary sectionName="Reporting Headline">
