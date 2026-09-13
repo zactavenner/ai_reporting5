@@ -225,8 +225,9 @@ export function ReportingHeadline({
 
       <p className="text-[11px] text-muted-foreground">
         These are the numbers already stored in this app from the selected source for the selected dates. They are not a live
-        check against Meta or the CRM, and a fetch time does not prove the platform agrees. Meta leads and CRM leads are
-        counted differently and are shown separately on purpose.
+        check against Meta or the CRM, and a fetch time does not prove the platform agrees. No lead count here is
+        Meta-attributed: the stored lead column is built from CRM records, and Meta's own lead count is not read by this
+        screen. Spend, impressions and clicks come from the Meta sync.
       </p>
     </section>
   );
