@@ -236,7 +236,7 @@ describe('production source aggregator: received funding only', () => {
       { funded_amount: 10000, commitment_amount: null, time_to_fund_days: 20, calls_to_fund: 4 },
     ] as never, []);
     expect(m.fundedDollars).toBe(60000);
-    expect(m.fundedCount).toBe(2);
+    expect(m.fundedInvestors).toBe(2);
     // Averages cover only investors who actually funded: (10 + 20) / 2 and (2 + 4) / 2.
     expect(m.avgTimeToFund).toBe(15);
     expect(m.avgCallsToFund).toBe(3);
@@ -247,7 +247,7 @@ describe('production source aggregator: received funding only', () => {
       { funded_amount: 0, commitment_amount: 250000 },
     ] as never, []);
     expect(m.fundedDollars).toBe(0);
-    expect(m.fundedCount).toBe(0);
+    expect(m.fundedInvestors).toBe(0);
     expect(m.avgTimeToFund).toBe(0);
   });
 });
