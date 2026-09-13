@@ -152,8 +152,15 @@ export function ReportingHeadline({
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
-        {tiles.map((t) => (
+      {blockReason && (
+        <p className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          These totals are incomplete: {blockReason} Nothing missing is counted as zero, and AI summaries are held back
+          until the selected source has loaded for every client in view.
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        {coreTiles.map((t) => (
           <Card key={t.label} className="border-2">
             <CardContent className="p-3">
               <p className="text-xl font-bold tabular-nums">{t.value}</p>
@@ -163,6 +170,26 @@ export function ReportingHeadline({
           </Card>
         ))}
       </div>
+
+      <Collapsible open={detailOpen} onOpenChange={setDetailOpen}>
+        <CollapsibleTrigger className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">
+          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', detailOpen && 'rotate-180')} />
+          {detailOpen ? 'Hide' : 'More'} metrics &amp; ad-platform detail
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="mt-3 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-3">
+            {detailTiles.map((t) => (
+              <Card key={t.label} className="border">
+                <CardContent className="p-3">
+                  <p className="text-lg font-bold tabular-nums">{t.value}</p>
+                  <p className="text-xs text-muted-foreground">{t.label}</p>
+                  {t.hint && <p className="text-[10px] text-muted-foreground/70 mt-0.5">{t.hint}</p>}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {excluded.length > 0 && (
         <details className="text-xs text-muted-foreground">
