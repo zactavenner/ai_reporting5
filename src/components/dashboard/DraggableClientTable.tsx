@@ -62,6 +62,8 @@ interface DraggableClientTableProps {
   onReorder?: (orderedClientIds: string[]) => void;
   isAdmin?: boolean;
   apiTestResults?: ClientApiStatus;
+  /** Which source the numbers came from, so lead columns are labelled honestly. */
+  metricsSource?: ReportingSource;
 }
 
 // Helper function to get CRM sync status from client data
@@ -525,8 +527,8 @@ export function DraggableClientTable({
               <SortableHeader column="adSpend" label="Monthly $" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="dailyTarget" label="$/Day" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="rollupSpend" label="Spend" sortConfig={sortConfig} onSort={handleSort} />
-              <SortableHeader column="rollupLeads" label="Leads" sortConfig={sortConfig} onSort={handleSort} />
-              <SortableHeader column="rollupCPL" label="CPL" sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="rollupLeads" label={labels.shortLeads} tooltip={labels.leadsHint} sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="rollupCPL" label={labels.shortCostPerLead} tooltip={labels.costPerLead} sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="rollupCalls" label="Calls" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="rollupShowed" label="Showed" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="rollupCPBC" label="CPBC" sortConfig={sortConfig} onSort={handleSort} />
@@ -695,10 +697,11 @@ export function DraggableClientTable({
 
                     {/* Rollup: Spend / Leads / CPL / Calls / CPBC / Funded / $ / CoC% — respects DateFilter (defaults to yesterday) */}
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {(m.totalAdSpend || 0) > 0 ? formatCurrency(m.totalAdSpend) : <span className="text-muted-foreground">-</span>}
+                      {typeof m.totalAdSpend === 'number' ? formatCurrency(m.totalAdSpend) : <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {(m.totalLeads || 0) > 0 ? m.totalLeads.toLocaleString() : <span className="text-muted-foreground">-</span>}
+                      {/* A real zero count is shown as 0; only an unknown value is a dash. */}
+                      {typeof m.totalLeads === 'number' ? m.totalLeads.toLocaleString() : <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
                       {(m.costPerLead || 0) > 0 ? formatCurrency(m.costPerLead) : <span className="text-muted-foreground">-</span>}
