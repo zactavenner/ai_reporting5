@@ -94,22 +94,21 @@ export function aggregateFromSourceData(
   const reconnectCalls = calls.filter(c => c.is_reconnect);
   const reconnectShowed = reconnectCalls.filter(c => c.showed);
 
-  // Calculate funded from source
-  // Use commitment_amount as fallback when funded_amount is 0
-  const fundedCount = fundedInvestors.length;
-  const fundedDollars = fundedInvestors.reduce((sum, f) => {
-    const amount = (f.funded_amount && f.funded_amount > 0) ? f.funded_amount : (f.commitment_amount || 0);
-    return sum + amount;
-  }, 0);
+  // Calculate funded from source — RECEIVED FUNDING ONLY.
+  // A pledged commitment_amount is NEVER substituted for a zero/missing
+  // funded_amount: commitments are reported separately as commitmentDollars.
+  const receivedFunded = fundedInvestors.filter(f => Number(f.funded_amount || 0) > 0);
+  const fundedCount = receivedFunded.length;
+  const fundedDollars = receivedFunded.reduce((sum, f) => sum + Number(f.funded_amount || 0), 0);
 
-  // Calculate funded investor averages from source
-  const fundedWithTimeData = fundedInvestors.filter(f => f.time_to_fund_days !== null);
+  // Averages are over investors who actually funded, not over pledges.
+  const fundedWithTimeData = receivedFunded.filter(f => f.time_to_fund_days !== null && f.time_to_fund_days !== undefined);
   const avgTimeToFund = fundedWithTimeData.length > 0
     ? fundedWithTimeData.reduce((sum, f) => sum + (f.time_to_fund_days || 0), 0) / fundedWithTimeData.length
     : 0;
 
   const avgCallsToFund = fundedCount > 0
-    ? fundedInvestors.reduce((sum, f) => sum + (f.calls_to_fund || 0), 0) / fundedCount
+    ? receivedFunded.reduce((sum, f) => sum + (f.calls_to_fund || 0), 0) / fundedCount
     : 0;
 
   // Derived metrics
