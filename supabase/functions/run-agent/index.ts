@@ -224,8 +224,11 @@ serve(async (req) => {
             daily_metrics: metrics,
             weekly_trend: weekMetrics || [],
             funded_investors: funded || [],
-            funded_count: funded?.length || 0,
-            funded_total: funded?.reduce((s: number, f: any) => s + (f.funded_amount || f.commitment_amount || 0), 0) || 0,
+            // Received funding only. A pledged commitment is NEVER substituted for a
+            // missing funded amount; commitments are reported as their own figure.
+            funded_count: (funded || []).filter((f: any) => Number(f.funded_amount || 0) > 0).length,
+            funded_total: (funded || []).reduce((s: number, f: any) => s + (Number(f.funded_amount) > 0 ? Number(f.funded_amount) : 0), 0),
+            commitment_total: (funded || []).reduce((s: number, f: any) => s + (Number(f.commitment_amount) || 0), 0),
             ad_spend_reports: adSpend || [],
             total_ad_spend: adSpend?.reduce((s: number, a: any) => s + (a.spend || 0), 0) || 0,
             call_analysis: callAnalysis || [],
