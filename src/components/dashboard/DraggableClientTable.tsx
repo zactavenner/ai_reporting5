@@ -151,6 +151,26 @@ function getMissingIntegrationRowStyle(client: Client): string {
   return '';
 }
 
+/**
+ * Denominator-aware cost/ratio cell.
+ *  - unknown or zero denominator  -> em dash (the ratio does not exist)
+ *  - positive denominator, zero numerator -> the real zero
+ */
+function renderRatio(
+  value: number | null | undefined,
+  numerator: number | null | undefined,
+  denominator: number | null | undefined,
+  fmt: (v: number) => string,
+) {
+  const denomKnown = typeof denominator === 'number' && Number.isFinite(denominator);
+  const numKnown = typeof numerator === 'number' && Number.isFinite(numerator);
+  if (!denomKnown || !numKnown || denominator === 0) {
+    return <span className="text-muted-foreground">-</span>;
+  }
+  const resolved = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  return fmt(resolved);
+}
+
 export function DraggableClientTable({
   clients,
   metrics,
