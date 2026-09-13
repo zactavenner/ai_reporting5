@@ -45,6 +45,7 @@ import { useMetaAccountAssets } from '@/components/ads-manager/shared/useMetaAcc
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { leadLabels, type ReportingSource } from '@/lib/reportingScope';
 import { SortConfig } from './SortableTableHeader';
 import { formatDistanceToNow } from 'date-fns';
 import { ClientApiStatus } from '@/hooks/useApiConnectionTest';
@@ -165,6 +166,15 @@ export function DraggableClientTable({
 }: DraggableClientTableProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  // Column labels state which source the lead count came from. A contactable CRM
+  // count is never called a Meta lead, and a sheet-mapped count never claims the
+  // contactable definition.
+  const labels = useMemo(() => {
+    const full = leadLabels(metricsSource);
+    return metricsSource === 'sheet'
+      ? { ...full, shortLeads: 'Leads (sheet)', shortCostPerLead: 'CPL (sheet)' }
+      : { ...full, shortLeads: 'CRM leads', shortCostPerLead: 'CRM CPL' };
+  }, [metricsSource]);
   const { dateRange } = useDateFilter();
   const numberOfDays = useMemo(() => differenceInDays(dateRange.to, dateRange.from) + 1, [dateRange]);
   const [draggedId, setDraggedId] = useState<string | null>(null);
