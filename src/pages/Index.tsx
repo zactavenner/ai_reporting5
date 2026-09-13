@@ -635,6 +635,7 @@ const Index = () => {
                           onDeleteClient={(c) => setDeleteClient(c)}
                           onReorder={handleReorder}
                           isAdmin={currentMember?.role === 'admin'}
+                          metricsSource={reportingSource}
                           apiTestResults={testResults}
                         />
                       </>

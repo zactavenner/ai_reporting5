@@ -170,11 +170,13 @@ serve(async (req) => {
 
 
           // Ad spend reports
-          const { data: adSpend } = await prodDb
+          // Spend is core context: a failed read must abort, never be read as $0.
+          const { data: adSpend, error: adSpendErr } = await prodDb
             .from('ad_spend_reports')
             .select('spend, impressions, clicks, campaign_name')
             .eq('client_id', client.id)
             .eq('reported_at', yesterdayStr);
+          requireOk('ad_spend_reports', adSpendErr);
 
           // Call analysis scores
           const { data: callAnalysis } = await prodDb
