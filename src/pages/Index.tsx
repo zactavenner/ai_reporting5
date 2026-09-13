@@ -249,12 +249,24 @@ const Index = () => {
   }, [reportingSource, clientIds.length, sheetConfiguredCount]);
 
   const visibleClientIds = useMemo(() => visibleClients.map((c) => c.id), [visibleClients]);
-  const dashboardMetricsLoadingRaw = metricsLoading || sourceMetricsLoading;
+  const dashboardMetricsLoadingRaw = databaseReadPending;
 
   const reportingScope = useMemo(() => {
-    const databaseStatuses: Record<string, 'loading'> | undefined = dashboardMetricsLoadingRaw
-      ? Object.fromEntries(visibleClientIds.map((id) => [id, 'loading' as const]))
-      : undefined;
+    // Per-client status for the "CRM + Meta" source:
+    //  - either required query failed  → every client is `error` (nothing is zeroed)
+    //  - either required query pending → every client is `loading`
+    //  - client has no CRM aggregate row → `not_configured` (unknown, not zero)
+    const databaseStatuses: Record<string, ClientMetricStatus> = {};
+    if (databaseReadFailed) {
+      for (const id of visibleClientIds) databaseStatuses[id] = 'error';
+    } else if (databaseReadPending) {
+      for (const id of visibleClientIds) databaseStatuses[id] = 'loading';
+    } else {
+      const covered = rpcCoveredClientIds(rpcMetrics);
+      for (const id of visibleClientIds) {
+        if (!covered.has(id)) databaseStatuses[id] = 'not_configured';
+      }
+    }
     return resolveReportingScope({
       source: reportingSource,
       visibleClientIds,
@@ -263,7 +275,16 @@ const Index = () => {
       sheetStatuses,
       databaseStatuses,
     });
-  }, [reportingSource, visibleClientIds, clientMetrics, sheetClientMetrics, sheetStatuses, dashboardMetricsLoadingRaw]);
+  }, [
+    reportingSource,
+    visibleClientIds,
+    clientMetrics,
+    sheetClientMetrics,
+    sheetStatuses,
+    databaseReadFailed,
+    databaseReadPending,
+    rpcMetrics,
+  ]);
 
   const scopedDailyRows = useMemo(() => {
     const allowed = new Set(reportingScope.includedClientIds);
