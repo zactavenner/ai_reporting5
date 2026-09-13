@@ -251,3 +251,33 @@ describe('production source aggregator: received funding only', () => {
     expect(m.avgTimeToFund).toBe(0);
   });
 });
+
+describe('explicit statuses are authoritative over cached values', () => {
+  it('excludes a client marked not_configured even when stale values exist, and blocks AI', () => {
+    const scope = resolveReportingScope({
+      source: 'sheet',
+      visibleClientIds: ['a', 'b'],
+      databaseMetrics: {},
+      sheetMetrics: { a: { totalAdSpend: 100, totalLeads: 5 }, b: { totalAdSpend: 50, totalLeads: 2 } },
+      sheetStatuses: { a: 'ok', b: 'not_configured' },
+    });
+    expect(scope.statusByClient.b).toBe('not_configured');
+    expect(scope.includedClientIds).toEqual(['a']);
+    expect(scope.excludedClientIds).toEqual(['b']);
+    expect(scope.isPartial).toBe(true);
+    expect(scopeIsCompleteForAI(scope)).toBe(false);
+    expect(scopeBlockReason(scope)).toBeTruthy();
+  });
+
+  it('honours an explicit error status over cached values', () => {
+    const scope = resolveReportingScope({
+      source: 'database',
+      visibleClientIds: ['a'],
+      databaseMetrics: { a: { totalAdSpend: 10 } },
+      sheetMetrics: {},
+      databaseStatuses: { a: 'error' },
+    });
+    expect(scope.hasError).toBe(true);
+    expect(scope.includedClientIds).toEqual([]);
+  });
+});

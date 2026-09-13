@@ -377,13 +377,16 @@ const Index = () => {
   // The export uses the SAME selected source, dates and client population as the
   // headline and the table — one client per row, excluded clients are not zeroed.
   const handleExportCSV = () => {
+    // Sheet leads are whatever the client's sheet mapping reports — they do NOT
+    // carry the contactable (email + phone, non-spam) CRM definition.
+    const leadsColumn = reportingScope.source === 'sheet' ? 'leads_as_reported_in_sheet' : 'contactable_crm_leads';
     const rows = reportingScope.includedClientIds.map((id) => {
       const m = (reportingScope.metricsByClient[id] ?? {}) as any;
       return {
         client: clientNameById[id] ?? id,
         source: reportingScope.source === 'sheet' ? 'Client KPI sheet' : 'CRM + Meta (stored)',
         ad_spend: m.totalAdSpend ?? '',
-        contactable_crm_leads: m.totalLeads ?? '',
+        [leadsColumn]: m.totalLeads ?? '',
         spam_crm_records: m.spamLeads ?? '',
         booked_calls: m.totalCalls ?? '',
         showed_calls: m.showedCalls ?? '',
@@ -396,7 +399,7 @@ const Index = () => {
       client: clientNameById[id] ?? id,
       source: reportingScope.source === 'sheet' ? 'Client KPI sheet' : 'CRM + Meta (stored)',
       ad_spend: 'excluded',
-      contactable_crm_leads: `excluded (${reportingScope.statusByClient[id]})`,
+      [leadsColumn]: `excluded (${reportingScope.statusByClient[id]})`,
       spam_crm_records: '',
       booked_calls: '',
       showed_calls: '',
@@ -680,6 +683,13 @@ const Index = () => {
                       clients={aiScopedClients}
                       clientMetrics={reportingScope.metricsByClient as Record<string, AggregatedMetrics>}
                       agencyMetrics={aggregatedMetrics}
+                      reportingScope={{
+                        source: reportingScope.source,
+                        sourceLabel: sourceLabel(reportingSource),
+                        startDate: String(startDate ?? '').split('T')[0],
+                        endDate: String(endDate ?? '').split('T')[0],
+                        includedClientIds: reportingScope.includedClientIds,
+                      }}
                     />
                   </>
                 ) : (

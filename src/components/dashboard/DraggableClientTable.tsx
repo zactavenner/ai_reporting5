@@ -151,6 +151,26 @@ function getMissingIntegrationRowStyle(client: Client): string {
   return '';
 }
 
+/**
+ * Denominator-aware cost/ratio cell.
+ *  - unknown or zero denominator  -> em dash (the ratio does not exist)
+ *  - positive denominator, zero numerator -> the real zero
+ */
+function renderRatio(
+  value: number | null | undefined,
+  numerator: number | null | undefined,
+  denominator: number | null | undefined,
+  fmt: (v: number) => string,
+) {
+  const denomKnown = typeof denominator === 'number' && Number.isFinite(denominator);
+  const numKnown = typeof numerator === 'number' && Number.isFinite(numerator);
+  if (!denomKnown || !numKnown || denominator === 0) {
+    return <span className="text-muted-foreground">-</span>;
+  }
+  const resolved = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  return fmt(resolved);
+}
+
 export function DraggableClientTable({
   clients,
   metrics,
@@ -715,26 +735,28 @@ export function DraggableClientTable({
                       {typeof m.totalLeads === 'number' ? m.totalLeads.toLocaleString() : <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {(m.costPerLead || 0) > 0 ? formatCurrency(m.costPerLead) : <span className="text-muted-foreground">-</span>}
+                      {/* Denominator-aware: leads known and > 0 => show the cost (0 spend => $0). */}
+                      {renderRatio(m.costPerLead, m.totalAdSpend, m.totalLeads, (v) => formatCurrency(v))}
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {(m.totalCalls || 0) > 0 ? m.totalCalls.toLocaleString() : <span className="text-muted-foreground">-</span>}
+                      {typeof m.totalCalls === 'number' ? m.totalCalls.toLocaleString() : <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {(m.showedCalls || 0) > 0 ? m.showedCalls.toLocaleString() : <span className="text-muted-foreground">-</span>}
+                      {typeof m.showedCalls === 'number' ? m.showedCalls.toLocaleString() : <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {(m.costPerCall || 0) > 0 ? formatCurrency(m.costPerCall) : <span className="text-muted-foreground">-</span>}
+                      {renderRatio(m.costPerCall, m.totalAdSpend, m.totalCalls, (v) => formatCurrency(v))}
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {(m.fundedInvestors || 0) > 0 ? m.fundedInvestors.toLocaleString() : <span className="text-muted-foreground">-</span>}
+                      {typeof m.fundedInvestors === 'number' ? m.fundedInvestors.toLocaleString() : <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {(m.fundedDollars || 0) > 0 ? formatCurrency(m.fundedDollars) : <span className="text-muted-foreground">-</span>}
+                      {typeof m.fundedDollars === 'number' ? formatCurrency(m.fundedDollars) : <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
-                      {(m.costOfCapital || 0) > 0 ? `${m.costOfCapital.toFixed(1)}%` : <span className="text-muted-foreground">-</span>}
+                      {renderRatio(m.costOfCapital, m.totalAdSpend, m.fundedDollars, (v) => `${v.toFixed(1)}%`)}
                     </TableCell>
+
 
                     {/* Quick Links — Sheet, Doc, Creatives, Funnel, Activity, BM, Meta, CRM */}
                     <TableCell className="py-0 px-1" onClick={(e) => e.stopPropagation()}>
