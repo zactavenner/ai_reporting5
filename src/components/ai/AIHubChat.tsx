@@ -403,7 +403,8 @@ Active Clients: ${clients.filter(c => c.status === 'active').map(c => c.name).jo
     handleSend(prompt);
   };
 
-  const activeClients = clients.filter(c => c.status === 'active');
+  // In scoped mode `clients` is already exactly the included population.
+  const activeClients = scoped ? clients : clients.filter(c => c.status === 'active');
 
   return (
     <div className="flex h-[700px] border rounded-xl overflow-hidden bg-card shadow-sm">

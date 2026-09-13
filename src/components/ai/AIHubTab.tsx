@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MessageSquare, BookOpen, Bot } from 'lucide-react';
-import { AIHubChat } from './AIHubChat';
+import { AIHubChat, type AIReportingScopeContext } from './AIHubChat';
 import { KnowledgeBasePanel } from './KnowledgeBasePanel';
 import { CustomGPTsPanel } from './CustomGPTsPanel';
 import { CustomGPT } from '@/hooks/useCustomGPTs';
@@ -12,9 +12,11 @@ interface AIHubTabProps {
   clients: Client[];
   clientMetrics: Record<string, AggregatedMetrics>;
   agencyMetrics: AggregatedMetrics;
+  /** When set, the chat is constrained to this source/date/client scope. */
+  reportingScope?: AIReportingScopeContext;
 }
 
-export function AIHubTab({ clients, clientMetrics, agencyMetrics }: AIHubTabProps) {
+export function AIHubTab({ clients, clientMetrics, agencyMetrics, reportingScope }: AIHubTabProps) {
   const [activeSubTab, setActiveSubTab] = useState('chat');
   const [selectedGPT, setSelectedGPT] = useState<CustomGPT | null>(null);
 
@@ -57,6 +59,7 @@ export function AIHubTab({ clients, clientMetrics, agencyMetrics }: AIHubTabProp
             clients={clients}
             clientMetrics={clientMetrics}
             agencyMetrics={agencyMetrics}
+            reportingScope={reportingScope}
           />
         </TabsContent>
 
