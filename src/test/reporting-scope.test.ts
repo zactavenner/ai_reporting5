@@ -5,6 +5,12 @@ import {
   aggregateMetaTotals,
   coverageLabel,
   ratio,
+  scopeIsCompleteForAI,
+  scopeBlockReason,
+  aggregateFundingTotals,
+  CRM_LEADS_LABEL,
+  CRM_COST_PER_LEAD_LABEL,
+  META_LEADS_LABEL,
 } from '@/lib/reportingScope';
 
 const db = {
@@ -119,5 +125,95 @@ describe('aggregateMetaTotals', () => {
     const meta = aggregateMetaTotals([{ client_id: 'a', ad_spend: 100, leads: 0 }], ['a']);
     expect(meta.costPerMetaLead).toBeNull();
     expect(meta.ctr).toBeNull();
+  });
+});
+
+describe('AI gating on incomplete scopes', () => {
+  it('blocks AI when a client is still loading, failed, or missing for the selected source', () => {
+    const loading = resolveReportingScope({ source: 'database', visibleClientIds: ['a', 'b'], databaseMetrics: db, sheetMetrics: sheet, databaseStatuses: { b: 'loading' } });
+    expect(scopeIsCompleteForAI(loading)).toBe(false);
+    expect(scopeBlockReason(loading)).toMatch(/still loading/i);
+
+    const failed = resolveReportingScope({ source: 'database', visibleClientIds: ['a', 'b'], databaseMetrics: db, sheetMetrics: sheet, databaseStatuses: { b: 'error' } });
+    expect(scopeIsCompleteForAI(failed)).toBe(false);
+    expect(scopeBlockReason(failed)).toMatch(/failed to load/i);
+
+    const notConfigured = resolveReportingScope({ source: 'sheet', visibleClientIds: ['a', 'b'], databaseMetrics: db, sheetMetrics: sheet });
+    expect(scopeIsCompleteForAI(notConfigured)).toBe(false);
+
+    const empty = resolveReportingScope({ source: 'database', visibleClientIds: [], databaseMetrics: db, sheetMetrics: sheet });
+    expect(scopeIsCompleteForAI(empty)).toBe(false);
+  });
+
+  it('allows AI only when every visible client loaded from the selected source', () => {
+    const scope = resolveReportingScope({ source: 'database', visibleClientIds: ['a', 'b'], databaseMetrics: db, sheetMetrics: sheet });
+    expect(scopeIsCompleteForAI(scope)).toBe(true);
+    expect(scopeBlockReason(scope)).toBeNull();
+  });
+
+  it('never falls back to the other source when the selected one fails', () => {
+    const scope = resolveReportingScope({ source: 'sheet', visibleClientIds: ['a'], databaseMetrics: db, sheetMetrics: sheet, sheetStatuses: { a: 'error' } });
+    expect(scope.includedClientIds).toEqual([]);
+    expect(aggregateScopeTotals(scope).adSpend).toBe(0);
+    expect(aggregateScopeTotals(scope).costPerLead).toBeNull();
+  });
+});
+
+describe('denominator behaviour', () => {
+  it('shows a dash for a cost with no denominator but zero for genuine zero spend with outcomes', () => {
+    const zeroSpend = resolveReportingScope({
+      source: 'database',
+      visibleClientIds: ['z'],
+      databaseMetrics: { z: { totalAdSpend: 0, totalLeads: 4, totalCalls: 2, showedCalls: 1, fundedInvestors: 1, fundedDollars: 500 } },
+      sheetMetrics: {},
+    });
+    const t = aggregateScopeTotals(zeroSpend);
+    expect(t.costPerLead).toBe(0);
+    expect(t.costPerCall).toBe(0);
+    expect(t.costOfCapital).toBe(0);
+
+    const noOutcomes = resolveReportingScope({
+      source: 'database',
+      visibleClientIds: ['z'],
+      databaseMetrics: { z: { totalAdSpend: 900, totalLeads: 0, totalCalls: 0, showedCalls: 0, fundedInvestors: 0, fundedDollars: 0 } },
+      sheetMetrics: {},
+    });
+    const n = aggregateScopeTotals(noOutcomes);
+    expect(n.costPerLead).toBeNull();
+    expect(n.costPerShow).toBeNull();
+    expect(n.costOfCapital).toBeNull();
+  });
+});
+
+describe('metric labels', () => {
+  it('never labels the contactable CRM count as Meta or qualified', () => {
+    expect(CRM_LEADS_LABEL).toBe('Contactable CRM leads');
+    expect(CRM_LEADS_LABEL.toLowerCase()).not.toMatch(/meta|qualified|accredited/);
+    expect(CRM_COST_PER_LEAD_LABEL.toLowerCase()).not.toMatch(/meta/);
+    expect(META_LEADS_LABEL.toLowerCase()).toContain('meta');
+  });
+});
+
+describe('received funding excludes commitments', () => {
+  it('ignores commitment amounts entirely when funding was not received', () => {
+    const f = aggregateFundingTotals([
+      { funded_amount: 50000, commitment_amount: 50000 },
+      { funded_amount: 0, commitment_amount: 100000 },
+      { funded_amount: null, commitment_amount: 25000 },
+      { funded_amount: 10000, commitment_amount: null },
+    ]);
+    expect(f.receivedFundingDollars).toBe(60000);
+    expect(f.fundedInvestors).toBe(2);
+    expect(f.commitmentDollars).toBe(175000);
+    expect(f.commitments).toBe(3);
+    expect(f.averageFundingPerInvestor).toBe(30000);
+  });
+
+  it('reports zero received funding and a dash average when only commitments exist', () => {
+    const f = aggregateFundingTotals([{ funded_amount: 0, commitment_amount: 250000 }]);
+    expect(f.receivedFundingDollars).toBe(0);
+    expect(f.fundedInvestors).toBe(0);
+    expect(f.averageFundingPerInvestor).toBeNull();
+    expect(f.commitmentDollars).toBe(250000);
   });
 });
