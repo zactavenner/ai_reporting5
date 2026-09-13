@@ -59,7 +59,7 @@ import { useClientSourceMetrics, buildClientMetricsFromRPC, rpcCoveredClientIds 
 import { useAllClientSettings, useAllClientFullSettings } from '@/hooks/useAllClientSettings';
 import { useSheetClientMetrics } from '@/hooks/useSheetClientMetrics';
 import { ReportingHeadline } from '@/components/dashboard/ReportingHeadline';
-import { resolveReportingScope, scopeIsCompleteForAI, scopeBlockReason, type ReportingSource, type ClientMetricStatus } from '@/lib/reportingScope';
+import { resolveReportingScope, scopeIsCompleteForAI, scopeBlockReason, sourceLabel, type ReportingSource, type ClientMetricStatus } from '@/lib/reportingScope';
 
 import { useAllClientMRR } from '@/hooks/useClientMRR';
 import { useMeetings, usePendingMeetingTasks, useSyncMeetings } from '@/hooks/useMeetings';
@@ -449,6 +449,12 @@ const Index = () => {
 
   // AI features must never summarise a partially loaded or partially failed scope.
   const aiDataComplete = scopeIsCompleteForAI(reportingScope);
+  // The AI only ever sees the clients whose numbers actually loaded for the
+  // selected source, so its context matches what is on screen.
+  const aiScopedClients = useMemo(() => {
+    const included = new Set(reportingScope.includedClientIds);
+    return clients.filter((c) => included.has(c.id));
+  }, [clients, reportingScope.includedClientIds]);
   const aiBlockReason = scopeBlockReason(reportingScope) ?? '';
 
   return (
