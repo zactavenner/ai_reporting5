@@ -373,6 +373,10 @@ const Index = () => {
 
   const dashboardMetricsLoading = metricsLoading || sourceMetricsLoading;
 
+  // AI features must never summarise a partially loaded or partially failed scope.
+  const aiDataComplete = scopeIsCompleteForAI(reportingScope);
+  const aiBlockReason = scopeBlockReason(reportingScope) ?? '';
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
