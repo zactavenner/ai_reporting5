@@ -10,17 +10,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { AlertCircle, ChevronDown, Database, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
-  aggregateMetaTotals,
+  aggregateStoredDailyTotals,
   aggregateScopeTotals,
   coverageLabel,
   sourceLabel,
   scopeBlockReason,
-  CRM_LEADS_LABEL,
-  CRM_LEADS_HINT,
-  CRM_COST_PER_LEAD_LABEL,
-  META_LEADS_LABEL,
-  META_LEADS_HINT,
-  META_COST_PER_LEAD_LABEL,
+  leadLabels,
+  STORED_LEADS_LABEL,
+  STORED_LEADS_HINT,
   type ReportingScope,
   type ReportingSource,
 } from '@/lib/reportingScope';
