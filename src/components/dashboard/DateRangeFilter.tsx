@@ -315,9 +315,15 @@ export function DateRangeFilter({
         </Popover>
 
         {onRefresh && (
-          <Button variant="outline" size={compact ? 'sm' : 'default'} className={compact ? 'h-8 text-xs' : ''} onClick={onRefresh}>
+          <Button
+            variant="outline"
+            size={compact ? 'sm' : 'default'}
+            className={compact ? 'h-8 text-xs' : ''}
+            onClick={onRefresh}
+            title="Re-reads the numbers already saved in this app. It does not sync Meta, the CRM or the KPI sheet — use Sync Yesterday for that."
+          >
             <RefreshCw className={compact ? 'mr-1.5 h-3.5 w-3.5' : 'mr-2 h-4 w-4'} />
-            Refresh
+            Reload saved data
           </Button>
         )}
 
