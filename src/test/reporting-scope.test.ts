@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   resolveReportingScope,
   aggregateScopeTotals,
-  aggregateMetaTotals,
+  aggregateStoredDailyTotals,
   coverageLabel,
   ratio,
   scopeIsCompleteForAI,
@@ -10,8 +10,11 @@ import {
   aggregateFundingTotals,
   CRM_LEADS_LABEL,
   CRM_COST_PER_LEAD_LABEL,
-  META_LEADS_LABEL,
+  SHEET_LEADS_LABEL,
+  STORED_LEADS_LABEL,
+  leadLabels,
 } from '@/lib/reportingScope';
+import { aggregateFromSourceData } from '@/hooks/useSourceMetrics';
 
 const db = {
   a: { totalAdSpend: 100, totalLeads: 10, totalCalls: 4, showedCalls: 2, fundedInvestors: 1, fundedDollars: 1000, impressions: 1000, clicks: 50 },
@@ -106,25 +109,24 @@ describe('ratios', () => {
   });
 });
 
-describe('aggregateMetaTotals', () => {
-  it('keeps Meta platform leads separate and scoped to the same clients', () => {
+describe('aggregateStoredDailyTotals', () => {
+  it('sums stored daily rows for exactly the included clients and never claims a Meta lead count', () => {
     const daily = [
       { client_id: 'a', ad_spend: 100, leads: 8, impressions: 1000, clicks: 50 },
       { client_id: 'b', ad_spend: 50, leads: 3, impressions: 500, clicks: 10 },
       { client_id: 'c', ad_spend: 999, leads: 77, impressions: 10, clicks: 1 },
     ];
     const scope = resolveReportingScope({ source: 'database', visibleClientIds: ['a', 'b'], databaseMetrics: db, sheetMetrics: sheet });
-    const meta = aggregateMetaTotals(daily, scope.includedClientIds);
-    expect(meta.metaLeads).toBe(11);
-    expect(meta.adSpend).toBe(150);
-    expect(aggregateScopeTotals(scope).crmLeads).toBe(15);
-    expect(meta.costPerMetaLead).toBeCloseTo(150 / 11, 10);
+    const stored = aggregateStoredDailyTotals(daily, scope.includedClientIds);
+    expect(stored.storedLeads).toBe(11);
+    expect(stored.adSpend).toBe(150);
+    expect(stored).not.toHaveProperty('metaLeads');
+    expect(STORED_LEADS_LABEL.toLowerCase()).not.toContain('meta');
   });
 
-  it('returns null cost per Meta lead when Meta reported no leads', () => {
-    const meta = aggregateMetaTotals([{ client_id: 'a', ad_spend: 100, leads: 0 }], ['a']);
-    expect(meta.costPerMetaLead).toBeNull();
-    expect(meta.ctr).toBeNull();
+  it('returns a null click-through rate when there were no impressions', () => {
+    const stored = aggregateStoredDailyTotals([{ client_id: 'a', ad_spend: 100, leads: 0 }], ['a']);
+    expect(stored.ctr).toBeNull();
   });
 });
 
@@ -190,7 +192,10 @@ describe('metric labels', () => {
     expect(CRM_LEADS_LABEL).toBe('Contactable CRM leads');
     expect(CRM_LEADS_LABEL.toLowerCase()).not.toMatch(/meta|qualified|accredited/);
     expect(CRM_COST_PER_LEAD_LABEL.toLowerCase()).not.toMatch(/meta/);
-    expect(META_LEADS_LABEL.toLowerCase()).toContain('meta');
+    expect(leadLabels('database').leads).toBe(CRM_LEADS_LABEL);
+    expect(leadLabels('sheet').leads).toBe(SHEET_LEADS_LABEL);
+    // A sheet-mapped count must not claim the contactable email+phone definition.
+    expect(SHEET_LEADS_LABEL.toLowerCase()).not.toMatch(/contactable|meta|qualified|accredited/);
   });
 });
 
@@ -215,5 +220,34 @@ describe('received funding excludes commitments', () => {
     expect(f.fundedInvestors).toBe(0);
     expect(f.averageFundingPerInvestor).toBeNull();
     expect(f.commitmentDollars).toBe(250000);
+  });
+});
+
+
+describe('production source aggregator: received funding only', () => {
+  const calls: never[] = [];
+  const leads: never[] = [];
+
+  it('never substitutes a commitment for a missing or zero funded amount', () => {
+    const m = aggregateFromSourceData(leads, calls, [
+      { funded_amount: 50000, commitment_amount: 50000, time_to_fund_days: 10, calls_to_fund: 2 },
+      { funded_amount: 0, commitment_amount: 100000, time_to_fund_days: 4, calls_to_fund: 8 },
+      { funded_amount: null, commitment_amount: 25000, time_to_fund_days: 6, calls_to_fund: 6 },
+      { funded_amount: 10000, commitment_amount: null, time_to_fund_days: 20, calls_to_fund: 4 },
+    ] as never, []);
+    expect(m.fundedDollars).toBe(60000);
+    expect(m.fundedCount).toBe(2);
+    // Averages cover only investors who actually funded: (10 + 20) / 2 and (2 + 4) / 2.
+    expect(m.avgTimeToFund).toBe(15);
+    expect(m.avgCallsToFund).toBe(3);
+  });
+
+  it('reports zero received funding when only commitments exist', () => {
+    const m = aggregateFromSourceData(leads, calls, [
+      { funded_amount: 0, commitment_amount: 250000 },
+    ] as never, []);
+    expect(m.fundedDollars).toBe(0);
+    expect(m.fundedCount).toBe(0);
+    expect(m.avgTimeToFund).toBe(0);
   });
 });
