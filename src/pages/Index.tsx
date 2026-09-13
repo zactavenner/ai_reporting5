@@ -522,15 +522,17 @@ const Index = () => {
                   <DailyAISummaryCard onTaskClick={handleNotificationTaskClick} />
                 </SectionErrorBoundary>
 
-                <div className="flex justify-end">
-                  {aiDataComplete ? (
-                    <AISheetSummaryButton />
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      AI summary paused — {aiBlockReason}
-                    </p>
-                  )}
-                </div>
+                {/*
+                  The all-clients "AI Summary" button was removed from this scoped
+                  reporting view on purpose. Its backend (ai-sheet-summary) always
+                  reads KPI Google Sheets and picks its OWN client set (every active /
+                  onboarding / paused client that has a sheet, capped at 25). It cannot
+                  honour the selected source, the paused-client toggle, or the excluded
+                  clients, so it would contradict the numbers on this screen. The
+                  per-client version stays on the client detail page, where the scope is
+                  unambiguous.
+                */}
+
 
                 <SectionErrorBoundary sectionName="Reporting Headline">
                   <ReportingHeadline
