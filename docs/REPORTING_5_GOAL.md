@@ -20,14 +20,24 @@ Screen copy: **Know what we spent, what it produced, and what needs attention.**
   selected source is excluded and named, never counted as 0. The CSV marks it `excluded`.
 - **Core KPIs first.** A short set of core tiles is always visible; the wider diagnostic
   and ad-platform metrics sit behind an expandable section.
-- **AI is blocked on incomplete data.** The AI summary button is replaced by the reason it
-  is paused, and AI Review shows a banner naming what did not load.
+- **AI is blocked, not merely warned, on incomplete data.** AI Review withholds the whole
+  tab and states the reason while any visible client is loading, failed, or has no data for
+  the selected source. When it does run, it receives only the included clients plus the
+  selected source and dates. The all-clients "AI Summary" button was removed from this
+  screen: its backend picks its own sheet-based client set (capped at 25) and cannot honour
+  the selected source, the paused-client toggle or the excluded clients. The per-client
+  summary on the client page is unaffected.
+- **Failed database reads are visible.** `useAllDailyMetrics` and `useClientSourceMetrics`
+  now reject instead of resolving to an empty array, so a failure (including a failed
+  refetch over a stale cache) marks every visible client `error`. A client with no row in
+  the CRM aggregate is marked `not_configured`, never zero-filled.
 - **Refresh means reload.** The button is labelled *Reload saved data* and its message says
   no sync ran. Pulling new numbers from Meta / CRM is still the separate *Sync Yesterday*.
 - **Date presets** Last 7 / 14 / 30 / 90 Days are recognised on inclusive spans (6/13/29/89
   days back from yesterday), so the active preset no longer fails to highlight.
-- **Received funding excludes commitments** in the shared `get_client_source_metrics` RPC
-  and in the agent's context. Commitment dollars remain a separate figure.
+- **Received funding excludes commitments** in the shared `get_client_source_metrics` RPC,
+  in the production client-side aggregator (`aggregateFromSourceData`) — including funded
+  counts and the time/calls-to-fund averages — and in the agent's context. Commitment dollars remain a separate figure.
 - **Agent runner**: core reporting queries now fail loudly instead of defaulting to zero;
   the non-existent `daily_metrics.funded` column was replaced with `funded_investors` /
   `funded_dollars`; model-proposed metric corrections are queued in `approval_queue` as
@@ -40,7 +50,9 @@ Screen copy: **Know what we spent, what it produced, and what needs attention.**
 | --- | --- |
 | Ad spend | Spend recorded in the selected source for the selected dates. |
 | Contactable CRM leads | Non-spam CRM records that have **both** an email and a phone. Not Meta leads, not qualified, not accredited. |
-| Meta leads | Only counts attributed by the Meta API. |
+| Meta leads | Only a count attributed by the Meta API. **No tile on the dashboard shows one.** The stored `daily_metrics.leads` column is written by `recalculate-daily-metrics` from CRM data, so it is labelled *Stored daily leads (CRM-derived)* and is only shown when the CRM + Meta source is selected. |
+| Leads (as mapped in sheet) | Whatever column the client's sheet mapping points at. It does not claim the contactable email+phone definition. |
+| Ad-platform spend / impressions / clicks | From the Meta ad-spend sync. |
 | Cost per contactable CRM lead | Ad spend ÷ contactable CRM leads. |
 | Received funding | Sum of positive `funded_amount` only. |
 | Funded investors | Investors with a positive `funded_amount`. |
@@ -57,3 +69,16 @@ Screen copy: **Know what we spent, what it produced, and what needs attention.**
    the spend sync rather than as its own step.
 4. **Qualified-lead mapping** — there is no stored qualified/accredited definition, so no
    qualified-lead KPI or cost-per-qualified-lead can be shown honestly yet.
+
+## Verification status of this pass
+
+- Applied: one minimal migration replacing `get_client_source_metrics` on this project's
+  own Cloud database. `ORIGINAL_SUPABASE_URL` / `ORIGINAL_SUPABASE_SERVICE_ROLE_KEY` are
+  not set, so there is no alternate SQL target and no ambiguity. No raw source records
+  were changed.
+- Not done: no Edge Function was deployed in this pass. The edited `run-agent` source is
+  therefore **not** live; the deployed copy still has the old behaviour.
+- Not done: frontend is unpublished, no production sync, agent run, notification, campaign
+  or budget change was performed.
+- Checks run: app and edge typechecks pass; `reporting-scope` and `connections-display`
+  suites pass (33 tests); production build succeeds.
