@@ -64,8 +64,15 @@ export function ReportingHeadline({
 }: ReportingHeadlineProps) {
   const [detailOpen, setDetailOpen] = useState(false);
   const totals = aggregateScopeTotals(scope);
-  const meta = aggregateMetaTotals(dailyRows, scope.includedClientIds);
   const blockReason = scopeBlockReason(scope);
+  const labels = leadLabels(scope.source);
+
+  // Stored daily_metrics detail is CRM/Meta-sync data. It is NOT shown while the
+  // sheet source is selected, so database numbers never bleed into sheet totals.
+  const showStoredDetail = scope.source === 'database';
+  const stored = showStoredDetail
+    ? aggregateStoredDailyTotals(dailyRows, scope.includedClientIds)
+    : null;
 
   const excluded = scope.excludedClientIds.map((id) => ({
     id,
@@ -76,16 +83,14 @@ export function ReportingHeadline({
   // Core KPIs stay visible; the longer diagnostic list is behind "More metrics".
   const coreTiles: Array<{ label: string; value: string; hint?: string }> = [
     { label: 'Ad spend', value: money(totals.adSpend), hint: 'What we spent' },
-    { label: CRM_LEADS_LABEL, value: count(totals.crmLeads), hint: CRM_LEADS_HINT },
-    { label: CRM_COST_PER_LEAD_LABEL, value: money(totals.costPerLead) },
+    { label: labels.leads, value: count(totals.crmLeads), hint: labels.leadsHint },
+    { label: labels.costPerLead, value: money(totals.costPerLead) },
     { label: 'Booked calls', value: count(totals.calls) },
     { label: 'Received funding', value: money(totals.fundedDollars), hint: 'Money actually recorded as funded. Commitments are not included.' },
     { label: 'Cost of capital', value: percent(totals.costOfCapital) },
   ];
 
   const detailTiles: Array<{ label: string; value: string; hint?: string }> = [
-    { label: META_LEADS_LABEL, value: count(meta.metaLeads), hint: META_LEADS_HINT },
-    { label: META_COST_PER_LEAD_LABEL, value: money(meta.costPerMetaLead) },
     { label: 'Showed calls', value: count(totals.showedCalls) },
     { label: 'Show rate', value: percent(totals.showRate) },
     { label: 'Cost per show', value: money(totals.costPerShow) },
@@ -94,6 +99,14 @@ export function ReportingHeadline({
     { label: 'Close rate', value: percent(totals.closeRate) },
     { label: 'Cost per funded investor', value: money(totals.costPerInvestor) },
     { label: 'Spam CRM records', value: count(totals.spamLeads) },
+    ...(stored
+      ? [
+          { label: 'Ad-platform impressions', value: count(stored.impressions), hint: 'From the Meta ad-spend sync.' },
+          { label: 'Ad-platform clicks', value: count(stored.clicks), hint: 'From the Meta ad-spend sync.' },
+          { label: 'Click-through rate', value: percent(stored.ctr) },
+          { label: STORED_LEADS_LABEL, value: count(stored.storedLeads), hint: STORED_LEADS_HINT },
+        ]
+      : []),
   ];
 
   return (
