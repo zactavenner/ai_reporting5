@@ -2,14 +2,17 @@
  * Deterministic attribution of a recorded MeetGeek meeting back to the
  * notetaker invite job that created it.
  *
- * Match order (first hit wins, most deterministic first):
- *   1. The invite UID embedded in the meeting title/description.
- *   2. The structured "[SHORTCODE] Calendar — Contact" title exactly matching a
- *      job's stored invite_summary within the scheduling window.
- *   3. Time-window overlap (±30 min) plus the same meeting URL.
- *   4. Time-window overlap alone, only when exactly one job matches.
+ * Authoritative identifiers ONLY. Match order (first hit wins):
+ *   1. The server-minted invite UID embedded in the meeting title/description,
+ *      and only when the job belongs to the meeting's client.
+ *   2. Scheduling-window overlap (±30 min) PLUS the identical join URL, inside
+ *      one known client.
+ *   3. Scheduling-window overlap PLUS the exact structured invite summary,
+ *      inside one known client.
  *
- * Ambiguity never guesses: 0 or 2+ candidates leaves the meeting unattributed.
+ * There is deliberately NO time-only and NO title-only path, and no path that
+ * can cross clients: a meeting with no resolved client, or 0/2+ candidates, is
+ * left unattributed with an explicit reason.
  */
 const WINDOW_MS = 30 * 60 * 1000;
 
@@ -20,15 +23,75 @@ export interface AttributionOutcome {
   reason?: string;
 }
 
-function normalizeUrl(url: string | null | undefined): string | null {
+export function normalizeUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   const m = String(url).match(/https?:\/\/[^\s<>"']+/);
   if (!m) return null;
   return m[0].replace(/[.,;)]+$/, '').toLowerCase();
 }
 
-function normalizeTitle(title: string | null | undefined): string {
+export function normalizeTitle(title: string | null | undefined): string {
   return String(title || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+export interface AttributionCandidate {
+  id: string;
+  client_id?: string | null;
+  invite_uid?: string | null;
+  invite_summary?: string | null;
+  meeting_url?: string | null;
+}
+
+export interface AttributionSubject {
+  client_id?: string | null;
+  title?: string | null;
+  summary?: string | null;
+  source_url?: string | null;
+  recording_url?: string | null;
+}
+
+/**
+ * Pure candidate selection, shared by the live path and the tests. `uidJob` is
+ * the row looked up by the invite UID found in the meeting text (if any).
+ */
+export function chooseAttributionCandidate(args: {
+  meeting: AttributionSubject;
+  uidJob?: AttributionCandidate | null;
+  windowCandidates: AttributionCandidate[];
+}): { job: AttributionCandidate | null; method: string | null; reason?: string } {
+  const clientId = args.meeting.client_id || null;
+
+  if (args.uidJob) {
+    // A UID is authoritative, but must never pull a meeting into another client.
+    if (clientId && args.uidJob.client_id && args.uidJob.client_id !== clientId) {
+      return { job: null, method: null, reason: 'uid_client_mismatch' };
+    }
+    return { job: args.uidJob, method: 'invite_uid' };
+  }
+
+  if (!clientId) return { job: null, method: null, reason: 'client_unresolved' };
+
+  const candidates = (args.windowCandidates || []).filter((c) => c.client_id === clientId);
+  if (!candidates.length) return { job: null, method: null, reason: 'no_candidate' };
+
+  const url = normalizeUrl(args.meeting.source_url) || normalizeUrl(args.meeting.recording_url);
+  const byUrl = url ? candidates.filter((c) => normalizeUrl(c.meeting_url) === url) : [];
+  if (byUrl.length === 1) return { job: byUrl[0], method: 'window_and_url' };
+  if (byUrl.length > 1) return { job: null, method: null, reason: 'ambiguous_candidates' };
+
+  const title = normalizeTitle(args.meeting.title);
+  const byTitle = title
+    ? candidates.filter((c) => normalizeTitle(c.invite_summary) === title)
+    : [];
+  if (byTitle.length === 1) return { job: byTitle[0], method: 'window_and_invite_summary' };
+  if (byTitle.length > 1) return { job: null, method: null, reason: 'ambiguous_candidates' };
+
+  // Time overlap alone is NEVER sufficient.
+  return {
+    job: null,
+    method: null,
+    reason: candidates.length > 1 ? 'ambiguous_candidates' : 'time_only_insufficient',
+  };
 }
 
 export async function attributeMeetingRecord(supabase: any, meetingRecordId: string): Promise<AttributionOutcome> {
@@ -50,55 +113,41 @@ export async function attributeMeetingRecord(supabase: any, meetingRecordId: str
     'contact_name, contact_email, assigned_user_id, assigned_user_name, invite_summary, invite_uid, ' +
     'scheduled_start, scheduled_end, meeting_url';
 
-  let job: any = null;
-  let method: string | null = null;
-
+  let uidJob: any = null;
   if (uidMatch) {
-    const { data } = await supabase.from('meetgeek_guest_invite_jobs').select(select).eq('invite_uid', uidMatch[0]).maybeSingle();
-    if (data) {
-      job = data;
-      method = 'invite_uid';
-    }
+    const { data } = await supabase
+      .from('meetgeek_guest_invite_jobs')
+      .select(select)
+      .eq('invite_uid', uidMatch[0])
+      .maybeSingle();
+    uidJob = data || null;
   }
 
   const startMs = meeting.started_at ? Date.parse(meeting.started_at) : NaN;
-  let candidates: any[] = [];
-  if (!job && Number.isFinite(startMs)) {
-    let q = supabase
+  let windowCandidates: any[] = [];
+  if (!uidJob && Number.isFinite(startMs) && meeting.client_id) {
+    const { data } = await supabase
       .from('meetgeek_guest_invite_jobs')
       .select(select)
+      .eq('client_id', meeting.client_id)
       .gte('scheduled_start', new Date(startMs - WINDOW_MS).toISOString())
       .lte('scheduled_start', new Date(startMs + WINDOW_MS).toISOString())
       .limit(25);
-    if (meeting.client_id) q = q.eq('client_id', meeting.client_id);
-    const { data } = await q;
-    candidates = data || [];
-
-    const title = normalizeTitle(meeting.title);
-    const byTitle = candidates.filter((c) => title && normalizeTitle(c.invite_summary) === title);
-    if (byTitle.length === 1) {
-      job = byTitle[0];
-      method = 'structured_title';
-    }
-
-    if (!job) {
-      const url = normalizeUrl(meeting.source_url) || normalizeUrl(meeting.recording_url);
-      const byUrl = url ? candidates.filter((c) => normalizeUrl(c.meeting_url) === url) : [];
-      if (byUrl.length === 1) {
-        job = byUrl[0];
-        method = 'window_and_url';
-      }
-    }
-
-    if (!job && candidates.length === 1) {
-      job = candidates[0];
-      method = 'window_only';
-    }
+    windowCandidates = data || [];
   }
+
+  const chosen = chooseAttributionCandidate({
+    meeting: meeting as AttributionSubject,
+    uidJob,
+    windowCandidates,
+  });
+  const job: any = chosen.job;
+  const method = chosen.method;
 
   if (!job) {
-    return { ok: false, method: null, reason: candidates.length > 1 ? 'ambiguous_candidates' : 'no_candidate' };
+    return { ok: false, method: null, reason: chosen.reason || 'no_candidate' };
   }
+
 
   await supabase
     .from('meeting_records')

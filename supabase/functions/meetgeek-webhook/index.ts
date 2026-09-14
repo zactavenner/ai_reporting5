@@ -11,6 +11,7 @@ import {
   extractTranscriptText,
   extractTranscriptCursor,
   signMeetgeekBody,
+  normalizeMeetgeekPayload,
 
   classifyHydrationFailure,
   type HydrationDiagnostic,
@@ -41,6 +42,7 @@ import {
 } from '../_shared/meetgeekRegion.ts';
 import { resolveMeetgeekApiKey, meetgeekRegionEnv } from '../_shared/meetgeekApiKey.ts';
 import { replayHydrationFailures } from '../_shared/meetgeekReplay.ts';
+import { buildDiagnosticsReport } from '../_shared/meetgeekDiagnostics.ts';
 import { authorizeOperator } from '../_shared/operatorAuth.ts';
 import { attributeMeetingRecord, attributeRecentMeetings } from '../_shared/meetingAttribution.ts';
 import { ghlAppointmentUrl } from '../_shared/ghlAttribution.ts';
@@ -408,85 +410,147 @@ async function enrichFromProvider(
 function buildLifecycleDeps(supabase: any): LifecycleDeps {
   return {
     async getConfigForMeeting(meeting) {
-      // Client authority: an attendee that already exists as a lead of a client
-      // whose MeetGeek integration is configured. Never from the request URL and
-      // never from the meeting title (attacker-controllable text).
-      const emails = meeting.participants
+      // Client authority is resolved in strict tiers, strongest first. Never
+      // from the request URL and never from the meeting title (attacker-
+      // controllable text). A tier that resolves to exactly ONE enabled client
+      // wins; an ambiguous tier falls through to the next tier instead of
+      // aborting, because a shared attendee (an agency team member, or one
+      // investor email that exists as a lead under many clients) is a weaker
+      // signal than our own server-minted invite ledger.
+      const allEmails = meeting.participants
         .map((p) => normalizeEmail(p.email))
         .filter((e): e is string => !!e);
-      const candidateIds = new Set<string>();
-      if (emails.length) {
+
+      // Agency/notetaker addresses can never identify a tenant: they attend
+      // every client's calls, so matching them as "leads" makes every meeting
+      // ambiguous across clients.
+      const internal = new Set<string>();
+      {
+        const { data: members } = await supabase.from('agency_members').select('email');
+        for (const m of members || []) {
+          const e = normalizeEmail(m?.email);
+          if (e) internal.add(e);
+        }
+        const { data: guests } = await supabase
+          .from('client_meetgeek_guest_configs')
+          .select('guest_email');
+        for (const g of guests || []) {
+          const e = normalizeEmail(g?.guest_email);
+          if (e) internal.add(e);
+        }
+      }
+      const externalEmails = allEmails.filter((e) => !internal.has(e));
+
+      const resolveOne = async (ids: Iterable<string>): Promise<MeetgeekClientConfig | null> => {
+        const configs: MeetgeekClientConfig[] = [];
+        for (const id of new Set(ids)) {
+          const cfg = await loadMeetgeekConfig(supabase, id);
+          if (cfg?.enabled) configs.push(cfg);
+        }
+        return configs.length === 1 ? configs[0] : null;
+      };
+
+      // Tier 1 — our OWN ghost-invite ledger, matched on the invited attendee.
+      // The notetaker only ever attends because this system invited it to one
+      // specific client appointment.
+      if (externalEmails.length) {
+        const { data } = await supabase
+          .from('meetgeek_guest_invite_jobs')
+          .select('client_id')
+          .eq('status', 'invited')
+          .in('contact_email', externalEmails)
+          .limit(50);
+        const hit = await resolveOne((data || []).map((r: any) => r.client_id).filter(Boolean));
+        if (hit) return hit;
+      }
+
+      // Tier 2 — an external attendee who exists as a lead of exactly one
+      // configured client.
+      if (externalEmails.length) {
         const { data } = await supabase
           .from('leads')
           .select('client_id')
-          .in('email', emails)
+          .in('email', externalEmails)
           .not('client_id', 'is', null)
           .limit(50);
-        for (const row of data || []) candidateIds.add(row.client_id as string);
+        const hit = await resolveOne((data || []).map((r: any) => r.client_id).filter(Boolean));
+        if (hit) return hit;
       }
 
-      // Second authority — our OWN ghost-invite ledger. The notetaker only ever
-      // attends a meeting because this system sent it an invite for a specific
-      // client appointment, so an invited job whose attendee email is on the
-      // meeting (or whose scheduled window contains it) identifies the tenant
-      // just as strictly as a lead match. Server-owned rows only; nothing here
-      // reads caller-supplied identity or meeting text.
-      if (!candidateIds.size) {
-        if (emails.length) {
+      // Tier 3 — the invite ledger matched on the scheduling window alone.
+      if (meeting.startedAt) {
+        const anchor = new Date(meeting.startedAt).getTime();
+        if (Number.isFinite(anchor)) {
+          const windowMs = 30 * 60 * 1000;
           const { data } = await supabase
             .from('meetgeek_guest_invite_jobs')
             .select('client_id')
             .eq('status', 'invited')
-            .in('contact_email', emails)
+            .gte('scheduled_start', new Date(anchor - windowMs).toISOString())
+            .lte('scheduled_start', new Date(anchor + windowMs).toISOString())
             .limit(50);
-          for (const row of data || []) if (row.client_id) candidateIds.add(row.client_id as string);
-        }
-        if (!candidateIds.size && meeting.startedAt) {
-          const anchor = new Date(meeting.startedAt).getTime();
-          if (Number.isFinite(anchor)) {
-            const windowMs = 30 * 60 * 1000;
-            const { data } = await supabase
-              .from('meetgeek_guest_invite_jobs')
-              .select('client_id')
-              .eq('status', 'invited')
-              .gte('scheduled_start', new Date(anchor - windowMs).toISOString())
-              .lte('scheduled_start', new Date(anchor + windowMs).toISOString())
-              .limit(50);
-            for (const row of data || []) if (row.client_id) candidateIds.add(row.client_id as string);
-          }
+          const hit = await resolveOne((data || []).map((r: any) => r.client_id).filter(Boolean));
+          if (hit) return hit;
         }
       }
 
-      const configs: MeetgeekClientConfig[] = [];
-      for (const id of candidateIds) {
-        const cfg = await loadMeetgeekConfig(supabase, id);
-        if (cfg?.enabled) configs.push(cfg);
-      }
-      // Ambiguity is still fail-closed: never guess between two tenants.
-      if (configs.length !== 1) return null;
-      return configs[0];
+      // Still ambiguous or unknown: fail closed rather than guess a tenant.
+      return null;
     },
     async findAppointments(config, meeting) {
       const mode = config.mode || 'selected_calendar';
       if (!config.ghlLocationId) return [];
       if (mode === 'selected_calendar' && !config.ghlCalendarId) return [];
-      const { apiKey, locationId } = await getMappedGhl(supabase, config.clientId);
-      if (!apiKey || !locationId || locationId !== config.ghlLocationId) return [];
       const anchor = meeting.startedAt ? new Date(meeting.startedAt).getTime() : Date.now();
       const startTime = anchor - 60 * 60 * 1000;
       const endTime = anchor + 60 * 60 * 1000;
-      const url = `${GHL_BASE}/calendars/events?locationId=${encodeURIComponent(locationId)}`
-        + (mode === 'selected_calendar' && config.ghlCalendarId
-          ? `&calendarId=${encodeURIComponent(config.ghlCalendarId)}`
-          : '')
-        + `&startTime=${startTime}&endTime=${endTime}`;
-      const res = await fetch(url, { headers: GHL_HEADERS(apiKey) });
-      if (!res.ok) return [];
-      const json = await res.json().catch(() => ({}));
-      const events = json?.events || json?.appointments || [];
-      return (Array.isArray(events) ? events : [])
-        .map(toGhlAppointment)
-        .filter((a: CalendarAppointment) => !!a.eventId);
+
+      const live: CalendarAppointment[] = [];
+      const { apiKey, locationId } = await getMappedGhl(supabase, config.clientId);
+      if (apiKey && locationId && locationId === config.ghlLocationId) {
+        const url = `${GHL_BASE}/calendars/events?locationId=${encodeURIComponent(locationId)}`
+          + (mode === 'selected_calendar' && config.ghlCalendarId
+            ? `&calendarId=${encodeURIComponent(config.ghlCalendarId)}`
+            : '')
+          + `&startTime=${startTime}&endTime=${endTime}`;
+        const res = await fetch(url, { headers: GHL_HEADERS(apiKey) });
+        if (res.ok) {
+          const json = await res.json().catch(() => ({}));
+          const events = json?.events || json?.appointments || [];
+          for (const ev of Array.isArray(events) ? events : []) {
+            const appt = toGhlAppointment(ev);
+            if (appt.eventId) live.push(appt);
+          }
+        }
+      }
+      if (live.length) return live;
+
+      // Fallback to OUR OWN invite ledger. Those rows are written server-side
+      // from the client's mapped GHL calendar when the ghost invite is created,
+      // so they carry the same authority as a live calendar read — and they
+      // survive a GHL outage, a rotated key, or an event GHL no longer returns
+      // (e.g. the appointment was moved after the call happened).
+      const { data: jobs } = await supabase
+        .from('meetgeek_guest_invite_jobs')
+        .select('ghl_appointment_id, ghl_calendar_id, ghl_location_id, ghl_contact_id, contact_email, invite_summary, scheduled_start, scheduled_end, meeting_url')
+        .eq('client_id', config.clientId)
+        .gte('scheduled_start', new Date(startTime).toISOString())
+        .lte('scheduled_start', new Date(endTime).toISOString())
+        .limit(25);
+
+      return (jobs || [])
+        .filter((j: any) => !!j.ghl_appointment_id)
+        .map((j: any): CalendarAppointment => ({
+          eventId: String(j.ghl_appointment_id),
+          calendarId: j.ghl_calendar_id ? String(j.ghl_calendar_id) : null,
+          locationId: j.ghl_location_id ? String(j.ghl_location_id) : config.ghlLocationId,
+          contactId: j.ghl_contact_id ? String(j.ghl_contact_id) : null,
+          attendeeEmail: normalizeEmail(j.contact_email),
+          title: j.invite_summary || null,
+          startTime: j.scheduled_start ? new Date(j.scheduled_start).toISOString() : null,
+          endTime: j.scheduled_end ? new Date(j.scheduled_end).toISOString() : null,
+          isVideo: !!j.meeting_url,
+        }));
     },
     async findActivity(source, idempotencyKey) {
       const { data } = await supabase
@@ -598,7 +662,28 @@ function buildIngestDeps(supabase: any): IngestDeps {
         crmSyncStatus: result.crmSyncStatus,
         activityId: result.activityId,
         duplicate: result.duplicate,
+        // The gate did the authenticated transcript/summary/insights reads —
+        // hand that enriched meeting back so it is what gets persisted.
+        meeting: result.meeting,
       };
+    },
+
+    // Durable hand-off to the reporting-sheet writer. Enqueue only: the actual
+    // Google Sheets write runs in `meeting-sheet-delivery` with its own retries,
+    // so a sheet outage can never fail or duplicate an ingestion.
+    async onMeetingPersisted({ meetingRecordId, clientId }) {
+      if (!clientId) return;
+      await supabase
+        .from('meeting_sheet_deliveries')
+        .upsert(
+          {
+            meeting_record_id: meetingRecordId,
+            client_id: clientId,
+            status: 'pending',
+            next_attempt_at: new Date().toISOString(),
+          },
+          { onConflict: 'meeting_record_id', ignoreDuplicates: true },
+        );
     },
     async findProcessedEvent(dedupeKey) {
       const { data } = await supabase
@@ -1028,6 +1113,171 @@ Deno.serve(async (req) => {
         const result = await runMeetgeekTestEvent(supabase, clientId, body.mode || 'match');
         return jsonResponse(result, result.ok ? 200 : 400);
       }
+    }
+
+    // -----------------------------------------------------------------
+    // Live provider diagnostics. Answers "can this deployment authenticate
+    // to MeetGeek and read meetings right now?" with evidence, and returns
+    // ONLY statuses, codes and counts — never the key, a provider body,
+    // meeting content or attendee identities.
+    // -----------------------------------------------------------------
+    if (body.action === 'mg_diagnose_provider') {
+      const api = await resolveAgencyMeetgeekApi(supabase);
+      if (!api) {
+        return jsonResponse({
+          diagnostics: buildDiagnosticsReport({
+            apiKeyConfigured: false,
+            region: null,
+            regionSource: 'unresolved',
+            list: { ok: false },
+            meetingReads: [],
+          }),
+        });
+      }
+
+      const pinned = api.region;
+      const listPath = '/v1/meetings?limit=5';
+      let region: MeetgeekRegion | null = pinned;
+      let listProbe: MeetgeekProbeResult;
+      if (pinned) {
+        listProbe = await mgProbe(api.apiKey, regionBaseUrl(pinned), listPath);
+      } else {
+        const resolution = await resolveMeetgeekRegion({
+          explicitRegion: null,
+          probe: (baseUrl) => mgProbe(api.apiKey, baseUrl, listPath),
+        });
+        region = resolution.ok ? resolution.region : null;
+        listProbe = resolution.ok
+          ? { ok: true, status: 200, body: resolution.body }
+          : (resolution.failure ?? { ok: false });
+      }
+
+      const listBody = (listProbe.body ?? {}) as Record<string, any>;
+      const items: any[] = Array.isArray(listBody.meetings)
+        ? listBody.meetings
+        : Array.isArray(listBody.data)
+          ? listBody.data
+          : Array.isArray(listBody)
+            ? (listBody as any)
+            : [];
+
+      // Sample individual reads (bounded) to prove per-meeting access too.
+      const reads: MeetgeekProbeResult[] = [];
+      if (listProbe.ok && region) {
+        for (const item of items.slice(0, 3)) {
+          const id = item?.meeting_id || item?.id;
+          if (!id) continue;
+          reads.push(await mgProbe(api.apiKey, regionBaseUrl(region), `/v1/meetings/${encodeURIComponent(String(id))}`));
+        }
+      }
+
+      return jsonResponse({
+        diagnostics: buildDiagnosticsReport({
+          apiKeyConfigured: true,
+          region: region ?? null,
+          regionSource: pinned ? 'explicit' : region ? 'probe' : 'unresolved',
+          list: {
+            ok: listProbe.ok,
+            status: listProbe.status ?? null,
+            errorKind: listProbe.errorKind ?? null,
+            count: listProbe.ok ? items.length : null,
+          },
+          meetingReads: reads.map((r) => ({
+            ok: r.ok,
+            status: r.status ?? null,
+            errorKind: r.errorKind ?? null,
+          })),
+        }),
+      });
+    }
+
+    // -----------------------------------------------------------------
+    // Why did ONE recorded meeting fail to map to a client? Returns only
+    // counts, booleans and safe codes — never attendee identities, emails,
+    // meeting content or the provider body.
+    // -----------------------------------------------------------------
+    if (body.action === 'mg_diagnose_meeting') {
+      const meetingId = String(body.meeting_id || body.meeting_external_id || '').trim();
+      if (!meetingId) return jsonResponse({ error: 'meeting_id required' }, 400);
+
+      const deps = buildIngestDeps(supabase);
+      const base = normalizeMeetgeekPayload({ message: 'File analyzed successfully', meeting_id: meetingId });
+      if (!base) return jsonResponse({ error: 'meeting_id could not be normalized' }, 400);
+
+      const attempt = await deps.hydrateFromProvider!(base);
+      const hydrated = attempt?.meeting ?? null;
+      if (!hydrated) {
+        return jsonResponse({
+          diagnosis: {
+            hydrated: false,
+            hydration_code: attempt?.diagnostic?.code ?? 'empty_response',
+          },
+        });
+      }
+
+      const emails = hydrated.participants
+        .map((p) => normalizeEmail(p.email))
+        .filter((e): e is string => !!e);
+
+      const { data: leadRows } = emails.length
+        ? await supabase.from('leads').select('client_id').in('email', emails).not('client_id', 'is', null).limit(50)
+        : { data: [] as any[] };
+      const leadClients = new Set((leadRows || []).map((r: any) => r.client_id));
+
+      const { data: jobRows } = emails.length
+        ? await supabase
+            .from('meetgeek_guest_invite_jobs')
+            .select('client_id')
+            .eq('status', 'invited')
+            .in('contact_email', emails)
+            .limit(50)
+        : { data: [] as any[] };
+      const jobClients = new Set((jobRows || []).map((r: any) => r.client_id).filter(Boolean));
+
+      let windowJobClients = 0;
+      if (hydrated.startedAt) {
+        const anchor = Date.parse(hydrated.startedAt);
+        if (Number.isFinite(anchor)) {
+          const w = 30 * 60 * 1000;
+          const { data } = await supabase
+            .from('meetgeek_guest_invite_jobs')
+            .select('client_id')
+            .eq('status', 'invited')
+            .gte('scheduled_start', new Date(anchor - w).toISOString())
+            .lte('scheduled_start', new Date(anchor + w).toISOString())
+            .limit(50);
+          windowJobClients = new Set((data || []).map((r: any) => r.client_id).filter(Boolean)).size;
+        }
+      }
+
+      const lifecycle = buildLifecycleDeps(supabase);
+      const config = await lifecycle.getConfigForMeeting(hydrated);
+
+      let appointmentCount: number | null = null;
+      let gateReason: string | null = null;
+      if (config) {
+        const appointments = await lifecycle.findAppointments(config, hydrated);
+        appointmentCount = appointments.length;
+        const decision = evaluateCalendarGate({ config, appointments });
+        gateReason = decision.allowed === true ? null : decision.reason;
+      }
+
+      return jsonResponse({
+        diagnosis: {
+          hydrated: true,
+          has_started_at: !!hydrated.startedAt,
+          has_join_url: !!hydrated.sourceUrl,
+          participant_count: hydrated.participants.length,
+          participant_email_count: emails.length,
+          lead_matched_clients: leadClients.size,
+          invite_email_matched_clients: jobClients.size,
+          invite_window_matched_clients: windowJobClients,
+          client_resolved: !!config,
+          client_id: config?.clientId ?? null,
+          appointment_count: appointmentCount,
+          gate_reason: gateReason,
+        },
+      });
     }
 
     return jsonResponse({ error: 'Unsupported action' }, 400);

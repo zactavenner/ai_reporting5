@@ -14,11 +14,21 @@
 export const MAX_REPLAY_BATCH = 50;
 export const DEFAULT_REPLAY_BATCH = 25;
 
-/** Hydration codes that a replay can plausibly fix. */
+/**
+ * Hydration codes a replay can plausibly fix: a credential/region problem that
+ * has since been corrected, or a transient provider failure (HTTP 5xx, 429,
+ * network drop, empty/incomplete body). Codes that describe the meeting itself
+ * (`not_found`, `parse_error`) are NOT replayable — retrying cannot change them.
+ */
 export const REPLAYABLE_HYDRATION_CODES: ReadonlyArray<string | null> = [
   null,
   'unauthorized',
   'missing_api_key',
+  'server_error',
+  'rate_limited',
+  'network_error',
+  'empty_response',
+  'incomplete_response',
 ];
 
 export interface ReplayCandidateRow {
