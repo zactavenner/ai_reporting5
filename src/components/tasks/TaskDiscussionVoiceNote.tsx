@@ -166,6 +166,10 @@ export function TaskDiscussionVoiceNote({
           console.error('Transcription not available:', e);
         }
         
+        if (!transcript) {
+          toast.warning('Voice note saved, but no speech could be transcribed');
+        }
+        
         // Add voice comment with transcript
         await addVoiceComment.mutateAsync({
           taskId,

@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,6 +22,10 @@ serve(async (req) => {
      }
 
      // Handle extract_task_details action (for auto-extracting task info from voice)
+     if (action === "backfill_transcripts") {
+       return await handleBackfillTranscripts(typeof body.limit === "number" ? body.limit : 25);
+     }
+
      if (action === "extract_task_details") {
        return await handleExtractTaskDetails(audioUrl, existingTaskContext, agencyMembers, agencyPods);
      }
@@ -58,57 +61,18 @@ serve(async (req) => {
 
     console.log("Processing voice note for client:", clientId);
 
-    // Step 1: Transcribe audio using Gemini API
-     const transcriptResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-       method: "POST",
-       headers: {
-         Authorization: `Bearer ${LOVABLE_API_KEY}`,
-         "Content-Type": "application/json",
-       },
-       body: JSON.stringify({
-         model: "nvidia/nemotron-3-ultra-550b-a55b:free",
-        models: ["nvidia/nemotron-3-ultra-550b-a55b:free", "google/gemini-2.0-flash-001", "openai/gpt-4o-mini"],
-         messages: [
-           {
-             role: "user",
-             content: [
-               {
-                 type: "text",
-                 text: "Transcribe this audio recording accurately. Only output the transcription text, nothing else. If you cannot hear any speech or the audio is unclear, respond with 'No speech detected'."
-               },
-               {
-                 type: "image_url",
-                 image_url: {
-                   url: `data:audio/webm;base64,${audioBase64}`
-                 }
-               }
-             ]
-           }
-         ],
-         max_tokens: 4096,
-         temperature: 0.1,
-       }),
-     });
-
-    if (!transcriptResponse.ok) {
-      const errorText = await transcriptResponse.text();
-      console.error("Transcription error:", transcriptResponse.status, errorText);
-      
-      if (transcriptResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      
+    // Step 1: Transcribe audio with a real speech-to-text model
+    let transcript = "";
+    try {
+      const bin = Uint8Array.from(atob(audioBase64), (c) => c.charCodeAt(0));
+      transcript = await transcribeAudioBytes(bin, "audio/webm");
+    } catch (e) {
+      console.error("Transcription error:", e instanceof Error ? e.message : "unknown");
       return new Response(
         JSON.stringify({ error: "Failed to transcribe audio" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const transcriptData = await transcriptResponse.json();
-     const transcript = transcriptData.choices?.[0]?.message?.content || "";
 
     if (!transcript.trim() || transcript.toLowerCase().includes("no speech detected")) {
       return new Response(
@@ -280,62 +244,12 @@ Return ONLY valid JSON in this exact shape:
 
 // Helper function for transcribe_only action
 async function handleTranscribeOnly(audioUrl: string) {
-  const LOVABLE_API_KEY = Deno.env.get('OPENROUTER_API_KEY');
-  if (!LOVABLE_API_KEY) {
-    return new Response(
-      JSON.stringify({ error: "AI API key not configured" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
   try {
-    // Fetch the audio file and convert to base64
     const audioResponse = await fetch(audioUrl);
-    const audioBlob = await audioResponse.arrayBuffer();
-    const base64Audio = base64Encode(audioBlob);
-
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "nvidia/nemotron-3-ultra-550b-a55b:free",
-        models: ["nvidia/nemotron-3-ultra-550b-a55b:free", "google/gemini-2.0-flash-001", "openai/gpt-4o-mini"],
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Transcribe this audio recording accurately. Only output the transcription text, nothing else."
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:audio/webm;base64,${base64Audio}`
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 4096,
-        temperature: 0.1,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Transcription error:", response.status, errorText);
-      return new Response(
-        JSON.stringify({ error: "Failed to transcribe audio", transcript: "" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const data = await response.json();
-    const transcript = data.choices?.[0]?.message?.content || "";
+    if (!audioResponse.ok) throw new Error(`audio fetch failed: ${audioResponse.status}`);
+    const bytes = new Uint8Array(await audioResponse.arrayBuffer());
+    const contentType = audioResponse.headers.get("content-type") || "audio/webm";
+    const transcript = await transcribeAudioBytes(bytes, contentType);
 
     return new Response(
       JSON.stringify({ transcript }),
@@ -366,54 +280,14 @@ async function handleExtractTaskDetails(
   }
 
   try {
-    // Fetch the audio file and convert to base64
+    // Step 1: Transcribe with a real speech-to-text model
     const audioResponse = await fetch(audioUrl);
-    const audioBlob = await audioResponse.arrayBuffer();
-    const base64Audio = base64Encode(audioBlob);
-
-    // Step 1: Transcribe
-    const transcribeResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "nvidia/nemotron-3-ultra-550b-a55b:free",
-        models: ["nvidia/nemotron-3-ultra-550b-a55b:free", "google/gemini-2.0-flash-001", "openai/gpt-4o-mini"],
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Transcribe this audio recording accurately. Only output the transcription text, nothing else."
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:audio/webm;base64,${base64Audio}`
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 4096,
-        temperature: 0.1,
-      }),
-    });
-
-    if (!transcribeResponse.ok) {
-      const errorText = await transcribeResponse.text();
-      console.error("Transcription error:", transcribeResponse.status, errorText);
-      return new Response(
-        JSON.stringify({ error: "Failed to transcribe audio" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const transcribeData = await transcribeResponse.json();
-    const transcript = transcribeData.choices?.[0]?.message?.content || "";
+    if (!audioResponse.ok) throw new Error(`audio fetch failed: ${audioResponse.status}`);
+    const audioBytes = new Uint8Array(await audioResponse.arrayBuffer());
+    const transcript = await transcribeAudioBytes(
+      audioBytes,
+      audioResponse.headers.get("content-type") || "audio/webm",
+    );
 
     if (!transcript.trim()) {
       return new Response(
@@ -517,4 +391,88 @@ Guidelines:
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
+}
+
+// Real speech-to-text via Lovable AI Gateway
+async function transcribeAudioBytes(bytes: Uint8Array, contentType: string): Promise<string> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+  const ext = contentType.includes("mp4") ? "mp4"
+    : contentType.includes("mpeg") ? "mp3"
+    : contentType.includes("wav") ? "wav"
+    : contentType.includes("ogg") ? "ogg"
+    : "webm";
+
+  const form = new FormData();
+  form.append("model", "google/gemini-3.5-transcribe");
+  form.append("file", new Blob([bytes], { type: contentType }), `recording.${ext}`);
+
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${LOVABLE_API_KEY}` },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`transcription failed ${res.status}: ${detail.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  return (data?.text || "").trim();
+}
+
+// Backfill transcripts for existing task voice comments that have none
+async function handleBackfillTranscripts(limit = 25) {
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  const { data: rows, error } = await supabase
+    .from("task_comments")
+    .select("id, audio_url")
+    .eq("comment_type", "voice")
+    .not("audio_url", "is", null)
+    .or("transcript.is.null,transcript.eq.")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  let transcribed = 0;
+  let failed = 0;
+
+  for (const row of rows || []) {
+    try {
+      const audioRes = await fetch(row.audio_url as string);
+      if (!audioRes.ok) throw new Error(`audio fetch ${audioRes.status}`);
+      const bytes = new Uint8Array(await audioRes.arrayBuffer());
+      const transcript = await transcribeAudioBytes(
+        bytes,
+        audioRes.headers.get("content-type") || "audio/webm",
+      );
+      if (!transcript) { failed++; continue; }
+      const { error: upErr } = await supabase
+        .from("task_comments")
+        .update({ transcript })
+        .eq("id", row.id);
+      if (upErr) throw upErr;
+      transcribed++;
+    } catch (e) {
+      failed++;
+      console.error("Backfill failed for comment", row.id, e instanceof Error ? e.message : "unknown");
+    }
+  }
+
+  return new Response(
+    JSON.stringify({ scanned: rows?.length || 0, transcribed, failed }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
 }
