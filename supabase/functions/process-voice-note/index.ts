@@ -277,54 +277,14 @@ async function handleExtractTaskDetails(
   }
 
   try {
-    // Fetch the audio file and convert to base64
+    // Step 1: Transcribe with a real speech-to-text model
     const audioResponse = await fetch(audioUrl);
-    const audioBlob = await audioResponse.arrayBuffer();
-    const base64Audio = base64Encode(audioBlob);
-
-    // Step 1: Transcribe
-    const transcribeResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "nvidia/nemotron-3-ultra-550b-a55b:free",
-        models: ["nvidia/nemotron-3-ultra-550b-a55b:free", "google/gemini-2.0-flash-001", "openai/gpt-4o-mini"],
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Transcribe this audio recording accurately. Only output the transcription text, nothing else."
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:audio/webm;base64,${base64Audio}`
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 4096,
-        temperature: 0.1,
-      }),
-    });
-
-    if (!transcribeResponse.ok) {
-      const errorText = await transcribeResponse.text();
-      console.error("Transcription error:", transcribeResponse.status, errorText);
-      return new Response(
-        JSON.stringify({ error: "Failed to transcribe audio" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const transcribeData = await transcribeResponse.json();
-    const transcript = transcribeData.choices?.[0]?.message?.content || "";
+    if (!audioResponse.ok) throw new Error(`audio fetch failed: ${audioResponse.status}`);
+    const audioBytes = new Uint8Array(await audioResponse.arrayBuffer());
+    const transcript = await transcribeAudioBytes(
+      audioBytes,
+      audioResponse.headers.get("content-type") || "audio/webm",
+    );
 
     if (!transcript.trim()) {
       return new Response(
