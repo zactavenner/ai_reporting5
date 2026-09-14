@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,6 +22,10 @@ serve(async (req) => {
      }
 
      // Handle extract_task_details action (for auto-extracting task info from voice)
+     if (action === "backfill_transcripts") {
+       return await handleBackfillTranscripts(typeof body.limit === "number" ? body.limit : 25);
+     }
+
      if (action === "extract_task_details") {
        return await handleExtractTaskDetails(audioUrl, existingTaskContext, agencyMembers, agencyPods);
      }
@@ -388,4 +391,88 @@ Guidelines:
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
+}
+
+// Real speech-to-text via Lovable AI Gateway
+async function transcribeAudioBytes(bytes: Uint8Array, contentType: string): Promise<string> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+  const ext = contentType.includes("mp4") ? "mp4"
+    : contentType.includes("mpeg") ? "mp3"
+    : contentType.includes("wav") ? "wav"
+    : contentType.includes("ogg") ? "ogg"
+    : "webm";
+
+  const form = new FormData();
+  form.append("model", "google/gemini-3.5-transcribe");
+  form.append("file", new Blob([bytes], { type: contentType }), `recording.${ext}`);
+
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${LOVABLE_API_KEY}` },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`transcription failed ${res.status}: ${detail.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  return (data?.text || "").trim();
+}
+
+// Backfill transcripts for existing task voice comments that have none
+async function handleBackfillTranscripts(limit = 25) {
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  const { data: rows, error } = await supabase
+    .from("task_comments")
+    .select("id, audio_url")
+    .eq("comment_type", "voice")
+    .not("audio_url", "is", null)
+    .or("transcript.is.null,transcript.eq.")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  let transcribed = 0;
+  let failed = 0;
+
+  for (const row of rows || []) {
+    try {
+      const audioRes = await fetch(row.audio_url as string);
+      if (!audioRes.ok) throw new Error(`audio fetch ${audioRes.status}`);
+      const bytes = new Uint8Array(await audioRes.arrayBuffer());
+      const transcript = await transcribeAudioBytes(
+        bytes,
+        audioRes.headers.get("content-type") || "audio/webm",
+      );
+      if (!transcript) { failed++; continue; }
+      const { error: upErr } = await supabase
+        .from("task_comments")
+        .update({ transcript })
+        .eq("id", row.id);
+      if (upErr) throw upErr;
+      transcribed++;
+    } catch (e) {
+      failed++;
+      console.error("Backfill failed for comment", row.id, e instanceof Error ? e.message : "unknown");
+    }
+  }
+
+  return new Response(
+    JSON.stringify({ scanned: rows?.length || 0, transcribed, failed }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
 }
