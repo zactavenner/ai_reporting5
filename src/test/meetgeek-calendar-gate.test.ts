@@ -25,6 +25,8 @@ const config: MeetgeekClientConfig = {
   mappingValid: true,
 };
 
+const JOIN_URL = 'https://meet.google.com/abc-defg-hij';
+
 function appt(over: Partial<CalendarAppointment> = {}): CalendarAppointment {
   return {
     eventId: 'evt-1',
@@ -36,23 +38,29 @@ function appt(over: Partial<CalendarAppointment> = {}): CalendarAppointment {
     startTime: '2026-02-01T17:00:00Z',
     endTime: '2026-02-01T17:30:00Z',
     isVideo: true,
+    joinUrl: JOIN_URL,
     ...over,
   };
 }
 
-const meeting: NormalizedMeeting = normalizeMeetgeekPayload({
-  event_id: 'evt_1',
-  status: 'analyzed',
-  meeting: {
-    meeting_id: 'mtg_1',
-    title: 'Discovery Call - Acme',
-    timestamp_start_utc: '2026-02-01T17:00:00Z',
-    timestamp_end_utc: '2026-02-01T17:30:00Z',
-  },
-  participants: [{ name: 'Jane', email: 'jane@acme.com' }],
-  summary: 'Great call',
-  action_items: ['Send deck'],
-})!;
+const meeting: NormalizedMeeting = {
+  ...normalizeMeetgeekPayload({
+    event_id: 'evt_1',
+    status: 'analyzed',
+    meeting: {
+      meeting_id: 'mtg_1',
+      title: 'Discovery Call - Acme',
+      timestamp_start_utc: '2026-02-01T17:00:00Z',
+      timestamp_end_utc: '2026-02-01T17:30:00Z',
+    },
+    participants: [{ name: 'Jane', email: 'jane@acme.com' }],
+    summary: 'Great call',
+    action_items: ['Send deck'],
+  })!,
+  // Identity + transcript are now prerequisites for any attribution.
+  sourceUrl: JOIN_URL,
+  transcriptText: 'Jane: thanks for the time. '.repeat(30),
+};
 
 function makeDeps(over: Partial<LifecycleDeps> = {}) {
   const calls: any = { activities: [], patches: [], notes: [], health: [] };
@@ -362,17 +370,23 @@ describe('HNWI capital-raising operational QA scorecard', () => {
 
   it('never scores from duration, recording presence or CRM matching', async () => {
     const { deps, calls } = makeDeps();
-    const res = await run(deps);
-    // Rich meeting, matched lead, but no transcript/analytics => transcript-derived
-    // categories earn nothing and the row cannot pass.
+    // A transcript long enough to clear the completeness gate but carrying no
+    // discovery/next-step evidence at all.
+    const res = await processCalendarMeeting({
+      meeting: { ...meeting, transcriptText: 'um. '.repeat(120), summary: null, actionItems: [], insights: null },
+      noteBuilder: () => 'note body',
+      deps,
+    });
+    // Long call, matched lead, note written — but a content-free transcript means
+    // every conversation-derived category earns nothing and the row cannot pass.
     expect(res.qaTotal).toBeLessThan(QA_PASS_THRESHOLD);
     expect(calls.activities[0].qa_total).toBe(res.qaTotal);
     const byKey = Object.fromEntries((calls.activities[0].qa_scores as any[]).map((c) => [c.key, c]));
-    for (const key of ['discovery', 'next_step', 'engagement', 'objection_handling']) {
+    for (const key of ['discovery', 'next_step', 'objection_handling', 'engagement', 'offer_fit']) {
       expect(byKey[key].points).toBe(0);
-      expect(byKey[key].insufficientEvidence || byKey[key].na).toBe(true);
     }
-    expect(calls.activities[0].qa_gate_status).toBe('manual_review');
+    expect(byKey.offer_fit.insufficientEvidence).toBe(true);
+    expect(calls.activities[0].qa_gate_status).not.toBe('pass');
     expect(calls.activities[0].qa_evidence_tags).toContain('insufficient_evidence');
   });
 

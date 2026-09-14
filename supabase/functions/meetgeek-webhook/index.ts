@@ -21,10 +21,12 @@ import {
 } from '../_shared/meetgeekIngest.ts';
 import {
   buildActivityRow,
+  canonicalJoinUrl,
   evaluateCalendarGate,
   GATE_REJECTION_MESSAGES,
   hashIdForLog,
   processCalendarMeeting,
+  verifyMeetingIdentity,
   type CalendarAppointment,
   type LifecycleDeps,
   type MeetgeekClientConfig,
@@ -165,6 +167,35 @@ async function getMappedGhl(supabase: any, clientId: string): Promise<{ apiKey: 
   return { apiKey: data?.ghl_api_key || null, locationId: data?.ghl_location_id || null };
 }
 
+/**
+ * Agency staff + notetaker addresses. These attend every client's calls, so they
+ * can never identify a tenant or a lead. NOTE: the notetaker column is
+ * `bot_guest_email` — the previous `guest_email` select silently returned
+ * nothing, which is how the notetaker address was treated as an external lead.
+ */
+async function loadInternalEmails(supabase: any): Promise<Set<string>> {
+  const internal = new Set<string>();
+  const { data: members } = await supabase.from('agency_members').select('email');
+  for (const m of members || []) {
+    const e = normalizeEmail(m?.email);
+    if (e) internal.add(e);
+  }
+  const { data: guests, error: guestErr } = await supabase
+    .from('client_meetgeek_guest_configs')
+    .select('bot_guest_email');
+  if (guestErr) throw guestErr; // fail closed: never run identity checks blind
+  for (const g of guests || []) {
+    const e = normalizeEmail(g?.bot_guest_email);
+    if (e) internal.add(e);
+  }
+  const { data: settings } = await supabase.from('agency_settings').select('*').limit(1).maybeSingle();
+  for (const key of ['notetaker_email', 'meetgeek_bot_email', 'support_email']) {
+    const e = normalizeEmail((settings as any)?.[key]);
+    if (e) internal.add(e);
+  }
+  return internal;
+}
+
 function isVideoAppointment(ev: any): boolean {
   const candidates = [ev?.address, ev?.meetingUrl, ev?.location, ev?.notes]
     .filter((v) => typeof v === 'string')
@@ -173,6 +204,13 @@ function isVideoAppointment(ev: any): boolean {
   if (/zoom\.us|meet\.google|teams\.microsoft|whereby|webex|https?:\/\//.test(candidates)) return true;
   const type = String(ev?.meetingLocationType || ev?.appointmentLocationType || '').toLowerCase();
   return ['zoom', 'google', 'gmeet', 'ms_teams', 'teams', 'custom'].includes(type);
+}
+
+function appointmentJoinUrl(ev: any): string | null {
+  const text = [ev?.address, ev?.meetingUrl, ev?.location, ev?.notes]
+    .filter((v) => typeof v === 'string')
+    .join(' ');
+  return canonicalJoinUrl(text);
 }
 
 function toGhlAppointment(ev: any): CalendarAppointment {
@@ -186,6 +224,7 @@ function toGhlAppointment(ev: any): CalendarAppointment {
     startTime: ev?.startTime ? new Date(ev.startTime).toISOString() : null,
     endTime: ev?.endTime ? new Date(ev.endTime).toISOString() : null,
     isVideo: isVideoAppointment(ev),
+    joinUrl: appointmentJoinUrl(ev),
   };
 }
 
@@ -409,37 +448,21 @@ async function enrichFromProvider(
 /** Builds the calendar-gated lifecycle dependencies (all IO, service role). */
 function buildLifecycleDeps(supabase: any): LifecycleDeps {
   return {
+    async listInternalEmails() {
+      return await loadInternalEmails(supabase);
+    },
     async getConfigForMeeting(meeting) {
-      // Client authority is resolved in strict tiers, strongest first. Never
-      // from the request URL and never from the meeting title (attacker-
-      // controllable text). A tier that resolves to exactly ONE enabled client
-      // wins; an ambiguous tier falls through to the next tier instead of
-      // aborting, because a shared attendee (an agency team member, or one
-      // investor email that exists as a lead under many clients) is a weaker
-      // signal than our own server-minted invite ledger.
-      const allEmails = meeting.participants
+      // Client authority requires a STABLE tie between this recording and one
+      // client's own server-minted invite ledger. Time proximity is never
+      // authority, and a shared attendee address is never authority: agency
+      // staff attend every client's calls and exist as leads under many
+      // clients, which previously wrote an internal meeting onto a client's
+      // contact. Both of those tiers have been removed.
+      const internal = await loadInternalEmails(supabase);
+      const externalEmails = meeting.participants
         .map((p) => normalizeEmail(p.email))
-        .filter((e): e is string => !!e);
-
-      // Agency/notetaker addresses can never identify a tenant: they attend
-      // every client's calls, so matching them as "leads" makes every meeting
-      // ambiguous across clients.
-      const internal = new Set<string>();
-      {
-        const { data: members } = await supabase.from('agency_members').select('email');
-        for (const m of members || []) {
-          const e = normalizeEmail(m?.email);
-          if (e) internal.add(e);
-        }
-        const { data: guests } = await supabase
-          .from('client_meetgeek_guest_configs')
-          .select('guest_email');
-        for (const g of guests || []) {
-          const e = normalizeEmail(g?.guest_email);
-          if (e) internal.add(e);
-        }
-      }
-      const externalEmails = allEmails.filter((e) => !internal.has(e));
+        .filter((e): e is string => !!e)
+        .filter((e) => !internal.has(e));
 
       const resolveOne = async (ids: Iterable<string>): Promise<MeetgeekClientConfig | null> => {
         const configs: MeetgeekClientConfig[] = [];
@@ -450,9 +473,26 @@ function buildLifecycleDeps(supabase: any): LifecycleDeps {
         return configs.length === 1 ? configs[0] : null;
       };
 
-      // Tier 1 — our OWN ghost-invite ledger, matched on the invited attendee.
-      // The notetaker only ever attends because this system invited it to one
-      // specific client appointment.
+      // Tier 1 — the recorded join URL is byte-identical to the join URL of a
+      // booking we invited the notetaker to. Strongest possible identity.
+      const meetingUrl = canonicalJoinUrl(meeting.sourceUrl);
+      if (meetingUrl) {
+        const { data } = await supabase
+          .from('meetgeek_guest_invite_jobs')
+          .select('client_id, meeting_url')
+          .not('meeting_url', 'is', null)
+          .limit(500);
+        const ids = (data || [])
+          .filter((r: any) => canonicalJoinUrl(r.meeting_url) === meetingUrl)
+          .map((r: any) => r.client_id)
+          .filter(Boolean);
+        const hit = await resolveOne(ids);
+        if (hit) return hit;
+      }
+
+      // Tier 2 — the invited EXTERNAL attendee of one client's booking is on the
+      // call. Still verified afterwards by the identity gate (join URL / invite
+      // id), so this only narrows the tenant, it never authorises a note.
       if (externalEmails.length) {
         const { data } = await supabase
           .from('meetgeek_guest_invite_jobs')
@@ -464,37 +504,7 @@ function buildLifecycleDeps(supabase: any): LifecycleDeps {
         if (hit) return hit;
       }
 
-      // Tier 2 — an external attendee who exists as a lead of exactly one
-      // configured client.
-      if (externalEmails.length) {
-        const { data } = await supabase
-          .from('leads')
-          .select('client_id')
-          .in('email', externalEmails)
-          .not('client_id', 'is', null)
-          .limit(50);
-        const hit = await resolveOne((data || []).map((r: any) => r.client_id).filter(Boolean));
-        if (hit) return hit;
-      }
-
-      // Tier 3 — the invite ledger matched on the scheduling window alone.
-      if (meeting.startedAt) {
-        const anchor = new Date(meeting.startedAt).getTime();
-        if (Number.isFinite(anchor)) {
-          const windowMs = 30 * 60 * 1000;
-          const { data } = await supabase
-            .from('meetgeek_guest_invite_jobs')
-            .select('client_id')
-            .eq('status', 'invited')
-            .gte('scheduled_start', new Date(anchor - windowMs).toISOString())
-            .lte('scheduled_start', new Date(anchor + windowMs).toISOString())
-            .limit(50);
-          const hit = await resolveOne((data || []).map((r: any) => r.client_id).filter(Boolean));
-          if (hit) return hit;
-        }
-      }
-
-      // Still ambiguous or unknown: fail closed rather than guess a tenant.
+      // Unknown or ambiguous: fail closed rather than guess a tenant.
       return null;
     },
     async findAppointments(config, meeting) {
@@ -525,14 +535,14 @@ function buildLifecycleDeps(supabase: any): LifecycleDeps {
       }
       if (live.length) return live;
 
-      // Fallback to OUR OWN invite ledger. Those rows are written server-side
-      // from the client's mapped GHL calendar when the ghost invite is created,
-      // so they carry the same authority as a live calendar read — and they
-      // survive a GHL outage, a rotated key, or an event GHL no longer returns
-      // (e.g. the appointment was moved after the call happened).
+      // Ledger fallback. It may ONLY stand in for a live calendar read when the
+      // ledger row proves it is the SAME meeting: identical join URL, or the
+      // invite UID present in the recording. A row selected by time window
+      // alone is not appointment authority and is discarded.
+      const meetingUrl = canonicalJoinUrl(meeting.sourceUrl);
       const { data: jobs } = await supabase
         .from('meetgeek_guest_invite_jobs')
-        .select('ghl_appointment_id, ghl_calendar_id, ghl_location_id, ghl_contact_id, contact_email, invite_summary, scheduled_start, scheduled_end, meeting_url')
+        .select('ghl_appointment_id, ghl_calendar_id, ghl_location_id, ghl_contact_id, contact_email, invite_summary, scheduled_start, scheduled_end, meeting_url, invite_uid')
         .eq('client_id', config.clientId)
         .gte('scheduled_start', new Date(startTime).toISOString())
         .lte('scheduled_start', new Date(endTime).toISOString())
@@ -540,6 +550,13 @@ function buildLifecycleDeps(supabase: any): LifecycleDeps {
 
       return (jobs || [])
         .filter((j: any) => !!j.ghl_appointment_id)
+        .filter((j: any) => {
+          const ledgerUrl = canonicalJoinUrl(j.meeting_url);
+          const urlProof = !!ledgerUrl && !!meetingUrl && ledgerUrl === meetingUrl;
+          const uidProof = !!j.invite_uid
+            && [meeting.title, meeting.summary].filter(Boolean).join('\n').includes(String(j.invite_uid));
+          return urlProof || uidProof;
+        })
         .map((j: any): CalendarAppointment => ({
           eventId: String(j.ghl_appointment_id),
           calendarId: j.ghl_calendar_id ? String(j.ghl_calendar_id) : null,
@@ -550,6 +567,8 @@ function buildLifecycleDeps(supabase: any): LifecycleDeps {
           startTime: j.scheduled_start ? new Date(j.scheduled_start).toISOString() : null,
           endTime: j.scheduled_end ? new Date(j.scheduled_end).toISOString() : null,
           isVideo: !!j.meeting_url,
+          joinUrl: j.meeting_url ? String(j.meeting_url) : null,
+          inviteUid: j.invite_uid ? String(j.invite_uid) : null,
         }));
     },
     async findActivity(source, idempotencyKey) {
@@ -940,7 +959,14 @@ Deno.serve(async (req) => {
       return jsonResponse({ agents: data || [] });
     }
 
+    // Containment kill-switch. Broad historical replay and bulk attribution
+    // sweeps stay OFF until an operator sets MEETGEEK_ALLOW_BULK=true, so no
+    // scheduled job or stray call can reprocess history while the pipeline is
+    // under review.
+    const bulkAllowed = (Deno.env.get('MEETGEEK_ALLOW_BULK') || '').toLowerCase() === 'true';
+
     if (body.action === 'mg_attribute_sweep') {
+      if (!bulkAllowed) return jsonResponse({ error: 'bulk_operations_disabled' }, 423);
       const res = await attributeRecentMeetings(supabase, Number(body.limit) || 100);
       return jsonResponse({ ok: true, ...res });
     }
@@ -953,6 +979,7 @@ Deno.serve(async (req) => {
     // identity from the caller. Returns counts and safe codes only.
     // -----------------------------------------------------------------
     if (body.action === 'mg_replay_hydration_failures') {
+      if (!bulkAllowed) return jsonResponse({ error: 'bulk_operations_disabled' }, 423);
       const secret = await resolveWebhookSecret(supabase);
       if (!secret) {
         return jsonResponse({ error: 'webhook_secret_not_configured' }, 500);
@@ -1204,20 +1231,26 @@ Deno.serve(async (req) => {
       const base = normalizeMeetgeekPayload({ message: 'File analyzed successfully', meeting_id: meetingId });
       if (!base) return jsonResponse({ error: 'meeting_id could not be normalized' }, 400);
 
-      const attempt = await deps.hydrateFromProvider!(base);
-      const hydrated = attempt?.meeting ?? null;
+      const attempt = await deps.hydrateFromProvider!(base) as
+        | NormalizedMeeting
+        | { meeting: NormalizedMeeting | null; diagnostic?: HydrationDiagnostic | null }
+        | null;
+      const wrapped = attempt && typeof attempt === 'object' && 'meeting' in (attempt as any)
+        ? attempt as { meeting: NormalizedMeeting | null; diagnostic?: HydrationDiagnostic | null }
+        : { meeting: (attempt as NormalizedMeeting | null), diagnostic: null };
+      const hydrated = wrapped.meeting;
       if (!hydrated) {
         return jsonResponse({
           diagnosis: {
             hydrated: false,
-            hydration_code: attempt?.diagnostic?.code ?? 'empty_response',
+            hydration_code: wrapped.diagnostic?.code ?? 'empty_response',
           },
         });
       }
 
       const emails = hydrated.participants
-        .map((p) => normalizeEmail(p.email))
-        .filter((e): e is string => !!e);
+        .map((p: { email?: string | null }) => normalizeEmail(p.email ?? null))
+        .filter((e: string | null): e is string => !!e);
 
       const { data: leadRows } = emails.length
         ? await supabase.from('leads').select('client_id').in('email', emails).not('client_id', 'is', null).limit(50)

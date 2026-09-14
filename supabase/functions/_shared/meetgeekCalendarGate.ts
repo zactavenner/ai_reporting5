@@ -48,6 +48,10 @@ export interface CalendarAppointment {
   endTime: string | null;
   /** True when the appointment carries a video conferencing link. */
   isVideo: boolean;
+  /** The booking's own join URL — the ONLY accepted proof of same-meeting identity. */
+  joinUrl?: string | null;
+  /** Server-minted invite UID for this booking, when a ghost invite was sent. */
+  inviteUid?: string | null;
 }
 
 export type GateRejection =
@@ -62,7 +66,10 @@ export type GateRejection =
   | 'ambiguous_appointment'
   | 'appointment_not_found'
   | 'not_video_meeting'
-  | 'bot_join_disabled';
+  | 'bot_join_disabled'
+  | 'internal_meeting'
+  | 'identity_unverified'
+  | 'transcript_incomplete';
 
 export type GateDecision =
   | { allowed: true; appointment: CalendarAppointment; botShouldJoin: boolean }
@@ -81,7 +88,96 @@ export const GATE_REJECTION_MESSAGES: Record<GateRejection, string> = {
   appointment_not_found: 'No booking on the selected calendar matched this meeting.',
   not_video_meeting: 'The booking has no video conferencing link.',
   bot_join_disabled: 'The bot-join policy for this client is set to never join.',
+  internal_meeting: 'Internal meeting: every attendee is agency staff, so it is never written to a client record.',
+  identity_unverified:
+    'The recording could not be proven to BE this booking (no matching join URL or invite id, or no external attendee) — refusing to attribute it.',
+  transcript_incomplete: 'The provider returned no usable transcript yet — nothing is written until it does.',
 };
+
+// ---------------------------------------------------------------------------
+// Identity verification — the containment fix.
+//
+// A recording may only be attributed to a client booking when we can prove the
+// recording IS that booking. Time proximity is NEVER proof, and an attendee
+// email that happens to exist as a lead is NEVER proof either: agency staff
+// attend every client's calls and exist as leads under many clients, which is
+// exactly how an internal HPA meeting was written onto a client's contact.
+// ---------------------------------------------------------------------------
+
+/** Canonical form of a conferencing URL for equality comparison. */
+export function canonicalJoinUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const m = String(url).match(/https?:\/\/[^\s<>"']+/i);
+  if (!m) return null;
+  let out = m[0].replace(/[.,;)\]]+$/, '').toLowerCase();
+  out = out.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '');
+  return out || null;
+}
+
+export type IdentityFailure = 'internal_meeting' | 'identity_unverified';
+
+export interface IdentityVerdict {
+  ok: boolean;
+  /** How identity was proven. */
+  method?: 'invite_uid' | 'join_url';
+  /** The external (non-staff) attendee that ties the booking to a real contact. */
+  externalEmail?: string | null;
+  reason?: IdentityFailure;
+}
+
+/**
+ * Proves that `meeting` is the same event as `appointment`.
+ *
+ * Requires BOTH:
+ *  1. stable same-meeting identity — the booking's invite UID appears in the
+ *     meeting text, OR the booking's join URL is identical to the recorded
+ *     meeting's join URL, and
+ *  2. an unambiguous EXTERNAL counterparty — at least one attendee who is not
+ *     agency staff / the notetaker, and the booking's own attendee email must be
+ *     among the meeting's attendees when the booking carries one.
+ *
+ * A meeting whose attendees are all internal is classified `internal_meeting`
+ * and never touches a client record.
+ */
+export function verifyMeetingIdentity(args: {
+  meeting: Pick<NormalizedMeeting, 'participants' | 'sourceUrl' | 'title' | 'summary'> & {
+    inviteUidText?: string | null;
+  };
+  appointment: CalendarAppointment;
+  /** Agency staff + notetaker addresses. Lowercased. */
+  internalEmails: Set<string>;
+}): IdentityVerdict {
+  const { appointment, internalEmails } = args;
+  const attendees = (args.meeting.participants || [])
+    .map((p) => normalizeEmail(p.email))
+    .filter((e): e is string => !!e);
+
+  const external = attendees.filter((e) => !internalEmails.has(e));
+  if (!external.length) return { ok: false, reason: 'internal_meeting' };
+
+  // (1) Stable same-meeting identity.
+  let method: 'invite_uid' | 'join_url' | null = null;
+  const haystack = [args.meeting.inviteUidText, args.meeting.title, args.meeting.summary]
+    .filter(Boolean)
+    .join('\n');
+  if (appointment.inviteUid && haystack.includes(appointment.inviteUid)) {
+    method = 'invite_uid';
+  } else {
+    const meetingUrl = canonicalJoinUrl(args.meeting.sourceUrl);
+    const apptUrl = canonicalJoinUrl(appointment.joinUrl);
+    if (meetingUrl && apptUrl && meetingUrl === apptUrl) method = 'join_url';
+  }
+  if (!method) return { ok: false, reason: 'identity_unverified' };
+
+  // (2) The booking's own attendee must actually be on the call.
+  const apptEmail = normalizeEmail(appointment.attendeeEmail);
+  if (apptEmail && !attendees.includes(apptEmail)) {
+    return { ok: false, reason: 'identity_unverified' };
+  }
+  const externalEmail = apptEmail && external.includes(apptEmail) ? apptEmail : external[0];
+
+  return { ok: true, method, externalEmail };
+}
 
 /**
  * Non-reversible short digest so rejection logs can be correlated without ever
@@ -293,6 +389,9 @@ export function buildActivityRow(args: {
 
 export const MAX_CRM_ATTEMPTS = 3;
 
+/** Below this a transcript is treated as missing/partial and nothing is written. */
+export const MIN_TRANSCRIPT_CHARS = 200;
+
 /** Retry policy for the CRM write-back: transient failures retry, refusals don't. */
 export function nextCrmState(input: {
   status: 'written' | 'skipped' | 'error';
@@ -326,6 +425,8 @@ export interface LifecycleDeps {
    * for rejected meetings.
    */
   enrichMeeting?(config: MeetgeekClientConfig, meeting: NormalizedMeeting): Promise<NormalizedMeeting>;
+  /** Agency staff + notetaker addresses that can never identify a client lead. */
+  listInternalEmails?(config: MeetgeekClientConfig): Promise<Set<string>>;
   writeGhlNote(input: { config: MeetgeekClientConfig; contactId: string; note: string }): Promise<{ status: 'written' | 'skipped' | 'error'; error?: string }>;
   touchHealth(clientId: string, patch: Record<string, unknown>): Promise<void>;
 }
@@ -404,20 +505,58 @@ export async function processCalendarMeeting(args: {
   }
 
   const appointment = decision.appointment;
-  const emails = meeting.participants
-    .map((p) => normalizeEmail(p.email))
-    .filter((e): e is string => !!e);
-  const appointmentEmail = normalizeEmail(appointment.attendeeEmail);
-  if (appointmentEmail && !emails.includes(appointmentEmail)) emails.unshift(appointmentEmail);
 
-  const lead = emails.length ? await deps.matchLead(config, emails) : null;
-  const stage: ActivityStage = lead ? 'completed' : 'unmatched';
-
-  // Provider insights + real transcript/summary are fetched only now, after the
-  // calendar mapping has been validated for this client.
+  // Provider insights + real transcript/summary are fetched now that the calendar
+  // mapping is validated — BEFORE any identity/transcript verdict, because both
+  // depend on the real participant list and transcript.
   if (deps.enrichMeeting) {
     meeting = await deps.enrichMeeting(config, meeting);
   }
+
+  const recordRejection = async (reason: GateRejection): Promise<LifecycleResult> => {
+    console.warn('[meetgeek] attribution refused', JSON.stringify({
+      reason,
+      client: config.clientId,
+      appointment: hashIdForLog(appointment.eventId),
+    }));
+    const row = buildActivityRow({
+      config,
+      stage: 'rejected',
+      meeting,
+      // A refused meeting is NEVER linked to the contact of a booking it could
+      // not be proven to be.
+      appointment: { ...appointment, contactId: null },
+      crmStatus: 'not_applicable',
+      errorMessage: GATE_REJECTION_MESSAGES[reason],
+    });
+    const prior = await deps.findActivity(row.source, row.idempotency_key);
+    const saved = prior ? { id: prior.id } : await deps.upsertActivity(row);
+    if (prior) await deps.patchActivity(prior.id, { status: 'rejected', ghl_contact_id: null, crm_sync_status: 'not_applicable', error_message: GATE_REJECTION_MESSAGES[reason] });
+    await deps.touchHealth(config.clientId, {
+      last_error: GATE_REJECTION_MESSAGES[reason],
+      last_error_at: new Date().toISOString(),
+    });
+    return { ok: false, status: 403, rejected: reason, activityId: saved.id, clientId: config.clientId, meeting, appointment };
+  };
+
+  // HARD GATE 1 — same-meeting identity + an external counterparty. Time
+  // proximity and staff attendance are not authority for anything.
+  const internalEmails = deps.listInternalEmails ? await deps.listInternalEmails(config) : new Set<string>();
+  const identity = verifyMeetingIdentity({ meeting, appointment, internalEmails });
+  if (!identity.ok) return await recordRejection(identity.reason!);
+
+  // HARD GATE 2 — a usable transcript must exist before anything is written.
+  const transcriptText = (meeting.transcriptText ?? '').trim();
+  if (transcriptText.length < MIN_TRANSCRIPT_CHARS) {
+    return await recordRejection('transcript_incomplete');
+  }
+
+  // Lead matching is restricted to the verified EXTERNAL attendee only, so a
+  // staff address that exists as a lead can never select the contact.
+  const emails = [identity.externalEmail].filter((e): e is string => !!e);
+  const lead = emails.length ? await deps.matchLead(config, emails) : null;
+  const stage: ActivityStage = lead ? 'completed' : 'unmatched';
+
   // Operational QA is derived exclusively from the ACTUAL provider artifacts:
   // transcript, MeetGeek summary, action items and analytics. Nothing is inferred
   // from duration, recording presence or CRM matching.
@@ -435,7 +574,7 @@ export async function processCalendarMeeting(args: {
     appointment,
     meeting,
     leadId: lead?.id ?? null,
-    attendeeEmail: lead?.email ?? appointmentEmail,
+    attendeeEmail: lead?.email ?? identity.externalEmail ?? null,
     agentJoinedAt: meeting.startedAt,
     crmStatus: 'pending',
     quality,
@@ -478,7 +617,9 @@ export async function processCalendarMeeting(args: {
   let crmError: string | null = null;
   let attempts = attemptsSoFar;
 
-  const contactId = lead?.external_id || appointment.contactId || null;
+  // ONLY the contact of the verified external lead. The booking's own contactId is
+  // never a fallback: an unmatched external attendee must stay unmatched.
+  const contactId = lead?.external_id || null;
   if (lead && contactId) {
     // Notes are written ONLY for an unambiguous, in-tenant, matched meeting.
     const res = await deps.writeGhlNote({ config, contactId, note: noteBuilder(meeting, appointment, quality) });
