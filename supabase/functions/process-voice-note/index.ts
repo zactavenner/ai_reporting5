@@ -58,57 +58,18 @@ serve(async (req) => {
 
     console.log("Processing voice note for client:", clientId);
 
-    // Step 1: Transcribe audio using Gemini API
-     const transcriptResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-       method: "POST",
-       headers: {
-         Authorization: `Bearer ${LOVABLE_API_KEY}`,
-         "Content-Type": "application/json",
-       },
-       body: JSON.stringify({
-         model: "nvidia/nemotron-3-ultra-550b-a55b:free",
-        models: ["nvidia/nemotron-3-ultra-550b-a55b:free", "google/gemini-2.0-flash-001", "openai/gpt-4o-mini"],
-         messages: [
-           {
-             role: "user",
-             content: [
-               {
-                 type: "text",
-                 text: "Transcribe this audio recording accurately. Only output the transcription text, nothing else. If you cannot hear any speech or the audio is unclear, respond with 'No speech detected'."
-               },
-               {
-                 type: "image_url",
-                 image_url: {
-                   url: `data:audio/webm;base64,${audioBase64}`
-                 }
-               }
-             ]
-           }
-         ],
-         max_tokens: 4096,
-         temperature: 0.1,
-       }),
-     });
-
-    if (!transcriptResponse.ok) {
-      const errorText = await transcriptResponse.text();
-      console.error("Transcription error:", transcriptResponse.status, errorText);
-      
-      if (transcriptResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      
+    // Step 1: Transcribe audio with a real speech-to-text model
+    let transcript = "";
+    try {
+      const bin = Uint8Array.from(atob(audioBase64), (c) => c.charCodeAt(0));
+      transcript = await transcribeAudioBytes(bin, "audio/webm");
+    } catch (e) {
+      console.error("Transcription error:", e instanceof Error ? e.message : "unknown");
       return new Response(
         JSON.stringify({ error: "Failed to transcribe audio" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const transcriptData = await transcriptResponse.json();
-     const transcript = transcriptData.choices?.[0]?.message?.content || "";
 
     if (!transcript.trim() || transcript.toLowerCase().includes("no speech detected")) {
       return new Response(
