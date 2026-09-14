@@ -97,13 +97,17 @@ const navStructure = [
     icon: Plug,
   },
   {
+    title: 'AI Meetings',
+    value: 'ai-meetings',
+    icon: Sparkles,
+  },
+  {
     title: 'More tools',
     value: 'more-tools',
     icon: Wrench,
     children: [
       { title: 'Daily Huddle', value: 'huddle', icon: Timer, href: '/huddle' },
       { title: 'Meetings', value: 'meetings', icon: Video },
-      { title: 'AI Meetings', value: 'ai-meetings', icon: Sparkles },
       { title: 'Call Transcripts', value: 'call-transcripts', icon: Phone },
       { title: 'Deals', value: 'deals', icon: Handshake },
       { title: 'Outreach', value: 'outreach', icon: MessageSquare },
