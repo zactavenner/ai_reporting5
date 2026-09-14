@@ -341,6 +341,14 @@ export interface LifecycleResult {
   clientId?: string | null;
   qaTotal?: number | null;
   qaGateStatus?: 'pass' | 'fail' | 'manual_review' | null;
+  /**
+   * The PROVIDER-ENRICHED meeting (transcript text, provider summary, insights,
+   * action items). The caller persists THIS, never the raw webhook meeting —
+   * otherwise a successful transcript fetch is silently dropped.
+   */
+  meeting?: NormalizedMeeting;
+  /** The single authoritative appointment this meeting was gated onto. */
+  appointment?: CalendarAppointment | null;
 }
 
 /**
@@ -435,8 +443,24 @@ export async function processCalendarMeeting(args: {
 
   const existing = await deps.findActivity(baseRow.source, baseRow.idempotency_key);
   if (existing && existing.crm_sync_status === 'written') {
-    return { ok: true, status: 200, duplicate: true, activityId: existing.id, matched: !!lead, crmSyncStatus: 'written', clientId: config.clientId };
+    // Exactly-once for the CRM note only. The enriched meeting is still returned
+    // so the caller can create/refresh the meeting record and its links — a
+    // redelivery must never leave `meeting_records` empty.
+    return {
+      ok: true,
+      status: 200,
+      duplicate: true,
+      activityId: existing.id,
+      matched: !!lead,
+      crmSyncStatus: 'written',
+      clientId: config.clientId,
+      meeting,
+      appointment,
+      qaTotal: quality.total,
+      qaGateStatus: quality.gateStatus,
+    };
   }
+
 
   const saved = await deps.upsertActivity(baseRow);
   const attemptsSoFar = existing?.crm_attempts ?? 0;
@@ -496,5 +520,7 @@ export async function processCalendarMeeting(args: {
     clientId: config.clientId,
     qaTotal: quality.total,
     qaGateStatus: quality.gateStatus,
+    meeting,
+    appointment,
   };
 }

@@ -17048,6 +17048,87 @@ export type Database = {
           },
         ]
       }
+      meeting_sheet_deliveries: {
+        Row: {
+          attempts: number
+          client_id: string | null
+          created_at: string
+          delivered_at: string | null
+          id: string
+          last_error: string | null
+          meeting_record_id: string
+          next_attempt_at: string
+          readback_verified: boolean
+          spreadsheet_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          client_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          last_error?: string | null
+          meeting_record_id: string
+          next_attempt_at?: string
+          readback_verified?: boolean
+          spreadsheet_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          client_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          last_error?: string | null
+          meeting_record_id?: string
+          next_attempt_at?: string
+          readback_verified?: boolean
+          spreadsheet_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_sheet_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meeting_sheet_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_sheet_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meeting_sheet_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meeting_sheet_deliveries_meeting_record_id_fkey"
+            columns: ["meeting_record_id"]
+            isOneToOne: true
+            referencedRelation: "meeting_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_activity_log: {
         Row: {
           action: string

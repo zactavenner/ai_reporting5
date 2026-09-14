@@ -88,7 +88,18 @@ export interface IngestDeps {
     crmSyncStatus?: string;
     activityId?: string;
     duplicate?: boolean;
+    /** Provider-enriched meeting (transcript/summary/insights) to persist. */
+    meeting?: NormalizedMeeting;
   }>;
+  /**
+   * Fired once the meeting record and lead links exist. Used to enqueue durable
+   * downstream delivery (reporting sheet). Never throws into ingestion.
+   */
+  onMeetingPersisted?(input: {
+    meetingRecordId: string;
+    clientId: string | null;
+    meeting: NormalizedMeeting;
+  }): Promise<void>;
   /**
    * Returns the existing ingest event for this dedupe key (any status), so the
    * caller can distinguish a terminal success (exactly-once) from a recoverable
@@ -756,6 +767,8 @@ export async function ingestMeetgeekWebhook(args: {
     let gatedClientId: string | null | undefined;
     let activityId: string | undefined;
     let gateOwnsCrm = false;
+    let gateDuplicate = false;
+    let gateCrmStatus: string | undefined;
     if (deps.calendarGate) {
       const gate = await deps.calendarGate(meeting);
       activityId = gate.activityId;
@@ -773,27 +786,24 @@ export async function ingestMeetgeekWebhook(args: {
           clientId: gate.clientId ?? null,
         };
       }
-      if (gate.duplicate) {
-        await deps.updateEvent(event.id, { status: 'processed', clientId: gate.clientId ?? null });
-        return {
-          ok: true,
-          status: 200,
-          duplicate: true,
-          reason: 'duplicate_event',
-          activityId,
-          clientId: gate.clientId ?? null,
-          matched: gate.matched,
-          ghlNoteStatus: gate.crmSyncStatus,
-        };
-      }
+      // The gate fetches the authoritative transcript/summary/insights AFTER the
+      // calendar mapping is validated. Persist THAT meeting, not the webhook one,
+      // or every transcript the gate fetched is silently thrown away.
+      if (gate.meeting) meeting = gate.meeting;
       gatedClientId = gate.clientId ?? null;
       gateOwnsCrm = true;
+      // A redelivery must not short-circuit persistence: the CRM note is
+      // already written (exactly-once), but the meeting record and its lead
+      // links still have to exist before the event may be marked processed.
+      gateDuplicate = !!gate.duplicate;
+      gateCrmStatus = gate.crmSyncStatus;
     }
 
     const clientId = gatedClientId !== undefined
       ? gatedClientId
       : await deps.resolveClientId(meeting);
     const record = await deps.upsertMeetingRecord(meeting, clientId);
+
 
     const emails = meeting.participants
       .map((p) => normalizeEmail(p.email))
@@ -814,7 +824,9 @@ export async function ingestMeetgeekWebhook(args: {
       ghlNoteError = res.error || null;
     } else if (match.lead && clientId) {
       ghlContactId = match.lead.external_id || null;
-      ghlNoteStatus = 'delegated_to_calendar_gate';
+      ghlNoteStatus = gateDuplicate
+        ? (gateCrmStatus || 'written')
+        : 'delegated_to_calendar_gate';
     }
 
     await deps.upsertLeadContext({
@@ -829,6 +841,16 @@ export async function ingestMeetgeekWebhook(args: {
       ghlNoteError,
     });
 
+    if (deps.onMeetingPersisted) {
+      // Downstream delivery (reporting sheet) is enqueued durably; a failure
+      // here must never undo an otherwise complete ingestion.
+      try {
+        await deps.onMeetingPersisted({ meetingRecordId: record.id, clientId, meeting });
+      } catch (e) {
+        console.warn('[meetgeek] sheet enqueue failed', e instanceof Error ? e.message : 'unknown');
+      }
+    }
+
     await deps.updateEvent(event.id, { status: 'processed', clientId, errorMessage: null });
 
     return {
@@ -840,6 +862,7 @@ export async function ingestMeetgeekWebhook(args: {
       ghlNoteStatus,
       activityId,
       clientId,
+      ...(gateDuplicate ? { duplicate: true, reason: 'duplicate_event' } : {}),
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : 'unknown_error';

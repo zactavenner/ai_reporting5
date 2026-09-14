@@ -115,8 +115,13 @@ describe('bounded operator replay', () => {
     expect(isReplayableEvent({ ...base, hydration_code: 'unauthorized' })).toBe(true);
     expect(isReplayableEvent({ ...base, hydration_code: null })).toBe(true);
     expect(isReplayableEvent({ ...base, hydration_code: 'missing_api_key' })).toBe(true);
-    // not replayable
-    expect(isReplayableEvent({ ...base, hydration_code: 'rate_limited' })).toBe(false);
+    // transient provider failures are replayable too
+    expect(isReplayableEvent({ ...base, hydration_code: 'rate_limited' })).toBe(true);
+    expect(isReplayableEvent({ ...base, hydration_code: 'server_error' })).toBe(true);
+    expect(isReplayableEvent({ ...base, hydration_code: 'network_error' })).toBe(true);
+    // not replayable: the meeting itself, not the transport
+    expect(isReplayableEvent({ ...base, hydration_code: 'not_found' })).toBe(false);
+    expect(isReplayableEvent({ ...base, hydration_code: 'parse_error' })).toBe(false);
     expect(isReplayableEvent({ ...base, signature_valid: false, hydration_code: null })).toBe(false);
     expect(isReplayableEvent({ ...base, status: 'processed', hydration_code: null })).toBe(false);
     expect(isReplayableEvent({ ...base, meeting_external_id: null, hydration_code: null })).toBe(false);
