@@ -345,14 +345,17 @@ describe('calendar gate is fail-closed', () => {
     expect(calls.contexts[0].ghlNoteStatus).toBe('delegated_to_calendar_gate');
   });
 
-  it('collapses a gate-reported duplicate without re-writing', async () => {
+  it('collapses a gate-reported duplicate without re-writing a note', async () => {
     const { deps, calls } = makeDeps({
       calendarGate: async () => ({ ok: true, status: 200, duplicate: true, clientId: 'c1', activityId: 'act-1' }),
     });
     const raw = JSON.stringify(payload);
     const res = await ingestMeetgeekWebhook({ rawBody: raw, signatureHeader: await sign(raw), secret: SECRET, deps });
     expect(res.duplicate).toBe(true);
-    expect(calls.meetings).toHaveLength(0);
+    // The record is still persisted/linked for the already-attributed client so a
+    // duplicate delivery cannot leave an orphaned event, but no second note is sent.
+    expect(calls.meetings).toHaveLength(1);
+    expect(calls.meetings[0].c).toBe('c1');
     expect(calls.notes).toHaveLength(0);
   });
 });
