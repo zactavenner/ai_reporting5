@@ -12,7 +12,12 @@
 // idempotent and safe to run concurrently with the chat worker.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+// Sanitized at read time — quotes/whitespace in the stored secret make OpenRouter
+// answer 401 {"message":"User not found."} on the video endpoints.
+const OPENROUTER_API_KEY = ((Deno.env.get("OPENROUTER_API_KEY") || "")
+  .trim()
+  .replace(/^['"]+|['"]+$/g, "")
+  .replace(/\s+/g, "")) || undefined;
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -38,6 +43,27 @@ Deno.serve(async (req) => {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Read-only credential self-check. Never returns the key itself — only whether
+    // OpenRouter accepts it. Used to tell an invalid/revoked key (401 "User not
+    // found.") apart from a malformed request when video submits fail.
+    const probeBody = await req.clone().json().catch(() => ({} as any));
+    if (probeBody?.action === "diagnose_key") {
+      const r = await fetch("https://openrouter.ai/api/v1/key", {
+        headers: { Authorization: `Bearer ${OPENROUTER_API_KEY}` },
+      });
+      const j: any = await r.json().catch(() => ({}));
+      return new Response(JSON.stringify({
+        accepted: r.ok,
+        status: r.status,
+        key_prefix_ok: OPENROUTER_API_KEY.startsWith("sk-or-"),
+        key_length: OPENROUTER_API_KEY.length,
+        limit_remaining: j?.data?.limit_remaining ?? null,
+        usage: j?.data?.usage ?? null,
+        provider_message: r.ok ? null : String(j?.error?.message ?? "").slice(0, 200),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
 
     const { data: rows, error } = await supa
       .from("ai_studio_canvas_items")

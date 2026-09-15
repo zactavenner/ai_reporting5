@@ -13,7 +13,12 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
+// Sanitized at read time — see ai-studio: quotes/whitespace in the stored secret
+// make OpenRouter answer 401 {"message":"User not found."}.
+const OPENROUTER_API_KEY = (Deno.env.get("OPENROUTER_API_KEY") || "")
+  .trim()
+  .replace(/^['"]+|['"]+$/g, "")
+  .replace(/\s+/g, "");
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") || "";
 
 const MODEL_CAPS: Record<string, { durations: number[]; defaultDuration: number; maxRes: "720p" | "1080p" | "4k" }> = {

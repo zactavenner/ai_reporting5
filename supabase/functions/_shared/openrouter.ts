@@ -37,7 +37,12 @@ export const IMAGE_MODELS = [
 ];
 
 function getKey() {
-  const k = Deno.env.get("OPENROUTER_API_KEY");
+  // Sanitized: quotes/whitespace in the stored secret authenticate as a
+  // non-existent principal and OpenRouter answers 401 "User not found."
+  const k = (Deno.env.get("OPENROUTER_API_KEY") || "")
+    .trim()
+    .replace(/^['"]+|['"]+$/g, "")
+    .replace(/\s+/g, "");
   if (!k) throw new Error("OPENROUTER_API_KEY not configured");
   return k;
 }

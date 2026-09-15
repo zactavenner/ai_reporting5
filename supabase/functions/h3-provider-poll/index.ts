@@ -74,7 +74,10 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action ?? "status");
-    const apiKey = Deno.env.get("OPENROUTER_API_KEY");
+    const apiKey = ((Deno.env.get("OPENROUTER_API_KEY") || "")
+      .trim()
+      .replace(/^['"]+|['"]+$/g, "")
+      .replace(/\s+/g, "")) || undefined;
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
