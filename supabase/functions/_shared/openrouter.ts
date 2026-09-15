@@ -15,18 +15,18 @@ export type ORMessage = {
 // Default fallback chains. Listed best-quality first; auto-falls back on 429/402/5xx/timeouts.
 export const TEXT_MODELS = [
   "nvidia/nemotron-3-ultra-550b-a55b:free",
-  "google/gemini-2.0-flash-001",
+  "google/gemini-3.5-flash",
   "openai/gpt-4o-mini",
 ];
 
 export const VISION_MODELS = [
-  "google/gemini-2.0-flash-001",
+  "google/gemini-3.5-flash",
   "openai/gpt-4o-mini",
 ];
 
 // Audio-capable (multimodal) models — used for transcription via inline audio/video data.
 export const AUDIO_MODELS = [
-  "google/gemini-2.0-flash-001",
+  "google/gemini-3.5-flash",
 ];
 
 // Image generation — "Nano Banana Pro 2" + GPT-image-1 as auto fallback.

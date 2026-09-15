@@ -3291,13 +3291,29 @@ function sanitizeAssistantText(t: string) {
     .trim();
 }
 
+/**
+ * Turns a stored/selected chat model id into the id OpenRouter actually serves.
+ * Strips the internal "openrouter/" namespace prefix and maps the DeepSeek
+ * "…-latest" pointer to its official tilde-aliased id (verified against
+ * GET https://openrouter.ai/api/v1/models — the un-prefixed form 400s with
+ * "is not a valid model ID").
+ */
+const CHAT_MODEL_ALIASES: Record<string, string> = {
+  "deepseek/deepseek-v4-flash-latest": "~deepseek/deepseek-v4-flash-latest",
+  "deepseek/deepseek-flash-latest": "~deepseek/deepseek-flash-latest",
+};
+function canonicalChatModelId(id: string): string {
+  const stripped = String(id || "").replace(/^openrouter\//, "");
+  return CHAT_MODEL_ALIASES[stripped] ?? stripped;
+}
+
 async function compareChatModelsInBackground(opts: { prompt: string; models: string[]; system?: string | null }) {
   if (!OPENROUTER_API_KEY) {
     return opts.models.map((model) => ({ model, error: "OPENROUTER_API_KEY not configured" }));
   }
   const safeModels = opts.models
-    .filter((model) => typeof model === "string" && /^[a-z0-9._:/-]+$/i.test(model))
-    .map((model) => model.replace(/^openrouter\//, ""))
+    .filter((model) => typeof model === "string" && /^[a-z0-9._:/~-]+$/i.test(model))
+    .map((model) => canonicalChatModelId(model))
     .filter((model, index, arr) => model && arr.indexOf(model) === index)
     .slice(0, 6);
   const messages = [
@@ -4741,7 +4757,7 @@ Deno.serve(async (req) => {
           // final Gemini safety net. Every chat attempt goes directly through
           // OpenRouter using OPENROUTER_API_KEY; no Lovable gateway fallback.
           const buildAttempt = (fullId: string) => {
-            const modelId = fullId.replace(/^openrouter\//, "");
+            const modelId = canonicalChatModelId(fullId);
             return {
               fullId,
               useOR: true,
