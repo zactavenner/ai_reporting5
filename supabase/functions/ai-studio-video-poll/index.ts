@@ -44,6 +44,27 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Read-only credential self-check. Never returns the key itself — only whether
+    // OpenRouter accepts it. Used to tell an invalid/revoked key (401 "User not
+    // found.") apart from a malformed request when video submits fail.
+    const probeBody = await req.clone().json().catch(() => ({} as any));
+    if (probeBody?.action === "diagnose_key") {
+      const r = await fetch("https://openrouter.ai/api/v1/key", {
+        headers: { Authorization: `Bearer ${OPENROUTER_API_KEY}` },
+      });
+      const j: any = await r.json().catch(() => ({}));
+      return new Response(JSON.stringify({
+        accepted: r.ok,
+        status: r.status,
+        key_prefix_ok: OPENROUTER_API_KEY.startsWith("sk-or-"),
+        key_length: OPENROUTER_API_KEY.length,
+        limit_remaining: j?.data?.limit_remaining ?? null,
+        usage: j?.data?.usage ?? null,
+        provider_message: r.ok ? null : String(j?.error?.message ?? "").slice(0, 200),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+
     const { data: rows, error } = await supa
       .from("ai_studio_canvas_items")
       .select("id, payload, created_at, conversation_id, user_id")
