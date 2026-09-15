@@ -11,7 +11,14 @@ const corsHeaders = {
 };
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+// Sanitize at read time: a stored key with surrounding quotes or stray
+// whitespace/newlines authenticates as a different (non-existent) principal and
+// OpenRouter answers 401 {"message":"User not found."} — which is exactly how the
+// video endpoint failed while sanitized chat calls kept working.
+const OPENROUTER_API_KEY = ((Deno.env.get("OPENROUTER_API_KEY") || "")
+  .trim()
+  .replace(/^['"]+|['"]+$/g, "")
+  .replace(/\s+/g, "")) || undefined;
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY') || "";
 const OPENAI_API_KEY_ENV = Deno.env.get("OPENAI_API_KEY");
 const GOOGLE_DOCS_API_KEY = Deno.env.get("GOOGLE_DOCS_API_KEY");
