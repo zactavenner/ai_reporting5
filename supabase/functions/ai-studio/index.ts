@@ -4741,7 +4741,7 @@ Deno.serve(async (req) => {
           // final Gemini safety net. Every chat attempt goes directly through
           // OpenRouter using OPENROUTER_API_KEY; no Lovable gateway fallback.
           const buildAttempt = (fullId: string) => {
-            const modelId = fullId.replace(/^openrouter\//, "");
+            const modelId = canonicalChatModelId(fullId);
             return {
               fullId,
               useOR: true,
