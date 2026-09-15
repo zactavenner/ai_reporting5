@@ -12,7 +12,12 @@
 // idempotent and safe to run concurrently with the chat worker.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+// Sanitized at read time — quotes/whitespace in the stored secret make OpenRouter
+// answer 401 {"message":"User not found."} on the video endpoints.
+const OPENROUTER_API_KEY = ((Deno.env.get("OPENROUTER_API_KEY") || "")
+  .trim()
+  .replace(/^['"]+|['"]+$/g, "")
+  .replace(/\s+/g, "")) || undefined;
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
