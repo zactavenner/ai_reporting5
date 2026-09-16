@@ -100,7 +100,7 @@ function seedProject(over: Partial<any> = {}) {
         version: 1,
         prompt: "Opening frame",
         imageModel: "openai",
-        source: "generated",
+        source: "generated" as const,
         createdAt: "2026-01-01T00:00:00.000Z",
       },
     ],
