@@ -425,6 +425,33 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
             <div className="space-y-1">
               <div className={labelCls}>Sources / references</div>
               <Input value={draft.sourceNotes} onChange={(e) => update({ sourceNotes: e.target.value })} placeholder="Links or documents backing the claims" />
+              <input
+                ref={offerFile}
+                type="file"
+                className="hidden"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  const at = scopeRef.current;
+                  try {
+                    const url = await uploadAsset(f, "sources", "document", clientId);
+                    if (!sameScope(at)) return;
+                    // Attached to this ad only — the saved offer is untouched.
+                    update({
+                      offerSnapshot: draft.offerSnapshot
+                        ? { ...draft.offerSnapshot, sources: [...(draft.offerSnapshot.sources || []), url] }
+                        : draft.offerSnapshot,
+                      sourceNotes: [draft.sourceNotes, url].filter(Boolean).join("\n"),
+                    });
+                    toast.success("Source attached to this ad only");
+                  } catch (err: any) {
+                    toast.error(err?.message || "Could not attach that file");
+                  }
+                }}
+              />
+              <Button variant="outline" size="sm" onClick={() => offerFile.current?.click()}>
+                <Upload className="mr-1.5 h-3.5 w-3.5" /> Attach a source file
+              </Button>
             </div>
           </div>
         </div>
