@@ -166,27 +166,30 @@ Deno.serve(async (req) => {
             completed_by: "cron_reaper",
           },
         }).eq("id", row.id);
+        await syncLedger(p, { kind: "completed", videoUrl: storedUrl, storagePath });
         result.completed++;
         continue;
       }
 
       if (status === "failed" || status === "cancelled") {
         const msg = pj?.error?.message || pj?.error || `Provider reported ${status}`;
+        const failure = `${p.requested_model || p.model || "Video"}: ${String(msg).slice(0, 300)}`;
         await supa.from("ai_studio_canvas_items").update({
           placeholder_until: null,
-          payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true,
-            error: `${p.requested_model || p.model || "Video"}: ${String(msg).slice(0, 300)}` },
+          payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true, error: failure },
         }).eq("id", row.id);
+        await syncLedger(p, { kind: "failed", error: failure });
         result.failed++;
         continue;
       }
 
       if (ageMs > MAX_AGE_MS) {
+        const stalled = `${p.requested_model || p.model || "Video"} render is still ${status || "queued"} at the provider after 75 minutes. Re-submit to retry.`;
         await supa.from("ai_studio_canvas_items").update({
           placeholder_until: null,
-          payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true,
-            error: `${p.requested_model || p.model || "Video"} render is still ${status || "queued"} at the provider after 75 minutes. Re-submit to retry.` },
+          payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true, error: stalled },
         }).eq("id", row.id);
+        await syncLedger(p, { kind: "failed", error: stalled });
         result.failed++;
         continue;
       }
