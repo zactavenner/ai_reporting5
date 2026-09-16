@@ -197,14 +197,13 @@ export function useMasterVideoProject(clientId: string | null, conversationId: s
 
   const refreshGenerations = useCallback(async () => {
     if (!projectId) return;
-    const { data } = await supabase
-      .from("ai_studio_video_generations")
-      .select("id, status, model, resolution, aspect_ratio, duration_seconds, provider_job_id, canvas_item_id, video_url, error, created_at")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false })
-      .limit(20);
-    if (data) setGenerations(data as MasterVideoGeneration[]);
-  }, [projectId]);
+    try {
+      const res = await call({ action: "load" });
+      if (res?.generations) setGenerations(res.generations as MasterVideoGeneration[]);
+    } catch (e) {
+      console.warn("master video render refresh failed", e);
+    }
+  }, [projectId, call]);
 
   /** Flushes pending edits so the server reads the same content the operator sees. */
   const saveNow = useCallback(async () => {
