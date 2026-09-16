@@ -188,6 +188,10 @@ beforeEach(() => {
 
 /* ------------------------------------------------------------------ tests --- */
 
+/** Only the paid-render calls, ignoring load/save traffic. */
+const generateCalls = () =>
+  invoke.mock.calls.filter(([, opts]: any[]) => !["load", "save"].includes(String(opts?.body?.action || "generate")));
+
 describe("Master AI Video workflow UI", () => {
   it("shows all six steps and resumes the saved project", async () => {
     seedProject();
