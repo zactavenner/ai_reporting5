@@ -1820,6 +1820,10 @@ export function AIStudioTab({ clientId, clientName }: Props) {
         clientId,
         conversationId: conversationId || undefined,
         userText: (() => {
+          // PRODUCE-VIDEO TURNS ARE PROMPT-ONLY: the renderer must see exactly
+          // what the user typed — no client brand summary, agent persona,
+          // reference or style blocks prepended.
+          if (selectedAgentMode === "video" && produceNow) return text;
           const agentEnabledForTurn = selectedAgentId !== "off";
           const mentioned = agentEnabledForTurn ? extractAgentMentions(text, clientAgents as any) : [];
           // Explicit picker overrides @mentions when set to a specific agent.
