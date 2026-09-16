@@ -369,7 +369,15 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
           );
         })}
         <div className="ml-auto flex shrink-0 items-center gap-2 pr-1 text-[10px] text-muted-foreground">
-          {project.saving ? "Saving…" : "Saved"}
+          {project.saving ? (
+            "Saving…"
+          ) : project.saveError ? (
+            <span className="text-destructive">Not saved — {project.saveError}</span>
+          ) : project.savedAt ? (
+            `Saved ${new Date(project.savedAt).toLocaleTimeString()}`
+          ) : (
+            "No changes yet"
+          )}
         </div>
       </div>
 
