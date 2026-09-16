@@ -838,7 +838,7 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
               project.generations.map((g) => (
                 <div key={g.id} className="rounded-xl border border-border/60 p-2 text-[11px]">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium capitalize">{g.status}</span>
+                    <span className="font-medium">{renderStatusLabel(g.status)}</span>
                     <span className="text-muted-foreground">{new Date(g.created_at).toLocaleString()}</span>
                   </div>
                   <div className="text-muted-foreground">
@@ -846,16 +846,51 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
                   </div>
                   {g.error && <div className="mt-1 text-amber-600">{g.error}</div>}
                   {g.video_url && (
-                    <video src={g.video_url} controls className="mt-1.5 w-full rounded-lg" />
+                    <>
+                      <video src={g.video_url} controls className="mt-1.5 w-full rounded-lg" />
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <a href={g.video_url} download target="_blank" rel="noreferrer">
+                          <Button variant="outline" size="sm">
+                            <Download className="mr-1.5 h-3.5 w-3.5" /> Download
+                          </Button>
+                        </a>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(g.video_url as string);
+                            toast.success("Link copied — paste it into captions or editing");
+                          }}
+                        >
+                          Copy link
+                        </Button>
+                      </div>
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        This is the untouched render. Captions or trims are made afterwards and saved separately, so
+                        this clean version stays as it is.
+                      </p>
+                    </>
                   )}
                   {!g.video_url && (g.status === "running" || g.status === "queued") && (
                     <div className="mt-1 text-muted-foreground">
                       Rendering — it finishes on the server, so you can close this.
                     </div>
                   )}
+                  {g.status === "submission_unknown" && (
+                    <div className="mt-1 text-amber-600">
+                      We could not confirm whether this reached the renderer, so it is held. It may already have been
+                      charged — check the Renders list again before starting another.
+                    </div>
+                  )}
                   {g.status === "failed" && (
-                    <Button variant="outline" size="sm" className="mt-1.5 w-full" onClick={generate} disabled={busy === "generate"}>
-                      Try this render again
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-1.5 w-full"
+                      onClick={() => generate(g.id)}
+                      disabled={busy === "generate"}
+                    >
+                      Try this exact version again
                     </Button>
                   )}
                 </div>
