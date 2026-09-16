@@ -252,7 +252,7 @@ describe("Master AI Video workflow UI", () => {
       frame: { hash: frameApprovalHash(row.draft), at: "", by: "user-1" },
       script: { hash: scriptApprovalHash(row.draft), at: "", by: "user-1" },
     };
-    invoke.mockResolvedValue({ data: { ok: true, duplicate: true, generation: { id: "g1", status: "running" } }, error: null });
+    generateResponse = { ok: true, duplicate: true, generation: { id: "g1", status: "running" } };
     const user = userEvent.setup();
     mount();
     await user.click(await screen.findByRole("button", { name: /^Generate$/i }));
@@ -314,5 +314,12 @@ describe("Master AI Video workflow UI", () => {
     expect(await screen.findByDisplayValue("Other client CTA")).toBeInTheDocument();
     expect(screen.queryByDisplayValue("Book a call")).not.toBeInTheDocument();
     view.unmount();
+  });
+
+  it("shows a readable message instead of an endless spinner when there is no session", async () => {
+    localStorage.clear();
+    mount();
+    expect(await screen.findByText(/Master video could not open/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Loading your video project/i)).not.toBeInTheDocument();
   });
 });
