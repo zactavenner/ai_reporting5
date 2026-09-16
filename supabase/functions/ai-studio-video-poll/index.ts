@@ -11,6 +11,7 @@
 // into the `creatives` bucket, and writes the terminal payload. It is
 // idempotent and safe to run concurrently with the chat worker.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { ledgerPatchForOutcome, type PollOutcome } from "../_shared/masterVideoLedger.ts";
 
 // Sanitized at read time — quotes/whitespace in the stored secret make OpenRouter
 // answer 401 {"message":"User not found."} on the video endpoints.
