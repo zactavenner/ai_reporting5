@@ -87,6 +87,16 @@ const navStructure = [
     icon: Bot,
   },
   {
+    title: 'AI Studio',
+    value: 'ai-studio',
+    icon: Palette,
+  },
+  {
+    title: 'Creative Library',
+    value: 'creative-library',
+    icon: Megaphone,
+  },
+  {
     title: 'Top Creatives',
     value: 'top-performers',
     icon: TrendingUp,
@@ -112,9 +122,7 @@ const navStructure = [
       { title: 'Deals', value: 'deals', icon: Handshake },
       { title: 'Outreach', value: 'outreach', icon: MessageSquare },
       { title: 'Offers', value: 'offers', icon: FileText },
-      { title: 'Creative Library', value: 'creative-library', icon: Megaphone },
       { title: 'Ads Generator', value: 'ads-generator-ext', icon: ExternalLink, externalUrl: 'https://id-preview--b57a79c0-3e59-4a78-be94-340c58fe824e.lovable.app' },
-      { title: 'AI Studio', value: 'ai-studio', icon: Bot },
       { title: 'Setter', value: 'setter', icon: Zap, href: '/setter' },
       { title: 'WhatsApp', value: 'whatsapp', icon: MessageCircle, href: '/whatsapp' },
       { title: 'Agents', value: 'agents', icon: Cpu },
