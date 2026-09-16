@@ -4346,8 +4346,10 @@ Deno.serve(async (req) => {
         // account manager) that is allowed to delegate to video sub-agents.
         const directVideoAuthorized = hasSelectedVideoModel
           && (agentToolPolicy === "video_only" || /jarvis|jeremy|account_manager|master/i.test(String(agentSlug || "")));
-        if (directVideoAuthorized && shouldDirectGenerateVideoPrompt(userText || "", hasSelectedVideoModel)) {
-          const totalDuration = 15;
+        const videoProduceIntent = !!(body as any)?.videoProduceIntent;
+        if (directVideoAuthorized && (videoProduceIntent || shouldDirectGenerateVideoPrompt(userText || "", hasSelectedVideoModel))) {
+          // Prompt-only render: the composer's length wins; no client/offer context.
+          const totalDuration = requestedVideoDuration && requestedVideoDuration > 0 ? requestedVideoDuration : 15;
           // UI Format dropdown is authoritative for video: only Reel 9:16 or Video 16:9.
           const aspect = resolveVideoAspect(userText, adFormat);
           // MiniMax H3 is the only model; prompt mentions are logged for audit only.
@@ -4449,7 +4451,7 @@ Deno.serve(async (req) => {
             const args = {
               prompt: segment.prompt,
               aspect_ratio: aspect,
-              duration: 15,
+              duration: segment.duration,
               resolution: segRes,
               image_url: imageUrl,
               last_frame_url: lastFrameUrl,
@@ -4471,8 +4473,7 @@ Deno.serve(async (req) => {
             const r = await generateSeedanceVideo({
                 prompt: segment.prompt + (videoRefStyleNotes ? `\n\nPacing/style inspiration (emulate, do not copy):${videoRefStyleNotes}` : ""),
                 aspectRatio: aspect,
-                // MiniMax H3 renders 15s clips.
-                duration: 15,
+                duration: segment.duration,
                 resolution: segRes,
                 imageUrl,
                 lastFrameUrl,

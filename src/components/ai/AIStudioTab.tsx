@@ -1820,6 +1820,10 @@ export function AIStudioTab({ clientId, clientName }: Props) {
         clientId,
         conversationId: conversationId || undefined,
         userText: (() => {
+          // PRODUCE-VIDEO TURNS ARE PROMPT-ONLY: the renderer must see exactly
+          // what the user typed — no client brand summary, agent persona,
+          // reference or style blocks prepended.
+          if (selectedAgentMode === "video" && produceNow) return text;
           const agentEnabledForTurn = selectedAgentId !== "off";
           const mentioned = agentEnabledForTurn ? extractAgentMentions(text, clientAgents as any) : [];
           // Explicit picker overrides @mentions when set to a specific agent.
@@ -1987,7 +1991,10 @@ export function AIStudioTab({ clientId, clientName }: Props) {
           : (selectedAgentId === "master" ? "account_manager" : undefined),
         ...(isJeremyAgent && effectivePersonaSlug ? { personaSlug: effectivePersonaSlug } : {}),
 
+        // Video renders never carry client/offer knowledge — prompt only.
+        videoProduceIntent: selectedAgentMode === "video" && produceNow,
         offerContext: (() => {
+          if (selectedAgentMode === "video" && produceNow) return undefined;
           const list = selectedOfferId === "all"
             ? clientOffers
             : clientOffers.filter(o => o.id === selectedOfferId);
@@ -2019,7 +2026,9 @@ export function AIStudioTab({ clientId, clientName }: Props) {
         ),
         // Phase 5 wiring: pass offer scope so the edge function can load
         // 3-layer context (agency agent + client brain + offer training).
-        offerIds: selectedOfferId && selectedOfferId !== "all" ? [selectedOfferId] : (clientOffers || []).map((o: any) => o.id),
+        offerIds: (selectedAgentMode === "video" && produceNow)
+          ? []
+          : (selectedOfferId && selectedOfferId !== "all" ? [selectedOfferId] : (clientOffers || []).map((o: any) => o.id)),
         attachments: attSnapshot.map(a => ({ url: a.url, name: a.name, mime: a.mime, text: a.text })),
       }, ctrl.signal);
       if (!res.ok || !res.body) throw new Error(`Stream failed: ${res.status} ${await res.text().catch(() => "")}`);
