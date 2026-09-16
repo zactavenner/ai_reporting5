@@ -1,0 +1,530 @@
+/**
+ * Master AI Video — the single shared contract.
+ *
+ * This module is deliberately pure TypeScript (no Deno, no browser, no imports)
+ * because BOTH sides depend on it:
+ *
+ *  - the browser workflow (`src/lib/masterVideo.ts` re-exports it) to compute
+ *    readiness, approval hashes and the video prompt it shows the operator;
+ *  - the `master-video-generate` edge function, which re-computes the SAME
+ *    hashes server-side before it is willing to spend money on a render.
+ *
+ * One implementation means a disabled button in the UI and the server's refusal
+ * can never disagree. Every rule that guards spend lives here.
+ */
+
+export type PresenterMode = "avatar" | "none";
+export type AspectRatio = "9:16" | "16:9";
+
+export type FrameAsset = {
+  id: string;
+  url: string;
+  version: number;
+  prompt: string;
+  imageModel: string | null;
+  source: "generated" | "uploaded";
+  createdAt: string;
+};
+
+export type OfferSnapshot = {
+  id: string;
+  name: string;
+  audience: string;
+  terms: string;
+  proof: string;
+  sources: string[];
+};
+
+export type MasterVideoDraft = {
+  /* 1. Offer */
+  offerId: string | null;
+  offerSnapshot: OfferSnapshot | null;
+  brief: string;
+  claims: string;
+  cta: string;
+  sourceNotes: string;
+
+  /* 2. Style */
+  styleId: string | null;
+  styleLabel: string | null;
+  styleReferenceUrl: string | null;
+  styleDirections: string;
+
+  /* 3. Avatar */
+  presenter: PresenterMode;
+  avatarId: string | null;
+  avatarName: string | null;
+  avatarImageUrl: string | null;
+  avatarDescription: string;
+  wardrobe: string;
+  location: string;
+  motion: string;
+
+  /* 4. First frame */
+  frames: FrameAsset[];
+  selectedFrameId: string | null;
+
+  /* 5. Script + video prompt */
+  script: string;
+  videoPrompt: string;
+  disclosure: string;
+
+  /* 6. Render settings */
+  model: string;
+  resolution: string;
+  aspectRatio: AspectRatio;
+  durationSeconds: number;
+  audio: boolean;
+};
+
+export type ApprovalRecord = { hash: string; at: string; by: string | null };
+export type MasterVideoApprovals = { frame?: ApprovalRecord; script?: ApprovalRecord };
+
+export type MasterVideoModelSpec = {
+  value: string;
+  label: string;
+  hint: string;
+  resolutions: string[];
+  durations: number[];
+  /** OpenRouter list price per generated second, in USD. */
+  pricePerSecond: number;
+  supportsFirstFrame: boolean;
+};
+
+/**
+ * Kept in step with `src/lib/modelRegistry.ts` VIDEO_MODELS and with the
+ * provider payload branches in `supabase/functions/ai-studio/index.ts`.
+ * Wan 3.0 genuinely serves 480p/720p/1080p and 2–30s — there is no 2K tier, so
+ * it is never offered or labelled as one.
+ */
+export const MASTER_VIDEO_MODELS: MasterVideoModelSpec[] = [
+  {
+    value: "alibaba/wan-3.0",
+    label: "Wan 3.0",
+    hint: "480p / 720p / 1080p · 2–30s in one clip · first frame · native audio",
+    resolutions: ["480p", "720p", "1080p"],
+    durations: [5, 10, 15, 20, 25, 30],
+    pricePerSecond: 0.034,
+    supportsFirstFrame: true,
+  },
+  {
+    value: "bytedance/seedance-2.5",
+    label: "Seedance 2.5",
+    hint: "480p / 720p · 4–30s in one clip · first/last frame",
+    resolutions: ["480p", "720p"],
+    durations: [5, 10, 15, 20, 25, 30],
+    pricePerSecond: 0.2311,
+    supportsFirstFrame: true,
+  },
+  {
+    value: "bytedance/seedance-2.0",
+    label: "Seedance",
+    hint: "720p · up to 15s · first/last frame + references",
+    resolutions: ["720p"],
+    durations: [5, 10, 15],
+    pricePerSecond: 0.0538,
+    supportsFirstFrame: true,
+  },
+  {
+    value: "minimax/hailuo-3",
+    label: "MiniMax H3",
+    hint: "720p or native 2K · up to 15s · first/last frame + reference identity",
+    resolutions: ["720p", "2k"],
+    durations: [5, 10, 15],
+    pricePerSecond: 0.13,
+    supportsFirstFrame: true,
+  },
+];
+
+export const DEFAULT_MASTER_VIDEO_MODEL = "alibaba/wan-3.0";
+
+export function modelSpec(model: string | null | undefined): MasterVideoModelSpec {
+  return (
+    MASTER_VIDEO_MODELS.find((m) => m.value === model) ||
+    MASTER_VIDEO_MODELS.find((m) => m.value === DEFAULT_MASTER_VIDEO_MODEL)!
+  );
+}
+
+export function createEmptyDraft(): MasterVideoDraft {
+  const spec = modelSpec(DEFAULT_MASTER_VIDEO_MODEL);
+  return {
+    offerId: null,
+    offerSnapshot: null,
+    brief: "",
+    claims: "",
+    cta: "",
+    sourceNotes: "",
+    styleId: null,
+    styleLabel: null,
+    styleReferenceUrl: null,
+    styleDirections: "",
+    presenter: "avatar",
+    avatarId: null,
+    avatarName: null,
+    avatarImageUrl: null,
+    avatarDescription: "",
+    wardrobe: "",
+    location: "",
+    motion: "",
+    frames: [],
+    selectedFrameId: null,
+    script: "",
+    videoPrompt: "",
+    disclosure: "",
+    model: DEFAULT_MASTER_VIDEO_MODEL,
+    // Defaults: vertical, the highest resolution this model genuinely serves, ~30s.
+    resolution: spec.resolutions[spec.resolutions.length - 1],
+    aspectRatio: "9:16",
+    durationSeconds: 30,
+    audio: true,
+  };
+}
+
+/** Coerces render settings onto values the selected model actually serves. */
+export function clampRenderSettings(draft: MasterVideoDraft): MasterVideoDraft {
+  const spec = modelSpec(draft.model);
+  const resolution = spec.resolutions.includes(draft.resolution)
+    ? draft.resolution
+    : spec.resolutions[spec.resolutions.length - 1];
+  const durations = spec.durations;
+  const wanted = Number(draft.durationSeconds) || durations[durations.length - 1];
+  const durationSeconds = durations.includes(wanted)
+    ? wanted
+    : durations.reduce((best, d) => (Math.abs(d - wanted) < Math.abs(best - wanted) ? d : best), durations[0]);
+  return { ...draft, model: spec.value, resolution, durationSeconds };
+}
+
+export function selectedFrame(draft: MasterVideoDraft): FrameAsset | null {
+  if (!draft.selectedFrameId) return null;
+  return draft.frames.find((f) => f.id === draft.selectedFrameId) || null;
+}
+
+/* ---------------------------------------------------------------- hashing --- */
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value ?? null);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(",")}}`;
+}
+
+/** FNV-1a, 64 bits as two 32-bit halves. Content addressing, not security. */
+export function contentHash(value: unknown): string {
+  const input = stableStringify(value);
+  let a = 0x811c9dc5;
+  let b = 0x01000193;
+  for (let i = 0; i < input.length; i++) {
+    const c = input.charCodeAt(i);
+    a = (a ^ c) >>> 0;
+    a = Math.imul(a, 0x01000193) >>> 0;
+    b = (b + Math.imul(c + i + 1, 0x85ebca6b)) >>> 0;
+    b = ((b << 13) | (b >>> 19)) >>> 0;
+  }
+  return `${a.toString(16).padStart(8, "0")}${b.toString(16).padStart(8, "0")}`;
+}
+
+const norm = (s: string | null | undefined) => (s ?? "").replace(/\s+/g, " ").trim();
+
+/**
+ * Everything the chosen opening frame depends on. Changing the avatar, the
+ * style, the aspect ratio or picking a different frame version invalidates the
+ * frame approval — and therefore the script approval that is built on it.
+ */
+export function frameApprovalHash(draft: MasterVideoDraft): string {
+  const frame = selectedFrame(draft);
+  return contentHash({
+    frameId: frame?.id ?? null,
+    frameUrl: frame?.url ?? null,
+    frameVersion: frame?.version ?? null,
+    framePrompt: norm(frame?.prompt),
+    presenter: draft.presenter,
+    avatarId: draft.avatarId,
+    avatarImageUrl: draft.avatarImageUrl,
+    avatarDescription: norm(draft.avatarDescription),
+    styleId: draft.styleId,
+    styleReferenceUrl: draft.styleReferenceUrl,
+    styleDirections: norm(draft.styleDirections),
+    aspectRatio: draft.aspectRatio,
+  });
+}
+
+/**
+ * The render contract: the exact frame, the exact spoken words, the exact
+ * directions and the exact paid render settings. Any edit upstream changes this
+ * hash, which is what makes a stale approval detectable instead of silent.
+ */
+export function scriptApprovalHash(draft: MasterVideoDraft): string {
+  return contentHash({
+    frame: frameApprovalHash(draft),
+    script: norm(draft.script),
+    videoPrompt: norm(draft.videoPrompt),
+    disclosure: norm(draft.disclosure),
+    cta: norm(draft.cta),
+    claims: norm(draft.claims),
+    offerId: draft.offerId,
+    model: draft.model,
+    resolution: draft.resolution,
+    aspectRatio: draft.aspectRatio,
+    durationSeconds: draft.durationSeconds,
+    audio: draft.audio,
+  });
+}
+
+export function frameApproved(draft: MasterVideoDraft, approvals: MasterVideoApprovals): boolean {
+  return !!approvals.frame && approvals.frame.hash === frameApprovalHash(draft);
+}
+
+export function scriptApproved(draft: MasterVideoDraft, approvals: MasterVideoApprovals): boolean {
+  return !!approvals.script && approvals.script.hash === scriptApprovalHash(draft);
+}
+
+/** True when an approval exists but no longer matches the current content. */
+export function frameApprovalStale(draft: MasterVideoDraft, approvals: MasterVideoApprovals): boolean {
+  return !!approvals.frame && approvals.frame.hash !== frameApprovalHash(draft);
+}
+
+export function scriptApprovalStale(draft: MasterVideoDraft, approvals: MasterVideoApprovals): boolean {
+  return !!approvals.script && approvals.script.hash !== scriptApprovalHash(draft);
+}
+
+/* -------------------------------------------------------------- readiness --- */
+
+export type StepKey = "offer" | "style" | "avatar" | "frame" | "script" | "generate";
+
+export const MASTER_VIDEO_STEPS: Array<{ key: StepKey; label: string; blurb: string }> = [
+  { key: "offer", label: "Offer", blurb: "What we're selling and the one call to action" },
+  { key: "style", label: "Style", blurb: "Look and feel of the ad" },
+  { key: "avatar", label: "Presenter", blurb: "Who is on camera, or nobody" },
+  { key: "frame", label: "First frame", blurb: "Approve the exact opening image" },
+  { key: "script", label: "Script & directions", blurb: "Exact words plus camera and audio" },
+  { key: "generate", label: "Generate", blurb: "Review everything, then make the video" },
+];
+
+export type StepStatus = { key: StepKey; complete: boolean; reason: string | null };
+
+export function stepStatuses(draft: MasterVideoDraft, approvals: MasterVideoApprovals): StepStatus[] {
+  const frame = selectedFrame(draft);
+  const out: StepStatus[] = [];
+
+  out.push({
+    key: "offer",
+    complete: !!draft.offerId && norm(draft.cta).length > 0,
+    reason: !draft.offerId ? "Pick the offer this ad sells" : norm(draft.cta) ? null : "Add one call to action",
+  });
+
+  out.push({
+    key: "style",
+    complete: !!draft.styleId || !!draft.styleReferenceUrl,
+    reason: !draft.styleId && !draft.styleReferenceUrl ? "Choose a style or upload a reference" : null,
+  });
+
+  const avatarOk = draft.presenter === "none" || (!!draft.avatarId && !!draft.avatarImageUrl);
+  out.push({
+    key: "avatar",
+    complete: avatarOk,
+    reason: avatarOk ? null : "Pick or upload a presenter, or choose no presenter",
+  });
+
+  out.push({
+    key: "frame",
+    complete: !!frame && frameApproved(draft, approvals),
+    reason: !frame
+      ? "Create or upload the opening frame"
+      : frameApprovalStale(draft, approvals)
+        ? "Something changed since you approved this frame — approve it again"
+        : frameApproved(draft, approvals)
+          ? null
+          : "Approve the frame you picked",
+  });
+
+  const hasScript = norm(draft.script).length > 0;
+  const hasPrompt = norm(draft.videoPrompt).length > 0;
+  out.push({
+    key: "script",
+    complete: hasScript && hasPrompt && scriptApproved(draft, approvals),
+    reason: !hasScript
+      ? "Write or draft the spoken script"
+      : !hasPrompt
+        ? "Add the camera, motion and audio directions"
+        : scriptApprovalStale(draft, approvals)
+          ? "The script, frame or render settings changed — approve again"
+          : scriptApproved(draft, approvals)
+            ? null
+            : "Approve the script and directions",
+  });
+
+  const ready = out.every((s) => s.complete);
+  out.push({
+    key: "generate",
+    complete: ready,
+    reason: ready ? null : "Finish and approve the earlier steps first",
+  });
+  return out;
+}
+
+export type GenerationGate = { ok: boolean; reasons: string[] };
+
+/** The one place that decides whether a paid render may be granted. */
+export function generationGate(draft: MasterVideoDraft, approvals: MasterVideoApprovals): GenerationGate {
+  const reasons: string[] = [];
+  for (const s of stepStatuses(draft, approvals)) {
+    if (s.key === "generate") continue;
+    if (!s.complete && s.reason) reasons.push(s.reason);
+  }
+  const frame = selectedFrame(draft);
+  if (frame && !/^https?:\/\//.test(frame.url)) {
+    reasons.push("The opening frame must be a saved image, not a temporary preview");
+  }
+  const spec = modelSpec(draft.model);
+  if (!spec.resolutions.includes(draft.resolution)) {
+    reasons.push(`${spec.label} does not serve ${draft.resolution}`);
+  }
+  if (!spec.durations.includes(draft.durationSeconds)) {
+    reasons.push(`${spec.label} does not serve ${draft.durationSeconds}s in one clip`);
+  }
+  return { ok: reasons.length === 0, reasons };
+}
+
+/* ------------------------------------------------------- prompt + summary --- */
+
+export function estimatedReadSeconds(script: string, wordsPerMinute = 150): number {
+  const words = norm(script).split(/\s+/).filter((w) => /[a-z0-9']/i.test(w)).length;
+  return Math.round((words / wordsPerMinute) * 60);
+}
+
+export function scriptWordCount(script: string): number {
+  return norm(script).split(/\s+/).filter((w) => /[a-z0-9']/i.test(w)).length;
+}
+
+/**
+ * Builds the directions half of the render prompt. The exact approved dialogue
+ * is appended verbatim and everything else is forbidden, so the provider cannot
+ * invent extra speech, subtitles, titles, logos or disclaimer text.
+ */
+export function buildVideoPrompt(draft: MasterVideoDraft): string {
+  const parts: string[] = [];
+  if (norm(draft.styleDirections)) parts.push(norm(draft.styleDirections));
+  if (draft.presenter === "avatar" && norm(draft.avatarDescription)) {
+    parts.push(`Presenter: ${norm(draft.avatarDescription)}. Keep this person's face, hair and identity unchanged.`);
+  }
+  if (norm(draft.wardrobe)) parts.push(`Wardrobe: ${norm(draft.wardrobe)}.`);
+  if (norm(draft.location)) parts.push(`Location: ${norm(draft.location)}.`);
+  if (norm(draft.motion)) parts.push(`Camera and motion: ${norm(draft.motion)}.`);
+  parts.push("Single continuous shot, no scene cuts.");
+  if (draft.presenter === "avatar") {
+    parts.push("The presenter speaks straight to camera, holding natural eye contact.");
+  }
+  return parts.join(" ");
+}
+
+/** The full wire prompt: directions, then the exact words, then prohibitions. */
+export function composeRenderPrompt(draft: MasterVideoDraft): string {
+  const directions = norm(draft.videoPrompt) || buildVideoPrompt(draft);
+  const spoken = norm(draft.script);
+  const lines = [directions];
+  if (spoken) {
+    lines.push(
+      draft.presenter === "avatar"
+        ? `The presenter says exactly this and nothing else: ${spoken}`
+        : `Voiceover, exactly this and nothing else: ${spoken}`,
+    );
+  }
+  lines.push(
+    "Do not add any other speech, dialogue or narration. No subtitles, no captions, no on-screen text, no titles, no logos, no watermarks, no disclaimer text.",
+  );
+  return lines.join("\n\n");
+}
+
+export type CostEstimate = { known: boolean; usd: number | null; note: string };
+
+export function costEstimate(draft: MasterVideoDraft): CostEstimate {
+  const spec = modelSpec(draft.model);
+  if (!spec.pricePerSecond) {
+    return { known: false, usd: null, note: "Cost for this model is not published — treat it as unknown." };
+  }
+  return {
+    known: true,
+    usd: Math.round(spec.pricePerSecond * draft.durationSeconds * 100) / 100,
+    note: `List price estimate for ${draft.durationSeconds}s on ${spec.label}. Actual provider billing may differ.`,
+  };
+}
+
+export type ReviewSummary = Array<{ label: string; value: string }>;
+
+export function reviewSummary(
+  draft: MasterVideoDraft,
+  extras: { clientName?: string | null; offerName?: string | null } = {},
+): ReviewSummary {
+  const spec = modelSpec(draft.model);
+  const frame = selectedFrame(draft);
+  const cost = costEstimate(draft);
+  return [
+    { label: "Client", value: extras.clientName || "Not set" },
+    { label: "Offer", value: extras.offerName || draft.offerSnapshot?.name || "Not set" },
+    { label: "Style", value: draft.styleLabel || (draft.styleReferenceUrl ? "Uploaded reference" : "Not set") },
+    {
+      label: "Presenter",
+      value: draft.presenter === "none" ? "No presenter" : draft.avatarName || "Selected presenter",
+    },
+    { label: "First frame", value: frame ? `v${frame.version} (${frame.source})` : "Not set" },
+    { label: "Spoken script", value: `${scriptWordCount(draft.script)} words · about ${estimatedReadSeconds(draft.script)}s to read` },
+    { label: "Call to action", value: norm(draft.cta) || "Not set" },
+    {
+      label: "Render",
+      value: `${spec.label} · ${draft.aspectRatio} · ${draft.resolution} · ${draft.durationSeconds}s · audio ${draft.audio ? "on" : "off"}`,
+    },
+    { label: "Clips", value: "1 render per Generate click" },
+    { label: "Estimated cost", value: cost.known ? `about $${cost.usd?.toFixed(2)}` : "Unknown" },
+  ];
+}
+
+/**
+ * The idempotency key for a paid render. Two clicks on identical approved
+ * content produce the same key, and the unique index on the render ledger turns
+ * the second one into a no-op instead of a second charge.
+ */
+export function generationIdempotencyKey(projectId: string, draft: MasterVideoDraft): string {
+  return `${projectId}:${scriptApprovalHash(draft)}`;
+}
+
+/* ------------------------------------------------------ server enforcement --- */
+
+export type ServerGateResult =
+  | { ok: true; idempotencyKey: string; prompt: string; frameUrl: string }
+  | { ok: false; status: 400 | 409; error: string };
+
+/**
+ * Server-side authority. The stored draft and approvals are the truth; the
+ * client's echoed hash only has to agree with them. A disabled button is a
+ * courtesy — this is the check that actually protects spend.
+ */
+export function authorizeGeneration(
+  projectId: string,
+  storedDraft: MasterVideoDraft,
+  storedApprovals: MasterVideoApprovals,
+  clientEchoedScriptHash?: string | null,
+): ServerGateResult {
+  const gate = generationGate(storedDraft, storedApprovals);
+  if (!gate.ok) {
+    return { ok: false, status: 409, error: `This video is not approved to render: ${gate.reasons.join("; ")}` };
+  }
+  const hash = scriptApprovalHash(storedDraft);
+  if (clientEchoedScriptHash && clientEchoedScriptHash !== hash) {
+    return {
+      ok: false,
+      status: 409,
+      error: "The saved video changed since this screen was loaded. Reload and approve the current version.",
+    };
+  }
+  const frame = selectedFrame(storedDraft);
+  if (!frame || !/^https?:\/\//.test(frame.url)) {
+    return { ok: false, status: 400, error: "The approved opening frame is missing a stored image." };
+  }
+  return {
+    ok: true,
+    idempotencyKey: `${projectId}:${hash}`,
+    prompt: composeRenderPrompt(storedDraft),
+    frameUrl: frame.url,
+  };
+}
