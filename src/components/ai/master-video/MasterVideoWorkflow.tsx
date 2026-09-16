@@ -111,12 +111,17 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
   const { data: avatars = [] } = useAvatars(clientId);
 
   const [step, setStep] = useState<StepKey>("offer");
-  const [framePrompt, setFramePrompt] = useState("");
-  const [frameModel, setFrameModel] = useState<string>(FRAME_IMAGE_MODELS[0].value);
-  const [busy, setBusy] = useState<null | "frame" | "script" | "generate">(null);
+  const [busy, setBusy] = useState<null | "frame" | "frame-edit" | "script" | "generate">(null);
   const frameFile = useRef<HTMLInputElement>(null);
   const avatarFile = useRef<HTMLInputElement>(null);
   const styleFile = useRef<HTMLInputElement>(null);
+  const offerFile = useRef<HTMLInputElement>(null);
+  const scriptFile = useRef<HTMLInputElement>(null);
+  /** The scope this screen is currently showing, so async work that finishes
+   * after a client or thread switch is thrown away instead of written. */
+  const scopeRef = useRef(`${clientId ?? ""}|${conversationId ?? ""}`);
+  scopeRef.current = `${clientId ?? ""}|${conversationId ?? ""}`;
+  const sameScope = (at: string) => scopeRef.current === at;
 
   const statuses = stepStatuses(draft, approvals);
   const statusOf = (key: StepKey) => statuses.find((s) => s.key === key)!;
@@ -129,18 +134,28 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
     [avatars],
   );
 
-  // Seed the frame prompt from the choices already made, once per project load.
+  // The frame prompt and image model live in the saved project, so a reload does
+  // not lose an edit in progress.
+  const framePrompt = draft.framePrompt;
+  const frameModel = draft.frameImageModel || FRAME_IMAGE_MODELS[0].value;
+  const setFramePrompt = (value: string) => update({ framePrompt: value, framePromptTouched: true });
+  const setFrameModel = (value: string) => update({ frameImageModel: value });
+
+  // Auto-seed the frame prompt from the choices already made, and keep it in step
+  // with them until the operator edits it by hand.
+  const seeded = buildFirstFramePrompt(draft, clientName);
   useEffect(() => {
     if (project.loading) return;
-    setFramePrompt((prev) => prev || frame?.prompt || buildFirstFramePrompt(draft, clientName));
+    if (draft.framePromptTouched) return;
+    if (draft.framePrompt === seeded) return;
+    update({ framePrompt: seeded });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project.loading, project.projectId]);
+  }, [project.loading, seeded, draft.framePromptTouched]);
 
   // Reset the local step when the scope changes so no draft state leaks across
   // clients or threads.
   useEffect(() => {
     setStep("offer");
-    setFramePrompt("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, conversationId]);
 
@@ -156,16 +171,31 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
       source,
       createdAt: new Date().toISOString(),
     };
+    // Older versions are kept — choosing a new one never deletes what came before.
     update({ frames: [...draft.frames, asset], selectedFrameId: asset.id });
   };
 
-  const generateFrame = async () => {
+  /**
+   * One image call for both "create a frame" and "edit the frame I chose". The
+   * edit passes the chosen image itself as the reference, so the person, clothes
+   * and place carry over instead of being re-imagined.
+   */
+  const runFrameImage = async (mode: "create" | "edit") => {
     if (!framePrompt.trim()) {
       toast.error("Add a prompt for the opening frame first");
       return;
     }
-    setBusy("frame");
+    if (mode === "edit" && !frame) {
+      toast.error("Choose a frame to edit first");
+      return;
+    }
+    const at = scopeRef.current;
+    setBusy(mode === "edit" ? "frame-edit" : "frame");
     try {
+      const references = [
+        mode === "edit" && frame ? frame.url : null,
+        draft.presenter === "avatar" ? draft.avatarImageUrl : null,
+      ].filter((u): u is string => !!u);
       const { data, error } = await supabase.functions.invoke("generate-static-ad", {
         headers: dashboardAuthHeaders(),
         body: {
@@ -176,15 +206,16 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
           clientId: clientId || "default",
           productDescription: draft.brief || offer?.description || undefined,
           // Keeps the presenter's identity intact while the frame is re-generated.
-          characterImageUrl: draft.presenter === "avatar" ? draft.avatarImageUrl || undefined : undefined,
-          referenceImages: draft.presenter === "avatar" && draft.avatarImageUrl ? [draft.avatarImageUrl] : [],
+          characterImageUrl: references[0] || undefined,
+          referenceImages: references,
         },
       });
       if (error) throw error;
       const url: string | undefined = data?.imageUrl;
       if (!url) throw new Error("No image came back");
+      if (!sameScope(at)) return; // a different client is on screen now
       addFrame(url, "generated", framePrompt.trim(), frameModel);
-      toast.success("New opening frame ready");
+      toast.success(mode === "edit" ? "Edited frame added as a new version" : "New opening frame ready");
     } catch {
       toast.error("Could not create that opening frame — try adjusting the prompt");
     } finally {
