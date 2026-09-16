@@ -220,7 +220,7 @@ describe("Master AI Video workflow UI", () => {
     seedProject();
     const user = userEvent.setup();
     mount();
-    await user.click(await screen.findByRole("button", { name: /^Generate$/i }));
+    await user.click(await screen.findByRole("button", { name: /Generate$/i }));
     const generateBtn = await screen.findByRole("button", { name: /Generate video/i });
     expect(generateBtn).toBeDisabled();
     expect(await screen.findByText(/Approve the frame you picked/i)).toBeInTheDocument();
@@ -295,7 +295,7 @@ describe("Master AI Video workflow UI", () => {
     // Edit the call to action on step 1 — that is part of the approved contract.
     const cta = await screen.findByDisplayValue("Book a call");
     await user.type(cta, " today");
-    await user.click(await screen.findByRole("button", { name: /^Generate$/i }));
+    await user.click(await screen.findByRole("button", { name: /Generate$/i }));
     expect(await screen.findByText(/approve again|Approve the script/i)).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /Generate video/i })).toBeDisabled();
   });
