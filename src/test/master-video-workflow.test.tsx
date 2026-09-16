@@ -126,12 +126,63 @@ function seedProject(over: Partial<any> = {}) {
 const mount = () =>
   render(<MasterVideoWorkflow clientId="client-1" clientName="Acme Capital" conversationId="conv-1" />);
 
+/** Responses the fake edge route gives for a `generate` call. */
+let generateResponse: any = { ok: true, duplicate: false, generation: { id: "g1", status: "running" } };
+
+/** Stands in for the guarded `master-video-generate` route (load / save / generate). */
+function fakeEdgeRoute(_name: string, opts: any) {
+  const b = opts?.body || {};
+  const owner = localStorage.getItem("team_member_id");
+  if (!owner) return Promise.resolve({ data: { error: "Unauthorized" }, error: null });
+  const match = () =>
+    db.projects.find(
+      (p) =>
+        p.user_id === owner &&
+        (p.client_id ?? null) === (b.clientId ?? null) &&
+        (p.conversation_id ?? null) === (b.conversationId ?? null),
+    ) || null;
+
+  if (b.action === "load") {
+    const project = match();
+    return Promise.resolve({
+      data: {
+        ok: true,
+        project,
+        generations: project ? db.generations.filter((g) => g.project_id === project.id) : [],
+      },
+      error: null,
+    });
+  }
+  if (b.action === "save") {
+    const existing = match();
+    if (existing) {
+      existing.draft = b.draft;
+      existing.approvals = b.approvals;
+      return Promise.resolve({ data: { ok: true, project: existing }, error: null });
+    }
+    const created = {
+      id: `project-new-${db.projects.length + 1}`,
+      user_id: owner,
+      client_id: b.clientId ?? null,
+      conversation_id: b.conversationId ?? null,
+      draft: b.draft,
+      approvals: b.approvals,
+    };
+    db.projects.push(created);
+    return Promise.resolve({ data: { ok: true, project: created }, error: null });
+  }
+  return Promise.resolve({ data: generateResponse, error: null });
+}
+
 beforeEach(() => {
   cleanup();
   db.projects = [];
   db.generations = [];
+  localStorage.clear();
+  localStorage.setItem("team_member_id", "user-1");
+  generateResponse = { ok: true, duplicate: false, generation: { id: "g1", status: "running" } };
   invoke.mockReset();
-  invoke.mockResolvedValue({ data: { ok: true, duplicate: false, generation: { id: "g1", status: "running" } }, error: null });
+  invoke.mockImplementation(fakeEdgeRoute);
   toasts.length = 0;
 });
 
