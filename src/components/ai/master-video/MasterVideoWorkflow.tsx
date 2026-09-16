@@ -57,15 +57,42 @@ function pill(active: boolean) {
   }`;
 }
 
-async function uploadImage(file: File, folder: string): Promise<string> {
-  const ext = file.name.split(".").pop() || "png";
-  const path = `master-video/${folder}/${crypto.randomUUID()}.${ext}`;
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+/**
+ * Uploads under the client's own folder and refuses anything that is not the
+ * expected kind or is over 50MB, so a wrong file never becomes an approved
+ * asset — and one client's files never land in another client's folder.
+ */
+async function uploadAsset(
+  file: File,
+  folder: string,
+  kind: "image" | "video" | "document",
+  clientId: string | null,
+): Promise<string> {
+  const type = file.type || "";
+  const okType =
+    kind === "image" ? type.startsWith("image/") : kind === "video" ? type.startsWith("video/") : !!type;
+  if (!okType) throw new Error(`That file is not ${kind === "image" ? "an image" : `a ${kind}`}.`);
+  if (file.size > MAX_UPLOAD_BYTES) throw new Error("That file is over the 50MB limit.");
+  const ext = (file.name.split(".").pop() || (kind === "image" ? "png" : "bin")).toLowerCase().slice(0, 8);
+  const path = `master-video/${clientId || "shared"}/${folder}/${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from("creatives").upload(path, file, {
-    contentType: file.type || "image/png",
+    contentType: type || "application/octet-stream",
     upsert: false,
   });
   if (error) throw error;
   return supabase.storage.from("creatives").getPublicUrl(path).data.publicUrl;
+}
+
+/** Plain-language label for a render's state, including the held-for-review one. */
+function renderStatusLabel(status: string): string {
+  if (status === "queued") return "Waiting to start";
+  if (status === "running") return "Rendering";
+  if (status === "completed") return "Ready";
+  if (status === "failed") return "Failed";
+  if (status === "submission_unknown") return "Held for review";
+  return status;
 }
 
 /**
