@@ -48,6 +48,7 @@ import { ImageStylesPopover, useImageStyles, buildImageStyleBlock } from "./Imag
 import { BatchScriptsDialog } from "./BatchScriptsDialog";
 import { StudioGoalDialog } from "./StudioGoalDialog";
 import { VideoProductionLine, buildPresetStyleBlock } from "./VideoProductionLine";
+import MasterVideoWorkflow from "./master-video/MasterVideoWorkflow";
 import { VIDEO_STYLE_PRESETS } from "@/lib/videoStylePresets";
 
 interface Props {
@@ -1200,6 +1201,9 @@ export function AIStudioTab({ clientId, clientName }: Props) {
   const [autoConnectedDoc, setAutoConnectedDoc] = useState(false);
   const [autoConnectedSheet, setAutoConnectedSheet] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  // "master" is the six-step approved workflow; "legacy" keeps the old
+  // chat-driven quick line reachable, but only when explicitly chosen.
+  const [videoFlow, setVideoFlow] = useState<"master" | "legacy">("master");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [canvas, setCanvas] = useState<CanvasEntry[]>([]);
   const [canvasView, setCanvasView] = useState<{ zoom: number; panX: number; panY: number } | null>(null);
@@ -2493,48 +2497,70 @@ export function AIStudioTab({ clientId, clientName }: Props) {
         <>
         {/* Video Styles bar moved to the composer — only renders when a video model is selected. */}
         {selectedAgentMode === "video" && (
-          <VideoProductionLine
-            aspect={videoAspectForAdFormat(adFormat)}
-            selectedPresetIds={presetStyleIds}
-            onTogglePreset={(id) =>
-              setPresetStyleIds((curr) => (curr.includes(id) ? curr.filter((v) => v !== id) : [...curr, id]))
-            }
-            generating={loading > 0}
-            onGenerateScripts={() => {
-              const picks = VIDEO_STYLE_PRESETS.filter((p) => presetStyleIds.includes(p.id));
-              if (!picks.length) return;
-              const seconds = videoTotalDuration;
-              const aspect = videoAspectForAdFormat(adFormat);
-              void send(
-                [
-                  `Write ${picks.length} video ad script${picks.length === 1 ? "" : "s"} for ${clientName} — one per reference style below, in this order: ${picks.map((p) => p.name).join(", ")}.`,
-                  `Each script targets ${seconds}s at ${aspect}, ~${paceWordBudget(seconds, speechPace)} words of voiceover at a ${speechPace} pace.`,
-                  "For each: a title line with the style name, the hook (0–2s), the beats with timecodes, the verbatim VO, and the visual direction drawn from that style's transcribed reference.",
-                  "Do not render anything yet — this is script work only.",
-                ].join("\n"),
-              );
-            }}
-            avatarName={selectedAvatar?.name || null}
-            onOpenAvatars={() => setAiStudioTab("avatars")}
-            produce={videoIntent === "produce"}
-            onSetProduce={(p) => setVideoIntent(p ? "produce" : "chat")}
-            summary={{
-              model: VIDEO_MODELS.find((m) => m.value === videoModel)?.label || videoModel || "—",
-              resolution: videoResolution,
-              seconds: videoTotalDuration,
-              cost: videoModel
-                ? `$${(
-                    modelPricePerSecond(
-                      videoModel,
-                      videoResolution as VideoRes,
-                      VIDEO_MODELS.find((m) => m.value === videoModel)?.pricePerSecond ?? 0.1,
-                    ) * videoTotalDuration
-                  ).toFixed(2)}`
-                : null,
-            }}
-            hasFirstFrame={!!videoFrames?.firstFrameUrl}
-            referenceCount={(videoFrames?.ingredientUrls || []).length}
-          />
+          <div className="px-4 sm:px-6 pt-3 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setVideoFlow("master")}
+                className={`px-2.5 py-1 rounded-full border text-[11px] transition ${videoFlow === "master" ? "border-primary bg-primary text-primary-foreground" : "border-border/60 text-muted-foreground hover:bg-muted"}`}
+              >
+                Master video (6 steps)
+              </button>
+              <button
+                type="button"
+                onClick={() => setVideoFlow("legacy")}
+                className={`px-2.5 py-1 rounded-full border text-[11px] transition ${videoFlow === "legacy" ? "border-primary bg-primary text-primary-foreground" : "border-border/60 text-muted-foreground hover:bg-muted"}`}
+              >
+                Quick chat line
+              </button>
+            </div>
+            {videoFlow === "master" ? (
+              <MasterVideoWorkflow clientId={clientId} clientName={clientName} conversationId={conversationId} />
+            ) : (
+              <VideoProductionLine
+                aspect={videoAspectForAdFormat(adFormat)}
+                selectedPresetIds={presetStyleIds}
+                onTogglePreset={(id) =>
+                  setPresetStyleIds((curr) => (curr.includes(id) ? curr.filter((v) => v !== id) : [...curr, id]))
+                }
+                generating={loading > 0}
+                onGenerateScripts={() => {
+                  const picks = VIDEO_STYLE_PRESETS.filter((p) => presetStyleIds.includes(p.id));
+                  if (!picks.length) return;
+                  const seconds = videoTotalDuration;
+                  const aspect = videoAspectForAdFormat(adFormat);
+                  void send(
+                    [
+                      `Write ${picks.length} video ad script${picks.length === 1 ? "" : "s"} for ${clientName} — one per reference style below, in this order: ${picks.map((p) => p.name).join(", ")}.`,
+                      `Each script targets ${seconds}s at ${aspect}, ~${paceWordBudget(seconds, speechPace)} words of voiceover at a ${speechPace} pace.`,
+                      "For each: a title line with the style name, the hook (0–2s), the beats with timecodes, the verbatim VO, and the visual direction drawn from that style's transcribed reference.",
+                      "Do not render anything yet — this is script work only.",
+                    ].join("\n"),
+                  );
+                }}
+                avatarName={selectedAvatar?.name || null}
+                onOpenAvatars={() => setAiStudioTab("avatars")}
+                produce={videoIntent === "produce"}
+                onSetProduce={(p) => setVideoIntent(p ? "produce" : "chat")}
+                summary={{
+                  model: VIDEO_MODELS.find((m) => m.value === videoModel)?.label || videoModel || "—",
+                  resolution: videoResolution,
+                  seconds: videoTotalDuration,
+                  cost: videoModel
+                    ? `$${(
+                        modelPricePerSecond(
+                          videoModel,
+                          videoResolution as VideoRes,
+                          VIDEO_MODELS.find((m) => m.value === videoModel)?.pricePerSecond ?? 0.1,
+                        ) * videoTotalDuration
+                      ).toFixed(2)}`
+                    : null,
+                }}
+                hasFirstFrame={!!videoFrames?.firstFrameUrl}
+                referenceCount={(videoFrames?.ingredientUrls || []).length}
+              />
+            )}
+          </div>
         )}
 
 
