@@ -606,11 +606,19 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
               <Textarea rows={5} value={framePrompt} onChange={(e) => setFramePrompt(e.target.value)} />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={generateFrame} disabled={busy === "frame"}>
+              <Button size="sm" onClick={() => runFrameImage("create")} disabled={busy === "frame"}>
                 {busy === "frame" ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="mr-1.5 h-3.5 w-3.5" />}
                 Create frame
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setFramePrompt(buildFirstFramePrompt(draft, clientName))}>
+              <Button variant="outline" size="sm" onClick={() => runFrameImage("edit")} disabled={busy === "frame-edit" || !frame}>
+                {busy === "frame-edit" ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+                Edit chosen frame
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => update({ framePrompt: buildFirstFramePrompt(draft, clientName), framePromptTouched: false })}
+              >
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Rebuild prompt
               </Button>
               <input
