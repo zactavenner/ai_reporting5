@@ -163,7 +163,7 @@ describe("server side generation authority", () => {
     const { draft } = approvedProject();
     const res = authorizeGeneration("p1", draft, {});
     expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.status).toBe(409);
+    expect((res as any).status).toBe(409);
   });
 
   it("refuses when the stored content changed after approval", () => {
@@ -176,7 +176,7 @@ describe("server side generation authority", () => {
     const { draft, approvals } = approvedProject();
     const res = authorizeGeneration("p1", draft, approvals, "deadbeefdeadbeef");
     expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.error).toMatch(/reload/i);
+    expect(String((res as any).error)).toMatch(/reload/i);
   });
 
   it("refuses a frame that is only a temporary browser preview", () => {
