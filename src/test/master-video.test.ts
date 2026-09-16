@@ -4,6 +4,10 @@ import {
   clampRenderSettings,
   composeRenderPrompt,
   costEstimate,
+  estimatedReadSeconds,
+  extractSpokenScript,
+  scriptWordCount,
+  MASTER_VIDEO_MODELS,
   createEmptyDraft,
   frameApprovalHash,
   frameApproved,
@@ -70,15 +74,10 @@ describe("master video defaults and model capabilities", () => {
   });
 
   it("clamps settings onto what the chosen model supports", () => {
-    const d = clampRenderSettings({ ...createEmptyDraft(), model: "bytedance/seedance-2.0", resolution: "1080p", durationSeconds: 30 });
-    expect(d.resolution).toBe("720p");
-    expect(d.durationSeconds).toBe(15);
-  });
-
-  it("estimates cost from the model's per-second list price", () => {
-    const c = costEstimate({ ...createEmptyDraft(), model: "alibaba/wan-3.0", durationSeconds: 30 });
-    expect(c.known).toBe(true);
-    expect(c.usd).toBeCloseTo(1.02, 2);
+    const d = clampRenderSettings({ ...createEmptyDraft(), model: "bytedance/seedance-2.5", resolution: "1080p", durationSeconds: 30 });
+    expect(d.resolution).toBe("720p"); // Seedance 2.5 tops out at 720p
+    const s2 = clampRenderSettings({ ...createEmptyDraft(), model: "bytedance/seedance-2.0", durationSeconds: 30 });
+    expect(s2.durationSeconds).toBe(15); // Seedance 2.0 tops out at 15s
   });
 });
 
@@ -219,5 +218,61 @@ describe("server side generation authority", () => {
     };
     const res = authorizeGeneration("p1", bad, approvals);
     expect(res.ok).toBe(false);
+  });
+});
+
+describe("live provider capabilities and pricing (OpenRouter /v1/videos/models, 2026-09-16)", () => {
+  it("prices Wan per resolution — a 30s 1080p clip is about $6, not $1.43", () => {
+    const d = { ...createEmptyDraft(), resolution: "1080p", durationSeconds: 30 };
+    const c = costEstimate(d);
+    expect(c.known).toBe(true);
+    expect(c.usd).toBe(6);
+    expect(costEstimate({ ...d, resolution: "720p" }).usd).toBe(3);
+    expect(costEstimate({ ...d, resolution: "480p" }).usd).toBe(1.5);
+  });
+
+  it("marks token-billed models as an honest unknown instead of guessing", () => {
+    const d = { ...createEmptyDraft(), model: "bytedance/seedance-2.5", resolution: "720p", durationSeconds: 30 };
+    const c = costEstimate(d);
+    expect(c.known).toBe(false);
+    expect(c.usd).toBeNull();
+    expect(c.note).toMatch(/unknown/i);
+  });
+
+  it("matches the live capability record for each offered model", () => {
+    expect(modelSpec("alibaba/wan-3.0").resolutions).toEqual(["480p", "720p", "1080p"]);
+    expect(modelSpec("minimax/hailuo-3").resolutions).toEqual(["2K"]);
+    expect(modelSpec("bytedance/seedance-2.5").resolutions).toEqual(["480p", "720p"]);
+    for (const m of MASTER_VIDEO_MODELS) {
+      expect(m.supportsFirstFrame).toBe(true);
+      expect(m.aspectRatios).toContain("9:16");
+      expect(Math.max(...m.durations)).toBeLessThanOrEqual(30);
+      for (const r of Object.keys(m.pricePerSecondByResolution)) expect(m.resolutions).toContain(r);
+    }
+  });
+});
+
+describe("spoken words drive the duration", () => {
+  const storyboard = [
+    "SHOT 1 — FRAMING: mid-shot, presenter centred, warm window light.",
+    "[0-3s] slow push in",
+    "VO: Most investors never see this deal flow.",
+    "B-ROLL: skyline drone plate, graded warm.",
+    "Presenter: Here is how the fund actually works. (beat)",
+    "CTA: Book a call today.",
+  ].join("\n");
+
+  it("counts only the spoken lines, not the storyboard prose", () => {
+    expect(extractSpokenScript(storyboard)).toBe(
+      "Most investors never see this deal flow. Here is how the fund actually works. Book a call today.",
+    );
+    expect(scriptWordCount(storyboard)).toBe(18);
+    expect(scriptWordCount(storyboard)).toBeLessThan(
+      storyboard.split(/\s+/).filter((w) => /[a-z0-9']/i.test(w)).length / 2,
+    );
+  });
+
+  it("estimates the read from the spoken words alone", () => {
+    expect(estimatedReadSeconds(storyboard)).toBe(7);
   });
 });
