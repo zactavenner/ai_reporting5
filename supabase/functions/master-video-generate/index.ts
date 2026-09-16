@@ -119,6 +119,10 @@ Deno.serve(async (req) => {
     const { data: existing, error: loadError } = await q.maybeSingle();
     if (loadError) return json({ error: loadError.message }, 500);
 
+    // Echoed back on every reply so the browser can throw away an answer that
+    // belongs to a client or thread it has already navigated away from.
+    const scope = { clientId: scopeClientId, conversationId: scopeConversationId };
+
     if (action === "save") {
       const row = {
         user_id: ownerId,
@@ -129,29 +133,46 @@ Deno.serve(async (req) => {
       };
       if (existing?.id) {
         const { error } = await supa.from("ai_studio_video_projects").update(row).eq("id", existing.id);
-        if (error) return json({ error: error.message }, 500);
-        return json({ ok: true, project: { id: existing.id, draft: row.draft, approvals: row.approvals } });
+        if (error) return json({ error: error.message, scope }, 500);
+        return json({ ok: true, scope, project: { id: existing.id, draft: row.draft, approvals: row.approvals } });
       }
       const { data: created, error } = await supa
         .from("ai_studio_video_projects")
         .insert(row)
         .select("id, draft, approvals")
         .single();
-      if (error) return json({ error: error.message }, 500);
-      return json({ ok: true, project: created });
+      if (error) {
+        // Two tabs (or two queued autosaves) racing the first insert: the unique
+        // scope index makes one of them lose, and it must update instead of
+        // creating a second draft for the same client and thread.
+        if ((error as any).code === "23505") {
+          let q2 = supa.from("ai_studio_video_projects").select("id").eq("user_id", ownerId).limit(1);
+          q2 = scopeClientId ? q2.eq("client_id", scopeClientId) : q2.is("client_id", null);
+          q2 = scopeConversationId ? q2.eq("conversation_id", scopeConversationId) : q2.is("conversation_id", null);
+          const { data: winner } = await q2.maybeSingle();
+          if (winner?.id) {
+            const { error: upErr } = await supa.from("ai_studio_video_projects").update(row).eq("id", winner.id);
+            if (upErr) return json({ error: upErr.message, scope }, 500);
+            return json({ ok: true, scope, project: { id: winner.id, draft: row.draft, approvals: row.approvals } });
+          }
+        }
+        return json({ error: error.message, scope }, 500);
+      }
+      return json({ ok: true, scope, project: created });
     }
 
     let generations: unknown[] = [];
     if (existing?.id) {
-      const { data: gens } = await supa
+      const { data: gens, error: genErr } = await supa
         .from("ai_studio_video_generations")
         .select("id, status, model, resolution, aspect_ratio, duration_seconds, provider_job_id, canvas_item_id, video_url, error, created_at")
         .eq("project_id", existing.id)
         .order("created_at", { ascending: false })
         .limit(20);
+      if (genErr) return json({ error: genErr.message, scope }, 500);
       generations = gens || [];
     }
-    return json({ ok: true, project: existing || null, generations });
+    return json({ ok: true, scope, project: existing || null, generations });
   }
 
   if (!OPENROUTER_API_KEY) return json({ error: "Video generation is not configured on the server." }, 503);
