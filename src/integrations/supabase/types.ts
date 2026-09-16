@@ -3155,6 +3155,89 @@ export type Database = {
           },
         ]
       }
+      ai_studio_video_generations: {
+        Row: {
+          aspect_ratio: string | null
+          canvas_item_id: string | null
+          client_id: string | null
+          conversation_id: string | null
+          created_at: string
+          duration_seconds: number | null
+          error: string | null
+          first_frame_url: string | null
+          id: string
+          idempotency_key: string
+          model: string | null
+          polling_url: string | null
+          project_id: string
+          provider_job_id: string | null
+          resolution: string | null
+          snapshot: Json
+          spoken_script: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          video_prompt: string | null
+          video_url: string | null
+        }
+        Insert: {
+          aspect_ratio?: string | null
+          canvas_item_id?: string | null
+          client_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          error?: string | null
+          first_frame_url?: string | null
+          id?: string
+          idempotency_key: string
+          model?: string | null
+          polling_url?: string | null
+          project_id: string
+          provider_job_id?: string | null
+          resolution?: string | null
+          snapshot?: Json
+          spoken_script?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          video_prompt?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          aspect_ratio?: string | null
+          canvas_item_id?: string | null
+          client_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          error?: string | null
+          first_frame_url?: string | null
+          id?: string
+          idempotency_key?: string
+          model?: string | null
+          polling_url?: string | null
+          project_id?: string
+          provider_job_id?: string | null
+          resolution?: string | null
+          snapshot?: Json
+          spoken_script?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          video_prompt?: string | null
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_studio_video_generations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "ai_studio_video_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_studio_video_model_decision_logs: {
         Row: {
           chosen_model: string | null
@@ -3232,6 +3315,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_studio_video_projects: {
+        Row: {
+          approvals: Json
+          client_id: string | null
+          conversation_id: string | null
+          created_at: string
+          draft: Json
+          id: string
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approvals?: Json
+          client_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          draft?: Json
+          id?: string
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approvals?: Json
+          client_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          draft?: Json
+          id?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       alert_configs: {
         Row: {
