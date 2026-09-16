@@ -63,11 +63,17 @@ export type MasterVideoDraft = {
   /* 4. First frame */
   frames: FrameAsset[];
   selectedFrameId: string | null;
+  /** In-progress frame prompt/model — saved so a reload does not lose the edit. */
+  framePrompt: string;
+  framePromptTouched: boolean;
+  frameImageModel: string | null;
 
   /* 5. Script + video prompt */
   script: string;
   videoPrompt: string;
   disclosure: string;
+  /** Real version history for the words, kept the way frames are kept. */
+  scriptVersions: ScriptVersion[];
 
   /* 6. Render settings */
   model: string;
@@ -75,6 +81,16 @@ export type MasterVideoDraft = {
   aspectRatio: AspectRatio;
   durationSeconds: number;
   audio: boolean;
+};
+
+export type ScriptVersion = {
+  id: string;
+  version: number;
+  script: string;
+  videoPrompt: string;
+  disclosure: string;
+  createdAt: string;
+  note: string;
 };
 
 export type ApprovalRecord = { hash: string; at: string; by: string | null };
