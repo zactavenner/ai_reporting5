@@ -1200,6 +1200,9 @@ export function AIStudioTab({ clientId, clientName }: Props) {
   const [autoConnectedDoc, setAutoConnectedDoc] = useState(false);
   const [autoConnectedSheet, setAutoConnectedSheet] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  // "master" is the six-step approved workflow; "legacy" keeps the old
+  // chat-driven quick line reachable, but only when explicitly chosen.
+  const [videoFlow, setVideoFlow] = useState<"master" | "legacy">("master");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [canvas, setCanvas] = useState<CanvasEntry[]>([]);
   const [canvasView, setCanvasView] = useState<{ zoom: number; panX: number; panY: number } | null>(null);
