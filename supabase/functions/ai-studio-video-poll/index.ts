@@ -11,6 +11,7 @@
 // into the `creatives` bucket, and writes the terminal payload. It is
 // idempotent and safe to run concurrently with the chat worker.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { ledgerPatchForOutcome, type PollOutcome } from "../_shared/masterVideoLedger.ts";
 
 // Sanitized at read time — quotes/whitespace in the stored secret make OpenRouter
 // answer 401 {"message":"User not found."} on the video endpoints.
@@ -74,6 +75,22 @@ Deno.serve(async (req) => {
       .limit(100);
     if (error) throw error;
 
+    /**
+     * Master Video renders also own a row in `ai_studio_video_generations`, and
+     * that row is what the six-step screen reads. Every terminal outcome below
+     * is mirrored onto it, so a finished video never shows as still rendering.
+     */
+    const syncLedger = async (payload: unknown, outcome: PollOutcome) => {
+      const link = ledgerPatchForOutcome(payload, outcome);
+      if (!link) return;
+      const { error: ledgerErr } = await supa
+        .from("ai_studio_video_generations")
+        .update(link.patch)
+        .eq("id", link.generationId);
+      if (ledgerErr) console.error("master video ledger update failed", link.generationId, ledgerErr.message);
+    };
+
+
     for (const row of rows || []) {
       const p: any = row.payload || {};
       if (p?.status !== "processing" || p?.video_url) continue;
@@ -84,11 +101,12 @@ Deno.serve(async (req) => {
 
       if (!pollingUrl) {
         if (ageMs > MAX_AGE_MS) {
+          const lost = `${p.requested_model || p.model || "Video"} render was submitted without a provider handle and cannot be recovered. Re-submit to retry.`;
           await supa.from("ai_studio_canvas_items").update({
             placeholder_until: null,
-            payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true,
-              error: `${p.requested_model || p.model || "Video"} render was submitted without a provider handle and cannot be recovered. Re-submit to retry.` },
+            payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true, error: lost },
           }).eq("id", row.id);
+          await syncLedger(p, { kind: "failed", error: lost });
           result.failed++;
         }
         continue;
@@ -109,11 +127,12 @@ Deno.serve(async (req) => {
         const urls: string[] = pj.unsigned_urls || pj.signed_urls || pj.urls || (pj.video?.url ? [pj.video.url] : []);
         const providerUrl = urls.find((u: unknown) => typeof u === "string" && /^https?:\/\//.test(u));
         if (!providerUrl) {
+          const noFile = "Provider reported completed but returned no video URL. Re-submit to retry.";
           await supa.from("ai_studio_canvas_items").update({
             placeholder_until: null,
-            payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true,
-              error: "Provider reported completed but returned no video URL. Re-submit to retry." },
+            payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true, error: noFile },
           }).eq("id", row.id);
+          await syncLedger(p, { kind: "failed", error: noFile });
           result.failed++;
           continue;
         }
@@ -147,27 +166,30 @@ Deno.serve(async (req) => {
             completed_by: "cron_reaper",
           },
         }).eq("id", row.id);
+        await syncLedger(p, { kind: "completed", videoUrl: storedUrl, storagePath });
         result.completed++;
         continue;
       }
 
       if (status === "failed" || status === "cancelled") {
         const msg = pj?.error?.message || pj?.error || `Provider reported ${status}`;
+        const failure = `${p.requested_model || p.model || "Video"}: ${String(msg).slice(0, 300)}`;
         await supa.from("ai_studio_canvas_items").update({
           placeholder_until: null,
-          payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true,
-            error: `${p.requested_model || p.model || "Video"}: ${String(msg).slice(0, 300)}` },
+          payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true, error: failure },
         }).eq("id", row.id);
+        await syncLedger(p, { kind: "failed", error: failure });
         result.failed++;
         continue;
       }
 
       if (ageMs > MAX_AGE_MS) {
+        const stalled = `${p.requested_model || p.model || "Video"} render is still ${status || "queued"} at the provider after 75 minutes. Re-submit to retry.`;
         await supa.from("ai_studio_canvas_items").update({
           placeholder_until: null,
-          payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true,
-            error: `${p.requested_model || p.model || "Video"} render is still ${status || "queued"} at the provider after 75 minutes. Re-submit to retry.` },
+          payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true, error: stalled },
         }).eq("id", row.id);
+        await syncLedger(p, { kind: "failed", error: stalled });
         result.failed++;
         continue;
       }

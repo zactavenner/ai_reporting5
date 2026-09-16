@@ -63,11 +63,17 @@ export type MasterVideoDraft = {
   /* 4. First frame */
   frames: FrameAsset[];
   selectedFrameId: string | null;
+  /** In-progress frame prompt/model — saved so a reload does not lose the edit. */
+  framePrompt: string;
+  framePromptTouched: boolean;
+  frameImageModel: string | null;
 
   /* 5. Script + video prompt */
   script: string;
   videoPrompt: string;
   disclosure: string;
+  /** Real version history for the words, kept the way frames are kept. */
+  scriptVersions: ScriptVersion[];
 
   /* 6. Render settings */
   model: string;
@@ -75,6 +81,16 @@ export type MasterVideoDraft = {
   aspectRatio: AspectRatio;
   durationSeconds: number;
   audio: boolean;
+};
+
+export type ScriptVersion = {
+  id: string;
+  version: number;
+  script: string;
+  videoPrompt: string;
+  disclosure: string;
+  createdAt: string;
+  note: string;
 };
 
 export type ApprovalRecord = { hash: string; at: string; by: string | null };
@@ -181,9 +197,13 @@ export function createEmptyDraft(): MasterVideoDraft {
     motion: "",
     frames: [],
     selectedFrameId: null,
+    framePrompt: "",
+    framePromptTouched: false,
+    frameImageModel: null,
     script: "",
     videoPrompt: "",
     disclosure: "",
+    scriptVersions: [],
     model: DEFAULT_MASTER_VIDEO_MODEL,
     // Defaults: vertical, the highest resolution this model genuinely serves, ~30s.
     resolution: spec.resolutions[spec.resolutions.length - 1],
@@ -259,6 +279,24 @@ export function frameApprovalHash(draft: MasterVideoDraft): string {
     styleReferenceUrl: draft.styleReferenceUrl,
     styleDirections: norm(draft.styleDirections),
     aspectRatio: draft.aspectRatio,
+    // The frame shows the person, the clothes, the place and the movement, so
+    // editing any of those has to invalidate the approved frame.
+    wardrobe: norm(draft.wardrobe),
+    location: norm(draft.location),
+    motion: norm(draft.motion),
+    // The offer that is being sold shapes the frame brief too.
+    offerId: draft.offerId,
+    offerSnapshot: draft.offerSnapshot
+      ? {
+          id: draft.offerSnapshot.id,
+          name: norm(draft.offerSnapshot.name),
+          audience: norm(draft.offerSnapshot.audience),
+          terms: norm(draft.offerSnapshot.terms),
+          proof: norm(draft.offerSnapshot.proof),
+          sources: (draft.offerSnapshot.sources || []).map(norm),
+        }
+      : null,
+    brief: norm(draft.brief),
   });
 }
 
@@ -276,12 +314,84 @@ export function scriptApprovalHash(draft: MasterVideoDraft): string {
     cta: norm(draft.cta),
     claims: norm(draft.claims),
     offerId: draft.offerId,
+    brief: norm(draft.brief),
+    sourceNotes: norm(draft.sourceNotes),
+    styleId: draft.styleId,
+    styleDirections: norm(draft.styleDirections),
+    presenter: draft.presenter,
+    avatarId: draft.avatarId,
     model: draft.model,
     resolution: draft.resolution,
     aspectRatio: draft.aspectRatio,
     durationSeconds: draft.durationSeconds,
     audio: draft.audio,
   });
+}
+
+/* ----------------------------------------------------- stored draft repair --- */
+
+/**
+ * Rows written before a field existed, or hand-edited JSON, must never crash the
+ * screen or quietly change a hash. Every field falls back to the empty default.
+ */
+export function normalizeStoredDraft(raw: unknown): MasterVideoDraft {
+  const base = createEmptyDraft();
+  if (!raw || typeof raw !== "object") return base;
+  const d = raw as Record<string, unknown>;
+  const str = (k: keyof MasterVideoDraft) => (typeof d[k] === "string" ? (d[k] as string) : (base[k] as string));
+  const out: MasterVideoDraft = {
+    ...base,
+    ...(d as Partial<MasterVideoDraft>),
+    brief: str("brief"),
+    claims: str("claims"),
+    cta: str("cta"),
+    sourceNotes: str("sourceNotes"),
+    styleDirections: str("styleDirections"),
+    avatarDescription: str("avatarDescription"),
+    wardrobe: str("wardrobe"),
+    location: str("location"),
+    motion: str("motion"),
+    framePrompt: str("framePrompt"),
+    framePromptTouched: d.framePromptTouched === true,
+    frameImageModel: typeof d.frameImageModel === "string" ? d.frameImageModel : null,
+    script: str("script"),
+    videoPrompt: str("videoPrompt"),
+    disclosure: str("disclosure"),
+    frames: Array.isArray(d.frames) ? (d.frames as FrameAsset[]) : [],
+    scriptVersions: Array.isArray(d.scriptVersions) ? (d.scriptVersions as ScriptVersion[]) : [],
+    audio: d.audio !== false,
+  };
+  return clampRenderSettings(out);
+}
+
+/** Appends the current words to history without ever dropping an older take. */
+export function pushScriptVersion(draft: MasterVideoDraft, note: string): MasterVideoDraft {
+  const last = draft.scriptVersions[draft.scriptVersions.length - 1];
+  if (
+    last &&
+    norm(last.script) === norm(draft.script) &&
+    norm(last.videoPrompt) === norm(draft.videoPrompt) &&
+    norm(last.disclosure) === norm(draft.disclosure)
+  ) {
+    return draft;
+  }
+  if (!norm(draft.script) && !norm(draft.videoPrompt)) return draft;
+  const version = (last?.version ?? 0) + 1;
+  return {
+    ...draft,
+    scriptVersions: [
+      ...draft.scriptVersions,
+      {
+        id: `sv-${version}-${contentHash({ s: draft.script, p: draft.videoPrompt, d: draft.disclosure })}`,
+        version,
+        script: draft.script,
+        videoPrompt: draft.videoPrompt,
+        disclosure: draft.disclosure,
+        createdAt: new Date().toISOString(),
+        note,
+      },
+    ],
+  };
 }
 
 export function frameApproved(draft: MasterVideoDraft, approvals: MasterVideoApprovals): boolean {
@@ -593,4 +703,114 @@ export function authorizeGeneration(
     prompt: composeRenderPrompt(storedDraft),
     frameUrl: frame.url,
   };
+}
+
+/* -------------------------------------------------- provider request body --- */
+
+/** The provider's own prompt ceiling. Over it we refuse rather than trim. */
+export const PROVIDER_PROMPT_CHAR_LIMIT = 6000;
+
+export type ProviderBodyResult =
+  | { ok: true; body: Record<string, unknown> }
+  | { ok: false; error: string };
+
+/**
+ * Builds the exact request sent to OpenRouter. Nothing is silently corrected
+ * here: an unknown model, an aspect ratio the model does not serve, a duration
+ * or resolution outside its live capability, or a prompt over the provider's
+ * character ceiling all stop the request before any money is spent. Trimming an
+ * approved prompt would mean rendering words nobody approved.
+ */
+export function buildProviderBody(
+  draft: MasterVideoDraft,
+  prompt: string,
+  frameUrl: string,
+): ProviderBodyResult {
+  const spec = MASTER_VIDEO_MODELS.find((m) => m.value === draft.model);
+  if (!spec) return { ok: false, error: `This video asks for a renderer we do not support (${draft.model}).` };
+  if (!spec.aspectRatios.includes(draft.aspectRatio)) {
+    return { ok: false, error: `${spec.label} cannot render ${draft.aspectRatio}. Pick a supported format.` };
+  }
+  if (!spec.resolutions.includes(draft.resolution)) {
+    return { ok: false, error: `${spec.label} cannot render ${draft.resolution}. Pick ${spec.resolutions.join(" or ")}.` };
+  }
+  if (!spec.durations.includes(draft.durationSeconds)) {
+    return {
+      ok: false,
+      error: `${spec.label} cannot render ${draft.durationSeconds}s. Pick ${spec.durations.join(", ")}s.`,
+    };
+  }
+  if (!spec.supportsFirstFrame) {
+    return { ok: false, error: `${spec.label} cannot start from your approved opening frame.` };
+  }
+  if (!/^https?:\/\//.test(frameUrl)) {
+    return { ok: false, error: "The approved opening frame is missing a stored image." };
+  }
+  if (prompt.length > PROVIDER_PROMPT_CHAR_LIMIT) {
+    return {
+      ok: false,
+      error: `The approved script and directions are ${prompt.length} characters, over the ${PROVIDER_PROMPT_CHAR_LIMIT} the renderer accepts. Shorten them and approve again — nothing was sent.`,
+    };
+  }
+  return {
+    ok: true,
+    body: {
+      model: spec.value,
+      prompt,
+      aspect_ratio: draft.aspectRatio,
+      duration: draft.durationSeconds,
+      generate_audio: draft.audio !== false,
+      resolution: draft.resolution,
+      frame_images: [{ type: "image_url", image_url: { url: frameUrl }, frame_type: "first_frame" }],
+    },
+  };
+}
+
+/* ------------------------------------------------------- submit outcomes --- */
+
+/**
+ * `rejected` = the provider answered and refused, so nothing is running and a
+ * fresh paid attempt is safe. `unknown` = we never learned the outcome (network
+ * drop, timeout, unreadable 2xx), so a render may already be running and paid
+ * for; the claim must be kept so no second charge can be authorised until a
+ * person confirms.
+ */
+export type SubmitOutcome = "rejected" | "unknown";
+
+export function classifySubmitFailure(input: {
+  responseStatus?: number | null;
+  responseBodyReadable?: boolean;
+  networkError?: boolean;
+  timedOut?: boolean;
+}): { outcome: SubmitOutcome; status: string; message: string } {
+  const { responseStatus, responseBodyReadable, networkError, timedOut } = input;
+  if (networkError || timedOut || !responseStatus) {
+    return {
+      outcome: "unknown",
+      status: "submission_unknown",
+      message:
+        "We lost contact with the renderer after sending this video, so we cannot tell whether it started. It is being held for review — no new render will be charged until that is settled.",
+    };
+  }
+  if (responseStatus >= 200 && responseStatus < 300 && responseBodyReadable === false) {
+    return {
+      outcome: "unknown",
+      status: "submission_unknown",
+      message:
+        "The renderer accepted this video but its reply could not be read, so it may already be running. It is being held for review — no new render will be charged until that is settled.",
+    };
+  }
+  return {
+    outcome: "rejected",
+    status: "failed",
+    message: `The renderer refused this video (${responseStatus}). Nothing was charged — you can try again.`,
+  };
+}
+
+/** Statuses that must never be auto-resubmitted or auto-retried. */
+export function isTerminalFailure(status: string | null | undefined): boolean {
+  return status === "failed";
+}
+export function needsReconciliation(status: string | null | undefined): boolean {
+  return status === "submission_unknown";
 }

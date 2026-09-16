@@ -6,6 +6,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Download,
   Film,
   ImagePlus,
   Loader2,
@@ -57,15 +58,42 @@ function pill(active: boolean) {
   }`;
 }
 
-async function uploadImage(file: File, folder: string): Promise<string> {
-  const ext = file.name.split(".").pop() || "png";
-  const path = `master-video/${folder}/${crypto.randomUUID()}.${ext}`;
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+/**
+ * Uploads under the client's own folder and refuses anything that is not the
+ * expected kind or is over 50MB, so a wrong file never becomes an approved
+ * asset — and one client's files never land in another client's folder.
+ */
+async function uploadAsset(
+  file: File,
+  folder: string,
+  kind: "image" | "video" | "document",
+  clientId: string | null,
+): Promise<string> {
+  const type = file.type || "";
+  const okType =
+    kind === "image" ? type.startsWith("image/") : kind === "video" ? type.startsWith("video/") : !!type;
+  if (!okType) throw new Error(`That file is not ${kind === "image" ? "an image" : `a ${kind}`}.`);
+  if (file.size > MAX_UPLOAD_BYTES) throw new Error("That file is over the 50MB limit.");
+  const ext = (file.name.split(".").pop() || (kind === "image" ? "png" : "bin")).toLowerCase().slice(0, 8);
+  const path = `master-video/${clientId || "shared"}/${folder}/${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from("creatives").upload(path, file, {
-    contentType: file.type || "image/png",
+    contentType: type || "application/octet-stream",
     upsert: false,
   });
   if (error) throw error;
   return supabase.storage.from("creatives").getPublicUrl(path).data.publicUrl;
+}
+
+/** Plain-language label for a render's state, including the held-for-review one. */
+function renderStatusLabel(status: string): string {
+  if (status === "queued") return "Waiting to start";
+  if (status === "running") return "Rendering";
+  if (status === "completed") return "Ready";
+  if (status === "failed") return "Failed";
+  if (status === "submission_unknown") return "Held for review";
+  return status;
 }
 
 /**
@@ -84,12 +112,17 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
   const { data: avatars = [] } = useAvatars(clientId);
 
   const [step, setStep] = useState<StepKey>("offer");
-  const [framePrompt, setFramePrompt] = useState("");
-  const [frameModel, setFrameModel] = useState<string>(FRAME_IMAGE_MODELS[0].value);
-  const [busy, setBusy] = useState<null | "frame" | "script" | "generate">(null);
+  const [busy, setBusy] = useState<null | "frame" | "frame-edit" | "script" | "generate">(null);
   const frameFile = useRef<HTMLInputElement>(null);
   const avatarFile = useRef<HTMLInputElement>(null);
   const styleFile = useRef<HTMLInputElement>(null);
+  const offerFile = useRef<HTMLInputElement>(null);
+  const scriptFile = useRef<HTMLInputElement>(null);
+  /** The scope this screen is currently showing, so async work that finishes
+   * after a client or thread switch is thrown away instead of written. */
+  const scopeRef = useRef(`${clientId ?? ""}|${conversationId ?? ""}`);
+  scopeRef.current = `${clientId ?? ""}|${conversationId ?? ""}`;
+  const sameScope = (at: string) => scopeRef.current === at;
 
   const statuses = stepStatuses(draft, approvals);
   const statusOf = (key: StepKey) => statuses.find((s) => s.key === key)!;
@@ -102,18 +135,28 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
     [avatars],
   );
 
-  // Seed the frame prompt from the choices already made, once per project load.
+  // The frame prompt and image model live in the saved project, so a reload does
+  // not lose an edit in progress.
+  const framePrompt = draft.framePrompt;
+  const frameModel = draft.frameImageModel || FRAME_IMAGE_MODELS[0].value;
+  const setFramePrompt = (value: string) => update({ framePrompt: value, framePromptTouched: true });
+  const setFrameModel = (value: string) => update({ frameImageModel: value });
+
+  // Auto-seed the frame prompt from the choices already made, and keep it in step
+  // with them until the operator edits it by hand.
+  const seeded = buildFirstFramePrompt(draft, clientName);
   useEffect(() => {
     if (project.loading) return;
-    setFramePrompt((prev) => prev || frame?.prompt || buildFirstFramePrompt(draft, clientName));
+    if (draft.framePromptTouched) return;
+    if (draft.framePrompt === seeded) return;
+    update({ framePrompt: seeded });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project.loading, project.projectId]);
+  }, [project.loading, seeded, draft.framePromptTouched]);
 
   // Reset the local step when the scope changes so no draft state leaks across
   // clients or threads.
   useEffect(() => {
     setStep("offer");
-    setFramePrompt("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, conversationId]);
 
@@ -129,16 +172,31 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
       source,
       createdAt: new Date().toISOString(),
     };
+    // Older versions are kept — choosing a new one never deletes what came before.
     update({ frames: [...draft.frames, asset], selectedFrameId: asset.id });
   };
 
-  const generateFrame = async () => {
+  /**
+   * One image call for both "create a frame" and "edit the frame I chose". The
+   * edit passes the chosen image itself as the reference, so the person, clothes
+   * and place carry over instead of being re-imagined.
+   */
+  const runFrameImage = async (mode: "create" | "edit") => {
     if (!framePrompt.trim()) {
       toast.error("Add a prompt for the opening frame first");
       return;
     }
-    setBusy("frame");
+    if (mode === "edit" && !frame) {
+      toast.error("Choose a frame to edit first");
+      return;
+    }
+    const at = scopeRef.current;
+    setBusy(mode === "edit" ? "frame-edit" : "frame");
     try {
+      const references = [
+        mode === "edit" && frame ? frame.url : null,
+        draft.presenter === "avatar" ? draft.avatarImageUrl : null,
+      ].filter((u): u is string => !!u);
       const { data, error } = await supabase.functions.invoke("generate-static-ad", {
         headers: dashboardAuthHeaders(),
         body: {
@@ -149,15 +207,16 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
           clientId: clientId || "default",
           productDescription: draft.brief || offer?.description || undefined,
           // Keeps the presenter's identity intact while the frame is re-generated.
-          characterImageUrl: draft.presenter === "avatar" ? draft.avatarImageUrl || undefined : undefined,
-          referenceImages: draft.presenter === "avatar" && draft.avatarImageUrl ? [draft.avatarImageUrl] : [],
+          characterImageUrl: references[0] || undefined,
+          referenceImages: references,
         },
       });
       if (error) throw error;
       const url: string | undefined = data?.imageUrl;
       if (!url) throw new Error("No image came back");
+      if (!sameScope(at)) return; // a different client is on screen now
       addFrame(url, "generated", framePrompt.trim(), frameModel);
-      toast.success("New opening frame ready");
+      toast.success(mode === "edit" ? "Edited frame added as a new version" : "New opening frame ready");
     } catch {
       toast.error("Could not create that opening frame — try adjusting the prompt");
     } finally {
@@ -209,18 +268,24 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
 
   /* ------------------------------------------------------- generate ------- */
 
-  const generate = async () => {
-    if (!gate.ok) {
+  const generate = async (retryOfGenerationId?: string) => {
+    if (!retryOfGenerationId && !gate.ok) {
       toast.error(gate.reasons[0]);
       return;
     }
     setBusy("generate");
     try {
-      // Flush the draft so the server reads exactly what is on screen.
-      await project.saveNow();
+      // Flush the draft so the server reads exactly what is on screen. If the save
+      // fails we stop — never pay to render something we could not store.
+      const saved = await project.saveNow();
+      if (!saved.ok) throw new Error(saved.error || "Your changes could not be saved, so nothing was sent.");
       const { data, error } = await supabase.functions.invoke("master-video-generate", {
         headers: dashboardAuthHeaders(),
-        body: { projectId: project.projectId, scriptHash: scriptApprovalHash(draft) },
+        body: {
+          projectId: saved.projectId || project.projectId,
+          scriptHash: scriptApprovalHash(draft),
+          retryOfGenerationId: retryOfGenerationId || undefined,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -304,7 +369,15 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
           );
         })}
         <div className="ml-auto flex shrink-0 items-center gap-2 pr-1 text-[10px] text-muted-foreground">
-          {project.saving ? "Saving…" : "Saved"}
+          {project.saving ? (
+            "Saving…"
+          ) : project.saveError ? (
+            <span className="text-destructive">Not saved — {project.saveError}</span>
+          ) : project.savedAt ? (
+            `Saved ${new Date(project.savedAt).toLocaleTimeString()}`
+          ) : (
+            "No changes yet"
+          )}
         </div>
       </div>
 
@@ -360,6 +433,33 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
             <div className="space-y-1">
               <div className={labelCls}>Sources / references</div>
               <Input value={draft.sourceNotes} onChange={(e) => update({ sourceNotes: e.target.value })} placeholder="Links or documents backing the claims" />
+              <input
+                ref={offerFile}
+                type="file"
+                className="hidden"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  const at = scopeRef.current;
+                  try {
+                    const url = await uploadAsset(f, "sources", "document", clientId);
+                    if (!sameScope(at)) return;
+                    // Attached to this ad only — the saved offer is untouched.
+                    update({
+                      offerSnapshot: draft.offerSnapshot
+                        ? { ...draft.offerSnapshot, sources: [...(draft.offerSnapshot.sources || []), url] }
+                        : draft.offerSnapshot,
+                      sourceNotes: [draft.sourceNotes, url].filter(Boolean).join("\n"),
+                    });
+                    toast.success("Source attached to this ad only");
+                  } catch (err: any) {
+                    toast.error(err?.message || "Could not attach that file");
+                  }
+                }}
+              />
+              <Button variant="outline" size="sm" onClick={() => offerFile.current?.click()}>
+                <Upload className="mr-1.5 h-3.5 w-3.5" /> Attach a source file
+              </Button>
             </div>
           </div>
         </div>
@@ -374,7 +474,18 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
               <button
                 key={p.id}
                 type="button"
-                onClick={() => update({ styleId: p.id, styleLabel: p.name })}
+                onClick={() => {
+                  // Picking a style fills in its full direction, unless the
+                  // operator has written their own directions.
+                  const ownWords =
+                    draft.styleDirections.trim() &&
+                    !VIDEO_STYLE_PRESETS.some((x) => x.promptHint === draft.styleDirections);
+                  update({
+                    styleId: p.id,
+                    styleLabel: p.name,
+                    ...(ownWords ? {} : { styleDirections: p.promptHint }),
+                  });
+                }}
                 className={`group overflow-hidden rounded-xl border text-left transition ${
                   draft.styleId === p.id ? "border-primary ring-2 ring-primary/30" : "border-border/60 hover:border-primary/40"
                 }`}
@@ -404,17 +515,18 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
             <input
               ref={styleFile}
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               className="hidden"
               onChange={async (e) => {
                 const f = e.target.files?.[0];
                 if (!f) return;
                 try {
-                  const url = await uploadImage(f, "style");
+                  const kind = f.type.startsWith("video/") ? "video" : "image";
+                  const url = await uploadAsset(f, "style", kind, clientId);
                   update({ styleReferenceUrl: url, styleLabel: draft.styleLabel || "Uploaded reference" });
                   toast.success("Reference uploaded");
-                } catch {
-                  toast.error("Could not upload that reference");
+                } catch (err: any) {
+                  toast.error(err?.message || "Could not upload that reference");
                 }
               }}
             />
@@ -481,11 +593,11 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
                     const f = e.target.files?.[0];
                     if (!f) return;
                     try {
-                      const url = await uploadImage(f, "presenter");
+                      const url = await uploadAsset(f, "presenter", "image", clientId);
                       update({ avatarId: `upload:${url}`, avatarName: "Uploaded presenter", avatarImageUrl: url });
                       toast.success("Presenter uploaded");
-                    } catch {
-                      toast.error("Could not upload that photo");
+                    } catch (err: any) {
+                      toast.error(err?.message || "Could not upload that photo");
                     }
                   }}
                 />
@@ -547,11 +659,19 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
               <Textarea rows={5} value={framePrompt} onChange={(e) => setFramePrompt(e.target.value)} />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={generateFrame} disabled={busy === "frame"}>
+              <Button size="sm" onClick={() => runFrameImage("create")} disabled={busy === "frame"}>
                 {busy === "frame" ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="mr-1.5 h-3.5 w-3.5" />}
                 Create frame
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setFramePrompt(buildFirstFramePrompt(draft, clientName))}>
+              <Button variant="outline" size="sm" onClick={() => runFrameImage("edit")} disabled={busy === "frame-edit" || !frame}>
+                {busy === "frame-edit" ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+                Edit chosen frame
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => update({ framePrompt: buildFirstFramePrompt(draft, clientName), framePromptTouched: false })}
+              >
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Rebuild prompt
               </Button>
               <input
@@ -563,11 +683,11 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
                   const f = e.target.files?.[0];
                   if (!f) return;
                   try {
-                    const url = await uploadImage(f, "frame");
+                    const url = await uploadAsset(f, "frame", "image", clientId);
                     addFrame(url, "uploaded", framePrompt.trim(), null);
                     toast.success("Frame uploaded");
-                  } catch {
-                    toast.error("Could not upload that image");
+                  } catch (err: any) {
+                    toast.error(err?.message || "Could not upload that image");
                   }
                 }}
               />
@@ -640,6 +760,33 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
               <Button variant="outline" size="sm" onClick={() => update({ videoPrompt: buildVideoPrompt(draft) })}>
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Rebuild directions
               </Button>
+              <input
+                ref={scriptFile}
+                type="file"
+                accept=".txt,.md,text/plain,text/markdown"
+                className="hidden"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  if (f.size > 2 * 1024 * 1024) {
+                    toast.error("That script file is too big — paste the words instead.");
+                    return;
+                  }
+                  const at = scopeRef.current;
+                  try {
+                    const text = (await f.text()).trim();
+                    if (!text) throw new Error("empty");
+                    if (!sameScope(at)) return;
+                    update({ script: text });
+                    toast.success("Script imported — edit it before approving");
+                  } catch {
+                    toast.error("Could not read that file");
+                  }
+                }}
+              />
+              <Button variant="outline" size="sm" onClick={() => scriptFile.current?.click()}>
+                <Upload className="mr-1.5 h-3.5 w-3.5" /> Import a script
+              </Button>
               <span className="text-[11px] text-muted-foreground">
                 {scriptWordCount(draft.script)} words · about {estimatedReadSeconds(draft.script)}s to read · render is {draft.durationSeconds}s
               </span>
@@ -694,8 +841,36 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
             {scriptApprovalStale(draft, approvals) && (
               <p className="flex items-start gap-1.5 text-[11px] text-amber-600">
                 <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                Something changed after you approved. Read it once more and approve again — the old version is kept.
+                Something changed after you approved. Read it once more and approve again — earlier versions are kept
+                below.
               </p>
+            )}
+            {draft.scriptVersions.length > 0 && (
+              <div className="space-y-1">
+                <div className={labelCls}>Earlier versions</div>
+                <div className="max-h-40 space-y-1 overflow-auto">
+                  {[...draft.scriptVersions]
+                    .slice()
+                    .reverse()
+                    .map((v) => (
+                      <div key={v.id} className="rounded-lg border border-border/60 p-1.5 text-[10px]">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">Version {v.version}</span>
+                          <button
+                            type="button"
+                            className="underline"
+                            onClick={() =>
+                              update({ script: v.script, videoPrompt: v.videoPrompt, disclosure: v.disclosure })
+                            }
+                          >
+                            Bring back
+                          </button>
+                        </div>
+                        <div className="truncate text-muted-foreground">{v.script}</div>
+                      </div>
+                    ))}
+                </div>
+              </div>
             )}
             {statusOf("script").reason && !scriptApprovalStale(draft, approvals) && (
               <p className="text-[11px] text-muted-foreground">{statusOf("script").reason}</p>
@@ -737,7 +912,7 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
               </ul>
             )}
             <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={generate} disabled={!gate.ok || busy === "generate" || !project.projectId}>
+              <Button onClick={() => generate()} disabled={!gate.ok || busy === "generate" || !project.projectId}>
                 {busy === "generate" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Film className="mr-1.5 h-4 w-4" />}
                 Generate video
               </Button>
@@ -760,7 +935,7 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
               project.generations.map((g) => (
                 <div key={g.id} className="rounded-xl border border-border/60 p-2 text-[11px]">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium capitalize">{g.status}</span>
+                    <span className="font-medium">{renderStatusLabel(g.status)}</span>
                     <span className="text-muted-foreground">{new Date(g.created_at).toLocaleString()}</span>
                   </div>
                   <div className="text-muted-foreground">
@@ -768,16 +943,51 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
                   </div>
                   {g.error && <div className="mt-1 text-amber-600">{g.error}</div>}
                   {g.video_url && (
-                    <video src={g.video_url} controls className="mt-1.5 w-full rounded-lg" />
+                    <>
+                      <video src={g.video_url} controls className="mt-1.5 w-full rounded-lg" />
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <a href={g.video_url} download target="_blank" rel="noreferrer">
+                          <Button variant="outline" size="sm">
+                            <Download className="mr-1.5 h-3.5 w-3.5" /> Download
+                          </Button>
+                        </a>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(g.video_url as string);
+                            toast.success("Link copied — paste it into captions or editing");
+                          }}
+                        >
+                          Copy link
+                        </Button>
+                      </div>
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        This is the untouched render. Captions or trims are made afterwards and saved separately, so
+                        this clean version stays as it is.
+                      </p>
+                    </>
                   )}
                   {!g.video_url && (g.status === "running" || g.status === "queued") && (
                     <div className="mt-1 text-muted-foreground">
                       Rendering — it finishes on the server, so you can close this.
                     </div>
                   )}
+                  {g.status === "submission_unknown" && (
+                    <div className="mt-1 text-amber-600">
+                      We could not confirm whether this reached the renderer, so it is held. It may already have been
+                      charged — check the Renders list again before starting another.
+                    </div>
+                  )}
                   {g.status === "failed" && (
-                    <Button variant="outline" size="sm" className="mt-1.5 w-full" onClick={generate} disabled={busy === "generate"}>
-                      Try this render again
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-1.5 w-full"
+                      onClick={() => generate(g.id)}
+                      disabled={busy === "generate"}
+                    >
+                      Try this exact version again
                     </Button>
                   )}
                 </div>
