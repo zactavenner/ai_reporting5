@@ -40,7 +40,7 @@ export function buildFirstFramePrompt(draft: MasterVideoDraft, clientName?: stri
   if (draft.offerSnapshot?.name) bits.push(`Context: an ad for ${draft.offerSnapshot.name}${clientName ? ` (${clientName})` : ""}.`);
   // Say the truth about the shape: a 16:9 frame described as "vertical" makes the
   // image model compose for the wrong crop.
-  const orientation = draft.aspectRatio === "9:16" || draft.aspectRatio === "3:4" ? "Vertical" : draft.aspectRatio === "1:1" ? "Square" : "Landscape";
+  const orientation = draft.aspectRatio === "9:16" ? "Vertical" : "Landscape";
   bits.push(`${orientation} framing for ${draft.aspectRatio}, natural lighting, shallow depth of field, shot on a cinema camera.`);
   bits.push("No text, no lettering, no captions, no logos, no watermarks anywhere in the image.");
   return bits.join(" ");
