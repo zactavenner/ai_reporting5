@@ -179,6 +179,7 @@ Deno.serve(async (req) => {
 
   const projectId = String(body.projectId || "");
   const echoedHash = body.scriptHash ? String(body.scriptHash) : null;
+  const retryOf = body.retryOfGenerationId ? String(body.retryOfGenerationId) : null;
   if (!projectId) return json({ error: "projectId is required" }, 400);
 
 
@@ -194,9 +195,47 @@ Deno.serve(async (req) => {
   if (project.user_id && project.user_id !== ownerId && caller.via === "dashboard") {
     return json({ error: "This video project belongs to another operator." }, 403);
   }
+  // The screen must be pointed at the same client and thread as the stored
+  // draft, so a scope switch mid-flight can never spend against the wrong one.
+  if (scopeClientId && (project.client_id || null) !== scopeClientId) {
+    return json({ error: "This screen is on a different client than the saved video. Reload and try again." }, 409);
+  }
+  if (scopeConversationId && (project.conversation_id || null) !== scopeConversationId) {
+    return json({ error: "This screen is on a different thread than the saved video. Reload and try again." }, 409);
+  }
 
-  const draft = (project.draft || {}) as MasterVideoDraft;
-  const approvals = (project.approvals || {}) as MasterVideoApprovals;
+  let draft = normalizeStoredDraft(project.draft);
+  let approvals = (project.approvals || {}) as MasterVideoApprovals;
+  let retriedRow: any = null;
+
+  // An explicit retry renders the EXACT snapshot that failed, never whatever the
+  // draft has been edited into since.
+  if (retryOf) {
+    const { data: prior, error: priorErr } = await supa
+      .from("ai_studio_video_generations")
+      .select("id, project_id, status, snapshot, idempotency_key")
+      .eq("id", retryOf)
+      .maybeSingle();
+    if (priorErr) return json({ error: priorErr.message }, 500);
+    if (!prior || prior.project_id !== projectId) {
+      return json({ error: "That earlier render does not belong to this video." }, 404);
+    }
+    if (!isTerminalFailure(prior.status)) {
+      return json(
+        {
+          error:
+            prior.status === "submission_unknown"
+              ? "That render's outcome is still unknown, so a new paid attempt is not allowed until it is checked."
+              : `That render is ${prior.status}, so there is nothing to retry.`,
+        },
+        409,
+      );
+    }
+    const snap = (prior.snapshot || {}) as any;
+    draft = normalizeStoredDraft(snap.draft);
+    approvals = (snap.approvals || {}) as MasterVideoApprovals;
+    retriedRow = prior;
+  }
 
   // The gate: approvals must exist, match the CURRENT stored content, and the
   // client's echoed hash must agree with the server's.
