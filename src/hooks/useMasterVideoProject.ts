@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { dashboardAuthHeaders, normalizeDashboardError } from "@/lib/dashboardAuthHeaders";
 import {
   createEmptyDraft,
   clampRenderSettings,
