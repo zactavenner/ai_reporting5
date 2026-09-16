@@ -44,9 +44,11 @@ function tableApi(name: string) {
   return api;
 }
 
+// The real portal session: NO Supabase auth user, identity comes from the
+// stored agency member id + dashboard token. This is what the QA blocker was.
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    auth: { getUser: async () => ({ data: { user: { id: "user-1" } } }) },
+    auth: { getUser: async () => ({ data: { user: null } }) },
     from: (name: string) => tableApi(name),
     functions: { invoke: (...args: any[]) => invoke(...args) },
     storage: {
@@ -89,7 +91,7 @@ function seedProject(over: Partial<any> = {}) {
     cta: "Book a call",
     styleId: "lakeside",
     styleLabel: "Lakeside",
-    presenter: "avatar",
+    presenter: "avatar" as const,
     avatarId: "avatar-1",
     avatarName: "Dana",
     avatarImageUrl: "https://cdn.example.com/dana.png",
@@ -100,7 +102,7 @@ function seedProject(over: Partial<any> = {}) {
         version: 1,
         prompt: "Opening frame",
         imageModel: "openai",
-        source: "generated",
+        source: "generated" as const,
         createdAt: "2026-01-01T00:00:00.000Z",
       },
     ],
@@ -124,16 +126,71 @@ function seedProject(over: Partial<any> = {}) {
 const mount = () =>
   render(<MasterVideoWorkflow clientId="client-1" clientName="Acme Capital" conversationId="conv-1" />);
 
+/** Responses the fake edge route gives for a `generate` call. */
+let generateResponse: any = { ok: true, duplicate: false, generation: { id: "g1", status: "running" } };
+
+/** Stands in for the guarded `master-video-generate` route (load / save / generate). */
+function fakeEdgeRoute(_name: string, opts: any) {
+  const b = opts?.body || {};
+  const owner = localStorage.getItem("team_member_id");
+  if (!owner) return Promise.resolve({ data: { error: "Unauthorized" }, error: null });
+  const match = () =>
+    db.projects.find(
+      (p) =>
+        p.user_id === owner &&
+        (p.client_id ?? null) === (b.clientId ?? null) &&
+        (p.conversation_id ?? null) === (b.conversationId ?? null),
+    ) || null;
+
+  if (b.action === "load") {
+    const project = match();
+    return Promise.resolve({
+      data: {
+        ok: true,
+        project,
+        generations: project ? db.generations.filter((g) => g.project_id === project.id) : [],
+      },
+      error: null,
+    });
+  }
+  if (b.action === "save") {
+    const existing = match();
+    if (existing) {
+      existing.draft = b.draft;
+      existing.approvals = b.approvals;
+      return Promise.resolve({ data: { ok: true, project: existing }, error: null });
+    }
+    const created = {
+      id: `project-new-${db.projects.length + 1}`,
+      user_id: owner,
+      client_id: b.clientId ?? null,
+      conversation_id: b.conversationId ?? null,
+      draft: b.draft,
+      approvals: b.approvals,
+    };
+    db.projects.push(created);
+    return Promise.resolve({ data: { ok: true, project: created }, error: null });
+  }
+  return Promise.resolve({ data: generateResponse, error: null });
+}
+
 beforeEach(() => {
   cleanup();
   db.projects = [];
   db.generations = [];
+  localStorage.clear();
+  localStorage.setItem("team_member_id", "user-1");
+  generateResponse = { ok: true, duplicate: false, generation: { id: "g1", status: "running" } };
   invoke.mockReset();
-  invoke.mockResolvedValue({ data: { ok: true, duplicate: false, generation: { id: "g1", status: "running" } }, error: null });
+  invoke.mockImplementation(fakeEdgeRoute);
   toasts.length = 0;
 });
 
 /* ------------------------------------------------------------------ tests --- */
+
+/** Only the paid-render calls, ignoring load/save traffic. */
+const generateCalls = () =>
+  invoke.mock.calls.filter(([, opts]: any[]) => !["load", "save"].includes(String(opts?.body?.action || "generate")));
 
 describe("Master AI Video workflow UI", () => {
   it("shows all six steps and resumes the saved project", async () => {
@@ -163,11 +220,11 @@ describe("Master AI Video workflow UI", () => {
     seedProject();
     const user = userEvent.setup();
     mount();
-    await user.click(await screen.findByRole("button", { name: /^Generate$/i }));
+    await user.click(await screen.findByRole("button", { name: /Generate$/i }));
     const generateBtn = await screen.findByRole("button", { name: /Generate video/i });
     expect(generateBtn).toBeDisabled();
     expect(await screen.findByText(/Approve the frame you picked/i)).toBeInTheDocument();
-    expect(invoke).not.toHaveBeenCalled();
+    expect(generateCalls()).toHaveLength(0);
   });
 
   it("grants a render only after both approvals, sending the exact project and approved hash", async () => {
@@ -182,8 +239,8 @@ describe("Master AI Video workflow UI", () => {
     const generateBtn = await screen.findByRole("button", { name: /Generate video/i });
     expect(generateBtn).toBeEnabled();
     await user.click(generateBtn);
-    await waitFor(() => expect(invoke).toHaveBeenCalled());
-    const [fnName, options] = invoke.mock.calls[0];
+    await waitFor(() => expect(generateCalls()).toHaveLength(1));
+    const [fnName, options] = generateCalls()[0];
     expect(fnName).toBe("master-video-generate");
     expect(options.body.projectId).toBe("project-1");
     expect(options.body.scriptHash).toBe(scriptApprovalHash(row.draft));
@@ -195,7 +252,7 @@ describe("Master AI Video workflow UI", () => {
       frame: { hash: frameApprovalHash(row.draft), at: "", by: "user-1" },
       script: { hash: scriptApprovalHash(row.draft), at: "", by: "user-1" },
     };
-    invoke.mockResolvedValue({ data: { ok: true, duplicate: true, generation: { id: "g1", status: "running" } }, error: null });
+    generateResponse = { ok: true, duplicate: true, generation: { id: "g1", status: "running" } };
     const user = userEvent.setup();
     mount();
     await user.click(await screen.findByRole("button", { name: /^Generate$/i }));
@@ -238,7 +295,7 @@ describe("Master AI Video workflow UI", () => {
     // Edit the call to action on step 1 — that is part of the approved contract.
     const cta = await screen.findByDisplayValue("Book a call");
     await user.type(cta, " today");
-    await user.click(await screen.findByRole("button", { name: /^Generate$/i }));
+    await user.click(await screen.findByRole("button", { name: /Generate$/i }));
     expect(await screen.findByText(/approve again|Approve the script/i)).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /Generate video/i })).toBeDisabled();
   });
@@ -257,5 +314,12 @@ describe("Master AI Video workflow UI", () => {
     expect(await screen.findByDisplayValue("Other client CTA")).toBeInTheDocument();
     expect(screen.queryByDisplayValue("Book a call")).not.toBeInTheDocument();
     view.unmount();
+  });
+
+  it("shows a readable message instead of an endless spinner when there is no session", async () => {
+    localStorage.clear();
+    mount();
+    expect(await screen.findByText(/Master video could not open/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Loading your video project/i)).not.toBeInTheDocument();
   });
 });

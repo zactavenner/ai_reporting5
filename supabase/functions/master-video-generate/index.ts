@@ -18,6 +18,7 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { authorizeGenerationCaller } from "../_shared/generationAuth.ts";
+import { readDashboardToken, verifyDashboardToken } from "../_shared/dashboardToken.ts";
 import {
   authorizeGeneration,
   modelSpec,
@@ -62,6 +63,36 @@ function buildProviderBody(draft: MasterVideoDraft, prompt: string, frameUrl: st
   return body;
 }
 
+/**
+ * Whose draft is this?
+ *
+ * Reporting's operator UI signs in through the password portal, which mints an
+ * HMAC dashboard token and an `agency_members` row — there is often NO Supabase
+ * auth user at all. `ai-studio` resolves identity exactly this way (auth uid
+ * first, then the verified dashboard member), and the Master Video routes must
+ * match it or the portal sees an endless spinner.
+ */
+async function resolveOwnerId(req: Request, body: any, supa: any): Promise<string | null> {
+  const dashboardToken = readDashboardToken(req, body);
+  if (dashboardToken) {
+    const member = await verifyDashboardToken(dashboardToken);
+    if (member?.id) return member.id;
+  }
+  const authHeader = req.headers.get("Authorization") || "";
+  if (authHeader.startsWith("Bearer ")) {
+    try {
+      const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data } = await userClient.auth.getUser();
+      if (data.user?.id) return data.user.id;
+    } catch { /* not a user JWT — fall through */ }
+  }
+  // Internal server-to-server pipelines act for an explicit owner.
+  if (typeof body?.internalUserId === "string" && body.internalUserId) return body.internalUserId;
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -76,17 +107,77 @@ Deno.serve(async (req) => {
   const caller = await authorizeGenerationCaller(req, body);
   if (!caller.ok) return json({ error: caller.error }, 401);
 
+  const supa = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
+
+  const ownerId = await resolveOwnerId(req, body, supa);
+  if (!ownerId) {
+    return json({ error: "We could not identify your dashboard session. Please sign in again." }, 401);
+  }
+
+  const action = String(body.action || "generate");
+  const scopeClientId = body.clientId ? String(body.clientId) : null;
+  const scopeConversationId = body.conversationId ? String(body.conversationId) : null;
+
+  /* ------------------------------------------------- load / save the draft --- */
+  // Reads and writes go through the service role behind this identity check, so
+  // the tables stay closed to the anon/authenticated roles: the portal never
+  // needs a Supabase auth user, and nobody can read another operator's draft.
+  if (action === "load" || action === "save") {
+    let q = supa
+      .from("ai_studio_video_projects")
+      .select("id, draft, approvals")
+      .eq("user_id", ownerId)
+      .limit(1);
+    q = scopeClientId ? q.eq("client_id", scopeClientId) : q.is("client_id", null);
+    q = scopeConversationId ? q.eq("conversation_id", scopeConversationId) : q.is("conversation_id", null);
+    const { data: existing, error: loadError } = await q.maybeSingle();
+    if (loadError) return json({ error: loadError.message }, 500);
+
+    if (action === "save") {
+      const row = {
+        user_id: ownerId,
+        client_id: scopeClientId,
+        conversation_id: scopeConversationId,
+        draft: body.draft ?? {},
+        approvals: body.approvals ?? {},
+      };
+      if (existing?.id) {
+        const { error } = await supa.from("ai_studio_video_projects").update(row).eq("id", existing.id);
+        if (error) return json({ error: error.message }, 500);
+        return json({ ok: true, project: { id: existing.id, draft: row.draft, approvals: row.approvals } });
+      }
+      const { data: created, error } = await supa
+        .from("ai_studio_video_projects")
+        .insert(row)
+        .select("id, draft, approvals")
+        .single();
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true, project: created });
+    }
+
+    let generations: unknown[] = [];
+    if (existing?.id) {
+      const { data: gens } = await supa
+        .from("ai_studio_video_generations")
+        .select("id, status, model, resolution, aspect_ratio, duration_seconds, provider_job_id, canvas_item_id, video_url, error, created_at")
+        .eq("project_id", existing.id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      generations = gens || [];
+    }
+    return json({ ok: true, project: existing || null, generations });
+  }
+
   if (!OPENROUTER_API_KEY) return json({ error: "Video generation is not configured on the server." }, 503);
 
   const projectId = String(body.projectId || "");
   const echoedHash = body.scriptHash ? String(body.scriptHash) : null;
   if (!projectId) return json({ error: "projectId is required" }, 400);
 
-  const supa = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    { auth: { persistSession: false } },
-  );
 
   const { data: project, error: projectError } = await supa
     .from("ai_studio_video_projects")
@@ -95,6 +186,11 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (projectError) return json({ error: projectError.message }, 500);
   if (!project) return json({ error: "This video project no longer exists." }, 404);
+  // Only the operator who owns the draft (or an internal pipeline acting for
+  // them) may spend on it.
+  if (project.user_id && project.user_id !== ownerId && caller.via === "dashboard") {
+    return json({ error: "This video project belongs to another operator." }, 403);
+  }
 
   const draft = (project.draft || {}) as MasterVideoDraft;
   const approvals = (project.approvals || {}) as MasterVideoApprovals;
