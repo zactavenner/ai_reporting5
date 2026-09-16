@@ -432,7 +432,18 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
               <button
                 key={p.id}
                 type="button"
-                onClick={() => update({ styleId: p.id, styleLabel: p.name })}
+                onClick={() => {
+                  // Picking a style fills in its full direction, unless the
+                  // operator has written their own directions.
+                  const ownWords =
+                    draft.styleDirections.trim() &&
+                    !VIDEO_STYLE_PRESETS.some((x) => x.promptHint === draft.styleDirections);
+                  update({
+                    styleId: p.id,
+                    styleLabel: p.name,
+                    ...(ownWords ? {} : { styleDirections: p.promptHint }),
+                  });
+                }}
                 className={`group overflow-hidden rounded-xl border text-left transition ${
                   draft.styleId === p.id ? "border-primary ring-2 ring-primary/30" : "border-border/60 hover:border-primary/40"
                 }`}
