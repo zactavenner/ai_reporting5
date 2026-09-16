@@ -44,9 +44,11 @@ function tableApi(name: string) {
   return api;
 }
 
+// The real portal session: NO Supabase auth user, identity comes from the
+// stored agency member id + dashboard token. This is what the QA blocker was.
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    auth: { getUser: async () => ({ data: { user: { id: "user-1" } } }) },
+    auth: { getUser: async () => ({ data: { user: null } }) },
     from: (name: string) => tableApi(name),
     functions: { invoke: (...args: any[]) => invoke(...args) },
     storage: {
