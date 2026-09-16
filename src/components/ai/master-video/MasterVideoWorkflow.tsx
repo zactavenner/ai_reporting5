@@ -268,6 +268,11 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
 
   return (
     <div className="space-y-3">
+      {project.loadError && (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          {project.loadError}
+        </div>
+      )}
       {/* Compact stage rail */}
       <div className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-border/60 bg-muted/20 p-1.5">
         {MASTER_VIDEO_STEPS.map((s, i) => {

@@ -25,3 +25,10 @@
 ## Remaining (blocked / next)
 - [ ] Pilot re-enable of ONE client per the checklist in `docs/meetgeek-end-to-end-verification.md` — needs operator go-ahead.
 - [ ] Earlier calendar mirror / phone-coverage tasks.
+
+# Master AI Video (AI Studio)
+- [x] Six-step workflow, approval gates, guarded render route, contract tests.
+- [x] QA blocker: portal (password/name) sessions have no Supabase auth user →
+      identity now resolves auth uid → verified dashboard member; draft load/save
+      goes through the guarded edge route; errors are visible, never a spinner.
+- [ ] Verify through a real dashboard sign-in in the preview (needs the dashboard password).
