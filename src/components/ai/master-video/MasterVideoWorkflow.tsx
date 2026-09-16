@@ -267,18 +267,24 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
 
   /* ------------------------------------------------------- generate ------- */
 
-  const generate = async () => {
-    if (!gate.ok) {
+  const generate = async (retryOfGenerationId?: string) => {
+    if (!retryOfGenerationId && !gate.ok) {
       toast.error(gate.reasons[0]);
       return;
     }
     setBusy("generate");
     try {
-      // Flush the draft so the server reads exactly what is on screen.
-      await project.saveNow();
+      // Flush the draft so the server reads exactly what is on screen. If the save
+      // fails we stop — never pay to render something we could not store.
+      const saved = await project.saveNow();
+      if (!saved.ok) throw new Error(saved.error || "Your changes could not be saved, so nothing was sent.");
       const { data, error } = await supabase.functions.invoke("master-video-generate", {
         headers: dashboardAuthHeaders(),
-        body: { projectId: project.projectId, scriptHash: scriptApprovalHash(draft) },
+        body: {
+          projectId: saved.projectId || project.projectId,
+          scriptHash: scriptApprovalHash(draft),
+          retryOfGenerationId: retryOfGenerationId || undefined,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
