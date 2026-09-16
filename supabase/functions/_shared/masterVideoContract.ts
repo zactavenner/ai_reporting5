@@ -704,3 +704,113 @@ export function authorizeGeneration(
     frameUrl: frame.url,
   };
 }
+
+/* -------------------------------------------------- provider request body --- */
+
+/** The provider's own prompt ceiling. Over it we refuse rather than trim. */
+export const PROVIDER_PROMPT_CHAR_LIMIT = 6000;
+
+export type ProviderBodyResult =
+  | { ok: true; body: Record<string, unknown> }
+  | { ok: false; error: string };
+
+/**
+ * Builds the exact request sent to OpenRouter. Nothing is silently corrected
+ * here: an unknown model, an aspect ratio the model does not serve, a duration
+ * or resolution outside its live capability, or a prompt over the provider's
+ * character ceiling all stop the request before any money is spent. Trimming an
+ * approved prompt would mean rendering words nobody approved.
+ */
+export function buildProviderBody(
+  draft: MasterVideoDraft,
+  prompt: string,
+  frameUrl: string,
+): ProviderBodyResult {
+  const spec = MASTER_VIDEO_MODELS.find((m) => m.value === draft.model);
+  if (!spec) return { ok: false, error: `This video asks for a renderer we do not support (${draft.model}).` };
+  if (!spec.aspectRatios.includes(draft.aspectRatio)) {
+    return { ok: false, error: `${spec.label} cannot render ${draft.aspectRatio}. Pick a supported format.` };
+  }
+  if (!spec.resolutions.includes(draft.resolution)) {
+    return { ok: false, error: `${spec.label} cannot render ${draft.resolution}. Pick ${spec.resolutions.join(" or ")}.` };
+  }
+  if (!spec.durations.includes(draft.durationSeconds)) {
+    return {
+      ok: false,
+      error: `${spec.label} cannot render ${draft.durationSeconds}s. Pick ${spec.durations.join(", ")}s.`,
+    };
+  }
+  if (!spec.supportsFirstFrame) {
+    return { ok: false, error: `${spec.label} cannot start from your approved opening frame.` };
+  }
+  if (!/^https?:\/\//.test(frameUrl)) {
+    return { ok: false, error: "The approved opening frame is missing a stored image." };
+  }
+  if (prompt.length > PROVIDER_PROMPT_CHAR_LIMIT) {
+    return {
+      ok: false,
+      error: `The approved script and directions are ${prompt.length} characters, over the ${PROVIDER_PROMPT_CHAR_LIMIT} the renderer accepts. Shorten them and approve again — nothing was sent.`,
+    };
+  }
+  return {
+    ok: true,
+    body: {
+      model: spec.value,
+      prompt,
+      aspect_ratio: draft.aspectRatio,
+      duration: draft.durationSeconds,
+      generate_audio: draft.audio !== false,
+      resolution: draft.resolution,
+      frame_images: [{ type: "image_url", image_url: { url: frameUrl }, frame_type: "first_frame" }],
+    },
+  };
+}
+
+/* ------------------------------------------------------- submit outcomes --- */
+
+/**
+ * `rejected` = the provider answered and refused, so nothing is running and a
+ * fresh paid attempt is safe. `unknown` = we never learned the outcome (network
+ * drop, timeout, unreadable 2xx), so a render may already be running and paid
+ * for; the claim must be kept so no second charge can be authorised until a
+ * person confirms.
+ */
+export type SubmitOutcome = "rejected" | "unknown";
+
+export function classifySubmitFailure(input: {
+  responseStatus?: number | null;
+  responseBodyReadable?: boolean;
+  networkError?: boolean;
+  timedOut?: boolean;
+}): { outcome: SubmitOutcome; status: string; message: string } {
+  const { responseStatus, responseBodyReadable, networkError, timedOut } = input;
+  if (networkError || timedOut || !responseStatus) {
+    return {
+      outcome: "unknown",
+      status: "submission_unknown",
+      message:
+        "We lost contact with the renderer after sending this video, so we cannot tell whether it started. It is being held for review — no new render will be charged until that is settled.",
+    };
+  }
+  if (responseStatus >= 200 && responseStatus < 300 && responseBodyReadable === false) {
+    return {
+      outcome: "unknown",
+      status: "submission_unknown",
+      message:
+        "The renderer accepted this video but its reply could not be read, so it may already be running. It is being held for review — no new render will be charged until that is settled.",
+    };
+  }
+  return {
+    outcome: "rejected",
+    status: "failed",
+    message: `The renderer refused this video (${responseStatus}). Nothing was charged — you can try again.`,
+  };
+}
+
+/** Statuses that must never be auto-resubmitted or auto-retried. */
+export function isTerminalFailure(status: string | null | undefined): boolean {
+  return status === "failed";
+}
+export function needsReconciliation(status: string | null | undefined): boolean {
+  return status === "submission_unknown";
+}
