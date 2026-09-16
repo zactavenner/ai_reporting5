@@ -41,24 +41,69 @@ export function useMasterVideoProject(clientId: string | null, conversationId: s
   const [generations, setGenerations] = useState<MasterVideoGeneration[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const scope: Scope = useMemo(
     () => ({ userId, clientId: clientId || null, conversationId: conversationId || null }),
     [userId, clientId, conversationId],
   );
-  const scopeKey = `${scope.userId ?? ""}|${scope.clientId ?? ""}|${scope.conversationId ?? ""}`;
+  const scopeKey = `${scope.clientId ?? ""}|${scope.conversationId ?? ""}`;
   const loadedScopeRef = useRef<string>("");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /* --------------------------------------------------------- identity ----- */
+  // Reporting signs operators in through the password portal, which stores an
+  // agency member id + HMAC dashboard token — most sessions have NO Supabase
+  // auth user. Resolve both, in the same order the backend does, and never
+  // block the UI on a Supabase user that will not exist.
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+    let cancelled = false;
+    (async () => {
+      let resolved: string | null = null;
+      try {
+        const { data } = await supabase.auth.getUser();
+        resolved = data.user?.id ?? null;
+      } catch {
+        /* no Supabase session — expected on the portal */
+      }
+      if (!resolved) {
+        try {
+          resolved = localStorage.getItem("team_member_id");
+        } catch {
+          resolved = null;
+        }
+      }
+      if (cancelled) return;
+      setUserId(resolved);
+      if (!resolved) {
+        // Visible, actionable state instead of an endless spinner.
+        setLoading(false);
+        setLoadError("We could not read your dashboard session. Please sign in again to use Master video.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  /** All reads/writes go through the guarded edge route (service role behind an
+   * identity check), so the tables stay closed to browser roles. */
+  const call = useCallback(async (payload: Record<string, unknown>) => {
+    const { data, error } = await supabase.functions.invoke("master-video-generate", {
+      body: { clientId: clientId || null, conversationId: conversationId || null, ...payload },
+      headers: dashboardAuthHeaders(),
+    });
+    if (error) throw await normalizeDashboardError(error);
+    if ((data as any)?.error) throw new Error(String((data as any).error));
+    return data as any;
+  }, [clientId, conversationId]);
 
   /* ------------------------------------------------------------- load ----- */
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
     setLoading(true);
+    setLoadError(null);
     // Reset first so a slow load can never show the previous client's draft.
     setProjectId(null);
     setDraft(createEmptyDraft());
@@ -66,31 +111,23 @@ export function useMasterVideoProject(clientId: string | null, conversationId: s
     setGenerations([]);
 
     (async () => {
-      let q = supabase
-        .from("ai_studio_video_projects")
-        .select("id, draft, approvals")
-        .eq("user_id", userId)
-        .limit(1);
-      q = clientId ? q.eq("client_id", clientId) : q.is("client_id", null);
-      q = conversationId ? q.eq("conversation_id", conversationId) : q.is("conversation_id", null);
-      const { data, error } = await q.maybeSingle();
-      if (cancelled) return;
-      if (error) {
-        console.error("master video load failed", error);
-      } else if (data) {
-        setProjectId(data.id);
-        setDraft(clampRenderSettings({ ...createEmptyDraft(), ...((data.draft as any) || {}) }));
-        setApprovals(((data.approvals as any) || {}) as MasterVideoApprovals);
-        const { data: gens } = await supabase
-          .from("ai_studio_video_generations")
-          .select("id, status, model, resolution, aspect_ratio, duration_seconds, provider_job_id, canvas_item_id, video_url, error, created_at")
-          .eq("project_id", data.id)
-          .order("created_at", { ascending: false })
-          .limit(20);
-        if (!cancelled && gens) setGenerations(gens as MasterVideoGeneration[]);
+      try {
+        const res = await call({ action: "load" });
+        if (cancelled) return;
+        if (res?.project) {
+          setProjectId(res.project.id);
+          setDraft(clampRenderSettings({ ...createEmptyDraft(), ...((res.project.draft as any) || {}) }));
+          setApprovals(((res.project.approvals as any) || {}) as MasterVideoApprovals);
+          setGenerations((res.generations || []) as MasterVideoGeneration[]);
+        }
+        loadedScopeRef.current = scopeKey;
+      } catch (e: any) {
+        if (cancelled) return;
+        console.error("master video load failed", e);
+        setLoadError(e?.message || "We could not open your video project. Try again.");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      loadedScopeRef.current = scopeKey;
-      if (!cancelled) setLoading(false);
     })();
 
     return () => {
@@ -105,33 +142,19 @@ export function useMasterVideoProject(clientId: string | null, conversationId: s
       if (!userId) return;
       setSaving(true);
       try {
-        const row = {
-          user_id: userId,
-          client_id: clientId || null,
-          conversation_id: conversationId || null,
-          draft: nextDraft as any,
-          approvals: nextApprovals as any,
-        };
-        if (projectId) {
-          const { error } = await supabase.from("ai_studio_video_projects").update(row).eq("id", projectId);
-          if (error) throw error;
-        } else {
-          const { data, error } = await supabase
-            .from("ai_studio_video_projects")
-            .insert(row)
-            .select("id")
-            .single();
-          if (error) throw error;
-          setProjectId(data.id);
-        }
-      } catch (e) {
+        const res = await call({ action: "save", draft: nextDraft, approvals: nextApprovals });
+        if (res?.project?.id) setProjectId(res.project.id);
+        setLoadError(null);
+      } catch (e: any) {
         console.error("master video save failed", e);
+        setLoadError(e?.message || "Your last change could not be saved.");
       } finally {
         setSaving(false);
       }
     },
-    [userId, clientId, conversationId, projectId],
+    [userId, call],
   );
+
 
   // Debounced autosave — only after this scope finished loading, so an empty
   // initial draft can never overwrite a saved one.
