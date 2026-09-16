@@ -725,6 +725,33 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
               <Button variant="outline" size="sm" onClick={() => update({ videoPrompt: buildVideoPrompt(draft) })}>
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Rebuild directions
               </Button>
+              <input
+                ref={scriptFile}
+                type="file"
+                accept=".txt,.md,text/plain,text/markdown"
+                className="hidden"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  if (f.size > 2 * 1024 * 1024) {
+                    toast.error("That script file is too big — paste the words instead.");
+                    return;
+                  }
+                  const at = scopeRef.current;
+                  try {
+                    const text = (await f.text()).trim();
+                    if (!text) throw new Error("empty");
+                    if (!sameScope(at)) return;
+                    update({ script: text });
+                    toast.success("Script imported — edit it before approving");
+                  } catch {
+                    toast.error("Could not read that file");
+                  }
+                }}
+              />
+              <Button variant="outline" size="sm" onClick={() => scriptFile.current?.click()}>
+                <Upload className="mr-1.5 h-3.5 w-3.5" /> Import a script
+              </Button>
               <span className="text-[11px] text-muted-foreground">
                 {scriptWordCount(draft.script)} words · about {estimatedReadSeconds(draft.script)}s to read · render is {draft.durationSeconds}s
               </span>
