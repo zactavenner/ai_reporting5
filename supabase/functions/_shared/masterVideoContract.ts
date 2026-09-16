@@ -432,6 +432,7 @@ export function extractSpokenScript(raw: string): string {
       continue;
     }
     line = line
+      .replace(TIMECODE, " ")
       .replace(/\([^)]*\)/g, " ")
       .replace(/\[[^\]]*\]/g, " ")
       .replace(/\s{2,}/g, " ")
