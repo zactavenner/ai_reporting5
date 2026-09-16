@@ -576,7 +576,7 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
               </Button>
               <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 Format
-                {(["9:16", "16:9"] as const).map((a) => (
+                {spec.aspectRatios.map((a) => (
                   <button key={a} type="button" className={pill(draft.aspectRatio === a)} onClick={() => update({ aspectRatio: a })}>
                     {a}
                   </button>

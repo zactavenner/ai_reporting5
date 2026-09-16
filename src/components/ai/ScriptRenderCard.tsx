@@ -3,6 +3,7 @@ import { Clapperboard, ImageIcon, Loader2, Check, RefreshCw, Sparkles, ChevronDo
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { dashboardAuthHeaders } from "@/lib/dashboardAuthHeaders";
+import { countSpokenWords } from "@/lib/spokenScript";
 import { toast } from "sonner";
 
 export type ScriptRenderAvatar = { id: string; name: string; image_url?: string | null };
@@ -109,16 +110,8 @@ export function ScriptRenderCard(props: Props) {
   const cap = maxSecondsFor(model);
   const min = minSecondsFor(model);
   const choices = [5, 8, 10, 15, 20, 25, 30].filter((s) => s >= min && s <= cap);
-  const words = useMemo(
-    () =>
-      script
-        .replace(/```[\s\S]*?```/g, " ")
-        .replace(/^\s*(?:[-*#>]+|\d+[.)])\s*/gm, " ")
-        .replace(/\*\*/g, "")
-        .split(/\s+/)
-        .filter((w) => /[a-z0-9']/i.test(w)).length,
-    [script],
-  );
+  // Only the spoken lines set the length — camera and visual direction is not read out.
+  const words = useMemo(() => countSpokenWords(script), [script]);
   const rawAuto = Math.round((words / wordsPerMinute) * 60);
   const autoSeconds = choices.length
     ? choices.reduce((best, s) => (Math.abs(s - rawAuto) < Math.abs(best - rawAuto) ? s : best), choices[0])

@@ -86,16 +86,24 @@ export type MasterVideoModelSpec = {
   hint: string;
   resolutions: string[];
   durations: number[];
-  /** OpenRouter list price per generated second, in USD. */
-  pricePerSecond: number;
+  aspectRatios: AspectRatio[];
+  /**
+   * OpenRouter per-second list price keyed by the resolution actually chosen.
+   * Models billed by video tokens (the Seedance family) have no per-second list
+   * price, so they carry an empty map and the estimate is honestly "unknown"
+   * rather than a made-up number.
+   */
+  pricePerSecondByResolution: Record<string, number>;
   supportsFirstFrame: boolean;
 };
 
 /**
- * Kept in step with `src/lib/modelRegistry.ts` VIDEO_MODELS and with the
- * provider payload branches in `supabase/functions/ai-studio/index.ts`.
- * Wan 3.0 genuinely serves 480p/720p/1080p and 2–30s — there is no 2K tier, so
- * it is never offered or labelled as one.
+ * Mirrors the live OpenRouter `/v1/videos/models` record for each model
+ * (resolutions, durations, aspect ratios, frame support and pricing SKUs),
+ * verified 2026-09-16. Wan 3.0 serves 480p/720p/1080p and 2–30s — there is no
+ * 2K tier, so it is never offered or labelled as one. MiniMax H3 serves 2K
+ * only. Prices are per generated second per resolution, which is why a 30s
+ * 1080p Wan clip estimates around $6.00 rather than a single blended rate.
  */
 export const MASTER_VIDEO_MODELS: MasterVideoModelSpec[] = [
   {
@@ -104,7 +112,8 @@ export const MASTER_VIDEO_MODELS: MasterVideoModelSpec[] = [
     hint: "480p / 720p / 1080p · 2–30s in one clip · first frame · native audio",
     resolutions: ["480p", "720p", "1080p"],
     durations: [5, 10, 15, 20, 25, 30],
-    pricePerSecond: 0.034,
+    aspectRatios: ["9:16", "16:9"],
+    pricePerSecondByResolution: { "480p": 0.05, "720p": 0.1, "1080p": 0.2 },
     supportsFirstFrame: true,
   },
   {
@@ -113,25 +122,29 @@ export const MASTER_VIDEO_MODELS: MasterVideoModelSpec[] = [
     hint: "480p / 720p · 4–30s in one clip · first/last frame",
     resolutions: ["480p", "720p"],
     durations: [5, 10, 15, 20, 25, 30],
-    pricePerSecond: 0.2311,
+    aspectRatios: ["9:16", "16:9"],
+    // Billed per video token, not per second — no honest per-second estimate.
+    pricePerSecondByResolution: {},
     supportsFirstFrame: true,
   },
   {
     value: "bytedance/seedance-2.0",
     label: "Seedance",
-    hint: "720p · up to 15s · first/last frame + references",
-    resolutions: ["720p"],
+    hint: "480p / 720p / 1080p · up to 15s · first/last frame + references",
+    resolutions: ["480p", "720p", "1080p"],
     durations: [5, 10, 15],
-    pricePerSecond: 0.0538,
+    aspectRatios: ["9:16", "16:9"],
+    pricePerSecondByResolution: {},
     supportsFirstFrame: true,
   },
   {
     value: "minimax/hailuo-3",
     label: "MiniMax H3",
-    hint: "720p or native 2K · up to 15s · first/last frame + reference identity",
-    resolutions: ["720p", "2k"],
+    hint: "native 2K only · up to 15s · first/last frame + reference identity",
+    resolutions: ["2K"],
     durations: [5, 10, 15],
-    pricePerSecond: 0.13,
+    aspectRatios: ["9:16", "16:9"],
+    pricePerSecondByResolution: { "2K": 0.13 },
     supportsFirstFrame: true,
   },
 ];
@@ -386,15 +399,58 @@ export function generationGate(draft: MasterVideoDraft, approvals: MasterVideoAp
   return { ok: reasons.length === 0, reasons };
 }
 
+/* --------------------------------------------------- spoken words only ----- */
+
+/** Labels whose text IS spoken. */
+const SPOKEN_LABELS =
+  /^(vo|v\.o\.|voice[- ]?over|voiceover|narration|narrator|dialogue|dialog|line|script|spoken|presenter|speaker|host|talent|hook|cta|audio)\b\s*:?/i;
+/** ALL-CAPS labels that are direction, never spoken (FRAMING:, B-ROLL:, SHOT:). */
+const DIRECTION_LABEL = /^[A-Z][A-Z0-9 .\/&'\u2013\u2014-]{1,40}:/;
+/** `[0-3s]`, `[00:03]` style markers. */
+const TIMECODE = /[[(]\s*\d{1,2}(?::\d{2}|\s*-\s*\d{1,2})?\s*s?\.?\s*[\])]/gi;
+
+/**
+ * Pull only the spoken words out of a storyboard. A draft that mixes camera and
+ * visual direction with the voiceover would otherwise read as ~370 words when
+ * the actual read is ~100, and the suggested clip length would be far too long.
+ */
+export function extractSpokenScript(raw: string): string {
+  if (!raw) return "";
+  const cleaned = raw.replace(/```[\s\S]*?```/g, " ").replace(/\*\*|__/g, "");
+  const kept: string[] = [];
+  for (const rawLine of cleaned.split(/\r?\n/)) {
+    let line = rawLine.replace(/^\s*(?:[-*#>]+|\d+[.)])\s*/, "").trim();
+    if (!line) continue;
+    // A line that OPENS with a bracket or timecode marker is a direction beat.
+    if (/^[[(]/.test(line)) continue;
+    const spoken = line.match(SPOKEN_LABELS);
+    if (spoken) {
+      line = line.slice(spoken[0].length).trim();
+    } else if (DIRECTION_LABEL.test(line)) {
+      continue;
+    } else if (/^[[(].*[\])]$/.test(line)) {
+      continue;
+    }
+    line = line
+      .replace(TIMECODE, " ")
+      .replace(/\([^)]*\)/g, " ")
+      .replace(/\[[^\]]*\]/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    if (line) kept.push(line);
+  }
+  return kept.join(" ").trim();
+}
+
 /* ------------------------------------------------------- prompt + summary --- */
 
 export function estimatedReadSeconds(script: string, wordsPerMinute = 150): number {
-  const words = norm(script).split(/\s+/).filter((w) => /[a-z0-9']/i.test(w)).length;
-  return Math.round((words / wordsPerMinute) * 60);
+  return Math.round((scriptWordCount(script) / wordsPerMinute) * 60);
 }
 
+/** Spoken words only — direction lines never count towards the read length. */
 export function scriptWordCount(script: string): number {
-  return norm(script).split(/\s+/).filter((w) => /[a-z0-9']/i.test(w)).length;
+  return norm(extractSpokenScript(script)).split(/\s+/).filter((w) => /[a-z0-9']/i.test(w)).length;
 }
 
 /**
@@ -438,15 +494,25 @@ export function composeRenderPrompt(draft: MasterVideoDraft): string {
 
 export type CostEstimate = { known: boolean; usd: number | null; note: string };
 
+/**
+ * Price the exact resolution the operator picked. A model billed by video
+ * tokens has no per-second list price, so the estimate says so instead of
+ * inventing a blended rate that understates the real charge.
+ */
 export function costEstimate(draft: MasterVideoDraft): CostEstimate {
   const spec = modelSpec(draft.model);
-  if (!spec.pricePerSecond) {
-    return { known: false, usd: null, note: "Cost for this model is not published — treat it as unknown." };
+  const perSecond = spec.pricePerSecondByResolution[draft.resolution];
+  if (!perSecond) {
+    return {
+      known: false,
+      usd: null,
+      note: `${spec.label} at ${draft.resolution} is not billed at a published per-second rate — the cost is unknown until the render is billed.`,
+    };
   }
   return {
     known: true,
-    usd: Math.round(spec.pricePerSecond * draft.durationSeconds * 100) / 100,
-    note: `List price estimate for ${draft.durationSeconds}s on ${spec.label}. Actual provider billing may differ.`,
+    usd: Math.round(perSecond * draft.durationSeconds * 100) / 100,
+    note: `List price estimate: ${draft.durationSeconds}s × $${perSecond.toFixed(2)}/s at ${draft.resolution} on ${spec.label}. Actual provider billing may differ.`,
   };
 }
 

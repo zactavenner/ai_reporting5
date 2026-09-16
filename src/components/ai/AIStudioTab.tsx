@@ -1908,9 +1908,11 @@ export function AIStudioTab({ clientId, clientName }: Props) {
               `🔒 VIDEO HARD-LOCK: model="${lockedModel}"${modelMeta ? ` (${modelMeta.label})` : ""} — only the approved renderers ${VIDEO_MODELS.map((m) => `"${m.value}"`).join(", ")} may be used; Grok, HappyHorse, Kling and Veo are retired and must never be requested. resolution="${lockedRes}" (supported: ${supportedResList.join(", ")}), duration=${effVideoDuration}s, format="${lockedAspect}", audio=on. Pass model/resolution/duration/aspect_ratio="${lockedAspect}" EXACTLY to generate_seedance_video. Do NOT substitute models, resolutions, durations, or formats.`,
             );
 
-            if (effVideoFrames?.firstFrameUrl) lockLines.push(`🔒 first_frame_url="${videoFrames.firstFrameUrl}"`);
-            if (effVideoFrames?.lastFrameUrl) lockLines.push(`🔒 last_frame_url="${videoFrames.lastFrameUrl}"`);
-            if (effVideoFrames?.ingredientUrl) lockLines.push(`🔒 ingredient_url="${videoFrames.ingredientUrl}"`);
+            // Always quote the EFFECTIVE frames (per-script override wins), so the
+            // locked URL is the exact image the operator selected for this script.
+            if (effVideoFrames?.firstFrameUrl) lockLines.push(`🔒 first_frame_url="${effVideoFrames.firstFrameUrl}"`);
+            if (effVideoFrames?.lastFrameUrl) lockLines.push(`🔒 last_frame_url="${effVideoFrames.lastFrameUrl}"`);
+            if (effVideoFrames?.ingredientUrl) lockLines.push(`🔒 ingredient_url="${effVideoFrames.ingredientUrl}"`);
             const extraIngredients = (effVideoFrames?.ingredientUrls || []).filter((u) => u && u !== effVideoFrames?.ingredientUrl);
             if (extraIngredients.length) lockLines.push(`🔒 additional_ingredient_urls=${extraIngredients.map((u) => `"${u}"`).join(", ")} (all sent to Seedance as reference images)`);
             if (effAvatarId && effAvatar) {
