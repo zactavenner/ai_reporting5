@@ -779,8 +779,36 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
             {scriptApprovalStale(draft, approvals) && (
               <p className="flex items-start gap-1.5 text-[11px] text-amber-600">
                 <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                Something changed after you approved. Read it once more and approve again — the old version is kept.
+                Something changed after you approved. Read it once more and approve again — earlier versions are kept
+                below.
               </p>
+            )}
+            {draft.scriptVersions.length > 0 && (
+              <div className="space-y-1">
+                <div className={labelCls}>Earlier versions</div>
+                <div className="max-h-40 space-y-1 overflow-auto">
+                  {[...draft.scriptVersions]
+                    .slice()
+                    .reverse()
+                    .map((v) => (
+                      <div key={v.id} className="rounded-lg border border-border/60 p-1.5 text-[10px]">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">Version {v.version}</span>
+                          <button
+                            type="button"
+                            className="underline"
+                            onClick={() =>
+                              update({ script: v.script, videoPrompt: v.videoPrompt, disclosure: v.disclosure })
+                            }
+                          >
+                            Bring back
+                          </button>
+                        </div>
+                        <div className="truncate text-muted-foreground">{v.script}</div>
+                      </div>
+                    ))}
+                </div>
+              </div>
             )}
             {statusOf("script").reason && !scriptApprovalStale(draft, approvals) && (
               <p className="text-[11px] text-muted-foreground">{statusOf("script").reason}</p>
