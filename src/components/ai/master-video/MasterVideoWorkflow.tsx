@@ -245,6 +245,19 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
     if (next) setStep(next.key);
   };
 
+  // A problem must be visible and actionable — never an endless spinner.
+  if (project.loadError && !project.projectId) {
+    return (
+      <div className="space-y-2 rounded-2xl border border-destructive/40 bg-destructive/5 p-4 text-sm">
+        <div className="font-medium">Master video could not open</div>
+        <div className="text-muted-foreground">{project.loadError}</div>
+        <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
+          Reload and try again
+        </Button>
+      </div>
+    );
+  }
+
   if (project.loading) {
     return (
       <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
