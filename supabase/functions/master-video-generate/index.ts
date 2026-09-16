@@ -21,7 +21,12 @@ import { authorizeGenerationCaller } from "../_shared/generationAuth.ts";
 import { readDashboardToken, verifyDashboardToken } from "../_shared/dashboardToken.ts";
 import {
   authorizeGeneration,
+  buildProviderBody,
+  classifySubmitFailure,
+  isTerminalFailure,
   modelSpec,
+  normalizeStoredDraft,
+  scriptApprovalHash,
   selectedFrame,
   type MasterVideoApprovals,
   type MasterVideoDraft,
@@ -39,29 +44,6 @@ const OPENROUTER_API_KEY = ((Deno.env.get("OPENROUTER_API_KEY") || "")
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-/** Model-specific wire payload, mirroring the verified contracts in `ai-studio`. */
-function buildProviderBody(draft: MasterVideoDraft, prompt: string, frameUrl: string) {
-  const spec = modelSpec(draft.model);
-  const body: Record<string, unknown> = {
-    model: spec.value,
-    prompt: prompt.slice(0, 6000),
-    aspect_ratio: draft.aspectRatio,
-    duration: draft.durationSeconds,
-    generate_audio: draft.audio !== false,
-  };
-  if (spec.value === "minimax/hailuo-3") {
-    // H3 accepts the literal "2K" only, caps at 15s, and hard-rejects
-    // frame_images together with input_references.
-    body.resolution = "2K";
-    body.duration = Math.max(5, Math.min(15, draft.durationSeconds));
-  } else {
-    // Wan 3.0 and both Seedance models take the lowercase resolution.
-    body.resolution = draft.resolution;
-  }
-  body.frame_images = [{ type: "image_url", image_url: { url: frameUrl }, frame_type: "first_frame" }];
-  return body;
-}
 
 /**
  * Whose draft is this?
