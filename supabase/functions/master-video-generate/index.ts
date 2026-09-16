@@ -232,9 +232,17 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     const message = String((e as any)?.message || e).slice(0, 500);
+    // Retire the idempotency key on failure. Nothing was charged, so an explicit
+    // operator retry of the SAME approved version must be able to claim again —
+    // while the failed attempt stays on the record.
     await supa
       .from("ai_studio_video_generations")
-      .update({ status: "failed", error: message, canvas_item_id: canvasItemId })
+      .update({
+        status: "failed",
+        error: message,
+        canvas_item_id: canvasItemId,
+        idempotency_key: `${gate.idempotencyKey}:failed:${generationId}`,
+      })
       .eq("id", generationId);
     if (canvasItemId) {
       const { data: cur } = await supa.from("ai_studio_canvas_items").select("payload").eq("id", canvasItemId).single();
