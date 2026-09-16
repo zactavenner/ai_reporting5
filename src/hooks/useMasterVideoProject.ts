@@ -234,5 +234,6 @@ export function useMasterVideoProject(clientId: string | null, conversationId: s
     refreshGenerations,
     saveNow,
     reset,
+    loadError,
   };
 }
