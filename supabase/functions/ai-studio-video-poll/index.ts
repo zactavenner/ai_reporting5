@@ -74,6 +74,22 @@ Deno.serve(async (req) => {
       .limit(100);
     if (error) throw error;
 
+    /**
+     * Master Video renders also own a row in `ai_studio_video_generations`, and
+     * that row is what the six-step screen reads. Every terminal outcome below
+     * is mirrored onto it, so a finished video never shows as still rendering.
+     */
+    const syncLedger = async (payload: unknown, outcome: PollOutcome) => {
+      const link = ledgerPatchForOutcome(payload, outcome);
+      if (!link) return;
+      const { error: ledgerErr } = await supa
+        .from("ai_studio_video_generations")
+        .update(link.patch)
+        .eq("id", link.generationId);
+      if (ledgerErr) console.error("master video ledger update failed", link.generationId, ledgerErr.message);
+    };
+
+
     for (const row of rows || []) {
       const p: any = row.payload || {};
       if (p?.status !== "processing" || p?.video_url) continue;
