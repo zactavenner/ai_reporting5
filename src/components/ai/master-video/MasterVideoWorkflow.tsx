@@ -431,17 +431,18 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
             <input
               ref={styleFile}
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               className="hidden"
               onChange={async (e) => {
                 const f = e.target.files?.[0];
                 if (!f) return;
                 try {
-                  const url = await uploadImage(f, "style");
+                  const kind = f.type.startsWith("video/") ? "video" : "image";
+                  const url = await uploadAsset(f, "style", kind, clientId);
                   update({ styleReferenceUrl: url, styleLabel: draft.styleLabel || "Uploaded reference" });
                   toast.success("Reference uploaded");
-                } catch {
-                  toast.error("Could not upload that reference");
+                } catch (err: any) {
+                  toast.error(err?.message || "Could not upload that reference");
                 }
               }}
             />
