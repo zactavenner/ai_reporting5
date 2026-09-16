@@ -197,9 +197,13 @@ export function createEmptyDraft(): MasterVideoDraft {
     motion: "",
     frames: [],
     selectedFrameId: null,
+    framePrompt: "",
+    framePromptTouched: false,
+    frameImageModel: null,
     script: "",
     videoPrompt: "",
     disclosure: "",
+    scriptVersions: [],
     model: DEFAULT_MASTER_VIDEO_MODEL,
     // Defaults: vertical, the highest resolution this model genuinely serves, ~30s.
     resolution: spec.resolutions[spec.resolutions.length - 1],
@@ -275,6 +279,24 @@ export function frameApprovalHash(draft: MasterVideoDraft): string {
     styleReferenceUrl: draft.styleReferenceUrl,
     styleDirections: norm(draft.styleDirections),
     aspectRatio: draft.aspectRatio,
+    // The frame shows the person, the clothes, the place and the movement, so
+    // editing any of those has to invalidate the approved frame.
+    wardrobe: norm(draft.wardrobe),
+    location: norm(draft.location),
+    motion: norm(draft.motion),
+    // The offer that is being sold shapes the frame brief too.
+    offerId: draft.offerId,
+    offerSnapshot: draft.offerSnapshot
+      ? {
+          id: draft.offerSnapshot.id,
+          name: norm(draft.offerSnapshot.name),
+          audience: norm(draft.offerSnapshot.audience),
+          terms: norm(draft.offerSnapshot.terms),
+          proof: norm(draft.offerSnapshot.proof),
+          sources: (draft.offerSnapshot.sources || []).map(norm),
+        }
+      : null,
+    brief: norm(draft.brief),
   });
 }
 
@@ -292,12 +314,84 @@ export function scriptApprovalHash(draft: MasterVideoDraft): string {
     cta: norm(draft.cta),
     claims: norm(draft.claims),
     offerId: draft.offerId,
+    brief: norm(draft.brief),
+    sourceNotes: norm(draft.sourceNotes),
+    styleId: draft.styleId,
+    styleDirections: norm(draft.styleDirections),
+    presenter: draft.presenter,
+    avatarId: draft.avatarId,
     model: draft.model,
     resolution: draft.resolution,
     aspectRatio: draft.aspectRatio,
     durationSeconds: draft.durationSeconds,
     audio: draft.audio,
   });
+}
+
+/* ----------------------------------------------------- stored draft repair --- */
+
+/**
+ * Rows written before a field existed, or hand-edited JSON, must never crash the
+ * screen or quietly change a hash. Every field falls back to the empty default.
+ */
+export function normalizeStoredDraft(raw: unknown): MasterVideoDraft {
+  const base = createEmptyDraft();
+  if (!raw || typeof raw !== "object") return base;
+  const d = raw as Record<string, unknown>;
+  const str = (k: keyof MasterVideoDraft) => (typeof d[k] === "string" ? (d[k] as string) : (base[k] as string));
+  const out: MasterVideoDraft = {
+    ...base,
+    ...(d as Partial<MasterVideoDraft>),
+    brief: str("brief"),
+    claims: str("claims"),
+    cta: str("cta"),
+    sourceNotes: str("sourceNotes"),
+    styleDirections: str("styleDirections"),
+    avatarDescription: str("avatarDescription"),
+    wardrobe: str("wardrobe"),
+    location: str("location"),
+    motion: str("motion"),
+    framePrompt: str("framePrompt"),
+    framePromptTouched: d.framePromptTouched === true,
+    frameImageModel: typeof d.frameImageModel === "string" ? d.frameImageModel : null,
+    script: str("script"),
+    videoPrompt: str("videoPrompt"),
+    disclosure: str("disclosure"),
+    frames: Array.isArray(d.frames) ? (d.frames as FrameAsset[]) : [],
+    scriptVersions: Array.isArray(d.scriptVersions) ? (d.scriptVersions as ScriptVersion[]) : [],
+    audio: d.audio !== false,
+  };
+  return clampRenderSettings(out);
+}
+
+/** Appends the current words to history without ever dropping an older take. */
+export function pushScriptVersion(draft: MasterVideoDraft, note: string): MasterVideoDraft {
+  const last = draft.scriptVersions[draft.scriptVersions.length - 1];
+  if (
+    last &&
+    norm(last.script) === norm(draft.script) &&
+    norm(last.videoPrompt) === norm(draft.videoPrompt) &&
+    norm(last.disclosure) === norm(draft.disclosure)
+  ) {
+    return draft;
+  }
+  if (!norm(draft.script) && !norm(draft.videoPrompt)) return draft;
+  const version = (last?.version ?? 0) + 1;
+  return {
+    ...draft,
+    scriptVersions: [
+      ...draft.scriptVersions,
+      {
+        id: `sv-${version}-${contentHash({ s: draft.script, p: draft.videoPrompt, d: draft.disclosure })}`,
+        version,
+        script: draft.script,
+        videoPrompt: draft.videoPrompt,
+        disclosure: draft.disclosure,
+        createdAt: new Date().toISOString(),
+        note,
+      },
+    ],
+  };
 }
 
 export function frameApproved(draft: MasterVideoDraft, approvals: MasterVideoApprovals): boolean {
