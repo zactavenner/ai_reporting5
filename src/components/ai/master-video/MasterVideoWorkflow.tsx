@@ -822,7 +822,7 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
               </ul>
             )}
             <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={generate} disabled={!gate.ok || busy === "generate" || !project.projectId}>
+              <Button onClick={() => generate()} disabled={!gate.ok || busy === "generate" || !project.projectId}>
                 {busy === "generate" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Film className="mr-1.5 h-4 w-4" />}
                 Generate video
               </Button>
