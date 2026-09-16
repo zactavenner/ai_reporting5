@@ -591,11 +591,11 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
                   const f = e.target.files?.[0];
                   if (!f) return;
                   try {
-                    const url = await uploadImage(f, "frame");
+                    const url = await uploadAsset(f, "frame", "image", clientId);
                     addFrame(url, "uploaded", framePrompt.trim(), null);
                     toast.success("Frame uploaded");
-                  } catch {
-                    toast.error("Could not upload that image");
+                  } catch (err: any) {
+                    toast.error(err?.message || "Could not upload that image");
                   }
                 }}
               />
