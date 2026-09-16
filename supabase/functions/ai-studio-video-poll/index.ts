@@ -101,11 +101,12 @@ Deno.serve(async (req) => {
 
       if (!pollingUrl) {
         if (ageMs > MAX_AGE_MS) {
+          const lost = `${p.requested_model || p.model || "Video"} render was submitted without a provider handle and cannot be recovered. Re-submit to retry.`;
           await supa.from("ai_studio_canvas_items").update({
             placeholder_until: null,
-            payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true,
-              error: `${p.requested_model || p.model || "Video"} render was submitted without a provider handle and cannot be recovered. Re-submit to retry.` },
+            payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true, error: lost },
           }).eq("id", row.id);
+          await syncLedger(p, { kind: "failed", error: lost });
           result.failed++;
         }
         continue;
