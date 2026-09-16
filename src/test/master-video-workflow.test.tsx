@@ -220,7 +220,7 @@ describe("Master AI Video workflow UI", () => {
     const generateBtn = await screen.findByRole("button", { name: /Generate video/i });
     expect(generateBtn).toBeDisabled();
     expect(await screen.findByText(/Approve the frame you picked/i)).toBeInTheDocument();
-    expect(invoke).not.toHaveBeenCalled();
+    expect(generateCalls()).toHaveLength(0);
   });
 
   it("grants a render only after both approvals, sending the exact project and approved hash", async () => {
@@ -235,8 +235,8 @@ describe("Master AI Video workflow UI", () => {
     const generateBtn = await screen.findByRole("button", { name: /Generate video/i });
     expect(generateBtn).toBeEnabled();
     await user.click(generateBtn);
-    await waitFor(() => expect(invoke).toHaveBeenCalled());
-    const [fnName, options] = invoke.mock.calls[0];
+    await waitFor(() => expect(generateCalls()).toHaveLength(1));
+    const [fnName, options] = generateCalls()[0];
     expect(fnName).toBe("master-video-generate");
     expect(options.body.projectId).toBe("project-1");
     expect(options.body.scriptHash).toBe(scriptApprovalHash(row.draft));
