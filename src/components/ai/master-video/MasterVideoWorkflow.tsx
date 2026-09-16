@@ -509,11 +509,11 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
                     const f = e.target.files?.[0];
                     if (!f) return;
                     try {
-                      const url = await uploadImage(f, "presenter");
+                      const url = await uploadAsset(f, "presenter", "image", clientId);
                       update({ avatarId: `upload:${url}`, avatarName: "Uploaded presenter", avatarImageUrl: url });
                       toast.success("Presenter uploaded");
-                    } catch {
-                      toast.error("Could not upload that photo");
+                    } catch (err: any) {
+                      toast.error(err?.message || "Could not upload that photo");
                     }
                   }}
                 />
