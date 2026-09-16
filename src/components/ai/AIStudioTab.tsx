@@ -48,6 +48,7 @@ import { ImageStylesPopover, useImageStyles, buildImageStyleBlock } from "./Imag
 import { BatchScriptsDialog } from "./BatchScriptsDialog";
 import { StudioGoalDialog } from "./StudioGoalDialog";
 import { VideoProductionLine, buildPresetStyleBlock } from "./VideoProductionLine";
+import MasterVideoWorkflow from "./master-video/MasterVideoWorkflow";
 import { VIDEO_STYLE_PRESETS } from "@/lib/videoStylePresets";
 
 interface Props {
