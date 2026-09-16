@@ -18,6 +18,7 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { authorizeGenerationCaller } from "../_shared/generationAuth.ts";
+import { readDashboardToken, verifyDashboardToken } from "../_shared/dashboardToken.ts";
 import {
   authorizeGeneration,
   modelSpec,
