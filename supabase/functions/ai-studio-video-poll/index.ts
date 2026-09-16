@@ -127,11 +127,12 @@ Deno.serve(async (req) => {
         const urls: string[] = pj.unsigned_urls || pj.signed_urls || pj.urls || (pj.video?.url ? [pj.video.url] : []);
         const providerUrl = urls.find((u: unknown) => typeof u === "string" && /^https?:\/\//.test(u));
         if (!providerUrl) {
+          const noFile = "Provider reported completed but returned no video URL. Re-submit to retry.";
           await supa.from("ai_studio_canvas_items").update({
             placeholder_until: null,
-            payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true,
-              error: "Provider reported completed but returned no video URL. Re-submit to retry." },
+            payload: { ...p, status: "failed", failed_at: new Date().toISOString(), reaper: true, error: noFile },
           }).eq("id", row.id);
+          await syncLedger(p, { kind: "failed", error: noFile });
           result.failed++;
           continue;
         }
