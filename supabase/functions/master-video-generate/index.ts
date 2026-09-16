@@ -186,6 +186,11 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (projectError) return json({ error: projectError.message }, 500);
   if (!project) return json({ error: "This video project no longer exists." }, 404);
+  // Only the operator who owns the draft (or an internal pipeline acting for
+  // them) may spend on it.
+  if (project.user_id && project.user_id !== ownerId && caller.via === "dashboard") {
+    return json({ error: "This video project belongs to another operator." }, 403);
+  }
 
   const draft = (project.draft || {}) as MasterVideoDraft;
   const approvals = (project.approvals || {}) as MasterVideoApprovals;
