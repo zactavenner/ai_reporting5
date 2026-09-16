@@ -1991,7 +1991,10 @@ export function AIStudioTab({ clientId, clientName }: Props) {
           : (selectedAgentId === "master" ? "account_manager" : undefined),
         ...(isJeremyAgent && effectivePersonaSlug ? { personaSlug: effectivePersonaSlug } : {}),
 
+        // Video renders never carry client/offer knowledge — prompt only.
+        videoProduceIntent: selectedAgentMode === "video" && produceNow,
         offerContext: (() => {
+          if (selectedAgentMode === "video" && produceNow) return undefined;
           const list = selectedOfferId === "all"
             ? clientOffers
             : clientOffers.filter(o => o.id === selectedOfferId);
