@@ -89,7 +89,7 @@ function seedProject(over: Partial<any> = {}) {
     cta: "Book a call",
     styleId: "lakeside",
     styleLabel: "Lakeside",
-    presenter: "avatar",
+    presenter: "avatar" as const,
     avatarId: "avatar-1",
     avatarName: "Dana",
     avatarImageUrl: "https://cdn.example.com/dana.png",
