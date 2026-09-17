@@ -3297,7 +3297,10 @@ export function AIStudioTab({ clientId, clientName }: Props) {
                   </div>
                 )}
 
-                <ScrollArea className="flex-1" ref={scrollRef as any}>
+                <ScrollArea
+                  className={selectedAgentMode === "video" && videoFlow === "master" ? "hidden" : "flex-1"}
+                  ref={scrollRef as any}
+                >
                   <div
                     className={`px-4 sm:px-6 py-6 space-y-5 mx-auto w-full transition-[max-width] ${wideChat ? "max-w-6xl" : "max-w-3xl"}`}
                   >
