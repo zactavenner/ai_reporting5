@@ -182,6 +182,7 @@ beforeEach(() => {
   db.generations = [];
   localStorage.clear();
   localStorage.setItem("team_member_id", "user-1");
+  localStorage.setItem("dashboard_session_token", "test-dashboard-session");
   generateResponse = { ok: true, duplicate: false, generation: { id: "g1", status: "running" } };
   invoke.mockReset();
   invoke.mockImplementation(fakeEdgeRoute);
@@ -237,7 +238,7 @@ describe("Master AI Video workflow UI", () => {
     };
     const user = userEvent.setup();
     mount();
-    await user.click(await screen.findByRole("button", { name: /^Generate$/i }));
+    await user.click(await screen.findByRole("button", { name: /Generate$/i }));
     const generateBtn = await screen.findByRole("button", { name: /Generate video/i });
     expect(generateBtn).toBeEnabled();
     await user.click(generateBtn);
@@ -257,7 +258,7 @@ describe("Master AI Video workflow UI", () => {
     generateResponse = { ok: true, duplicate: true, generation: { id: "g1", status: "running" } };
     const user = userEvent.setup();
     mount();
-    await user.click(await screen.findByRole("button", { name: /^Generate$/i }));
+    await user.click(await screen.findByRole("button", { name: /Generate$/i }));
     await user.click(await screen.findByRole("button", { name: /Generate video/i }));
     await waitFor(() => expect(toasts.some((t) => /nothing was charged twice/i.test(t))).toBe(true));
   });
@@ -281,9 +282,9 @@ describe("Master AI Video workflow UI", () => {
     });
     const user = userEvent.setup();
     mount();
-    await user.click(await screen.findByRole("button", { name: /^Generate$/i }));
+    await user.click(await screen.findByRole("button", { name: /Generate$/i }));
     expect(await screen.findByText(/Provider rejected the frame/i)).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: /Try this render again/i })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: /Try this exact version again/i })).toBeEnabled();
   });
 
   it("invalidates the approval with a clear message after an upstream edit", async () => {
