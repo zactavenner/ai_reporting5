@@ -194,8 +194,112 @@ beforeEach(() => {
 /** Only the paid-render calls, ignoring load/save traffic. */
 const generateCalls = () =>
   invoke.mock.calls.filter(([, opts]: any[]) => !["load", "save"].includes(String(opts?.body?.action || "generate")));
-
 describe("Master AI Video workflow UI", () => {
+  it("keeps the existing script when importing a replacement", async () => {
+    const row = seedProject();
+    const original = row.draft.script;
+    const user = userEvent.setup();
+    const view = mount();
+    await user.click(await screen.findByRole("button", { name: /Script & directions/i }));
+    const input = view.container.querySelector('input[accept=".txt,.md,text/plain,text/markdown"]') as HTMLInputElement;
+    const file = new File(["A replacement spoken script."], "script.txt", { type: "text/plain" });
+    Object.defineProperty(file, "text", { value: async () => "A replacement spoken script." });
+    await user.upload(input, file);
+    expect(await screen.findByDisplayValue("A replacement spoken script.")).toBeInTheDocument();
+    expect(await screen.findByText(original)).toBeInTheDocument();
+  });
+  it("keeps current words when restoring an earlier version", async () => {
+    const row = seedProject();
+    const original = row.draft.script;
+    row.draft.scriptVersions = [
+      {
+        id: "take-old",
+        version: 1,
+        script: "Earlier words.",
+        videoPrompt: "Earlier directions.",
+        disclosure: "",
+        createdAt: new Date().toISOString(),
+        note: "older",
+      },
+    ];
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole("button", { name: /Script & directions/i }));
+    await user.click(await screen.findByRole("button", { name: /Bring back/i }));
+    expect(await screen.findByDisplayValue("Earlier words.")).toBeInTheDocument();
+    expect(await screen.findByText(original)).toBeInTheDocument();
+  });
+  it("drops an old upload callback after switching clients", async () => {
+    seedProject();
+    db.projects.push({
+      id: "project-2",
+      user_id: "user-1",
+      client_id: "client-2",
+      conversation_id: "conv-1",
+      draft: { ...createEmptyDraft(), cta: "Second client" },
+      approvals: {},
+    });
+    const view = renderHook(({ id }) => useMasterVideoProject(id, "conv-1"), { initialProps: { id: "client-1" } });
+    await waitFor(() => expect(view.result.current.draft.cta).toBe("Book a call"));
+    const lateUploadUpdate = view.result.current.update;
+    view.rerender({ id: "client-2" });
+    await waitFor(() => expect(view.result.current.draft.cta).toBe("Second client"));
+    act(() => lateUploadUpdate({ cta: "Wrong client upload response" }));
+    expect(view.result.current.draft.cta).toBe("Second client");
+  });
+  it("does not submit a paid render after a failed save", async () => {
+    const row = seedProject();
+    row.approvals = {
+      frame: { hash: frameApprovalHash(row.draft), at: "", by: "user-1" },
+      script: { hash: scriptApprovalHash(row.draft), at: "", by: "user-1" },
+    };
+    invoke.mockImplementation((name, opts) =>
+      opts?.body?.action === "save"
+        ? Promise.resolve({ data: { error: "Storage unavailable" }, error: null })
+        : fakeEdgeRoute(name, opts),
+    );
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole("button", { name: /Generate$/i }));
+    await user.click(await screen.findByRole("button", { name: /Generate video/i }));
+    await waitFor(() => expect(toasts.some((t) => t.includes("Storage unavailable"))).toBe(true));
+    expect(generateCalls()).toHaveLength(0);
+  });
+  it("retries the failed snapshot after current draft edits without echoing a different hash", async () => {
+    seedProject();
+    db.generations.push({
+      id: "failed-1",
+      project_id: "project-1",
+      status: "failed",
+      model: "alibaba/wan-3.0",
+      resolution: "1080p",
+      duration_seconds: 30,
+      created_at: new Date().toISOString(),
+      video_url: null,
+    });
+    const user = userEvent.setup();
+    mount();
+    await user.type(await screen.findByDisplayValue("Book a call"), " today");
+    await user.click(await screen.findByRole("button", { name: /Generate$/i }));
+    await user.click(await screen.findByRole("button", { name: /Try this exact version again/i }));
+    await waitFor(() => expect(generateCalls()).toHaveLength(1));
+    const body = generateCalls()[0][1].body;
+    expect(body.retryOfGenerationId).toBe("failed-1");
+    expect(body.scriptHash).toBeUndefined();
+    expect(body.clientId).toBe("client-1");
+    expect(body.conversationId).toBe("conv-1");
+  });
+  it("returns to the saved stage after remounting the same project", async () => {
+    const row = seedProject();
+    const user = userEvent.setup();
+    const first = mount();
+    await user.click(await screen.findByRole("button", { name: /Script & directions/i }));
+    expect(await screen.findByDisplayValue(row.draft.script)).toBeInTheDocument();
+    first.unmount();
+    mount();
+    expect(await screen.findByDisplayValue(row.draft.script)).toBeInTheDocument();
+  });
+
   it("shows all six steps and resumes the saved project", async () => {
     seedProject();
     mount();
