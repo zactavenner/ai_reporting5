@@ -2319,6 +2319,10 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     // A "Generate video with this script" click in chat renders this turn even
     // while the composer is still in Chat-script intent.
     const produceNow = !!opts?.forceProduce || videoIntent === "produce";
+    if (selectedAgentMode === "video" && videoFlow === "master" && (produceNow || opts?.videoApproved)) {
+      toast.info("Use the six-step review above to approve the frame, script and settings before generating.");
+      return;
+    }
     const ov = opts?.videoOverride;
     const effVideoModel = ov?.model || videoModel;
     const effVideoResolution = ov?.resolution || videoResolution;
