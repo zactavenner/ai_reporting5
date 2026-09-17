@@ -1,5 +1,5 @@
--- Master AI Video: one recoverable draft per (user, client, conversation) plus an
--- idempotency ledger so an approved render can never be charged twice.
+-- Master AI Video: one recoverable draft per (user, client, conversation).
+-- Only the verified server route may access drafts and the render ledger.
 CREATE TABLE public.ai_studio_video_projects (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL,
@@ -19,21 +19,16 @@ CREATE UNIQUE INDEX ai_studio_video_projects_scope_uidx
     COALESCE(conversation_id, '00000000-0000-0000-0000-000000000000'::uuid)
   );
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.ai_studio_video_projects TO authenticated;
+REVOKE ALL ON public.ai_studio_video_projects FROM anon, authenticated;
 GRANT ALL ON public.ai_studio_video_projects TO service_role;
 ALTER TABLE public.ai_studio_video_projects ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "team can read master video projects"
-  ON public.ai_studio_video_projects FOR SELECT TO authenticated USING (true);
-CREATE POLICY "team can write master video projects"
-  ON public.ai_studio_video_projects FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- No browser policies: master-video-generate verifies identity and ownership.
 
 CREATE TRIGGER ai_studio_video_projects_touch
   BEFORE UPDATE ON public.ai_studio_video_projects
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
--- Render ledger. The unique idempotency key is what stops a double-click, a
--- retried network call or two browser tabs from paying for the same render.
+-- Unique render identity prevents duplicate paid submissions.
 CREATE TABLE public.ai_studio_video_generations (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   project_id UUID NOT NULL REFERENCES public.ai_studio_video_projects(id) ON DELETE CASCADE,
@@ -62,12 +57,9 @@ CREATE TABLE public.ai_studio_video_generations (
 CREATE INDEX ai_studio_video_generations_project_idx
   ON public.ai_studio_video_generations (project_id, created_at DESC);
 
-GRANT SELECT ON public.ai_studio_video_generations TO authenticated;
+REVOKE ALL ON public.ai_studio_video_generations FROM anon, authenticated;
 GRANT ALL ON public.ai_studio_video_generations TO service_role;
 ALTER TABLE public.ai_studio_video_generations ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "team can read master video generations"
-  ON public.ai_studio_video_generations FOR SELECT TO authenticated USING (true);
 
 CREATE TRIGGER ai_studio_video_generations_touch
   BEFORE UPDATE ON public.ai_studio_video_generations
