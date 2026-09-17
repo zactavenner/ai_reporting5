@@ -11,7 +11,46 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAgencyPersonas } from "@/hooks/useAgencyPersonas";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Sparkles, FileText, Table as TableIcon, Image as ImageIcon, Send, Loader2, ExternalLink, Wand2, Square, Trash2, Film, Settings2, ChevronDown, Library, BookOpenCheck, ShieldAlert, DollarSign, Mic, Copy, Check, PanelRightClose, PanelRightOpen, Globe, Search, Pencil, Paperclip, Bot, History, X, Code2, Eye, Maximize2, Minimize2, MessageSquare, Target, Rocket, Layers, Clapperboard } from "lucide-react";
+import {
+  Sparkles,
+  FileText,
+  Table as TableIcon,
+  Image as ImageIcon,
+  Send,
+  Loader2,
+  ExternalLink,
+  Wand2,
+  Square,
+  Trash2,
+  Film,
+  Settings2,
+  ChevronDown,
+  Library,
+  BookOpenCheck,
+  ShieldAlert,
+  DollarSign,
+  Mic,
+  Copy,
+  Check,
+  PanelRightClose,
+  PanelRightOpen,
+  Globe,
+  Search,
+  Pencil,
+  Paperclip,
+  Bot,
+  History,
+  X,
+  Code2,
+  Eye,
+  Maximize2,
+  Minimize2,
+  MessageSquare,
+  Target,
+  Rocket,
+  Layers,
+  Clapperboard,
+} from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +58,13 @@ import { useAgencySettings } from "@/hooks/useAgencySettings";
 import { useClientSettings, useUpdateClientSettings } from "@/hooks/useClientSettings";
 import { useClient } from "@/hooks/useClients";
 import { toast } from "sonner";
-import { AIStudioCanvas, type CanvasEntry, type CanvasItem, type CanvasPlaceholder, modelLabel } from "./AIStudioCanvas";
+import {
+  AIStudioCanvas,
+  type CanvasEntry,
+  type CanvasItem,
+  type CanvasPlaceholder,
+  modelLabel,
+} from "./AIStudioCanvas";
 import { AIStudioReferenceLibrary } from "./AIStudioReferenceLibrary";
 import { H3RunManager } from "@/components/h3/H3RunManager";
 import { OnboardingPromptEditor } from "@/components/onboarding/OnboardingPromptEditor";
@@ -30,7 +75,16 @@ import ReactMarkdown from "react-markdown";
 import { useClientAgents, extractAgentMentions, buildAgentContextBlock } from "@/hooks/useClientAgents";
 import { useAgencyAgents } from "@/hooks/useAgencyAgents";
 import { AgentMentionPopover } from "./AgentMentionPopover";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AgentFolderInline } from "@/components/agents/AgentFolderInline";
 import { AIStudioAgentsTab } from "./AIStudioAgentsTab";
 import { AIStudioAvatarsTab } from "./AIStudioAvatarsTab";
@@ -57,7 +111,18 @@ interface Props {
 }
 
 type CompareResult = { model: string; label: string; output?: string; error?: string; ms?: number; usage?: any };
-type Msg = { id?: string; role: "user" | "assistant"; content: string; reasoning?: string; tools?: any[]; actorName?: string | null; compare?: CompareResult[]; compareLoading?: boolean; streaming?: boolean; createdAt?: string };
+type Msg = {
+  id?: string;
+  role: "user" | "assistant";
+  content: string;
+  reasoning?: string;
+  tools?: any[];
+  actorName?: string | null;
+  compare?: CompareResult[];
+  compareLoading?: boolean;
+  streaming?: boolean;
+  createdAt?: string;
+};
 type ChatImage = { url: string; aspect_ratio?: string; prompt?: string; toolName?: string; args?: any; model?: string };
 type ChatVideo = {
   url: string;
@@ -81,7 +146,15 @@ type ChatVideo = {
   actual_height?: number | null;
   resolution_match?: boolean | null;
 };
-type Attachment = { url: string; name: string; mime: string; text?: string; uploading?: boolean; fromOffer?: boolean; role?: string };
+type Attachment = {
+  url: string;
+  name: string;
+  mime: string;
+  text?: string;
+  uploading?: boolean;
+  fromOffer?: boolean;
+  role?: string;
+};
 
 const DEFAULT_CHAT_MODEL = "openrouter/deepseek/deepseek-v4-flash-latest";
 const CHAT_MODELS = [
@@ -94,7 +167,12 @@ const CHAT_MODELS = [
 const IMAGE_MODELS: { value: "nano-banana" | "openai" | "riverflow"; label: string; hint: string; price: string }[] = [
   { value: "nano-banana", label: "Nano Banana 2", hint: "Fast iteration", price: "~$0.04 / image" },
   { value: "openai", label: "GPT Image 2", hint: "Highest quality finals", price: "~$0.19 / image (high quality)" },
-  { value: "riverflow", label: "Riverflow v2 Pro", hint: "Up to 5 reference images", price: "$0.15 / image (1–2K) · $0.33 / image (4K)" },
+  {
+    value: "riverflow",
+    label: "Riverflow v2 Pro",
+    hint: "Up to 5 reference images",
+    price: "$0.15 / image (1–2K) · $0.33 / image (4K)",
+  },
 ];
 
 // Video models (all routed through OpenRouter /v1/videos)
@@ -105,10 +183,34 @@ const IMAGE_MODELS: { value: "nano-banana" | "openai" | "riverflow"; label: stri
 // Two approved video models: MiniMax H3 (720p / native 2K) and Seedance (720p only).
 // Grok, HappyHorse, Veo and Kling stay retired across every AI Studio surface.
 const VIDEO_MODELS: { value: string; label: string; hint: string; maxSeconds: number; pricePerSecond: number }[] = [
-  { value: "minimax/hailuo-3",            label: "MiniMax H3",      hint: "MiniMax H3 — 720p (fastest) or native 2K, 5–15s, text-to-video + first/last frame + reference identity, native audio", maxSeconds: 15, pricePerSecond: 0.13 },
-  { value: "bytedance/seedance-2.0",      label: "Seedance",        hint: "Seedance 2.0 — 720p only, up to 15s, text-to-video + first/last frame keyframing + reference images, native audio", maxSeconds: 15, pricePerSecond: 0.0938 },
-  { value: "bytedance/seedance-2.5",      label: "Seedance 2.5",    hint: "Seedance 2.5 — long-form: 4–30s in ONE clip, 480p or 720p, first/last frame control, native audio. Best pick for full 20–30s ads (no clip stitching).", maxSeconds: 30, pricePerSecond: 0.2311 },
-  { value: "alibaba/wan-3.0",             label: "Wan 3.0",         hint: "Alibaba Wan 3.0 — 2–30s in ONE clip, 480p / 720p / 1080p, first frame + reference images, native audio. Cheapest long-form renderer.", maxSeconds: 30, pricePerSecond: 0.034 },
+  {
+    value: "minimax/hailuo-3",
+    label: "MiniMax H3",
+    hint: "MiniMax H3 — 720p (fastest) or native 2K, 5–15s, text-to-video + first/last frame + reference identity, native audio",
+    maxSeconds: 15,
+    pricePerSecond: 0.13,
+  },
+  {
+    value: "bytedance/seedance-2.0",
+    label: "Seedance",
+    hint: "Seedance 2.0 — 720p only, up to 15s, text-to-video + first/last frame keyframing + reference images, native audio",
+    maxSeconds: 15,
+    pricePerSecond: 0.0938,
+  },
+  {
+    value: "bytedance/seedance-2.5",
+    label: "Seedance 2.5",
+    hint: "Seedance 2.5 — long-form: 4–30s in ONE clip, 480p or 720p, first/last frame control, native audio. Best pick for full 20–30s ads (no clip stitching).",
+    maxSeconds: 30,
+    pricePerSecond: 0.2311,
+  },
+  {
+    value: "alibaba/wan-3.0",
+    label: "Wan 3.0",
+    hint: "Alibaba Wan 3.0 — 2–30s in ONE clip, 480p / 720p / 1080p, first frame + reference images, native audio. Cheapest long-form renderer.",
+    maxSeconds: 30,
+    pricePerSecond: 0.034,
+  },
 ];
 export const WAN_VIDEO_MODEL = "alibaba/wan-3.0";
 export const ONLY_VIDEO_MODEL = "alibaba/wan-3.0";
@@ -118,13 +220,13 @@ export const SEEDANCE_25_VIDEO_MODEL = "bytedance/seedance-2.5";
 type VideoRes = "480p" | "720p" | "1080p" | "2k" | "4k";
 const VIDEO_MODEL_RES: Record<string, VideoRes[]> = {
   // MiniMax H3 on OpenRouter accepts 720p and native 2K (both verified end-to-end).
-  "minimax/hailuo-3":            ["720p", "2k"],
+  "minimax/hailuo-3": ["720p", "2k"],
   // Seedance is locked to 720p in Reporting 5.0.
-  "bytedance/seedance-2.0":      ["720p"],
+  "bytedance/seedance-2.0": ["720p"],
   // Seedance 2.5 offers 480p (cheapest) and 720p per OpenRouter /videos/models.
-  "bytedance/seedance-2.5":      ["480p", "720p"],
+  "bytedance/seedance-2.5": ["480p", "720p"],
   // Wan 3.0 on OpenRouter accepts 480p / 720p / 1080p.
-  "alibaba/wan-3.0":             ["480p", "720p", "1080p"],
+  "alibaba/wan-3.0": ["480p", "720p", "1080p"],
 };
 // Per-model, per-resolution USD pricing per second (OpenRouter list rates).
 // Falls back to model.pricePerSecond * generic multiplier when not specified.
@@ -148,12 +250,17 @@ const VIDEO_MODEL_MAX_SECONDS: Record<string, number> = {
 export type SpeechPace = "normal" | "fast" | "rapid";
 const SPEECH_PACES: { value: SpeechPace; label: string; wpm: number; hint: string }[] = [
   { value: "normal", label: "Normal", wpm: 158, hint: "Conversational ~150–165 wpm" },
-  { value: "fast",   label: "Fast",   wpm: 200, hint: "Tight, energetic ~190–215 wpm — minimal pauses" },
-  { value: "rapid",  label: "Rapid",  wpm: 245, hint: "Rapid-fire ad read ~230–260 wpm — zero dead air, jump-cut energy" },
+  { value: "fast", label: "Fast", wpm: 200, hint: "Tight, energetic ~190–215 wpm — minimal pauses" },
+  {
+    value: "rapid",
+    label: "Rapid",
+    wpm: 245,
+    hint: "Rapid-fire ad read ~230–260 wpm — zero dead air, jump-cut energy",
+  },
 ];
 /** Words a script can carry at the locked length + pace. Keeps VO from overrunning. */
 function paceWordBudget(seconds: number, pace: SpeechPace): number {
-  const wpm = SPEECH_PACES.find(p => p.value === pace)?.wpm ?? 158;
+  const wpm = SPEECH_PACES.find((p) => p.value === pace)?.wpm ?? 158;
   return Math.round((seconds / 60) * wpm);
 }
 function modelPricePerSecond(modelId: string, res: VideoRes, fallback: number): number {
@@ -214,8 +321,18 @@ function agentToolPolicyFor(agent: any, isMaster: boolean): "text_only" | "stati
 // AI Studio system prompt so the model picks the right dims, safe zones,
 // text-overlay placement, and platform-native look automatically.
 const AD_FORMATS: { value: string; label: string; aspect: "1:1" | "9:16" | "16:9"; hint: string }[] = [
-  { value: "reel_9x16", label: "Reel 9:16", aspect: "9:16", hint: "1080×1920 · vertical video (Reels / Shorts / TikTok / Stories)" },
-  { value: "video_16x9", label: "Video 16:9", aspect: "16:9", hint: "1920×1080 · horizontal video (YouTube / web / landscape)" },
+  {
+    value: "reel_9x16",
+    label: "Reel 9:16",
+    aspect: "9:16",
+    hint: "1080×1920 · vertical video (Reels / Shorts / TikTok / Stories)",
+  },
+  {
+    value: "video_16x9",
+    label: "Video 16:9",
+    aspect: "16:9",
+    hint: "1920×1080 · horizontal video (YouTube / web / landscape)",
+  },
   { value: "static_1x1", label: "Static 1:1", aspect: "1:1", hint: "1080×1080 · static image only (Feed posts)" },
 ];
 const aspectForAdFormat = (format: string): "9:16" | "16:9" | "1:1" =>
@@ -233,7 +350,8 @@ const detectAdFormatFromPrompt = (text: string): "reel_9x16" | "video_16x9" | "s
   if (/\b9\s*[:x/]\s*16\b/.test(t)) return "reel_9x16";
   if (/\b1\s*[:x/]\s*1\b/.test(t)) return "static_1x1";
   // Landscape / horizontal cues
-  if (/\b(landscape|horizontal|widescreen|youtube(?!\s*shorts?)|yt(?!\s*shorts?)|desktop|web\s*ad)\b/.test(t)) return "video_16x9";
+  if (/\b(landscape|horizontal|widescreen|youtube(?!\s*shorts?)|yt(?!\s*shorts?)|desktop|web\s*ad)\b/.test(t))
+    return "video_16x9";
   // Vertical / short-form cues
   if (/\b(vertical|reel|reels|tiktok|shorts?|story|stories|ig\s*story|instagram\s*story)\b/.test(t)) return "reel_9x16";
   return null;
@@ -261,28 +379,48 @@ function contextLimitFor(model: string): number {
   return 200_000;
 }
 
-function CompareGrid({ primary, isStreaming, compare, loading }: { primary: string; isStreaming: boolean; compare: CompareResult[]; loading: boolean }) {
-  const cols: Array<{ key: string; label: string; body: string; meta?: string; error?: string; streaming?: boolean }> = [
-    { key: "__primary", label: "Primary", body: primary || "", streaming: isStreaming },
-    ...compare.map((c) => ({
-      key: c.model,
-      label: c.label,
-      body: c.output || "",
-      error: c.error,
-      meta: `${c.ms ? (c.ms / 1000).toFixed(1) + "s" : ""}${c.usage?.total_tokens ? ` · ${c.usage.total_tokens} tok` : ""}`,
-    })),
-  ];
+function CompareGrid({
+  primary,
+  isStreaming,
+  compare,
+  loading,
+}: {
+  primary: string;
+  isStreaming: boolean;
+  compare: CompareResult[];
+  loading: boolean;
+}) {
+  const cols: Array<{ key: string; label: string; body: string; meta?: string; error?: string; streaming?: boolean }> =
+    [
+      { key: "__primary", label: "Primary", body: primary || "", streaming: isStreaming },
+      ...compare.map((c) => ({
+        key: c.model,
+        label: c.label,
+        body: c.output || "",
+        error: c.error,
+        meta: `${c.ms ? (c.ms / 1000).toFixed(1) + "s" : ""}${c.usage?.total_tokens ? ` · ${c.usage.total_tokens} tok` : ""}`,
+      })),
+    ];
   return (
     <div className="mt-1">
       <div className="mb-2 text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-2">
         <span>Side-by-side comparison</span>
-        {loading && <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> running compare…</span>}
+        {loading && (
+          <span className="inline-flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" /> running compare…
+          </span>
+        )}
       </div>
       <div className="grid gap-2 auto-cols-[minmax(280px,1fr)] grid-flow-col overflow-x-auto pb-2 snap-x">
         {cols.map((c) => (
-          <div key={c.key} className="snap-start rounded-xl border border-border/60 bg-background/40 backdrop-blur p-3 min-w-[280px] max-h-[520px] overflow-y-auto">
+          <div
+            key={c.key}
+            className="snap-start rounded-xl border border-border/60 bg-background/40 backdrop-blur p-3 min-w-[280px] max-h-[520px] overflow-y-auto"
+          >
             <div className="flex items-center justify-between gap-2 mb-2 sticky top-0 bg-background/80 backdrop-blur -mx-3 px-3 py-1 border-b border-border/40">
-              <Badge variant={c.key === "__primary" ? "default" : "secondary"} className="text-[10px]">{c.label}</Badge>
+              <Badge variant={c.key === "__primary" ? "default" : "secondary"} className="text-[10px]">
+                {c.label}
+              </Badge>
               {c.meta && <span className="text-[10px] text-muted-foreground">{c.meta}</span>}
             </div>
             {c.error ? (
@@ -298,7 +436,9 @@ function CompareGrid({ primary, isStreaming, compare, loading }: { primary: stri
                 )}
               </div>
             ) : c.streaming ? (
-              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> thinking…</span>
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" /> thinking…
+              </span>
             ) : loading ? (
               <div className="space-y-2 animate-pulse">
                 <div className="h-2 bg-muted rounded w-3/4" />
@@ -316,8 +456,20 @@ function CompareGrid({ primary, isStreaming, compare, loading }: { primary: stri
   );
 }
 
-function ChatMessage({ message: m, isStreaming, clientId, clientName, onApproveVideo }: { message: Msg; isStreaming: boolean; clientId: string; clientName?: string; onApproveVideo?: (plan: any) => void }) {
-  const artifacts = extractArtifacts(m.role === "assistant" ? (m.content || "") : "");
+function ChatMessage({
+  message: m,
+  isStreaming,
+  clientId,
+  clientName,
+  onApproveVideo,
+}: {
+  message: Msg;
+  isStreaming: boolean;
+  clientId: string;
+  clientName?: string;
+  onApproveVideo?: (plan: any) => void;
+}) {
+  const artifacts = extractArtifacts(m.role === "assistant" ? m.content || "" : "");
   const ts = formatChatTimestamp(m.createdAt);
   if (m.role === "user") {
     return (
@@ -350,33 +502,50 @@ function ChatMessage({ message: m, isStreaming, clientId, clientName, onApproveV
   for (const t of m.tools || []) {
     if (!t.result || t.result.error) continue;
     const u = t.result.url_for_internal_use_only || t.result.image_url;
-    if (u) inlineImages.push({ url: u, aspect_ratio: t.result.aspect_ratio, prompt: t.args?.prompt, toolName: t.name, args: t.args, model: t.result.model });
+    if (u)
+      inlineImages.push({
+        url: u,
+        aspect_ratio: t.result.aspect_ratio,
+        prompt: t.args?.prompt,
+        toolName: t.name,
+        args: t.args,
+        model: t.result.model,
+      });
     if (Array.isArray(t.result.variant_urls_internal)) {
-      for (const vu of t.result.variant_urls_internal) inlineImages.push({ url: vu, aspect_ratio: t.result.aspect_ratio, prompt: t.args?.prompt, toolName: t.name, args: t.args, model: t.result.model });
+      for (const vu of t.result.variant_urls_internal)
+        inlineImages.push({
+          url: vu,
+          aspect_ratio: t.result.aspect_ratio,
+          prompt: t.args?.prompt,
+          toolName: t.name,
+          args: t.args,
+          model: t.result.model,
+        });
     }
     const vu = t.result.video_url;
-    if (vu) inlineVideos.push({
-      url: vu,
-      aspect_ratio: t.result.aspect_ratio || t.args?.aspect_ratio,
-      prompt: t.args?.prompt || t.args?.video_prompt,
-      toolName: t.name,
-      args: t.args,
-      model: t.result.model,
-      duration: t.result.effective_duration || t.result.duration || t.args?.duration,
-      resolution: t.result.effective_resolution || t.result.resolution || t.args?.resolution,
-      requested_model: t.result.requested_model ?? t.args?.model ?? null,
-      requested_duration: t.result.requested_duration ?? t.args?.duration ?? null,
-      requested_resolution: t.result.requested_resolution ?? t.args?.resolution ?? null,
-      effective_model: t.result.effective_model ?? t.result.model ?? null,
-      effective_duration: t.result.effective_duration ?? t.result.duration ?? null,
-      effective_resolution: t.result.effective_resolution ?? t.result.resolution ?? null,
-      wire_resolution: t.result.wire_resolution ?? null,
-      wire_size: t.result.wire_size ?? null,
-      actual_resolution: t.result.actual_resolution ?? null,
-      actual_width: t.result.actual_width ?? null,
-      actual_height: t.result.actual_height ?? null,
-      resolution_match: t.result.resolution_match ?? null,
-    });
+    if (vu)
+      inlineVideos.push({
+        url: vu,
+        aspect_ratio: t.result.aspect_ratio || t.args?.aspect_ratio,
+        prompt: t.args?.prompt || t.args?.video_prompt,
+        toolName: t.name,
+        args: t.args,
+        model: t.result.model,
+        duration: t.result.effective_duration || t.result.duration || t.args?.duration,
+        resolution: t.result.effective_resolution || t.result.resolution || t.args?.resolution,
+        requested_model: t.result.requested_model ?? t.args?.model ?? null,
+        requested_duration: t.result.requested_duration ?? t.args?.duration ?? null,
+        requested_resolution: t.result.requested_resolution ?? t.args?.resolution ?? null,
+        effective_model: t.result.effective_model ?? t.result.model ?? null,
+        effective_duration: t.result.effective_duration ?? t.result.duration ?? null,
+        effective_resolution: t.result.effective_resolution ?? t.result.resolution ?? null,
+        wire_resolution: t.result.wire_resolution ?? null,
+        wire_size: t.result.wire_size ?? null,
+        actual_resolution: t.result.actual_resolution ?? null,
+        actual_width: t.result.actual_width ?? null,
+        actual_height: t.result.actual_height ?? null,
+        resolution_match: t.result.resolution_match ?? null,
+      });
   }
   return (
     <div className="text-sm text-foreground leading-relaxed">
@@ -389,7 +558,9 @@ function ChatMessage({ message: m, isStreaming, clientId, clientName, onApproveV
                 {toolDisplayName(t)}
               </Badge>
               {t.status === "running" ? (
-                <span className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> running…</span>
+                <span className="flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" /> running…
+                </span>
               ) : t.status === "error" || t.result?.error ? (
                 <span className="text-destructive truncate max-w-[260px]">{toolErrorText(t)}</span>
               ) : (
@@ -403,7 +574,8 @@ function ChatMessage({ message: m, isStreaming, clientId, clientName, onApproveV
         <div className="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 space-y-2">
           <div className="flex items-center gap-2 text-xs font-medium">
             <ShieldAlert className="h-3.5 w-3.5 text-amber-600" />
-            Approval required before rendering {pendingVideoTools.length === 1 ? "this video" : `these ${pendingVideoTools.length} videos`}
+            Approval required before rendering{" "}
+            {pendingVideoTools.length === 1 ? "this video" : `these ${pendingVideoTools.length} videos`}
           </div>
           <div className="space-y-1.5">
             {pendingVideoTools.map((t: any, i: number) => {
@@ -411,11 +583,31 @@ function ChatMessage({ message: m, isStreaming, clientId, clientName, onApproveV
               return (
                 <div key={i} className="text-[11px] text-muted-foreground">
                   <div className="flex flex-wrap gap-1.5 mb-1">
-                    {p.model && <Badge variant="secondary" className="text-[10px]">{modelLabel(p.model)}</Badge>}
-                    {p.duration && <Badge variant="outline" className="text-[10px]">{p.duration}s</Badge>}
-                    {p.resolution && <Badge variant="outline" className="text-[10px]">{p.resolution}</Badge>}
-                    {p.aspect_ratio && <Badge variant="outline" className="text-[10px]">{p.aspect_ratio}</Badge>}
-                    {p.image_url && <Badge variant="outline" className="text-[10px]">first frame</Badge>}
+                    {p.model && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        {modelLabel(p.model)}
+                      </Badge>
+                    )}
+                    {p.duration && (
+                      <Badge variant="outline" className="text-[10px]">
+                        {p.duration}s
+                      </Badge>
+                    )}
+                    {p.resolution && (
+                      <Badge variant="outline" className="text-[10px]">
+                        {p.resolution}
+                      </Badge>
+                    )}
+                    {p.aspect_ratio && (
+                      <Badge variant="outline" className="text-[10px]">
+                        {p.aspect_ratio}
+                      </Badge>
+                    )}
+                    {p.image_url && (
+                      <Badge variant="outline" className="text-[10px]">
+                        first frame
+                      </Badge>
+                    )}
                   </div>
                   {p.prompt && <p className="line-clamp-3 font-mono">{p.prompt}</p>}
                 </div>
@@ -431,7 +623,9 @@ function ChatMessage({ message: m, isStreaming, clientId, clientName, onApproveV
             >
               Approve &amp; render
             </Button>
-            <span className="text-[10px] text-muted-foreground">Nothing has been generated yet — no credits spent.</span>
+            <span className="text-[10px] text-muted-foreground">
+              Nothing has been generated yet — no credits spent.
+            </span>
           </div>
         </div>
       )}
@@ -459,7 +653,9 @@ function ChatMessage({ message: m, isStreaming, clientId, clientName, onApproveV
           </div>
           {Array.isArray(lq.samples) && lq.samples.length > 0 && (
             <details className="text-[11px] text-muted-foreground">
-              <summary className="cursor-pointer hover:text-foreground">View {lq.samples.length} flagged samples</summary>
+              <summary className="cursor-pointer hover:text-foreground">
+                View {lq.samples.length} flagged samples
+              </summary>
               <ul className="mt-1 space-y-0.5 max-h-40 overflow-y-auto pl-3">
                 {lq.samples.slice(0, 25).map((s: any, i: number) => (
                   <li key={i} className="font-mono truncate">
@@ -472,8 +668,13 @@ function ChatMessage({ message: m, isStreaming, clientId, clientName, onApproveV
         </div>
       )}
       {(m.compare && m.compare.length > 0) || m.compareLoading ? (
-        <CompareGrid primary={m.content} isStreaming={isStreaming} compare={m.compare || []} loading={!!m.compareLoading} />
-      ) : (m.content || m.reasoning) ? (
+        <CompareGrid
+          primary={m.content}
+          isStreaming={isStreaming}
+          compare={m.compare || []}
+          loading={!!m.compareLoading}
+        />
+      ) : m.content || m.reasoning ? (
         <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 prose-headings:mt-4 prose-headings:mb-2 prose-headings:font-semibold prose-strong:text-foreground prose-strong:font-semibold prose-h1:text-base prose-h2:text-sm prose-h3:text-sm prose-blockquote:border-l-primary/50 prose-code:bg-muted prose-code:px-1 prose-code:rounded">
           {m.reasoning ? (
             <details
@@ -553,7 +754,9 @@ function ChatMessage({ message: m, isStreaming, clientId, clientName, onApproveV
             <ArtifactPreviewButton key={i} artifact={a} />
           ))}
           {ts && (
-            <span className="text-[10px] text-muted-foreground/70 ml-1" title={m.createdAt}>{ts}</span>
+            <span className="text-[10px] text-muted-foreground/70 ml-1" title={m.createdAt}>
+              {ts}
+            </span>
           )}
         </div>
       )}
@@ -569,12 +772,14 @@ function formatChatTimestamp(iso?: string | null): string {
   const sameDay = d.toDateString() === now.toDateString();
   const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   if (sameDay) return time;
-  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
   if (d.toDateString() === yesterday.toDateString()) return `Yesterday · ${time}`;
   const sameYear = d.getFullYear() === now.getFullYear();
-  const date = d.toLocaleDateString([], sameYear
-    ? { month: "short", day: "numeric" }
-    : { month: "short", day: "numeric", year: "numeric" });
+  const date = d.toLocaleDateString(
+    [],
+    sameYear ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" },
+  );
   return `${date} · ${time}`;
 }
 
@@ -593,7 +798,8 @@ function extractArtifacts(text: string): Artifact[] {
 function ArtifactPreviewButton({ artifact }: { artifact: Artifact }) {
   const [open, setOpen] = useState(false);
   const html = (() => {
-    if (artifact.lang === "svg") return `<!doctype html><html><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#0a0a0a">${artifact.code}</body></html>`;
+    if (artifact.lang === "svg")
+      return `<!doctype html><html><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#0a0a0a">${artifact.code}</body></html>`;
     if (artifact.lang === "html") return artifact.code;
     // jsx/tsx/react → wrap in Babel standalone
     return `<!doctype html><html><head><meta charset="utf-8"/><script src="https://unpkg.com/react@18/umd/react.development.js"></script><script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script><script src="https://unpkg.com/@babel/standalone/babel.min.js"></script><script src="https://cdn.tailwindcss.com"></script></head><body><div id="root"></div><script type="text/babel" data-presets="react,typescript">${artifact.code}\ntry{const Comp=typeof App!=='undefined'?App:(typeof Component!=='undefined'?Component:null);if(Comp){ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Comp));}}catch(e){document.body.innerText=String(e);}</script></body></html>`;
@@ -608,19 +814,45 @@ function ArtifactPreviewButton({ artifact }: { artifact: Artifact }) {
         <Eye className="h-3 w-3" /> Preview {artifact.label}
       </button>
       {open && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm grid place-items-center p-6" onClick={() => setOpen(false)}>
-          <div className="w-full max-w-5xl h-[80vh] bg-background rounded-xl shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm grid place-items-center p-6"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="w-full max-w-5xl h-[80vh] bg-background rounded-xl shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between px-4 py-2 border-b">
-              <div className="flex items-center gap-2 text-xs"><Code2 className="h-3.5 w-3.5" /> Live artifact preview ({artifact.label})</div>
+              <div className="flex items-center gap-2 text-xs">
+                <Code2 className="h-3.5 w-3.5" /> Live artifact preview ({artifact.label})
+              </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => { navigator.clipboard.writeText(artifact.code); toast.success("Copied"); }} className="text-[10px] px-2 py-1 rounded hover:bg-muted">Copy code</button>
-                <button onClick={() => {
-                  const blob = new Blob([artifact.lang === "html" ? html : artifact.code], { type: "text/html" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a"); a.href = url; a.download = `artifact.${artifact.lang === "tsx" ? "tsx" : artifact.lang === "jsx" ? "jsx" : artifact.lang}`;
-                  a.click(); URL.revokeObjectURL(url);
-                }} className="text-[10px] px-2 py-1 rounded hover:bg-muted">Download</button>
-                <button onClick={() => setOpen(false)} className="p-1 hover:bg-muted rounded"><X className="h-4 w-4" /></button>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(artifact.code);
+                    toast.success("Copied");
+                  }}
+                  className="text-[10px] px-2 py-1 rounded hover:bg-muted"
+                >
+                  Copy code
+                </button>
+                <button
+                  onClick={() => {
+                    const blob = new Blob([artifact.lang === "html" ? html : artifact.code], { type: "text/html" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `artifact.${artifact.lang === "tsx" ? "tsx" : artifact.lang === "jsx" ? "jsx" : artifact.lang}`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="text-[10px] px-2 py-1 rounded hover:bg-muted"
+                >
+                  Download
+                </button>
+                <button onClick={() => setOpen(false)} className="p-1 hover:bg-muted rounded">
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             </div>
             <iframe srcDoc={html} className="flex-1 w-full bg-white" sandbox="allow-scripts" title="artifact" />
@@ -636,7 +868,11 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={async () => {
-        try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {}
       }}
       className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition px-2 py-1 rounded-md hover:bg-muted"
       title="Copy reply"
@@ -665,7 +901,10 @@ async function downloadAsset(url: string, suggestedName: string) {
   }
 }
 
-function buildRecreatePrompt(asset: { prompt?: string; toolName?: string; args?: any }, kind: "image" | "video"): string {
+function buildRecreatePrompt(
+  asset: { prompt?: string; toolName?: string; args?: any },
+  kind: "image" | "video",
+): string {
   const a = asset.args || {};
   const lines: string[] = [];
   lines.push(`Regenerate with same params (edit anything below before sending):`);
@@ -719,7 +958,10 @@ function PreviewActionBar({
   const [sent, setSent] = useState(false);
   const sendToCreatives = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!url || !clientId) { toast.error("No client selected"); return; }
+    if (!url || !clientId) {
+      toast.error("No client selected");
+      return;
+    }
     setSending(true);
     try {
       const row = {
@@ -745,7 +987,10 @@ function PreviewActionBar({
   return (
     <div className="flex items-center gap-1">
       <button
-        onClick={(e) => { e.stopPropagation(); downloadAsset(url, filename); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          downloadAsset(url, filename);
+        }}
         className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-primary text-primary-foreground hover:opacity-90"
         title="Download"
       >
@@ -768,7 +1013,7 @@ function PreviewActionBar({
           window.dispatchEvent(
             new CustomEvent("aistudio:add-canvas-asset", {
               detail: { kind: canvasKind, payload: { ...canvasPayload, prompt } },
-            })
+            }),
           );
         }}
         className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-muted hover:bg-muted/70 text-foreground"
@@ -796,7 +1041,7 @@ function ChatImagePreview({ image, clientId }: { image: ChatImage; clientId?: st
       e.dataTransfer.setData("text/plain", image.url);
       e.dataTransfer.setData(
         "application/x-aistudio-image",
-        JSON.stringify({ url: image.url, aspect_ratio: image.aspect_ratio, prompt: image.prompt })
+        JSON.stringify({ url: image.url, aspect_ratio: image.aspect_ratio, prompt: image.prompt }),
       );
       e.dataTransfer.effectAllowed = "copyMove";
     } catch {}
@@ -807,7 +1052,9 @@ function ChatImagePreview({ image, clientId }: { image: ChatImage; clientId?: st
     <div className="shrink-0 snap-start w-56 rounded-xl border border-border/60 bg-muted/30 overflow-hidden">
       {image.model && (
         <div className="px-2 pt-1.5 pb-1 flex items-center gap-1 border-b border-border/40">
-          <Badge variant="secondary" className="text-[9px] h-4 px-1.5" title={image.model}>{modelLabel(image.model)}</Badge>
+          <Badge variant="secondary" className="text-[9px] h-4 px-1.5" title={image.model}>
+            {modelLabel(image.model)}
+          </Badge>
           {image.aspect_ratio && <span className="text-[9px] text-muted-foreground">{image.aspect_ratio}</span>}
         </div>
       )}
@@ -818,7 +1065,13 @@ function ChatImagePreview({ image, clientId }: { image: ChatImage; clientId?: st
         className="relative h-56 w-56 cursor-zoom-in bg-muted/40"
         title="Click to expand · drag onto composer to use as reference"
       >
-        <img src={image.url} alt={image.prompt || "Generated"} className="h-full w-full object-cover pointer-events-none" loading="lazy" draggable={false} />
+        <img
+          src={image.url}
+          alt={image.prompt || "Generated"}
+          className="h-full w-full object-cover pointer-events-none"
+          loading="lazy"
+          draggable={false}
+        />
       </div>
       <div className="px-2 py-1.5 flex items-center justify-between gap-1 border-t border-border/40">
         <PreviewActionBar
@@ -840,7 +1093,9 @@ function ChatImagePreview({ image, clientId }: { image: ChatImage; clientId?: st
         <button
           onClick={(e) => {
             e.stopPropagation();
-            window.dispatchEvent(new CustomEvent("aistudio:use-image", { detail: { url: image.url, name: `ref-${Date.now()}.png` } }));
+            window.dispatchEvent(
+              new CustomEvent("aistudio:use-image", { detail: { url: image.url, name: `ref-${Date.now()}.png` } }),
+            );
             toast.success("Added as reference");
           }}
           className="text-[10px] px-1.5 py-1 rounded-md hover:bg-muted text-muted-foreground"
@@ -850,15 +1105,30 @@ function ChatImagePreview({ image, clientId }: { image: ChatImage; clientId?: st
         </button>
       </div>
       {open && (
-        <div onClick={() => setOpen(false)} className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm grid place-items-center p-4 cursor-zoom-out">
-          <img src={image.url} alt={image.prompt || "Generated"} className="max-w-[90vw] max-h-[90vh] rounded-xl shadow-2xl" />
+        <div
+          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm grid place-items-center p-4 cursor-zoom-out"
+        >
+          <img
+            src={image.url}
+            alt={image.prompt || "Generated"}
+            className="max-w-[90vw] max-h-[90vh] rounded-xl shadow-2xl"
+          />
         </div>
       )}
     </div>
   );
 }
 
-function ChatVideoPreview({ video, clientId, clientName }: { video: ChatVideo; clientId: string; clientName?: string }) {
+function ChatVideoPreview({
+  video,
+  clientId,
+  clientName,
+}: {
+  video: ChatVideo;
+  clientId: string;
+  clientName?: string;
+}) {
   const filename = `aistudio-${Date.now()}.mp4`;
   const aspect = video.aspect_ratio === "16:9" ? "16/9" : video.aspect_ratio === "1:1" ? "1/1" : "9/16";
   const hasUrl = !!video.url;
@@ -903,11 +1173,13 @@ function ChatVideoPreview({ video, clientId, clientName }: { video: ChatVideo; c
     <div className="shrink-0 snap-start w-72 rounded-xl border border-border/60 bg-muted/30 overflow-hidden">
       {video.model && (
         <div className="px-2 pt-1.5 pb-1 flex items-center gap-1 border-b border-border/40">
-          <Badge variant="secondary" className="text-[9px] h-4 px-1.5" title={video.model}>{modelLabel(video.model)}</Badge>
+          <Badge variant="secondary" className="text-[9px] h-4 px-1.5" title={video.model}>
+            {modelLabel(video.model)}
+          </Badge>
           {video.aspect_ratio && <span className="text-[9px] text-muted-foreground">{video.aspect_ratio}</span>}
           {video.resolution && <span className="text-[9px] text-muted-foreground">· {video.resolution}</span>}
-          {video.actual_resolution && (
-            video.resolution_match === false ? (
+          {video.actual_resolution &&
+            (video.resolution_match === false ? (
               <span
                 className="text-[9px] font-medium text-amber-600 dark:text-amber-400"
                 title={`Requested ${video.resolution || "?"} but actual output is ${video.actual_resolution} (${video.actual_width}×${video.actual_height}). The model may have downscaled.`}
@@ -922,8 +1194,7 @@ function ChatVideoPreview({ video, clientId, clientName }: { video: ChatVideo; c
               >
                 ✓ verified
               </span>
-            )
-          )}
+            ))}
         </div>
       )}
       <VideoPlayerCard
@@ -932,28 +1203,56 @@ function ChatVideoPreview({ video, clientId, clientName }: { video: ChatVideo; c
         status={hasUrl ? "ready" : "failed"}
         errorMessage={!hasUrl ? "The video URL could not be returned. Try Recreate." : undefined}
         className="rounded-none border-0"
-        onEdit={hasUrl ? (u) => {
-          window.dispatchEvent(new CustomEvent("aistudio:edit-video", {
-            detail: { url: u, prompt: video.prompt, aspect_ratio: video.aspect_ratio },
-          }));
-        } : undefined}
+        onEdit={
+          hasUrl
+            ? (u) => {
+                window.dispatchEvent(
+                  new CustomEvent("aistudio:edit-video", {
+                    detail: { url: u, prompt: video.prompt, aspect_ratio: video.aspect_ratio },
+                  }),
+                );
+              }
+            : undefined
+        }
       />
       {isH3 && (
         <div className="mx-2 mt-2 rounded-lg border border-primary/25 bg-primary/5 p-2 text-[9px]">
           <div className="mb-1 flex items-center justify-between gap-2">
             <span className="font-semibold text-foreground">MiniMax H3 render debug</span>
             <Badge variant={h3Locked ? "secondary" : "destructive"} className="h-4 px-1 text-[9px]">
-              {h3Locked ? `Locked 15s/${String(effectiveResolution || "").toLowerCase() === "2k" ? "2K" : "720p"}` : "Check"}
+              {h3Locked
+                ? `Locked 15s/${String(effectiveResolution || "").toLowerCase() === "2k" ? "2K" : "720p"}`
+                : "Check"}
             </Badge>
           </div>
           <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-muted-foreground">
-            <span>Exact model</span><span className="font-mono text-foreground truncate" title={effectiveModel}>{effectiveModel}</span>
-            <span>Duration used</span><span className="font-mono text-foreground">{effectiveDuration ?? "—"}s</span>
-            <span>Resolution used</span><span className="font-mono text-foreground">{effectiveResolution || "—"}</span>
-            <span>OpenRouter sent</span><span className="font-mono text-foreground">{video.wire_resolution || effectiveResolution || "—"}</span>
-            {video.wire_size && <><span>Exact size sent</span><span className="font-mono text-foreground">{video.wire_size}</span></>}
-            <span>Requested</span><span className="font-mono text-foreground truncate">{video.requested_duration ?? video.duration ?? "—"}s / {video.requested_resolution ?? video.resolution ?? "—"}</span>
-            <span>Actual file</span><span className="font-mono text-foreground">{video.actual_width && video.actual_height ? `${video.actual_width}×${video.actual_height}` : video.actual_resolution || "pending"}</span>
+            <span>Exact model</span>
+            <span className="font-mono text-foreground truncate" title={effectiveModel}>
+              {effectiveModel}
+            </span>
+            <span>Duration used</span>
+            <span className="font-mono text-foreground">{effectiveDuration ?? "—"}s</span>
+            <span>Resolution used</span>
+            <span className="font-mono text-foreground">{effectiveResolution || "—"}</span>
+            <span>OpenRouter sent</span>
+            <span className="font-mono text-foreground">{video.wire_resolution || effectiveResolution || "—"}</span>
+            {video.wire_size && (
+              <>
+                <span>Exact size sent</span>
+                <span className="font-mono text-foreground">{video.wire_size}</span>
+              </>
+            )}
+            <span>Requested</span>
+            <span className="font-mono text-foreground truncate">
+              {video.requested_duration ?? video.duration ?? "—"}s /{" "}
+              {video.requested_resolution ?? video.resolution ?? "—"}
+            </span>
+            <span>Actual file</span>
+            <span className="font-mono text-foreground">
+              {video.actual_width && video.actual_height
+                ? `${video.actual_width}×${video.actual_height}`
+                : video.actual_resolution || "pending"}
+            </span>
           </div>
         </div>
       )}
@@ -1008,10 +1307,16 @@ function ChatVideoPreview({ video, clientId, clientName }: { video: ChatVideo; c
 const SUGGESTIONS = [
   { icon: <ImageIcon className="h-4 w-4" />, label: "Generate a 1:1 ad creative for our offer" },
   { icon: <Wand2 className="h-4 w-4" />, label: "Generate 4 Instagram 1:1 variations of our offer" },
-  { icon: <Film className="h-4 w-4" />, label: "Build a 32s 9:16 reel (4 keyframes → wait for my approval → Veo 3.1, 8s each)" },
+  {
+    icon: <Film className="h-4 w-4" />,
+    label: "Build a 32s 9:16 reel (4 keyframes → wait for my approval → Veo 3.1, 8s each)",
+  },
   { icon: <FileText className="h-4 w-4" />, label: "Summarize the master doc" },
   { icon: <TableIcon className="h-4 w-4" />, label: "Audit EVERY tab in the sheet and give me a performance report" },
-  { icon: <ShieldAlert className="h-4 w-4" />, label: "Scan leads for spam patterns (armyspy, teleworm, name/email mismatch)" },
+  {
+    icon: <ShieldAlert className="h-4 w-4" />,
+    label: "Scan leads for spam patterns (armyspy, teleworm, name/email mismatch)",
+  },
 ];
 
 // Defensive: strip any image markdown / image URLs from streamed assistant text
@@ -1056,7 +1361,9 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     return DEFAULT_CHAT_MODEL;
   });
   useEffect(() => {
-    try { localStorage.setItem("ai-studio:chat-model", chatModel); } catch {}
+    try {
+      localStorage.setItem("ai-studio:chat-model", chatModel);
+    } catch {}
   }, [chatModel]);
   // Extra models for inline side-by-side comparison (besides chatModel).
   const [compareModels, setCompareModels] = useState<string[]>([]);
@@ -1071,7 +1378,9 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     return [];
   });
   useEffect(() => {
-    try { localStorage.setItem("ai-studio:image-models", JSON.stringify(imageModels)); } catch {}
+    try {
+      localStorage.setItem("ai-studio:image-models", JSON.stringify(imageModels));
+    } catch {}
   }, [imageModels]);
   const [videoModels, setVideoModels] = useState<string[]>(() => {
     const known = new Set(VIDEO_MODELS.map((m) => m.value));
@@ -1093,7 +1402,9 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     return [];
   });
   useEffect(() => {
-    try { localStorage.setItem("ai-studio:video-models", JSON.stringify(videoModels)); } catch {}
+    try {
+      localStorage.setItem("ai-studio:video-models", JSON.stringify(videoModels));
+    } catch {}
   }, [videoModels]);
   // first selection drives single-clip default model passed to the server
   const videoModel = videoModels[0] || undefined;
@@ -1109,7 +1420,9 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     return "2k";
   });
   useEffect(() => {
-    try { localStorage.setItem("ai-studio:video-resolution", videoResolution); } catch {}
+    try {
+      localStorage.setItem("ai-studio:video-resolution", videoResolution);
+    } catch {}
   }, [videoResolution]);
   // Target total video length in seconds. H3 / Seedance 2.0 are hard-capped to 15s
   // per clip, so 30s renders as two back-to-back 15s clips (same ingredient/first
@@ -1119,20 +1432,28 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     try {
       const v = Number(localStorage.getItem("ai-studio:video-total-duration"));
       return Number.isFinite(v) && v >= 4 && v <= 30 ? Math.round(v) : 15;
-    } catch { return 15; }
+    } catch {
+      return 15;
+    }
   });
   useEffect(() => {
-    try { localStorage.setItem("ai-studio:video-total-duration", String(videoTotalDuration)); } catch {}
+    try {
+      localStorage.setItem("ai-studio:video-total-duration", String(videoTotalDuration));
+    } catch {}
   }, [videoTotalDuration]);
   // Talk speed for the voiceover. Persisted so fast-paced ad workflows stay sticky.
   const [speechPace, setSpeechPace] = useState<SpeechPace>(() => {
     try {
       const v = localStorage.getItem("ai-studio:speech-pace");
       return v === "fast" || v === "rapid" || v === "normal" ? v : "fast";
-    } catch { return "fast"; }
+    } catch {
+      return "fast";
+    }
   });
   useEffect(() => {
-    try { localStorage.setItem("ai-studio:speech-pace", speechPace); } catch {}
+    try {
+      localStorage.setItem("ai-studio:speech-pace", speechPace);
+    } catch {}
   }, [speechPace]);
   // Video Ads agent has two intents: "chat" (script/strategy only — no renders,
   // no spend) and "produce" (renders with the locked composer settings).
@@ -1140,10 +1461,14 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     try {
       const v = localStorage.getItem("ai-studio:video-intent");
       return v === "produce" ? "produce" : v === "image" ? "image" : "chat";
-    } catch { return "chat"; }
+    } catch {
+      return "chat";
+    }
   });
   useEffect(() => {
-    try { localStorage.setItem("ai-studio:video-intent", videoIntent); } catch {}
+    try {
+      localStorage.setItem("ai-studio:video-intent", videoIntent);
+    } catch {}
   }, [videoIntent]);
 
   // Video Styles (UGC, Podcast, B-roll VO, Animated Cartoon, plus user-defined).
@@ -1155,10 +1480,16 @@ export function AIStudioTab({ clientId, clientName }: Props) {
       const raw = localStorage.getItem("ai-studio:video-preset-styles");
       const arr = raw ? JSON.parse(raw) : [];
       return Array.isArray(arr) ? arr.filter((v: unknown) => typeof v === "string") : [];
-    } catch { return []; }
+    } catch {
+      return [];
+    }
   });
   useEffect(() => {
-    try { localStorage.setItem("ai-studio:video-preset-styles", JSON.stringify(presetStyleIds)); } catch { /* ignore */ }
+    try {
+      localStorage.setItem("ai-studio:video-preset-styles", JSON.stringify(presetStyleIds));
+    } catch {
+      /* ignore */
+    }
   }, [presetStyleIds]);
   const imageStyles = useImageStyles();
   const [adFormat, setAdFormat] = useState<string>(() => {
@@ -1174,9 +1505,15 @@ export function AIStudioTab({ clientId, clientName }: Props) {
         youtube_16x9: "video_16x9",
       };
       return legacy[stored] || stored;
-    } catch { return "reel_9x16"; }
+    } catch {
+      return "reel_9x16";
+    }
   });
-  useEffect(() => { try { localStorage.setItem("ai-studio:ad-format", adFormat); } catch {} }, [adFormat]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("ai-studio:ad-format", adFormat);
+    } catch {}
+  }, [adFormat]);
   useEffect(() => {
     // Video generation has exactly two formats: 9:16 Reel and 16:9 Video.
     // If a browser had the static 1:1 option persisted, switch it off as soon
@@ -1186,15 +1523,31 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     }
   }, [adFormat, videoModels.length]);
   const [hookFramework, setHookFramework] = useState<string>(() => {
-    try { return localStorage.getItem("ai-studio:hook-framework") || "auto"; } catch { return "auto"; }
+    try {
+      return localStorage.getItem("ai-studio:hook-framework") || "auto";
+    } catch {
+      return "auto";
+    }
   });
-  useEffect(() => { try { localStorage.setItem("ai-studio:hook-framework", hookFramework); } catch {} }, [hookFramework]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("ai-studio:hook-framework", hookFramework);
+    } catch {}
+  }, [hookFramework]);
   // Selected offer drives which client offer the AI uses as the active campaign context.
   // "all" = pass every offer as context. Otherwise a single offer.id.
   const [selectedOfferId, setSelectedOfferId] = useState<string>(() => {
-    try { return localStorage.getItem(`ai-studio:offer:${clientId}`) || "all"; } catch { return "all"; }
+    try {
+      return localStorage.getItem(`ai-studio:offer:${clientId}`) || "all";
+    } catch {
+      return "all";
+    }
   });
-  useEffect(() => { try { localStorage.setItem(`ai-studio:offer:${clientId}`, selectedOfferId); } catch {} }, [clientId, selectedOfferId]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(`ai-studio:offer:${clientId}`, selectedOfferId);
+    } catch {}
+  }, [clientId, selectedOfferId]);
   const [activeReferenceIds, setActiveReferenceIds] = useState<string[]>([]);
   const [activeVideoReferenceIds, setActiveVideoReferenceIds] = useState<string[]>([]);
   const [contextUsage, setContextUsage] = useState<{ chars: number; tokens: number } | null>(null);
@@ -1214,23 +1567,30 @@ export function AIStudioTab({ clientId, clientName }: Props) {
   // Offer context handed to a backend goal so Jarvis has the same offer knowledge
   // the chat composer sends.
   const goalOfferContext = useMemo(() => {
-    const list = selectedOfferId === "all"
-      ? (clientOffers as any[])
-      : (clientOffers as any[]).filter((o) => o.id === selectedOfferId);
+    const list =
+      selectedOfferId === "all"
+        ? (clientOffers as any[])
+        : (clientOffers as any[]).filter((o) => o.id === selectedOfferId);
     if (!list?.length) return undefined;
-    return list.map((o: any, i: number) => {
-      const parts = [`OFFER ${i + 1}: ${o.title}`];
-      if (o.description) parts.push(o.description);
-      const files = (clientOfferFiles as any[]).filter((f) => f.offer_id === o.id);
-      files.forEach((f: any, idx: number) => parts.push(`  ${idx + 1}. ${f.file_name} → ${f.file_url}`));
-      return parts.join("\n");
-    }).join("\n\n---\n\n");
+    return list
+      .map((o: any, i: number) => {
+        const parts = [`OFFER ${i + 1}: ${o.title}`];
+        if (o.description) parts.push(o.description);
+        const files = (clientOfferFiles as any[]).filter((f) => f.offer_id === o.id);
+        files.forEach((f: any, idx: number) => parts.push(`  ${idx + 1}. ${f.file_name} → ${f.file_url}`));
+        return parts.join("\n");
+      })
+      .join("\n\n---\n\n");
   }, [clientOffers, clientOfferFiles, selectedOfferId]);
   const [caretPos, setCaretPos] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [aiStudioTab, setAiStudioTab] = useState<"chat" | "agents" | "avatars">("chat");
   const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(() => {
-    try { return localStorage.getItem(`ai-studio:avatar:${clientId}`) || null; } catch { return null; }
+    try {
+      return localStorage.getItem(`ai-studio:avatar:${clientId}`) || null;
+    } catch {
+      return null;
+    }
   });
   useEffect(() => {
     try {
@@ -1239,10 +1599,20 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     } catch {}
   }, [selectedAvatarId, clientId]);
   const { data: studioAvatars = [] } = useAvatars(clientId);
-  const selectedAvatar = studioAvatars.find(a => a.id === selectedAvatarId) || null;
-  const [editVideo, setEditVideo] = useState<{ url: string; prompt?: string; aspect_ratio?: string; autoCaptions?: boolean } | null>(null);
+  const selectedAvatar = studioAvatars.find((a) => a.id === selectedAvatarId) || null;
+  const [editVideo, setEditVideo] = useState<{
+    url: string;
+    prompt?: string;
+    aspect_ratio?: string;
+    autoCaptions?: boolean;
+  } | null>(null);
   const [captionsVideo, setCaptionsVideo] = useState<{ url: string } | null>(null);
-  const [disclaimerTarget, setDisclaimerTarget] = useState<{ kind: "image" | "video"; url: string; aspect_ratio?: string; prompt?: string } | null>(null);
+  const [disclaimerTarget, setDisclaimerTarget] = useState<{
+    kind: "image" | "video";
+    url: string;
+    aspect_ratio?: string;
+    prompt?: string;
+  } | null>(null);
   const { data: agencyRefs } = useAgencyReferences();
   const { data: clientRefs } = useClientReferences(clientId);
   // Counter of in-flight `send()` calls. Treated as boolean (0 = idle, >0 = running)
@@ -1250,21 +1620,54 @@ export function AIStudioTab({ clientId, clientName }: Props) {
   const [loading, setLoading] = useState<number>(0);
   const [hydrated, setHydrated] = useState(false);
   const [showCanvas, setShowCanvas] = useState<boolean>(() => {
-    try { return localStorage.getItem("ai-studio:show-canvas") !== "false"; } catch { return true; }
+    try {
+      return localStorage.getItem("ai-studio:show-canvas") !== "false";
+    } catch {
+      return true;
+    }
   });
   const [showChat, setShowChat] = useState<boolean>(() => {
-    try { return localStorage.getItem("ai-studio:show-chat") !== "false"; } catch { return true; }
+    try {
+      return localStorage.getItem("ai-studio:show-chat") !== "false";
+    } catch {
+      return true;
+    }
   });
-  useEffect(() => { try { localStorage.setItem("ai-studio:show-chat", String(showChat)); } catch {} }, [showChat]);
-  useEffect(() => { try { localStorage.setItem("ai-studio:show-canvas", String(showCanvas)); } catch {} }, [showCanvas]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("ai-studio:show-chat", String(showChat));
+    } catch {}
+  }, [showChat]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("ai-studio:show-canvas", String(showCanvas));
+    } catch {}
+  }, [showCanvas]);
   const [wideChat, setWideChat] = useState<boolean>(() => {
-    try { return localStorage.getItem("ai-studio:wide-chat") === "true"; } catch { return false; }
+    try {
+      return localStorage.getItem("ai-studio:wide-chat") === "true";
+    } catch {
+      return false;
+    }
   });
-  useEffect(() => { try { localStorage.setItem("ai-studio:wide-chat", String(wideChat)); } catch {} }, [wideChat]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("ai-studio:wide-chat", String(wideChat));
+    } catch {}
+  }, [wideChat]);
   const [composerHeight, setComposerHeight] = useState<number>(() => {
-    try { const v = parseInt(localStorage.getItem("ai-studio:composer-h") || "", 10); return Number.isFinite(v) && v >= 80 ? v : 120; } catch { return 120; }
+    try {
+      const v = parseInt(localStorage.getItem("ai-studio:composer-h") || "", 10);
+      return Number.isFinite(v) && v >= 80 ? v : 120;
+    } catch {
+      return 120;
+    }
   });
-  useEffect(() => { try { localStorage.setItem("ai-studio:composer-h", String(composerHeight)); } catch {} }, [composerHeight]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("ai-studio:composer-h", String(composerHeight));
+    } catch {}
+  }, [composerHeight]);
   const [followups, setFollowups] = useState<string[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -1272,9 +1675,17 @@ export function AIStudioTab({ clientId, clientName }: Props) {
   const speechBaseInputRef = useRef<string>("");
   const [threads, setThreads] = useState<Thread[]>([]);
   const [showThreads, setShowThreads] = useState<boolean>(() => {
-    try { return localStorage.getItem("ai-studio:show-threads") !== "false"; } catch { return true; }
+    try {
+      return localStorage.getItem("ai-studio:show-threads") !== "false";
+    } catch {
+      return true;
+    }
   });
-  useEffect(() => { try { localStorage.setItem("ai-studio:show-threads", String(showThreads)); } catch {} }, [showThreads]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("ai-studio:show-threads", String(showThreads));
+    } catch {}
+  }, [showThreads]);
   // Mobile-only view switcher: shows either Chat or Canvas at < lg width
   // so both panels don't stack into a giant scroll on phones.
   const [mobileView, setMobileView] = useState<"chat" | "canvas">("chat");
@@ -1284,27 +1695,46 @@ export function AIStudioTab({ clientId, clientName }: Props) {
   const [fullscreen, setFullscreen] = useState<"none" | "chat" | "canvas">("none");
   useEffect(() => {
     if (fullscreen === "none") return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFullscreen("none"); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFullscreen("none");
+    };
     window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
   }, [fullscreen]);
   const chatFsClass = fullscreen === "chat" ? "fixed inset-0 z-[60] rounded-none" : "";
   const canvasFsClass = fullscreen === "canvas" ? "fixed inset-0 z-[60] rounded-none" : "";
   const [agentMode, setAgentMode] = useState<boolean>(() => {
-    try { return localStorage.getItem("ai-studio:agent-mode") === "true"; } catch { return false; }
+    try {
+      return localStorage.getItem("ai-studio:agent-mode") === "true";
+    } catch {
+      return false;
+    }
   });
-  useEffect(() => { try { localStorage.setItem("ai-studio:agent-mode", String(agentMode)); } catch {} }, [agentMode]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("ai-studio:agent-mode", String(agentMode));
+    } catch {}
+  }, [agentMode]);
   // Active agent selector — replaces the old binary "Agent" toggle.
   // Values: "off" (no agent), "master" (delegating master agent that picks the right
   // specialist), or a specific client_agents.id. When a specific agent is picked we also
   // override chatModel with that agent's preferred model, if it has one.
   const [selectedAgentId, setSelectedAgentId] = useState<string>(() => {
-    try { return localStorage.getItem(`ai-studio:agent-id:${clientId}`) || (agentMode ? "master" : "off"); } catch { return "off"; }
+    try {
+      return localStorage.getItem(`ai-studio:agent-id:${clientId}`) || (agentMode ? "master" : "off");
+    } catch {
+      return "off";
+    }
   });
   useEffect(() => {
-    try { localStorage.setItem(`ai-studio:agent-id:${clientId}`, selectedAgentId); } catch {}
+    try {
+      localStorage.setItem(`ai-studio:agent-id:${clientId}`, selectedAgentId);
+    } catch {}
     // Keep legacy agentMode flag in sync so backend keeps receiving it
     setAgentMode(selectedAgentId !== "off");
   }, [selectedAgentId, clientId]);
@@ -1312,48 +1742,78 @@ export function AIStudioTab({ clientId, clientName }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Sticky frame slots for video generation (first frame / last frame / ingredient/product image)
   type FrameSlot = "firstFrame" | "lastFrame" | "ingredient";
-  const [videoFrames, setVideoFrames] = useState<{ firstFrameUrl?: string; lastFrameUrl?: string; ingredientUrl?: string; ingredientUrls?: string[] }>(() => {
-    try { return JSON.parse(localStorage.getItem(`ai-studio:video-frames:${clientId}`) || "{}"); } catch { return {}; }
+  const [videoFrames, setVideoFrames] = useState<{
+    firstFrameUrl?: string;
+    lastFrameUrl?: string;
+    ingredientUrl?: string;
+    ingredientUrls?: string[];
+  }>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(`ai-studio:video-frames:${clientId}`) || "{}");
+    } catch {
+      return {};
+    }
   });
   useEffect(() => {
-    try { localStorage.setItem(`ai-studio:video-frames:${clientId}`, JSON.stringify(videoFrames)); } catch {}
+    try {
+      localStorage.setItem(`ai-studio:video-frames:${clientId}`, JSON.stringify(videoFrames));
+    } catch {}
   }, [videoFrames, clientId]);
   const frameInputRef = useRef<HTMLInputElement>(null);
   const frameSlotRef = useRef<FrameSlot | null>(null);
   const [uploadingSlot, setUploadingSlot] = useState<FrameSlot | null>(null);
-  const uploadFrame = useCallback(async (slot: FrameSlot, files: File | File[]) => {
-    const list = Array.isArray(files) ? files : [files];
-    if (list.some((f) => f.size > 20 * 1024 * 1024)) { toast.error("Each frame must be under 20MB"); return; }
-    setUploadingSlot(slot);
-    try {
-      const uploaded: string[] = [];
-      for (const file of list) {
-        const ext = file.name.split(".").pop() || "png";
-        const path = `ai-studio/${clientId}/frames/${slot}-${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
-        const { error } = await supabase.storage.from("gpt-files").upload(path, file, { contentType: file.type, upsert: false });
-        if (error) throw error;
-        const { data: pub } = supabase.storage.from("gpt-files").getPublicUrl(path);
-        uploaded.push(pub.publicUrl);
+  const uploadFrame = useCallback(
+    async (slot: FrameSlot, files: File | File[]) => {
+      const list = Array.isArray(files) ? files : [files];
+      if (list.some((f) => f.size > 20 * 1024 * 1024)) {
+        toast.error("Each frame must be under 20MB");
+        return;
       }
-      if (!uploaded.length) return;
-      setVideoFrames(curr => {
-        if (slot === "firstFrame") return { ...curr, firstFrameUrl: uploaded[0] };
-        if (slot === "lastFrame") return { ...curr, lastFrameUrl: uploaded[0] };
-        // Ingredient slot accepts MULTIPLE reference images (Seedance 2.0 & 2.5).
-        const next = Array.from(new Set([...(curr.ingredientUrls || []), ...(curr.ingredientUrl ? [curr.ingredientUrl] : []), ...uploaded])).slice(0, 7);
-        return { ...curr, ingredientUrl: next[0], ingredientUrls: next };
-      });
-    } catch (e: any) {
-      toast.error(`Upload failed: ${e?.message || e}`);
-    } finally {
-      setUploadingSlot(null);
-    }
-  }, [clientId]);
+      setUploadingSlot(slot);
+      try {
+        const uploaded: string[] = [];
+        for (const file of list) {
+          const ext = file.name.split(".").pop() || "png";
+          const path = `ai-studio/${clientId}/frames/${slot}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+          const { error } = await supabase.storage
+            .from("gpt-files")
+            .upload(path, file, { contentType: file.type, upsert: false });
+          if (error) throw error;
+          const { data: pub } = supabase.storage.from("gpt-files").getPublicUrl(path);
+          uploaded.push(pub.publicUrl);
+        }
+        if (!uploaded.length) return;
+        setVideoFrames((curr) => {
+          if (slot === "firstFrame") return { ...curr, firstFrameUrl: uploaded[0] };
+          if (slot === "lastFrame") return { ...curr, lastFrameUrl: uploaded[0] };
+          // Ingredient slot accepts MULTIPLE reference images (Seedance 2.0 & 2.5).
+          const next = Array.from(
+            new Set([...(curr.ingredientUrls || []), ...(curr.ingredientUrl ? [curr.ingredientUrl] : []), ...uploaded]),
+          ).slice(0, 7);
+          return { ...curr, ingredientUrl: next[0], ingredientUrls: next };
+        });
+      } catch (e: any) {
+        toast.error(`Upload failed: ${e?.message || e}`);
+      } finally {
+        setUploadingSlot(null);
+      }
+    },
+    [clientId],
+  );
   const mediaRecRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recStreamRef = useRef<MediaStream | null>(null);
   const [clientDocUrl, setClientDocUrl] = useState<string>("");
-  const [docTest, setDocTest] = useState<null | { ok: boolean; source?: string; title?: string; char_count?: number; doc_id?: string; latency_ms?: number; error?: string; client?: { name?: string } }>(null);
+  const [docTest, setDocTest] = useState<null | {
+    ok: boolean;
+    source?: string;
+    title?: string;
+    char_count?: number;
+    doc_id?: string;
+    latency_ms?: number;
+    error?: string;
+    client?: { name?: string };
+  }>(null);
   const [testingDoc, setTestingDoc] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRefs = useRef<Set<AbortController>>(new Set());
@@ -1378,11 +1838,7 @@ export function AIStudioTab({ clientId, clientName }: Props) {
   // rail agent, image/static controls ONLY in Static Ads. Every other agent
   // (Jarvis, Media Buyer, Reporting, Sales, Jeremy AI) is chat-only.
   const selectedAgentMode: "static" | "video" | null =
-    selectedAgentId === "slug:video_ads"
-      ? "video"
-      : selectedAgentId === "slug:static_ads"
-        ? "static"
-        : null;
+    selectedAgentId === "slug:video_ads" ? "video" : selectedAgentId === "slug:static_ads" ? "static" : null;
 
   // Jeremy AI talks to a persona endpoint from the registry (Settings → Personas).
   // Each chat can pick a persona; switching starts a fresh persona conversation.
@@ -1394,8 +1850,6 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     personaSlug && activePersonas.some((p) => p.slug === personaSlug)
       ? personaSlug
       : (activePersonas.find((p) => p.is_default)?.slug ?? activePersonas[0]?.slug ?? null);
-
-
 
   useEffect(() => {
     if (selectedAgentId === "off" || selectedAgentId === "master") return;
@@ -1423,18 +1877,21 @@ export function AIStudioTab({ clientId, clientName }: Props) {
   // Whenever the offer picker changes, drop any previously-imported offer images and
   // pull in the new offer's image files so the AI uses them as reference for any
   // creative it generates. The user can still delete individual ones with the × button.
-  const selectedOfferTitle = clientOffers.find(o => o.id === selectedOfferId)?.title || "";
+  const selectedOfferTitle = clientOffers.find((o) => o.id === selectedOfferId)?.title || "";
   const offerImageFiles = (() => {
     if (!selectedOfferId || selectedOfferId === "all") return [] as any[];
     const IMG = /(png|jpe?g|gif|webp|svg|heic|avif)/i;
-    return (clientOfferFiles as any[]).filter(f =>
-      f.offer_id === selectedOfferId && (IMG.test(f.file_type || "") || IMG.test(f.file_name || ""))
+    return (clientOfferFiles as any[]).filter(
+      (f) => f.offer_id === selectedOfferId && (IMG.test(f.file_type || "") || IMG.test(f.file_name || "")),
     );
   })();
-  const offerImageKey = offerImageFiles.map(f => f.file_url).sort().join("|");
+  const offerImageKey = offerImageFiles
+    .map((f) => f.file_url)
+    .sort()
+    .join("|");
   useEffect(() => {
-    setPendingAttachments(curr => {
-      const userOnly = curr.filter(a => !a.fromOffer);
+    setPendingAttachments((curr) => {
+      const userOnly = curr.filter((a) => !a.fromOffer);
       const imported: Attachment[] = offerImageFiles.map((f: any) => ({
         url: f.file_url,
         name: f.file_name,
@@ -1444,7 +1901,7 @@ export function AIStudioTab({ clientId, clientName }: Props) {
       }));
       // dedupe by url
       const seen = new Set<string>();
-      const merged = [...imported, ...userOnly].filter(a => {
+      const merged = [...imported, ...userOnly].filter((a) => {
         if (seen.has(a.url)) return false;
         seen.add(a.url);
         return true;
@@ -1452,7 +1909,9 @@ export function AIStudioTab({ clientId, clientName }: Props) {
       return merged;
     });
     if (offerImageFiles.length > 0 && selectedOfferTitle) {
-      toast.success(`Using ${offerImageFiles.length} image${offerImageFiles.length === 1 ? "" : "s"} from "${selectedOfferTitle}" as references`);
+      toast.success(
+        `Using ${offerImageFiles.length} image${offerImageFiles.length === 1 ? "" : "s"} from "${selectedOfferTitle}" as references`,
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offerImageKey]);
@@ -1467,19 +1926,22 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     return { token, dashboardToken };
   }, []);
 
-  const studioFetch = useCallback(async (body: Record<string, any>, signal?: AbortSignal) => {
-    const { token, dashboardToken } = await getStudioAuth(true);
-    return fetch(aiStudioUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
-      },
-      body: JSON.stringify({ ...body, dashboardToken }),
-      signal,
-    });
-  }, [aiStudioUrl, getStudioAuth]);
+  const studioFetch = useCallback(
+    async (body: Record<string, any>, signal?: AbortSignal) => {
+      const { token, dashboardToken } = await getStudioAuth(true);
+      return fetch(aiStudioUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+        },
+        body: JSON.stringify({ ...body, dashboardToken }),
+        signal,
+      });
+    },
+    [aiStudioUrl, getStudioAuth],
+  );
 
   // Load list of threads for this client
   const loadThreads = useCallback(async () => {
@@ -1490,86 +1952,103 @@ export function AIStudioTab({ clientId, clientName }: Props) {
       if (!res.ok) return;
       const { threads = [] } = await res.json();
       setThreads(threads as Thread[]);
-    } catch (e) { console.error("list_threads failed", e); }
+    } catch (e) {
+      console.error("list_threads failed", e);
+    }
   }, [clientId, getStudioAuth, studioFetch]);
 
   // Load conversation + history + canvas items from DB
-  const loadHistory = useCallback(async (threadId?: string | null) => {
-    setHydrated(false);
-    try {
-      const { token, dashboardToken } = await getStudioAuth(false);
-      if (!token && !dashboardToken) {
-        setMessages([]);
-        setCanvas([]);
-        setHydrated(true);
-        return;
-      }
-      const res = await studioFetch({ action: "history", clientId, conversationId: threadId || undefined });
-      if (!res.ok) throw new Error(await res.text().catch(() => "Failed to load AI Studio history"));
-      const { conversation: convo, messages: msgs = [], canvasItems: items = [], members = {} } = await res.json();
+  const loadHistory = useCallback(
+    async (threadId?: string | null) => {
+      setHydrated(false);
+      try {
+        const { token, dashboardToken } = await getStudioAuth(false);
+        if (!token && !dashboardToken) {
+          setMessages([]);
+          setCanvas([]);
+          setHydrated(true);
+          return;
+        }
+        const res = await studioFetch({ action: "history", clientId, conversationId: threadId || undefined });
+        if (!res.ok) throw new Error(await res.text().catch(() => "Failed to load AI Studio history"));
+        const { conversation: convo, messages: msgs = [], canvasItems: items = [], members = {} } = await res.json();
 
-      if (convo) {
-        setConversationId(convo.id);
-        if (convo.doc_url) setDocUrl(convo.doc_url);
-        if (convo.sheet_url) setSheetUrl(convo.sheet_url);
-        if (convo.image_quality === "fast" || convo.image_quality === "pro") setQuality(convo.image_quality);
-        if (typeof (convo as any).chat_model === "string" && (convo as any).chat_model) setChatModel((convo as any).chat_model);
-        if (Array.isArray((convo as any).active_reference_ids)) setActiveReferenceIds((convo as any).active_reference_ids as string[]);
-        if (Array.isArray((convo as any).active_video_reference_ids)) setActiveVideoReferenceIds((convo as any).active_video_reference_ids as string[]);
-        setCanvasView({
-          zoom: Number((convo as any).canvas_zoom ?? 1) || 1,
-          panX: Number((convo as any).canvas_pan_x ?? 0) || 0,
-          panY: Number((convo as any).canvas_pan_y ?? 0) || 0,
-        });
-        setFocusedItemId(((convo as any).focused_canvas_item_id as string) || null);
-        setMessages((msgs || []).map((m: any) => {
-          const tools = Array.isArray(m.tools) ? m.tools : [];
-          const compareTool = tools.find((t: any) => t?.name === "compare_chat_models");
-          const compareResults = Array.isArray(compareTool?.result?.results) ? compareTool.result.results : [];
-          return {
-            id: m.id,
-            role: m.role as "user" | "assistant",
-            content: m.content || "",
-            tools,
-            createdAt: m.created_at || m.createdAt || undefined,
-            compare: compareResults.length ? compareResults.map((r: any) => ({
-              model: r.model,
-              label: CHAT_MODELS.find(mm => mm.value === r.model || mm.value === `openrouter/${r.model}`)?.label || r.model,
-              output: r.output,
-              error: r.error,
-              ms: r.ms,
-              usage: r.usage,
-            })) : undefined,
-            actorName: m.actor_member_id ? (members?.[m.actor_member_id]?.name || null) : null,
-          };
-        }));
-        // Canvas builds downward (oldest → newest) to align with chat flow.
-        // DB returns newest-first; reverse for chronological top-to-bottom render.
-        setCanvas(((items || []) as CanvasItem[]).slice().reverse());
-      } else {
+        if (convo) {
+          setConversationId(convo.id);
+          if (convo.doc_url) setDocUrl(convo.doc_url);
+          if (convo.sheet_url) setSheetUrl(convo.sheet_url);
+          if (convo.image_quality === "fast" || convo.image_quality === "pro") setQuality(convo.image_quality);
+          if (typeof (convo as any).chat_model === "string" && (convo as any).chat_model)
+            setChatModel((convo as any).chat_model);
+          if (Array.isArray((convo as any).active_reference_ids))
+            setActiveReferenceIds((convo as any).active_reference_ids as string[]);
+          if (Array.isArray((convo as any).active_video_reference_ids))
+            setActiveVideoReferenceIds((convo as any).active_video_reference_ids as string[]);
+          setCanvasView({
+            zoom: Number((convo as any).canvas_zoom ?? 1) || 1,
+            panX: Number((convo as any).canvas_pan_x ?? 0) || 0,
+            panY: Number((convo as any).canvas_pan_y ?? 0) || 0,
+          });
+          setFocusedItemId(((convo as any).focused_canvas_item_id as string) || null);
+          setMessages(
+            (msgs || []).map((m: any) => {
+              const tools = Array.isArray(m.tools) ? m.tools : [];
+              const compareTool = tools.find((t: any) => t?.name === "compare_chat_models");
+              const compareResults = Array.isArray(compareTool?.result?.results) ? compareTool.result.results : [];
+              return {
+                id: m.id,
+                role: m.role as "user" | "assistant",
+                content: m.content || "",
+                tools,
+                createdAt: m.created_at || m.createdAt || undefined,
+                compare: compareResults.length
+                  ? compareResults.map((r: any) => ({
+                      model: r.model,
+                      label:
+                        CHAT_MODELS.find((mm) => mm.value === r.model || mm.value === `openrouter/${r.model}`)?.label ||
+                        r.model,
+                      output: r.output,
+                      error: r.error,
+                      ms: r.ms,
+                      usage: r.usage,
+                    }))
+                  : undefined,
+                actorName: m.actor_member_id ? members?.[m.actor_member_id]?.name || null : null,
+              };
+            }),
+          );
+          // Canvas builds downward (oldest → newest) to align with chat flow.
+          // DB returns newest-first; reverse for chronological top-to-bottom render.
+          setCanvas(((items || []) as CanvasItem[]).slice().reverse());
+        } else {
+          setConversationId(null);
+          setMessages([]);
+          setCanvas([]);
+        }
+      } catch (e) {
+        console.error("AI Studio history load failed", e);
+        const msg = String((e as any)?.message || "");
+        if (msg.includes("Not authenticated") || msg.includes("401")) {
+          // Dashboard session token is missing/expired/invalid — force re-login
+          try {
+            localStorage.removeItem("dashboard_session_token");
+            localStorage.removeItem("dashboard_auth");
+          } catch {}
+          if (typeof window !== "undefined") window.location.reload();
+        }
         setConversationId(null);
         setMessages([]);
         setCanvas([]);
       }
-    } catch (e) {
-      console.error("AI Studio history load failed", e);
-      const msg = String((e as any)?.message || "");
-      if (msg.includes("Not authenticated") || msg.includes("401")) {
-        // Dashboard session token is missing/expired/invalid — force re-login
-        try {
-          localStorage.removeItem("dashboard_session_token");
-          localStorage.removeItem("dashboard_auth");
-        } catch {}
-        if (typeof window !== "undefined") window.location.reload();
-      }
-      setConversationId(null);
-      setMessages([]);
-      setCanvas([]);
-    }
-    setHydrated(true);
-  }, [clientId, getStudioAuth, studioFetch]);
+      setHydrated(true);
+    },
+    [clientId, getStudioAuth, studioFetch],
+  );
 
-  useEffect(() => { loadHistory(); loadThreads(); }, [loadHistory, loadThreads]);
+  useEffect(() => {
+    loadHistory();
+    loadThreads();
+  }, [loadHistory, loadThreads]);
 
   // Realtime: keep the canvas in sync with background video jobs that finish
   // after the user leaves the page or after the SSE stream drops. The edge
@@ -1582,121 +2061,184 @@ export function AIStudioTab({ clientId, clientName }: Props) {
       .channel(`ai-studio-canvas-${conversationId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "ai_studio_canvas_items", filter: `conversation_id=eq.${conversationId}` },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "ai_studio_canvas_items",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
         (payload) => {
           const row = payload.new as CanvasItem;
-          setCanvas(curr => curr.some(c => !("__placeholder" in c) && (c as any).id === row.id) ? curr : [...curr, row]);
+          setCanvas((curr) =>
+            curr.some((c) => !("__placeholder" in c) && (c as any).id === row.id) ? curr : [...curr, row],
+          );
         },
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "ai_studio_canvas_items", filter: `conversation_id=eq.${conversationId}` },
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "ai_studio_canvas_items",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
         (payload) => {
           const row = payload.new as CanvasItem;
-          setCanvas(curr => curr.map(c => (!("__placeholder" in c) && (c as any).id === row.id) ? row : c));
+          setCanvas((curr) => curr.map((c) => (!("__placeholder" in c) && (c as any).id === row.id ? row : c)));
         },
       )
       .on(
         "postgres_changes",
-        { event: "DELETE", schema: "public", table: "ai_studio_canvas_items", filter: `conversation_id=eq.${conversationId}` },
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "ai_studio_canvas_items",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
         (payload) => {
           const oldId = (payload.old as any)?.id;
           if (!oldId) return;
-          setCanvas(curr => curr.filter(c => ("__placeholder" in c) || (c as any).id !== oldId));
+          setCanvas((curr) => curr.filter((c) => "__placeholder" in c || (c as any).id !== oldId));
         },
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [conversationId]);
 
   // Thread actions
-  const newThread = useCallback(async (agentKeyOverride?: string) => {
-    const agentKey = normalizeAgentKey(agentKeyOverride ?? selectedAgentId);
-    const res = await studioFetch({
-      action: "new_thread", clientId, threadTitle: `New ${agentLabelForKey(agentKey)} chat`, quality, chatModel, agentKey,
-    });
-    if (!res.ok) { toast.error("Failed to create thread"); return; }
-    const { conversation } = await res.json();
-    setConversationId(conversation.id);
-    setMessages([]);
-    setCanvas([]);
-    setPendingAttachments(curr => curr.filter(a => a.fromOffer));
-    setFollowups([]);
-    await loadThreads();
-  }, [clientId, quality, chatModel, studioFetch, loadThreads, selectedAgentId]);
+  const newThread = useCallback(
+    async (agentKeyOverride?: string) => {
+      const agentKey = normalizeAgentKey(agentKeyOverride ?? selectedAgentId);
+      const res = await studioFetch({
+        action: "new_thread",
+        clientId,
+        threadTitle: `New ${agentLabelForKey(agentKey)} chat`,
+        quality,
+        chatModel,
+        agentKey,
+      });
+      if (!res.ok) {
+        toast.error("Failed to create thread");
+        return;
+      }
+      const { conversation } = await res.json();
+      setConversationId(conversation.id);
+      setMessages([]);
+      setCanvas([]);
+      setPendingAttachments((curr) => curr.filter((a) => a.fromOffer));
+      setFollowups([]);
+      await loadThreads();
+    },
+    [clientId, quality, chatModel, studioFetch, loadThreads, selectedAgentId],
+  );
 
-  const switchThread = useCallback(async (id: string) => {
-    if (id === conversationId) return;
-    setConversationId(id);
-    await loadHistory(id);
-  }, [conversationId, loadHistory]);
+  const switchThread = useCallback(
+    async (id: string) => {
+      if (id === conversationId) return;
+      setConversationId(id);
+      await loadHistory(id);
+    },
+    [conversationId, loadHistory],
+  );
 
   /**
    * Grok-style agent rail: each agent owns its own chat threads. Picking an agent
    * binds the composer to it and jumps to that agent's most recent thread (creating
    * one when the agent has no history yet). The canvas Feed rolls all agents up.
    */
-  const selectRailAgent = useCallback(async (key: string) => {
-    setSelectedAgentId(key);
-    const own = threads.filter(t => normalizeAgentKey(t.agent_key) === key);
-    if (own.length) {
-      const next = own.find(t => t.pinned) || own[0];
-      if (next.id !== conversationId) { setConversationId(next.id); await loadHistory(next.id); }
-      return;
-    }
-    await newThread(key);
-  }, [threads, conversationId, loadHistory, newThread]);
+  const selectRailAgent = useCallback(
+    async (key: string) => {
+      setSelectedAgentId(key);
+      const own = threads.filter((t) => normalizeAgentKey(t.agent_key) === key);
+      if (own.length) {
+        const next = own.find((t) => t.pinned) || own[0];
+        if (next.id !== conversationId) {
+          setConversationId(next.id);
+          await loadHistory(next.id);
+        }
+        return;
+      }
+      await newThread(key);
+    },
+    [threads, conversationId, loadHistory, newThread],
+  );
 
-
-
-  const updateThread = useCallback(async (id: string, patch: { title?: string; pinned?: boolean; archived?: boolean }) => {
-    const res = await studioFetch({ action: "update_thread", clientId, conversationId: id, threadUpdate: patch });
-    if (!res.ok) { toast.error("Update failed"); return; }
-    if (patch.archived && id === conversationId) {
-      setConversationId(null); setMessages([]); setCanvas([]);
-    }
-    await loadThreads();
-  }, [clientId, conversationId, studioFetch, loadThreads]);
+  const updateThread = useCallback(
+    async (id: string, patch: { title?: string; pinned?: boolean; archived?: boolean }) => {
+      const res = await studioFetch({ action: "update_thread", clientId, conversationId: id, threadUpdate: patch });
+      if (!res.ok) {
+        toast.error("Update failed");
+        return;
+      }
+      if (patch.archived && id === conversationId) {
+        setConversationId(null);
+        setMessages([]);
+        setCanvas([]);
+      }
+      await loadThreads();
+    },
+    [clientId, conversationId, studioFetch, loadThreads],
+  );
 
   // File upload — store in gpt-files bucket, parse PDFs server-side later if needed
-  const uploadFiles = useCallback(async (files: FileList | File[]) => {
-    const list = Array.from(files);
-    for (const f of list) {
-      if (f.size > 20 * 1024 * 1024) { toast.error(`${f.name} exceeds 20MB`); continue; }
-      const tempUrl = URL.createObjectURL(f);
-      const tempAtt: Attachment = { url: tempUrl, name: f.name, mime: f.type || "application/octet-stream", uploading: true };
-      setPendingAttachments(curr => [...curr, tempAtt]);
-      try {
-        const ext = f.name.split(".").pop() || "bin";
-        const path = `ai-studio/${clientId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-        const { error } = await supabase.storage.from("gpt-files").upload(path, f, { contentType: f.type, upsert: false });
-        if (error) throw error;
-        const { data: pub } = supabase.storage.from("gpt-files").getPublicUrl(path);
-        let text: string | undefined;
-        if (/^text\/|\b(application\/json|csv|markdown)\b/i.test(f.type) || /\.(txt|md|json|csv|log)$/i.test(f.name)) {
-          try { text = await f.text(); } catch {}
+  const uploadFiles = useCallback(
+    async (files: FileList | File[]) => {
+      const list = Array.from(files);
+      for (const f of list) {
+        if (f.size > 20 * 1024 * 1024) {
+          toast.error(`${f.name} exceeds 20MB`);
+          continue;
         }
-        setPendingAttachments(curr => curr.map(a => a.url === tempUrl ? { url: pub.publicUrl, name: f.name, mime: f.type, text } : a));
-        URL.revokeObjectURL(tempUrl);
-      } catch (e: any) {
-        toast.error(`Failed to upload ${f.name}: ${e?.message || e}`);
-        setPendingAttachments(curr => curr.filter(a => a.url !== tempUrl));
+        const tempUrl = URL.createObjectURL(f);
+        const tempAtt: Attachment = {
+          url: tempUrl,
+          name: f.name,
+          mime: f.type || "application/octet-stream",
+          uploading: true,
+        };
+        setPendingAttachments((curr) => [...curr, tempAtt]);
+        try {
+          const ext = f.name.split(".").pop() || "bin";
+          const path = `ai-studio/${clientId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+          const { error } = await supabase.storage
+            .from("gpt-files")
+            .upload(path, f, { contentType: f.type, upsert: false });
+          if (error) throw error;
+          const { data: pub } = supabase.storage.from("gpt-files").getPublicUrl(path);
+          let text: string | undefined;
+          if (
+            /^text\/|\b(application\/json|csv|markdown)\b/i.test(f.type) ||
+            /\.(txt|md|json|csv|log)$/i.test(f.name)
+          ) {
+            try {
+              text = await f.text();
+            } catch {}
+          }
+          setPendingAttachments((curr) =>
+            curr.map((a) => (a.url === tempUrl ? { url: pub.publicUrl, name: f.name, mime: f.type, text } : a)),
+          );
+          URL.revokeObjectURL(tempUrl);
+        } catch (e: any) {
+          toast.error(`Failed to upload ${f.name}: ${e?.message || e}`);
+          setPendingAttachments((curr) => curr.filter((a) => a.url !== tempUrl));
+        }
       }
-    }
-  }, [clientId]);
+    },
+    [clientId],
+  );
 
   // Load the Google Doc tied directly to this client (clients.google_doc_url)
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from("clients")
-        .select("google_doc_url")
-        .eq("id", clientId)
-        .maybeSingle();
+      const { data } = await supabase.from("clients").select("google_doc_url").eq("id", clientId).maybeSingle();
       if (!cancelled) setClientDocUrl(((data as any)?.google_doc_url as string) || "");
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [clientId]);
 
   // Default URLs from agency settings (only if conversation has none)
@@ -1706,11 +2248,17 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     // AI Studio is strictly tied to that client's own Doc/Sheet.
     if (!docUrl) {
       const fallback = clientDocUrl || (clientSettings as any)?.kpi_google_doc_url;
-      if (fallback) { setDocUrl(fallback); setAutoConnectedDoc(true); }
+      if (fallback) {
+        setDocUrl(fallback);
+        setAutoConnectedDoc(true);
+      }
     }
     if (!sheetUrl) {
       const fallback = (clientSettings as any)?.kpi_google_sheet_url;
-      if (fallback) { setSheetUrl(fallback); setAutoConnectedSheet(true); }
+      if (fallback) {
+        setSheetUrl(fallback);
+        setAutoConnectedSheet(true);
+      }
     }
   }, [clientSettings, hydrated, docUrl, sheetUrl, clientDocUrl]);
 
@@ -1739,7 +2287,8 @@ export function AIStudioTab({ clientId, clientName }: Props) {
       "openai/gpt-5-mini": { in: 0.25, out: 2 },
     };
     const r = RATES[chatModel] || { in: 1, out: 5 };
-    let inChars = 0, outChars = 0;
+    let inChars = 0,
+      outChars = 0;
     for (const m of messages) {
       if (m.role === "user") inChars += (m.content || "").length;
       else outChars += (m.content || "").length;
@@ -1777,7 +2326,10 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     const effVideoFrames = ov?.firstFrameUrl ? { ...videoFrames, firstFrameUrl: ov.firstFrameUrl } : videoFrames;
     const effAvatarId = ov ? (ov.avatarId ?? null) : selectedAvatarId;
     const effAvatar = studioAvatars.find((a) => a.id === effAvatarId) || null;
-    if (pendingAttachments.some(a => a.uploading)) { toast.error("Attachments still uploading"); return; }
+    if (pendingAttachments.some((a) => a.uploading)) {
+      toast.error("Attachments still uploading");
+      return;
+    }
     setFollowups([]);
     // Auto-detect intended aspect from the prompt so the user doesn't need to
     // click the Format select. Video mode is locked to 9:16 / 16:9; static mode
@@ -1789,7 +2341,10 @@ export function AIStudioTab({ clientId, clientName }: Props) {
       if (detected) {
         if (selectedAgentMode === "video") {
           const forced = detected === "static_1x1" ? "reel_9x16" : detected;
-          if (forced !== adFormat) { effectiveAdFormat = forced; setAdFormat(forced); }
+          if (forced !== adFormat) {
+            effectiveAdFormat = forced;
+            setAdFormat(forced);
+          }
         } else if (detected !== adFormat) {
           effectiveAdFormat = detected;
           setAdFormat(detected);
@@ -1797,246 +2352,290 @@ export function AIStudioTab({ clientId, clientName }: Props) {
       }
     }
     const attSnapshot = pendingAttachments.slice();
-    const userContent = attSnapshot.length
-      ? text + "\n\n" + attSnapshot.map(a => `📎 ${a.name}`).join("\n")
-      : text;
-    const optimisticActorName =
-      (typeof window !== "undefined" && localStorage.getItem("team_member_name")) || null;
+    const userContent = attSnapshot.length ? text + "\n\n" + attSnapshot.map((a) => `📎 ${a.name}`).join("\n") : text;
+    const optimisticActorName = (typeof window !== "undefined" && localStorage.getItem("team_member_name")) || null;
     const nowIso = new Date().toISOString();
     const userMsg: Msg = { role: "user", content: userContent, actorName: optimisticActorName, createdAt: nowIso };
     const placeholderId = `__pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const placeholder: Msg = { id: placeholderId, role: "assistant", content: "", tools: [], compareLoading: compareModels.length > 0, streaming: true, createdAt: nowIso };
-    setMessages(curr => [...curr, userMsg, placeholder]);
+    const placeholder: Msg = {
+      id: placeholderId,
+      role: "assistant",
+      content: "",
+      tools: [],
+      compareLoading: compareModels.length > 0,
+      streaming: true,
+      createdAt: nowIso,
+    };
+    setMessages((curr) => [...curr, userMsg, placeholder]);
     setInput("");
-    setPendingAttachments(curr => curr.filter(a => a.fromOffer));
-    setLoading(n => n + 1);
+    setPendingAttachments((curr) => curr.filter((a) => a.fromOffer));
+    setLoading((n) => n + 1);
     const ctrl = new AbortController();
     abortRefs.current.add(ctrl);
 
     // ID-based update avoids index drift (history reloads, parallel state updates)
     // which was the root cause of mid-stream flicker / wrong-message overwrites.
     const updateAssistant = (mut: (m: Msg) => Msg) => {
-      setMessages(curr => curr.map(m => (m.id === placeholderId ? mut(m) : m)));
+      setMessages((curr) => curr.map((m) => (m.id === placeholderId ? mut(m) : m)));
     };
 
     try {
-      const res = await studioFetch({
-        clientId,
-        conversationId: conversationId || undefined,
-        userText: (() => {
-          // PRODUCE-VIDEO TURNS ARE PROMPT-ONLY: the renderer must see exactly
-          // what the user typed — no client brand summary, agent persona,
-          // reference or style blocks prepended.
-          if (selectedAgentMode === "video" && produceNow) return text;
-          const agentEnabledForTurn = selectedAgentId !== "off";
-          const mentioned = agentEnabledForTurn ? extractAgentMentions(text, clientAgents as any) : [];
-          // Explicit picker overrides @mentions when set to a specific agent.
-          const pickedAgent = (agentEnabledForTurn && selectedAgentId !== "master" && !selectedAgentId.startsWith("slug:"))
-            ? (clientAgents as any[]).find(a => a.id === selectedAgentId && a.enabled)
-            : null;
-          const pickedAgencyForTurn = (agentEnabledForTurn && selectedAgentId.startsWith("slug:"))
-            ? pickedAgencyAgent
-            : null;
-          const agencyContextBlock = pickedAgencyForTurn
-            ? `You are operating as the ${pickedAgencyForTurn.name} (${pickedAgencyForTurn.role}). Follow this role and speak in this voice for the entire turn.\n\n${pickedAgencyForTurn.system_prompt || ""}\n\n---\nUser request follows:\n`
-            : "";
-          const agentBlock = pickedAgent
-            ? buildAgentContextBlock([pickedAgent])
-            : (mentioned.length && !pickedAgencyForTurn ? buildAgentContextBlock(mentioned) : "");
-          const masterAgentBlock = selectedAgentId === "master" && agentEnabledForTurn
-            ? [
-                "You are Jarvis, the Account Manager. You do NOT hand the user back to a specialist — you deliver the finished work yourself by orchestrating them end-to-end in this SAME turn.",
-                "",
-                "Delegation contract (silent — never tell the user to switch bubbles):",
-                "1. Restate the goal in one line.",
-                "2. If copy / hooks / captions / scripts are needed → adopt the Copywriter voice first and produce the copy in-chat before any visual tool call.",
-                "3. If a static ad / image is needed → call the image tools (generate_static_ad / edit_static_ad / compare_image_models / generate_ad_variations) with the composer's locked model + aspect ratio.",
-                "4. If a video / reel / VSL is needed → call generate_seedance_video with the composer's locked video model, resolution and duration.",
-                "5. When BOTH copy and a creative are requested, do copy → static → video in one turn (parallel tool calls where possible). Never stop after the copy step and ask the user to run the visuals separately.",
-                "6. After every tool run, briefly review the output in the copywriter/creative-director voice (what works, one crisp iteration if the output is weak) and finish with a Done summary listing every deliverable.",
-                "",
-                agencyRoster.length > 0
-                  ? `Roster you can channel (adopt their voice/knowledge — do NOT @-mention them to the user):\n${agencyRoster.map(a => `- @${a.slug} (${a.role}) — ${a.name}`).join("\n")}`
-                  : "",
-                "---",
-                "",
-              ].filter(Boolean).join("\n")
-            : "";
-          const masterBlock = buildMasterReferenceBlock(agencyRefs, clientRefs);
-          const videoAllowed = selectedAgentMode === "video" && produceNow;
-          const vStyleBlock = buildVideoStyleBlock(videoStyles.selected, videoAllowed && videoModels.length > 0);
-          // Reference styles picked in the production line — used for both script
-          // writing (chat) and rendering (produce).
-          const presetBlock =
-            selectedAgentMode === "video" && presetStyleIds.length
-              ? buildPresetStyleBlock(presetStyleIds) + "\n\n"
+      const res = await studioFetch(
+        {
+          clientId,
+          conversationId: conversationId || undefined,
+          userText: (() => {
+            // PRODUCE-VIDEO TURNS ARE PROMPT-ONLY: the renderer must see exactly
+            // what the user typed — no client brand summary, agent persona,
+            // reference or style blocks prepended.
+            if (selectedAgentMode === "video" && produceNow) return text;
+            const agentEnabledForTurn = selectedAgentId !== "off";
+            const mentioned = agentEnabledForTurn ? extractAgentMentions(text, clientAgents as any) : [];
+            // Explicit picker overrides @mentions when set to a specific agent.
+            const pickedAgent =
+              agentEnabledForTurn && selectedAgentId !== "master" && !selectedAgentId.startsWith("slug:")
+                ? (clientAgents as any[]).find((a) => a.id === selectedAgentId && a.enabled)
+                : null;
+            const pickedAgencyForTurn =
+              agentEnabledForTurn && selectedAgentId.startsWith("slug:") ? pickedAgencyAgent : null;
+            const agencyContextBlock = pickedAgencyForTurn
+              ? `You are operating as the ${pickedAgencyForTurn.name} (${pickedAgencyForTurn.role}). Follow this role and speak in this voice for the entire turn.\n\n${pickedAgencyForTurn.system_prompt || ""}\n\n---\nUser request follows:\n`
               : "";
-          const iStyleBlock = buildImageStyleBlock(imageStyles.selected, imageModels.length > 0);
-          // Hard-lock block — forces the LLM to call generators with the exact
-          // model / resolution / frames the user pre-selected in the composer.
-          const lockLines: string[] = [];
-          if (!videoAllowed && selectedAgentMode === "video" && videoIntent === "image") {
-            lockLines.push(
-              [
-                "🖼 IMAGE MODE — the user asked for still images in this turn. Call generate_static_ad (or compare_image_models when several image models are locked) with the locked image model, style, avatar and aspect ratio, and put the result on the canvas.",
-                selectedAvatar
-                  ? `🔒 AVATAR LOCK: the person in the image must be avatar "${selectedAvatar.name}"${selectedAvatar.image_url ? ` — pass reference_image_url="${selectedAvatar.image_url}"` : ""}. Do not invent a different person.`
-                  : "",
-                "Never call any video generation tool in this turn.",
-              ].filter(Boolean).join("\n"),
-            );
-          } else if (!videoAllowed && selectedAgentMode === "video") {
-            lockLines.push(
-              "💬 SCRIPT MODE (Chat) — the user has NOT switched on Produce. Never call any video generation tool in this turn. Work the creative with them instead: write/refine the script beat by beat, propose hooks, set the visual direction, note the shot list, and end by telling them to hit “Produce video” when the script is locked.",
-            );
-          } else if (!videoAllowed) {
-            lockLines.push(
-              "🚫 VIDEO DISABLED for this agent. Never call any video generation tool here — video production happens only in the Video Ads agent. If the user asks for a video, tell them to switch to the Video Ads agent.",
-            );
-          }
-          if (videoAllowed && effVideoModel) {
-            const lockedAspect = videoAspectForAdFormat(effectiveAdFormat);
-            const lockedModel = effVideoModel;
-            const modelMeta = VIDEO_MODELS.find((m) => m.value === lockedModel);
-            // Respect the composer's resolution pick, clamped to what the
-            // selected renderer actually supports.
-            const supportedResList = VIDEO_MODEL_RES[lockedModel] || ["720p"];
-            const lockedRes = (supportedResList as string[]).includes(effVideoResolution)
-              ? effVideoResolution
-              : supportedResList[supportedResList.length - 1];
-            lockLines.push(
-              `🔒 VIDEO HARD-LOCK: model="${lockedModel}"${modelMeta ? ` (${modelMeta.label})` : ""} — only the approved renderers ${VIDEO_MODELS.map((m) => `"${m.value}"`).join(", ")} may be used; Grok, HappyHorse, Kling and Veo are retired and must never be requested. resolution="${lockedRes}" (supported: ${supportedResList.join(", ")}), duration=${effVideoDuration}s, format="${lockedAspect}", audio=on. Pass model/resolution/duration/aspect_ratio="${lockedAspect}" EXACTLY to generate_seedance_video. Do NOT substitute models, resolutions, durations, or formats.`,
-            );
+            const agentBlock = pickedAgent
+              ? buildAgentContextBlock([pickedAgent])
+              : mentioned.length && !pickedAgencyForTurn
+                ? buildAgentContextBlock(mentioned)
+                : "";
+            const masterAgentBlock =
+              selectedAgentId === "master" && agentEnabledForTurn
+                ? [
+                    "You are Jarvis, the Account Manager. You do NOT hand the user back to a specialist — you deliver the finished work yourself by orchestrating them end-to-end in this SAME turn.",
+                    "",
+                    "Delegation contract (silent — never tell the user to switch bubbles):",
+                    "1. Restate the goal in one line.",
+                    "2. If copy / hooks / captions / scripts are needed → adopt the Copywriter voice first and produce the copy in-chat before any visual tool call.",
+                    "3. If a static ad / image is needed → call the image tools (generate_static_ad / edit_static_ad / compare_image_models / generate_ad_variations) with the composer's locked model + aspect ratio.",
+                    "4. If a video / reel / VSL is needed → call generate_seedance_video with the composer's locked video model, resolution and duration.",
+                    "5. When BOTH copy and a creative are requested, do copy → static → video in one turn (parallel tool calls where possible). Never stop after the copy step and ask the user to run the visuals separately.",
+                    "6. After every tool run, briefly review the output in the copywriter/creative-director voice (what works, one crisp iteration if the output is weak) and finish with a Done summary listing every deliverable.",
+                    "",
+                    agencyRoster.length > 0
+                      ? `Roster you can channel (adopt their voice/knowledge — do NOT @-mention them to the user):\n${agencyRoster.map((a) => `- @${a.slug} (${a.role}) — ${a.name}`).join("\n")}`
+                      : "",
+                    "---",
+                    "",
+                  ]
+                    .filter(Boolean)
+                    .join("\n")
+                : "";
+            const masterBlock = buildMasterReferenceBlock(agencyRefs, clientRefs);
+            const videoAllowed = selectedAgentMode === "video" && produceNow;
+            const vStyleBlock = buildVideoStyleBlock(videoStyles.selected, videoAllowed && videoModels.length > 0);
+            // Reference styles picked in the production line — used for both script
+            // writing (chat) and rendering (produce).
+            const presetBlock =
+              selectedAgentMode === "video" && presetStyleIds.length
+                ? buildPresetStyleBlock(presetStyleIds) + "\n\n"
+                : "";
+            const iStyleBlock = buildImageStyleBlock(imageStyles.selected, imageModels.length > 0);
+            // Hard-lock block — forces the LLM to call generators with the exact
+            // model / resolution / frames the user pre-selected in the composer.
+            const lockLines: string[] = [];
+            if (!videoAllowed && selectedAgentMode === "video" && videoIntent === "image") {
+              lockLines.push(
+                [
+                  "🖼 IMAGE MODE — the user asked for still images in this turn. Call generate_static_ad (or compare_image_models when several image models are locked) with the locked image model, style, avatar and aspect ratio, and put the result on the canvas.",
+                  selectedAvatar
+                    ? `🔒 AVATAR LOCK: the person in the image must be avatar "${selectedAvatar.name}"${selectedAvatar.image_url ? ` — pass reference_image_url="${selectedAvatar.image_url}"` : ""}. Do not invent a different person.`
+                    : "",
+                  "Never call any video generation tool in this turn.",
+                ]
+                  .filter(Boolean)
+                  .join("\n"),
+              );
+            } else if (!videoAllowed && selectedAgentMode === "video") {
+              lockLines.push(
+                "💬 SCRIPT MODE (Chat) — the user has NOT switched on Produce. Never call any video generation tool in this turn. Work the creative with them instead: write/refine the script beat by beat, propose hooks, set the visual direction, note the shot list, and end by telling them to hit “Produce video” when the script is locked.",
+              );
+            } else if (!videoAllowed) {
+              lockLines.push(
+                "🚫 VIDEO DISABLED for this agent. Never call any video generation tool here — video production happens only in the Video Ads agent. If the user asks for a video, tell them to switch to the Video Ads agent.",
+              );
+            }
+            if (videoAllowed && effVideoModel) {
+              const lockedAspect = videoAspectForAdFormat(effectiveAdFormat);
+              const lockedModel = effVideoModel;
+              const modelMeta = VIDEO_MODELS.find((m) => m.value === lockedModel);
+              // Respect the composer's resolution pick, clamped to what the
+              // selected renderer actually supports.
+              const supportedResList = VIDEO_MODEL_RES[lockedModel] || ["720p"];
+              const lockedRes = (supportedResList as string[]).includes(effVideoResolution)
+                ? effVideoResolution
+                : supportedResList[supportedResList.length - 1];
+              lockLines.push(
+                `🔒 VIDEO HARD-LOCK: model="${lockedModel}"${modelMeta ? ` (${modelMeta.label})` : ""} — only the approved renderers ${VIDEO_MODELS.map((m) => `"${m.value}"`).join(", ")} may be used; Grok, HappyHorse, Kling and Veo are retired and must never be requested. resolution="${lockedRes}" (supported: ${supportedResList.join(", ")}), duration=${effVideoDuration}s, format="${lockedAspect}", audio=on. Pass model/resolution/duration/aspect_ratio="${lockedAspect}" EXACTLY to generate_seedance_video. Do NOT substitute models, resolutions, durations, or formats.`,
+              );
 
-            // Always quote the EFFECTIVE frames (per-script override wins), so the
-            // locked URL is the exact image the operator selected for this script.
-            if (effVideoFrames?.firstFrameUrl) lockLines.push(`🔒 first_frame_url="${effVideoFrames.firstFrameUrl}"`);
-            if (effVideoFrames?.lastFrameUrl) lockLines.push(`🔒 last_frame_url="${effVideoFrames.lastFrameUrl}"`);
-            if (effVideoFrames?.ingredientUrl) lockLines.push(`🔒 ingredient_url="${effVideoFrames.ingredientUrl}"`);
-            const extraIngredients = (effVideoFrames?.ingredientUrls || []).filter((u) => u && u !== effVideoFrames?.ingredientUrl);
-            if (extraIngredients.length) lockLines.push(`🔒 additional_ingredient_urls=${extraIngredients.map((u) => `"${u}"`).join(", ")} (all sent to Seedance as reference images)`);
-            if (effAvatarId && effAvatar) {
+              // Always quote the EFFECTIVE frames (per-script override wins), so the
+              // locked URL is the exact image the operator selected for this script.
+              if (effVideoFrames?.firstFrameUrl) lockLines.push(`🔒 first_frame_url="${effVideoFrames.firstFrameUrl}"`);
+              if (effVideoFrames?.lastFrameUrl) lockLines.push(`🔒 last_frame_url="${effVideoFrames.lastFrameUrl}"`);
+              if (effVideoFrames?.ingredientUrl) lockLines.push(`🔒 ingredient_url="${effVideoFrames.ingredientUrl}"`);
+              const extraIngredients = (effVideoFrames?.ingredientUrls || []).filter(
+                (u) => u && u !== effVideoFrames?.ingredientUrl,
+              );
+              if (extraIngredients.length)
+                lockLines.push(
+                  `🔒 additional_ingredient_urls=${extraIngredients.map((u) => `"${u}"`).join(", ")} (all sent to Seedance as reference images)`,
+                );
+              if (effAvatarId && effAvatar) {
+                lockLines.push(
+                  `🔒 AVATAR LOCK: use avatar "${effAvatar.name}" (id="${effAvatarId}"${effAvatar.image_url ? `, image_url="${effAvatar.image_url}"` : ""}) as the on-camera talent for every clip. Do NOT invent a different person or swap wardrobe between clips.`,
+                );
+              }
+              if (videoStyles?.selected?.name) {
+                lockLines.push(
+                  `🔒 STYLE LOCK: render in the "${videoStyles.selected.name}" video style — do not drift to another look.`,
+                );
+              }
               lockLines.push(
-                `🔒 AVATAR LOCK: use avatar "${effAvatar.name}" (id="${effAvatarId}"${effAvatar.image_url ? `, image_url="${effAvatar.image_url}"` : ""}) as the on-camera talent for every clip. Do NOT invent a different person or swap wardrobe between clips.`,
+                `🔒 These composer settings are FINAL. If the user's prompt text conflicts with them, follow the composer settings and note the override in your reply — never silently fall back to defaults.`,
+              );
+              const perClipCap = VIDEO_MODEL_MAX_SECONDS[lockedModel] ?? 15;
+              const paceMeta = SPEECH_PACES.find((p) => p.value === speechPace);
+              lockLines.push(
+                `🔒 SPEECH PACE LOCK: "${speechPace}" (~${paceMeta?.wpm ?? 158} words per minute). ${
+                  speechPace === "rapid"
+                    ? 'Write and direct the VO rapid-fire: 3–8 word sentences, zero dead air, no pauses between lines, jump-cut energy. Add "speaks rapid-fire, urgent high-energy delivery, no pauses" to every render prompt.'
+                    : speechPace === "fast"
+                      ? 'Write and direct the VO fast and tight: minimal pauses, punchy lines. Add "speaks quickly and energetically, tight pacing, no dead air" to every render prompt.'
+                      : "Conversational delivery at a natural pace."
+                } The script must fit ~${paceWordBudget(effVideoDuration, speechPace)} words total for ${effVideoDuration}s at this pace — never write more.`,
+              );
+              if (effVideoDuration > perClipCap) {
+                const clips = Math.ceil(effVideoDuration / perClipCap);
+                const identityUrl = effVideoFrames?.firstFrameUrl || effVideoFrames?.ingredientUrl || "";
+                lockLines.push(
+                  `🔒 TOTAL LENGTH = ${effVideoDuration}s and "${lockedModel}" caps at ${perClipCap}s per clip → emit EXACTLY ${clips} generate_seedance_video tool_calls IN THE SAME assistant turn (parallel), with durations summing to ${effVideoDuration}s. Every call uses model="${lockedModel}", resolution="${lockedRes}", aspect_ratio="${lockedAspect}"${identityUrl ? `, image_url="${identityUrl}"` : ""}${effVideoFrames?.ingredientUrl ? `, and preserve the ingredient reference` : ""}. Clip 1 = opening beat; the last clip = the payoff. Keep the SAME subject, wardrobe, camera framing and lighting across clips for character consistency. Never emit more than ${clips} calls.`,
+                );
+              } else {
+                const identityUrl = effVideoFrames?.firstFrameUrl || effVideoFrames?.ingredientUrl || "";
+                lockLines.push(
+                  `🔒 TOTAL LENGTH = ${effVideoDuration}s → emit ONE generate_seedance_video tool_call with duration=${effVideoDuration}, model="${lockedModel}", resolution="${lockedRes}", aspect_ratio="${lockedAspect}"${identityUrl ? `, image_url="${identityUrl}"` : ""}. "${lockedModel}" renders this length in a single clip — do NOT split it.`,
+                );
+              }
+            }
+            if (imageModels.length === 1) {
+              lockLines.push(
+                `🔒 IMAGE HARD-LOCK: model="${imageModels[0]}". Pass this EXACT value to generate_static_ad / edit_static_ad.`,
+              );
+            } else if (imageModels.length > 1) {
+              lockLines.push(
+                `🔒 IMAGE HARD-LOCK: compare models [${imageModels.map((m) => `"${m}"`).join(", ")}] via compare_image_models.`,
               );
             }
-            if (videoStyles?.selected?.name) {
-              lockLines.push(`🔒 STYLE LOCK: render in the "${videoStyles.selected.name}" video style — do not drift to another look.`);
-            }
-            lockLines.push(
-              `🔒 These composer settings are FINAL. If the user's prompt text conflicts with them, follow the composer settings and note the override in your reply — never silently fall back to defaults.`,
+            const lockBlock = lockLines.length ? lockLines.join("\n") + "\n\n" : "";
+            return (
+              masterBlock +
+              masterAgentBlock +
+              agencyContextBlock +
+              agentBlock +
+              iStyleBlock +
+              vStyleBlock +
+              presetBlock +
+              lockBlock +
+              text
             );
-            const perClipCap = VIDEO_MODEL_MAX_SECONDS[lockedModel] ?? 15;
-            const paceMeta = SPEECH_PACES.find(p => p.value === speechPace);
-            lockLines.push(
-              `🔒 SPEECH PACE LOCK: "${speechPace}" (~${paceMeta?.wpm ?? 158} words per minute). ${
-                speechPace === "rapid"
-                  ? "Write and direct the VO rapid-fire: 3–8 word sentences, zero dead air, no pauses between lines, jump-cut energy. Add \"speaks rapid-fire, urgent high-energy delivery, no pauses\" to every render prompt."
-                  : speechPace === "fast"
-                    ? "Write and direct the VO fast and tight: minimal pauses, punchy lines. Add \"speaks quickly and energetically, tight pacing, no dead air\" to every render prompt."
-                    : "Conversational delivery at a natural pace."
-              } The script must fit ~${paceWordBudget(effVideoDuration, speechPace)} words total for ${effVideoDuration}s at this pace — never write more.`,
-            );
-            if (effVideoDuration > perClipCap) {
-              const clips = Math.ceil(effVideoDuration / perClipCap);
-              const identityUrl = effVideoFrames?.firstFrameUrl || effVideoFrames?.ingredientUrl || "";
-              lockLines.push(
-                `🔒 TOTAL LENGTH = ${effVideoDuration}s and "${lockedModel}" caps at ${perClipCap}s per clip → emit EXACTLY ${clips} generate_seedance_video tool_calls IN THE SAME assistant turn (parallel), with durations summing to ${effVideoDuration}s. Every call uses model="${lockedModel}", resolution="${lockedRes}", aspect_ratio="${lockedAspect}"${identityUrl ? `, image_url="${identityUrl}"` : ""}${effVideoFrames?.ingredientUrl ? `, and preserve the ingredient reference` : ""}. Clip 1 = opening beat; the last clip = the payoff. Keep the SAME subject, wardrobe, camera framing and lighting across clips for character consistency. Never emit more than ${clips} calls.`,
-              );
-            } else {
-              const identityUrl = effVideoFrames?.firstFrameUrl || effVideoFrames?.ingredientUrl || "";
-              lockLines.push(
-                `🔒 TOTAL LENGTH = ${effVideoDuration}s → emit ONE generate_seedance_video tool_call with duration=${effVideoDuration}, model="${lockedModel}", resolution="${lockedRes}", aspect_ratio="${lockedAspect}"${identityUrl ? `, image_url="${identityUrl}"` : ""}. "${lockedModel}" renders this length in a single clip — do NOT split it.`,
-              );
+          })(),
+          docUrl: docUrl || undefined,
+          sheetUrl: sheetUrl || undefined,
+          quality,
+          chatModel: (() => {
+            if (selectedAgentId.startsWith("slug:") && pickedAgencyAgent?.default_model) {
+              return pickedAgencyAgent.default_model;
             }
-          }
-          if (imageModels.length === 1) {
-            lockLines.push(`🔒 IMAGE HARD-LOCK: model="${imageModels[0]}". Pass this EXACT value to generate_static_ad / edit_static_ad.`);
-          } else if (imageModels.length > 1) {
-            lockLines.push(`🔒 IMAGE HARD-LOCK: compare models [${imageModels.map(m => `"${m}"`).join(", ")}] via compare_image_models.`);
-          }
-          const lockBlock = lockLines.length ? lockLines.join("\n") + "\n\n" : "";
-          return masterBlock + masterAgentBlock + agencyContextBlock + agentBlock + iStyleBlock + vStyleBlock + presetBlock + lockBlock + text;
-        })(),
-        docUrl: docUrl || undefined,
-        sheetUrl: sheetUrl || undefined,
-        quality,
-        chatModel: (() => {
-          if (selectedAgentId.startsWith("slug:") && pickedAgencyAgent?.default_model) {
-            return pickedAgencyAgent.default_model;
-          }
-          if (selectedAgentId !== "off" && selectedAgentId !== "master" && !selectedAgentId.startsWith("slug:")) {
-            const a = (clientAgents as any[]).find(a => a.id === selectedAgentId && a.enabled);
-            if (a?.model) return a.model;
-            // Copywriting agent defaults to DeepSeek V4 Flash when no explicit model is set.
-            const label = `${a?.handle || ""} ${a?.name || ""} ${a?.role || ""}`.toLowerCase();
-            if (a && /copyw|copy writ/.test(label)) return "openrouter/deepseek/deepseek-v4-flash-latest";
-          }
-          return chatModel;
-        })(),
-        compareModels: compareModels.length ? compareModels : undefined,
-        // Image models travel when the agent is a static one, or when the Video Ads
-        // composer is explicitly in "Generate image" mode. Chat-script and Produce-video
-        // turns never enable the image tools.
-        imageModels: selectedAgentMode === "video" && videoIntent !== "image" ? [] : imageModels,
-        // Video params travel ONLY from the Video Ads agent — other agents never render video.
-        ...(selectedAgentMode === "video" && produceNow && effVideoModel
-          ? {
-              videoModel: effVideoModel,
-              videoModels: ov?.model ? [ov.model] : videoModels,
-              videoFrames: effVideoFrames,
-              videoResolution: effVideoResolution,
-              videoDuration: effVideoDuration,
-              speechPace,
+            if (selectedAgentId !== "off" && selectedAgentId !== "master" && !selectedAgentId.startsWith("slug:")) {
+              const a = (clientAgents as any[]).find((a) => a.id === selectedAgentId && a.enabled);
+              if (a?.model) return a.model;
+              // Copywriting agent defaults to DeepSeek V4 Flash when no explicit model is set.
+              const label = `${a?.handle || ""} ${a?.name || ""} ${a?.role || ""}`.toLowerCase();
+              if (a && /copyw|copy writ/.test(label)) return "openrouter/deepseek/deepseek-v4-flash-latest";
             }
-          : {}),
-        avatarId: effAvatarId,
-        adFormat: effectiveAdFormat || undefined,
-        agentSlug: selectedAgentId.startsWith("slug:")
-          ? selectedAgentId.slice("slug:".length)
-          : (selectedAgentId === "master" ? "account_manager" : undefined),
-        ...(isJeremyAgent && effectivePersonaSlug ? { personaSlug: effectivePersonaSlug } : {}),
+            return chatModel;
+          })(),
+          compareModels: compareModels.length ? compareModels : undefined,
+          // Image models travel when the agent is a static one, or when the Video Ads
+          // composer is explicitly in "Generate image" mode. Chat-script and Produce-video
+          // turns never enable the image tools.
+          imageModels: selectedAgentMode === "video" && videoIntent !== "image" ? [] : imageModels,
+          // Video params travel ONLY from the Video Ads agent — other agents never render video.
+          ...(selectedAgentMode === "video" && produceNow && effVideoModel
+            ? {
+                videoModel: effVideoModel,
+                videoModels: ov?.model ? [ov.model] : videoModels,
+                videoFrames: effVideoFrames,
+                videoResolution: effVideoResolution,
+                videoDuration: effVideoDuration,
+                speechPace,
+              }
+            : {}),
+          avatarId: effAvatarId,
+          adFormat: effectiveAdFormat || undefined,
+          agentSlug: selectedAgentId.startsWith("slug:")
+            ? selectedAgentId.slice("slug:".length)
+            : selectedAgentId === "master"
+              ? "account_manager"
+              : undefined,
+          ...(isJeremyAgent && effectivePersonaSlug ? { personaSlug: effectivePersonaSlug } : {}),
 
-        // Video renders never carry client/offer knowledge — prompt only.
-        videoProduceIntent: selectedAgentMode === "video" && produceNow,
-        offerContext: (() => {
-          if (selectedAgentMode === "video" && produceNow) return undefined;
-          const list = selectedOfferId === "all"
-            ? clientOffers
-            : clientOffers.filter(o => o.id === selectedOfferId);
-          if (!list.length) return undefined;
-          return list.map((o, i) => {
-            const parts = [`OFFER ${i + 1}: ${o.title}`];
-            if (o.description) parts.push(o.description);
-            if (o.file_name) parts.push(`Primary file: ${o.file_name}${o.file_url ? ` (${o.file_url})` : ""}`);
-            const files = (clientOfferFiles as any[]).filter(f => f.offer_id === o.id);
-            if (files.length > 0) {
-              parts.push(`Attached files (${files.length}) — review each PDF / asset:`);
-              files.forEach((f: any, idx: number) => {
-                const roleLabel = f.role && f.role !== "reference" ? ` {role: ${f.role}}` : "";
-                parts.push(`  ${idx + 1}. ${f.file_name}${f.file_type ? ` [${f.file_type}]` : ""}${roleLabel} → ${f.file_url}`);
-              });
-            }
-            return parts.join("\n");
-          }).join("\n\n---\n\n");
-        })(),
-        activeReferenceIds,
-        activeVideoReferenceIds,
-        agentMode: selectedAgentId !== "off",
-        // Regular chat mode gates video renders behind an explicit approval
-        // click; this flag is only true on the approved re-run.
-        videoApproved: !!opts?.videoApproved,
-        agentToolPolicy: agentToolPolicyFor(
-          (clientAgents as any[]).find(a => a.id === selectedAgentId) || null,
-          selectedAgentId === "master",
-        ),
-        // Phase 5 wiring: pass offer scope so the edge function can load
-        // 3-layer context (agency agent + client brain + offer training).
-        offerIds: (selectedAgentMode === "video" && produceNow)
-          ? []
-          : (selectedOfferId && selectedOfferId !== "all" ? [selectedOfferId] : (clientOffers || []).map((o: any) => o.id)),
-        attachments: attSnapshot.map(a => ({ url: a.url, name: a.name, mime: a.mime, text: a.text })),
-      }, ctrl.signal);
+          // Video renders never carry client/offer knowledge — prompt only.
+          videoProduceIntent: selectedAgentMode === "video" && produceNow,
+          offerContext: (() => {
+            if (selectedAgentMode === "video" && produceNow) return undefined;
+            const list =
+              selectedOfferId === "all" ? clientOffers : clientOffers.filter((o) => o.id === selectedOfferId);
+            if (!list.length) return undefined;
+            return list
+              .map((o, i) => {
+                const parts = [`OFFER ${i + 1}: ${o.title}`];
+                if (o.description) parts.push(o.description);
+                if (o.file_name) parts.push(`Primary file: ${o.file_name}${o.file_url ? ` (${o.file_url})` : ""}`);
+                const files = (clientOfferFiles as any[]).filter((f) => f.offer_id === o.id);
+                if (files.length > 0) {
+                  parts.push(`Attached files (${files.length}) — review each PDF / asset:`);
+                  files.forEach((f: any, idx: number) => {
+                    const roleLabel = f.role && f.role !== "reference" ? ` {role: ${f.role}}` : "";
+                    parts.push(
+                      `  ${idx + 1}. ${f.file_name}${f.file_type ? ` [${f.file_type}]` : ""}${roleLabel} → ${f.file_url}`,
+                    );
+                  });
+                }
+                return parts.join("\n");
+              })
+              .join("\n\n---\n\n");
+          })(),
+          activeReferenceIds,
+          activeVideoReferenceIds,
+          agentMode: selectedAgentId !== "off",
+          // Regular chat mode gates video renders behind an explicit approval
+          // click; this flag is only true on the approved re-run.
+          videoApproved: !!opts?.videoApproved,
+          agentToolPolicy: agentToolPolicyFor(
+            (clientAgents as any[]).find((a) => a.id === selectedAgentId) || null,
+            selectedAgentId === "master",
+          ),
+          // Phase 5 wiring: pass offer scope so the edge function can load
+          // 3-layer context (agency agent + client brain + offer training).
+          offerIds:
+            selectedAgentMode === "video" && produceNow
+              ? []
+              : selectedOfferId && selectedOfferId !== "all"
+                ? [selectedOfferId]
+                : (clientOffers || []).map((o: any) => o.id),
+          attachments: attSnapshot.map((a) => ({ url: a.url, name: a.name, mime: a.mime, text: a.text })),
+        },
+        ctrl.signal,
+      );
       if (!res.ok || !res.body) throw new Error(`Stream failed: ${res.status} ${await res.text().catch(() => "")}`);
 
       const reader = res.body.getReader();
@@ -2050,27 +2649,32 @@ export function AIStudioTab({ clientId, clientName }: Props) {
         const parts = buffer.split("\n\n");
         buffer = parts.pop() || "";
         for (const part of parts) {
-          const line = part.split("\n").find(l => l.startsWith("data:"));
+          const line = part.split("\n").find((l) => l.startsWith("data:"));
           if (!line) continue;
-          let evt: any; try { evt = JSON.parse(line.slice(5).trim()); } catch { continue; }
+          let evt: any;
+          try {
+            evt = JSON.parse(line.slice(5).trim());
+          } catch {
+            continue;
+          }
 
           if (evt.type === "conversation") {
             setConversationId(evt.conversationId);
           } else if (evt.type === "context_usage") {
             setContextUsage({ chars: evt.chars, tokens: evt.estimated_tokens });
           } else if (evt.type === "text") {
-            updateAssistant(m => ({ ...m, content: stripImageMarkup((m.content || "") + evt.delta) }));
+            updateAssistant((m) => ({ ...m, content: stripImageMarkup((m.content || "") + evt.delta) }));
           } else if (evt.type === "reasoning") {
-            updateAssistant(m => ({ ...m, reasoning: (m.reasoning || "") + (evt.delta || "") }));
+            updateAssistant((m) => ({ ...m, reasoning: (m.reasoning || "") + (evt.delta || "") }));
           } else if (evt.type === "tool_start") {
-            updateAssistant(m => ({
+            updateAssistant((m) => ({
               ...m,
               tools: [...(m.tools || []), { id: evt.id, name: evt.name, args: evt.args, status: "running" }],
             }));
           } else if (evt.type === "tool_end") {
-            updateAssistant(m => ({
+            updateAssistant((m) => ({
               ...m,
-              tools: (m.tools || []).map(t =>
+              tools: (m.tools || []).map((t) =>
                 t.id === evt.id ? { ...t, result: evt.result, status: evt.result?.error ? "error" : "done" } : t,
               ),
             }));
@@ -2083,14 +2687,16 @@ export function AIStudioTab({ clientId, clientName }: Props) {
               aspect_ratio: evt.aspect_ratio,
               quality: evt.quality,
             };
-            setCanvas(curr => [...curr, ph]);
+            setCanvas((curr) => [...curr, ph]);
           } else if (evt.type === "canvas_placeholder_failed") {
-            setCanvas(curr =>
-              curr.map(c => "__placeholder" in c && c.placeholder_id === evt.placeholder_id ? { ...c, failed: evt.error } : c),
+            setCanvas((curr) =>
+              curr.map((c) =>
+                "__placeholder" in c && c.placeholder_id === evt.placeholder_id ? { ...c, failed: evt.error } : c,
+              ),
             );
           } else if (evt.type === "canvas_placeholder_progress") {
-            setCanvas(curr =>
-              curr.map(c => {
+            setCanvas((curr) =>
+              curr.map((c) => {
                 if (!("__placeholder" in c) || c.placeholder_id !== evt.placeholder_id) return c;
                 return {
                   ...c,
@@ -2107,9 +2713,9 @@ export function AIStudioTab({ clientId, clientName }: Props) {
               }),
             );
           } else if (evt.type === "canvas_item") {
-            setCanvas(curr => {
+            setCanvas((curr) => {
               const filtered = evt.replace_placeholder_id
-                ? curr.filter(c => !("__placeholder" in c) || c.placeholder_id !== evt.replace_placeholder_id)
+                ? curr.filter((c) => !("__placeholder" in c) || c.placeholder_id !== evt.replace_placeholder_id)
                 : curr;
               // Append newest at the bottom so canvas grows downward with the chat.
               return [...filtered, evt.item as CanvasItem];
@@ -2117,13 +2723,15 @@ export function AIStudioTab({ clientId, clientName }: Props) {
           } else if (evt.type === "compare_results") {
             const compare: CompareResult[] = (Array.isArray(evt.results) ? evt.results : []).map((r: any) => ({
               model: r.model,
-              label: CHAT_MODELS.find(mm => mm.value === r.model || mm.value === `openrouter/${r.model}`)?.label || r.model,
+              label:
+                CHAT_MODELS.find((mm) => mm.value === r.model || mm.value === `openrouter/${r.model}`)?.label ||
+                r.model,
               output: r.output,
               error: r.error,
               ms: r.ms,
               usage: r.usage,
             }));
-            updateAssistant(m => ({ ...m, compare, compareLoading: false }));
+            updateAssistant((m) => ({ ...m, compare, compareLoading: false }));
           } else if (evt.type === "suggested_followups") {
             setFollowups(Array.isArray(evt.suggestions) ? evt.suggestions : []);
           } else if (evt.type === "clip_avatar_mapping") {
@@ -2133,10 +2741,12 @@ export function AIStudioTab({ clientId, clientName }: Props) {
             // eslint-disable-next-line no-console
             console.log(
               `[avatar-mapping] ${ok} clip ${evt.clip_index}/${evt.clip_count} model=${evt.model} avatar=${evt.avatar_name || evt.avatar_id} source=${evt.source}`,
-              { actual_image_url: evt.actual_image_url, avatar_image_url: evt.avatar_image_url }
+              { actual_image_url: evt.actual_image_url, avatar_image_url: evt.avatar_image_url },
             );
             if (evt.verified === false) {
-              toast.warning(`Clip ${evt.clip_index}/${evt.clip_count} did not reuse the selected avatar image (${evt.source})`);
+              toast.warning(
+                `Clip ${evt.clip_index}/${evt.clip_count} did not reuse the selected avatar image (${evt.source})`,
+              );
             }
           } else if (evt.type === "model_rerouted") {
             // Server auto-routed a Seedance request to Veo because an avatar
@@ -2150,25 +2760,28 @@ export function AIStudioTab({ clientId, clientName }: Props) {
             // eslint-disable-next-line no-console
             console.log(
               `[script-batch] script#${evt.script_index} "${evt.script_title}" → ${evt.clip_count} clip(s) on ${evt.model}${evt.rerouted ? " (rerouted)" : ""}`,
-              { group_id: evt.group_id, has_avatar: evt.has_avatar }
+              { group_id: evt.group_id, has_avatar: evt.has_avatar },
             );
           } else if (evt.type === "error") {
-            updateAssistant(m => ({ ...m, content: (m.content || "") + `\n\n⚠️ ${evt.message}` }));
+            updateAssistant((m) => ({ ...m, content: (m.content || "") + `\n\n⚠️ ${evt.message}` }));
             toast.error(evt.message);
           }
         }
       }
     } catch (e: any) {
       if (e?.name === "AbortError") {
-        updateAssistant(m => ({ ...m, content: (m.content || "") + "\n\n_(continuing in background — reopen this thread to see results)_" }));
+        updateAssistant((m) => ({
+          ...m,
+          content: (m.content || "") + "\n\n_(continuing in background — reopen this thread to see results)_",
+        }));
       } else {
         toast.error(e?.message || "AI Studio failed");
-        updateAssistant(m => ({ ...m, content: (m.content || "") + `\n\nError: ${e?.message || e}` }));
+        updateAssistant((m) => ({ ...m, content: (m.content || "") + `\n\nError: ${e?.message || e}` }));
       }
     } finally {
       abortRefs.current.delete(ctrl);
-      updateAssistant(m => ({ ...m, streaming: false }));
-      setLoading(n => Math.max(0, n - 1));
+      updateAssistant((m) => ({ ...m, streaming: false }));
+      setLoading((n) => Math.max(0, n - 1));
       loadThreads();
     }
   }
@@ -2188,14 +2801,14 @@ export function AIStudioTab({ clientId, clientName }: Props) {
       try {
         // Surface a clear permission state before starting.
         if (navigator.mediaDevices?.getUserMedia) {
-          await navigator.mediaDevices.getUserMedia({ audio: true }).then((s) =>
-            s.getTracks().forEach((t) => t.stop()),
-          );
+          await navigator.mediaDevices
+            .getUserMedia({ audio: true })
+            .then((s) => s.getTracks().forEach((t) => t.stop()));
         }
         const rec = new SR();
         rec.continuous = true;
         rec.interimResults = true;
-        rec.lang = (navigator.language || "en-US");
+        rec.lang = navigator.language || "en-US";
         speechBaseInputRef.current = input;
         let finalText = "";
         rec.onresult = (event: any) => {
@@ -2243,9 +2856,11 @@ export function AIStudioTab({ clientId, clientName }: Props) {
       const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm";
       const mr = new MediaRecorder(stream, { mimeType: mime });
       mediaRecRef.current = mr;
-      mr.ondataavailable = (e) => { if (e.data?.size) audioChunksRef.current.push(e.data); };
+      mr.ondataavailable = (e) => {
+        if (e.data?.size) audioChunksRef.current.push(e.data);
+      };
       mr.onstop = async () => {
-        recStreamRef.current?.getTracks().forEach(t => t.stop());
+        recStreamRef.current?.getTracks().forEach((t) => t.stop());
         recStreamRef.current = null;
         if (!audioChunksRef.current.length) return;
         setIsTranscribing(true);
@@ -2253,29 +2868,44 @@ export function AIStudioTab({ clientId, clientName }: Props) {
         const reader = new FileReader();
         reader.onloadend = async () => {
           try {
-            const { data, error } = await supabase.functions.invoke("transcribe-audio", { body: { audio: reader.result } });
+            const { data, error } = await supabase.functions.invoke("transcribe-audio", {
+              body: { audio: reader.result },
+            });
             if (error) throw error;
             const txt = (data as any)?.text?.trim();
-            if (txt) setInput(curr => (curr ? curr + " " : "") + txt);
+            if (txt) setInput((curr) => (curr ? curr + " " : "") + txt);
             else toast.error("No speech detected");
-          } catch (e: any) { toast.error(e?.message || "Transcription failed"); }
-          finally { setIsTranscribing(false); }
+          } catch (e: any) {
+            toast.error(e?.message || "Transcription failed");
+          } finally {
+            setIsTranscribing(false);
+          }
         };
         reader.readAsDataURL(blob);
       };
       mr.start();
       setIsRecording(true);
-    } catch (e: any) { toast.error(e?.message || "Mic permission denied"); }
+    } catch (e: any) {
+      toast.error(e?.message || "Mic permission denied");
+    }
   }, [input]);
   const stopRecording = useCallback(() => {
-    try { speechRecRef.current?.stop(); } catch {}
+    try {
+      speechRecRef.current?.stop();
+    } catch {}
     speechRecRef.current = null;
-    try { mediaRecRef.current?.stop(); } catch {}
+    try {
+      mediaRecRef.current?.stop();
+    } catch {}
     setIsRecording(false);
   }, []);
 
   async function clearConversation() {
-    if (!conversationId) { setMessages([]); setCanvas([]); return; }
+    if (!conversationId) {
+      setMessages([]);
+      setCanvas([]);
+      return;
+    }
     setClearOpen(true);
   }
   const [clearOpen, setClearOpen] = useState(false);
@@ -2283,7 +2913,10 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     setClearOpen(false);
     if (!conversationId) return;
     const res = await studioFetch({ action: "clear", clientId, conversationId });
-    if (!res.ok) { toast.error("Failed to clear"); return; }
+    if (!res.ok) {
+      toast.error("Failed to clear");
+      return;
+    }
     setMessages([]);
     setCanvas([]);
     toast.success("Conversation cleared");
@@ -2293,23 +2926,48 @@ export function AIStudioTab({ clientId, clientName }: Props) {
   useEffect(() => {
     if (!hydrated || !conversationId) return;
     const t = setTimeout(() => {
-      studioFetch({ action: "settings", clientId, conversationId, docUrl: docUrl || null, sheetUrl: sheetUrl || null, quality, chatModel, activeReferenceIds, activeVideoReferenceIds })
-        .catch((e) => console.error("AI Studio settings save failed", e));
+      studioFetch({
+        action: "settings",
+        clientId,
+        conversationId,
+        docUrl: docUrl || null,
+        sheetUrl: sheetUrl || null,
+        quality,
+        chatModel,
+        activeReferenceIds,
+        activeVideoReferenceIds,
+      }).catch((e) => console.error("AI Studio settings save failed", e));
     }, 500);
     return () => clearTimeout(t);
-  }, [docUrl, sheetUrl, quality, chatModel, activeReferenceIds, activeVideoReferenceIds, conversationId, hydrated, clientId, studioFetch]);
+  }, [
+    docUrl,
+    sheetUrl,
+    quality,
+    chatModel,
+    activeReferenceIds,
+    activeVideoReferenceIds,
+    conversationId,
+    hydrated,
+    clientId,
+    studioFetch,
+  ]);
 
   // Inline edit from canvas — fire a hidden edit prompt that targets edit_static_ad
-  const inlineEdit = useCallback(async (imageUrl: string, aspectRatio: string, instruction: string) => {
-    const text = `Edit the canvas ad (source_image_url: ${imageUrl}, aspect_ratio: ${aspectRatio}). ${instruction}. Use the edit_static_ad tool.`;
-    await send(text);
-  }, [/* send is stable enough via closure; no deps to avoid loop */]);
+  const inlineEdit = useCallback(
+    async (imageUrl: string, aspectRatio: string, instruction: string) => {
+      const text = `Edit the canvas ad (source_image_url: ${imageUrl}, aspect_ratio: ${aspectRatio}). ${instruction}. Use the edit_static_ad tool.`;
+      await send(text);
+    },
+    [
+      /* send is stable enough via closure; no deps to avoid loop */
+    ],
+  );
 
   // Drag-from-chat → drop on composer (and click "+ Reference" button on hover)
   const addImageAsReference = useCallback((url: string, name?: string) => {
     if (!url) return;
-    setPendingAttachments(curr => {
-      if (curr.some(a => a.url === url)) return curr;
+    setPendingAttachments((curr) => {
+      if (curr.some((a) => a.url === url)) return curr;
       return [...curr, { url, name: name || url.split("/").pop() || "reference.png", mime: "image/png" }];
     });
   }, []);
@@ -2343,7 +3001,7 @@ export function AIStudioTab({ clientId, clientName }: Props) {
         });
         if (!res.ok) throw new Error(await res.text().catch(() => "Pin failed"));
         const { item } = await res.json();
-        if (item) setCanvas(curr => [...curr, item as CanvasItem]);
+        if (item) setCanvas((curr) => [...curr, item as CanvasItem]);
         toast.success("Pinned to canvas");
       } catch (err: any) {
         toast.error(err?.message || "Failed to pin to canvas");
@@ -2379,7 +3037,9 @@ export function AIStudioTab({ clientId, clientName }: Props) {
   }, [addImageAsReference, inlineEdit, conversationId, clientId, studioFetch]);
 
   return (
-    <div className={`grid grid-cols-1 ${showThreads ? "lg:grid-cols-[220px,1fr]" : "lg:grid-cols-1"} gap-3 h-full min-h-0`}>
+    <div
+      className={`grid grid-cols-1 ${showThreads ? "lg:grid-cols-[220px,1fr]" : "lg:grid-cols-1"} gap-3 h-full min-h-0`}
+    >
       {showThreads && (
         <Card className="hidden lg:flex flex-col overflow-hidden border-border/60 shadow-sm p-0">
           <AIStudioThreadSidebar
@@ -2395,1241 +3055,1605 @@ export function AIStudioTab({ clientId, clientName }: Props) {
           />
         </Card>
       )}
-      <div className={`grid grid-cols-1 ${showChat && showCanvas ? "lg:grid-cols-[1fr,1.1fr]" : "lg:grid-cols-1"} gap-3 min-w-0 min-h-0`}>
-      {/* Mobile-only Chat / Canvas switcher */}
-      {showChat && showCanvas && (
-        <div className="lg:hidden flex items-center gap-1 p-1 rounded-xl bg-muted/40 border border-border/60 sticky top-0 z-10">
-          <button
-            type="button"
-            onClick={() => setMobileView("chat")}
-            className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition ${mobileView === "chat" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"}`}
-          >
-            Chat
-          </button>
-          <button
-            type="button"
-            onClick={() => setMobileView("canvas")}
-            className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition ${mobileView === "canvas" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"}`}
-          >
-            Canvas
-          </button>
-        </div>
-      )}
-      {/* LEFT — Chat */}
-      {showChat && (
-      <Card className={`${showCanvas && mobileView !== "chat" ? "hidden lg:flex" : "flex"} flex-col overflow-hidden border-border/60 shadow-sm min-h-0 ${chatFsClass}`}>
-        <div className="px-3 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-3 border-b border-border/60 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <div className="flex items-center gap-1 sm:gap-2">
-            <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <Sparkles className="h-4 w-4 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm leading-tight truncate">AI Studio</h3>
-              <p className="text-[11px] text-muted-foreground truncate">{clientName}</p>
-            </div>
-            <Button variant="ghost" size="sm" className="h-10 w-10 sm:h-8 sm:w-8 p-0 hidden lg:inline-flex shrink-0" onClick={() => setShowThreads(v => !v)} title={showThreads ? "Hide threads" : "Show threads"}>
-              <History className="h-3.5 w-3.5" />
-            </Button>
-            <div className="hidden md:flex shrink-0">
-              <AgentFolderInline clientId={clientId} clientName={clientName} compact />
-            </div>
-            <Button variant="ghost" size="sm" className="h-10 w-10 sm:h-8 sm:w-8 p-0 shrink-0 hidden lg:inline-flex" onClick={() => setShowCanvas(v => !v)} title={showCanvas ? "Hide canvas" : "Show canvas"}>
-              {showCanvas ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
-            </Button>
-            <Button variant="ghost" size="sm" className="h-10 w-10 sm:h-8 sm:w-8 p-0 hidden lg:inline-flex shrink-0" onClick={() => setWideChat(v => !v)} title={wideChat ? "Comfortable width" : "Expand chat width"}>
-              {wideChat ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-            </Button>
-            <Button variant="ghost" size="sm" className="h-10 w-10 sm:h-8 sm:w-8 p-0 shrink-0" onClick={() => setFullscreen(f => f === "chat" ? "none" : "chat")} title={fullscreen === "chat" ? "Exit fullscreen" : "Fullscreen chat"}>
-              {fullscreen === "chat" ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-            </Button>
-            <Button variant="ghost" size="sm" className="h-10 w-10 sm:h-8 sm:w-8 p-0 shrink-0" onClick={clearConversation} title="Clear conversation">
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-        <AlertDialog open={clearOpen} onOpenChange={setClearOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Clear this AI Studio conversation?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Past messages and canvas items will be hidden from this thread. This cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={doClear}>Clear</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        <div className="flex items-center gap-1 px-3 py-1 border-b border-border/60 bg-muted/10">
-          <button
-            type="button"
-            onClick={() => setAiStudioTab("chat")}
-            className={`text-xs px-3 py-1 rounded-md transition ${aiStudioTab === "chat" ? "bg-background border border-border/60 text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
-          >Chat</button>
-          <button
-            type="button"
-            onClick={() => setAiStudioTab("agents")}
-            className={`text-xs px-3 py-1 rounded-md transition inline-flex items-center gap-1 ${aiStudioTab === "agents" ? "bg-background border border-border/60 text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
-          ><Bot className="h-3 w-3" /> Agents</button>
-          <button
-            type="button"
-            onClick={() => setAiStudioTab("avatars")}
-            className={`text-xs px-3 py-1 rounded-md transition inline-flex items-center gap-1 ${aiStudioTab === "avatars" ? "bg-background border border-border/60 text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
-          >Avatars{selectedAvatar ? <span className="ml-1 inline-flex items-center gap-1 text-[10px] text-primary">· {selectedAvatar.name}</span> : null}</button>
-        </div>
-
-        {aiStudioTab === "agents" && (
-          <div className="flex-1 min-h-0">
-            <AIStudioAgentsTab clientId={clientId} clientName={clientName} />
+      <div
+        className={`grid grid-cols-1 ${showChat && showCanvas ? "lg:grid-cols-[1fr,1.1fr]" : "lg:grid-cols-1"} gap-3 min-w-0 min-h-0`}
+      >
+        {/* Mobile-only Chat / Canvas switcher */}
+        {showChat && showCanvas && (
+          <div className="lg:hidden flex items-center gap-1 p-1 rounded-xl bg-muted/40 border border-border/60 sticky top-0 z-10">
+            <button
+              type="button"
+              onClick={() => setMobileView("chat")}
+              className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition ${mobileView === "chat" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"}`}
+            >
+              Chat
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileView("canvas")}
+              className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition ${mobileView === "canvas" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"}`}
+            >
+              Canvas
+            </button>
           </div>
         )}
-        {aiStudioTab === "avatars" && (
-          <div className="flex-1 min-h-0">
-            <AIStudioAvatarsTab
-              clientId={clientId}
-              clientName={clientName}
-              selectedAvatarId={selectedAvatarId}
-              onSelectAvatar={setSelectedAvatarId}
-            />
-          </div>
-        )}
-        {aiStudioTab === "chat" && (
-        <>
-        {/* Video Styles bar moved to the composer — only renders when a video model is selected. */}
-        {selectedAgentMode === "video" && (
-          <div className="px-4 sm:px-6 pt-3 space-y-2">
-            <div className="flex items-center gap-1.5">
+        {/* LEFT — Chat */}
+        {showChat && (
+          <Card
+            className={`${showCanvas && mobileView !== "chat" ? "hidden lg:flex" : "flex"} flex-col overflow-hidden border-border/60 shadow-sm min-h-0 ${chatFsClass}`}
+          >
+            <div className="px-3 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-3 border-b border-border/60 pt-[max(0.75rem,env(safe-area-inset-top))]">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm leading-tight truncate">AI Studio</h3>
+                  <p className="text-[11px] text-muted-foreground truncate">{clientName}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 w-10 sm:h-8 sm:w-8 p-0 hidden lg:inline-flex shrink-0"
+                  onClick={() => setShowThreads((v) => !v)}
+                  title={showThreads ? "Hide threads" : "Show threads"}
+                >
+                  <History className="h-3.5 w-3.5" />
+                </Button>
+                <div className="hidden md:flex shrink-0">
+                  <AgentFolderInline clientId={clientId} clientName={clientName} compact />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 w-10 sm:h-8 sm:w-8 p-0 shrink-0 hidden lg:inline-flex"
+                  onClick={() => setShowCanvas((v) => !v)}
+                  title={showCanvas ? "Hide canvas" : "Show canvas"}
+                >
+                  {showCanvas ? (
+                    <PanelRightClose className="h-3.5 w-3.5" />
+                  ) : (
+                    <PanelRightOpen className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 w-10 sm:h-8 sm:w-8 p-0 hidden lg:inline-flex shrink-0"
+                  onClick={() => setWideChat((v) => !v)}
+                  title={wideChat ? "Comfortable width" : "Expand chat width"}
+                >
+                  {wideChat ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 w-10 sm:h-8 sm:w-8 p-0 shrink-0"
+                  onClick={() => setFullscreen((f) => (f === "chat" ? "none" : "chat"))}
+                  title={fullscreen === "chat" ? "Exit fullscreen" : "Fullscreen chat"}
+                >
+                  {fullscreen === "chat" ? (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 w-10 sm:h-8 sm:w-8 p-0 shrink-0"
+                  onClick={clearConversation}
+                  title="Clear conversation"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+            <AlertDialog open={clearOpen} onOpenChange={setClearOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear this AI Studio conversation?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Past messages and canvas items will be hidden from this thread. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={doClear}>Clear</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <div className="flex items-center gap-1 px-3 py-1 border-b border-border/60 bg-muted/10">
               <button
                 type="button"
-                onClick={() => setVideoFlow("master")}
-                className={`px-2.5 py-1 rounded-full border text-[11px] transition ${videoFlow === "master" ? "border-primary bg-primary text-primary-foreground" : "border-border/60 text-muted-foreground hover:bg-muted"}`}
+                onClick={() => setAiStudioTab("chat")}
+                className={`text-xs px-3 py-1 rounded-md transition ${aiStudioTab === "chat" ? "bg-background border border-border/60 text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
               >
-                Master video (6 steps)
+                Chat
               </button>
               <button
                 type="button"
-                onClick={() => setVideoFlow("legacy")}
-                className={`px-2.5 py-1 rounded-full border text-[11px] transition ${videoFlow === "legacy" ? "border-primary bg-primary text-primary-foreground" : "border-border/60 text-muted-foreground hover:bg-muted"}`}
+                onClick={() => setAiStudioTab("agents")}
+                className={`text-xs px-3 py-1 rounded-md transition inline-flex items-center gap-1 ${aiStudioTab === "agents" ? "bg-background border border-border/60 text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
               >
-                Quick chat line
+                <Bot className="h-3 w-3" /> Agents
+              </button>
+              <button
+                type="button"
+                onClick={() => setAiStudioTab("avatars")}
+                className={`text-xs px-3 py-1 rounded-md transition inline-flex items-center gap-1 ${aiStudioTab === "avatars" ? "bg-background border border-border/60 text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Avatars
+                {selectedAvatar ? (
+                  <span className="ml-1 inline-flex items-center gap-1 text-[10px] text-primary">
+                    · {selectedAvatar.name}
+                  </span>
+                ) : null}
               </button>
             </div>
-            {videoFlow === "master" ? (
-              <MasterVideoWorkflow clientId={clientId} clientName={clientName} conversationId={conversationId} />
-            ) : (
-              <VideoProductionLine
-                aspect={videoAspectForAdFormat(adFormat)}
-                selectedPresetIds={presetStyleIds}
-                onTogglePreset={(id) =>
-                  setPresetStyleIds((curr) => (curr.includes(id) ? curr.filter((v) => v !== id) : [...curr, id]))
-                }
-                generating={loading > 0}
-                onGenerateScripts={() => {
-                  const picks = VIDEO_STYLE_PRESETS.filter((p) => presetStyleIds.includes(p.id));
-                  if (!picks.length) return;
-                  const seconds = videoTotalDuration;
-                  const aspect = videoAspectForAdFormat(adFormat);
-                  void send(
-                    [
-                      `Write ${picks.length} video ad script${picks.length === 1 ? "" : "s"} for ${clientName} — one per reference style below, in this order: ${picks.map((p) => p.name).join(", ")}.`,
-                      `Each script targets ${seconds}s at ${aspect}, ~${paceWordBudget(seconds, speechPace)} words of voiceover at a ${speechPace} pace.`,
-                      "For each: a title line with the style name, the hook (0–2s), the beats with timecodes, the verbatim VO, and the visual direction drawn from that style's transcribed reference.",
-                      "Do not render anything yet — this is script work only.",
-                    ].join("\n"),
-                  );
-                }}
-                avatarName={selectedAvatar?.name || null}
-                onOpenAvatars={() => setAiStudioTab("avatars")}
-                produce={videoIntent === "produce"}
-                onSetProduce={(p) => setVideoIntent(p ? "produce" : "chat")}
-                summary={{
-                  model: VIDEO_MODELS.find((m) => m.value === videoModel)?.label || videoModel || "—",
-                  resolution: videoResolution,
-                  seconds: videoTotalDuration,
-                  cost: videoModel
-                    ? `$${(
-                        modelPricePerSecond(
-                          videoModel,
-                          videoResolution as VideoRes,
-                          VIDEO_MODELS.find((m) => m.value === videoModel)?.pricePerSecond ?? 0.1,
-                        ) * videoTotalDuration
-                      ).toFixed(2)}`
-                    : null,
-                }}
-                hasFirstFrame={!!videoFrames?.firstFrameUrl}
-                referenceCount={(videoFrames?.ingredientUrls || []).length}
-              />
-            )}
-          </div>
-        )}
 
-
-        <ScrollArea className="flex-1" ref={scrollRef as any}>
-          <div className={`px-4 sm:px-6 py-6 space-y-5 mx-auto w-full transition-[max-width] ${wideChat ? "max-w-6xl" : "max-w-3xl"}`}>
-            {messages.length === 0 && hydrated && (
-              <div className="py-8 space-y-6">
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-semibold tracking-tight">What can I build for {clientName.split(" ")[0]}?</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Ask for ad creatives, scripts, copy, doc edits, or sheet queries. Visual results appear on the Canvas →
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {SUGGESTIONS.map(s => (
-                    <button
-                      key={s.label}
-                      onClick={() => send(s.label)}
-                      className="group flex items-center gap-2 rounded-full border border-border/60 bg-background hover:bg-muted/60 hover:border-border transition px-3 py-1.5 text-xs text-left"
-                    >
-                      <span className="text-primary/80 group-hover:text-primary">{s.icon}</span>
-                      <span className="line-clamp-1">{s.label}</span>
-                    </button>
-                  ))}
-                </div>
+            {aiStudioTab === "agents" && (
+              <div className="flex-1 min-h-0">
+                <AIStudioAgentsTab clientId={clientId} clientName={clientName} />
               </div>
             )}
-            {messages.map((m, i) => {
-              const isEmptyAssistant = m.role === "assistant" && !m.content && (!m.tools || m.tools.length === 0);
-              if (isEmptyAssistant && !m.streaming) return null;
-              // One production box per generated script. Script artifacts (one per
-              // script) win; otherwise the whole reply is treated as a single script.
-              const scriptReady =
-                selectedAgentMode === "video" &&
-                m.role === "assistant" &&
-                !m.streaming &&
-                !!(m.content && m.content.trim().length > 40);
-              const artifactScripts: { title: string; content: string }[] = (m.tools || [])
-                .filter((t: any) => (t?.name || t?.function?.name) === "create_text_artifact")
-                .map((t: any) => {
-                  let args = t?.args ?? t?.arguments ?? t?.function?.arguments ?? {};
-                  if (typeof args === "string") { try { args = JSON.parse(args); } catch { args = {}; } }
-                  return { title: String(args?.title || "Script"), content: String(args?.content || "") };
-                })
-                .filter((s) => s.content.trim().length > 40);
-              const scriptCards =
-                selectedAgentMode === "video" && m.role === "assistant" && !m.streaming
-                  ? artifactScripts.length
-                    ? artifactScripts
-                    : scriptReady
-                      ? [{ title: "Generated script", content: (m.content || "").trim() }]
-                      : []
-                  : [];
-              return (
-                <div key={m.id || i} className="space-y-1.5">
-                <ChatMessage
-                  message={m}
-                  isStreaming={!!m.streaming && m.role === "assistant"}
+            {aiStudioTab === "avatars" && (
+              <div className="flex-1 min-h-0">
+                <AIStudioAvatarsTab
                   clientId={clientId}
                   clientName={clientName}
-                  onApproveVideo={(plans) => {
-                    const list = (Array.isArray(plans) ? plans : [plans]).filter(Boolean);
-                    const lines = list.map((p: any, idx: number) => [
-                      `Clip ${idx + 1}:`,
-                      p?.model ? `model="${p.model}"` : "",
-                      p?.resolution ? `resolution="${p.resolution}"` : "",
-                      p?.duration ? `duration=${p.duration}` : "",
-                      p?.aspect_ratio ? `aspect_ratio="${p.aspect_ratio}"` : "",
-                      p?.image_url ? `image_url="${p.image_url}"` : "",
-                      p?.last_frame_url ? `last_frame_url="${p.last_frame_url}"` : "",
-                      p?.prompt ? `\nprompt: ${p.prompt}` : "",
-                    ].filter(Boolean).join(" "));
-                    send(
-                      `APPROVED — render the video(s) now exactly as proposed. Emit ${list.length} generate_seedance_video tool_call${list.length === 1 ? "" : "s"} in this same turn with these exact settings and no changes:\n\n${lines.join("\n\n")}`,
-                      { videoApproved: true },
-                    );
-                  }}
+                  selectedAvatarId={selectedAvatarId}
+                  onSelectAvatar={setSelectedAvatarId}
                 />
-                {scriptCards.map((sc, si) => (
-                  <ScriptRenderCard
-                    key={`${m.id || i}-script-${si}`}
-                    title={sc.title}
-                    script={sc.content}
-                    index={si}
-                    total={scriptCards.length}
-                    models={VIDEO_MODELS.map((vm) => ({ value: vm.value, label: vm.label, hint: vm.hint }))}
-                    resolutionsFor={(mv) => (VIDEO_MODEL_RES[mv] || ["720p"]) as unknown as string[]}
-                    maxSecondsFor={(mv) => VIDEO_MODEL_MAX_SECONDS[mv] ?? 15}
-                    minSecondsFor={(mv) => (mv === WAN_VIDEO_MODEL ? 2 : 4)}
-                    defaultModel={videoModel}
-                    defaultResolution={videoResolution}
-                    defaultAspect={videoAspectForAdFormat(adFormat) === "16:9" ? "16:9" : "9:16"}
-                    wordsPerMinute={SPEECH_PACES.find((p) => p.value === speechPace)?.wpm ?? 158}
-                    avatars={studioAvatars.map((a) => ({ id: a.id, name: a.name, image_url: a.image_url }))}
-                    defaultAvatarId={selectedAvatarId}
-                    clientId={clientId}
-                    offerDescription={goalOfferContext || undefined}
-                    busy={loading > 0}
-                    onGenerate={(req) => {
-                      setVideoIntent("produce");
-                      send(
-                        [
-                          `Produce the video for the script titled "${req.title}" below. Ignore every other script in this conversation.`,
-                          "Turn it into ONE optimized render prompt: subject + wardrobe, setting, camera move, lighting, on-screen action beat by beat, and the spoken VO lines verbatim.",
-                          req.firstFrameUrl
-                            ? "Start the render from the supplied first frame image — keep that exact person, wardrobe and setting."
-                            : "",
-                          "Then call generate_seedance_video with the locked settings. Do not rewrite the script or ask follow-up questions first.",
-                          "",
-                          "SCRIPT:",
-                          req.script,
-                        ]
-                          .filter(Boolean)
-                          .join("\n"),
-                        {
-                          forceProduce: true,
-                          videoApproved: true,
-                          videoOverride: {
-                            model: req.model,
-                            resolution: req.resolution,
-                            duration: req.duration,
-                            aspect: req.aspect,
-                            firstFrameUrl: req.firstFrameUrl,
-                            avatarId: req.avatarId,
-                          },
-                        },
-                      );
-                    }}
-                  />
-                ))}
-                </div>
-              );
-            })}
-          </div>
-        </ScrollArea>
-
-        <div className="px-3 sm:px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
-          <div className={`mx-auto w-full transition-[max-width] ${wideChat ? "max-w-6xl" : "max-w-3xl"}`}>
-            {/* Context usage + auto doc toggle */}
-            {(() => {
-              const limit = contextLimitFor(chatModel);
-              const used = contextUsage?.tokens ?? 0;
-              const pct = Math.min(100, Math.round((used / limit) * 100));
-              const barColor = pct > 85 ? "bg-destructive" : pct > 60 ? "bg-amber-500" : "bg-primary";
-              return (
-                <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] text-muted-foreground">
-                  <div className="flex-1 min-w-[180px] flex items-center gap-2">
-                    <BookOpenCheck className="h-3 w-3" />
-                    <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
-                    </div>
-                    <span className="tabular-nums whitespace-nowrap">
-                      {used.toLocaleString()} / {limit.toLocaleString()} tok ({pct}%)
-                    </span>
-                  </div>
-                </div>
-              );
-            })()}
-            {/* Cost analysis based on model + usage for this client/conversation */}
-            {messages.length > 0 && (
-              <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
-                <DollarSign className="h-3 w-3" />
-                <span className="tabular-nums whitespace-nowrap">
-                  ~${usageStats.cost.toFixed(4)} this convo
-                </span>
-                <span className="text-muted-foreground/60 hidden sm:inline">·</span>
-                <span className="tabular-nums whitespace-nowrap">
-                  in {usageStats.inTok.toLocaleString()} · out {usageStats.outTok.toLocaleString()} tok
-                </span>
-                <span className="text-muted-foreground/60 hidden sm:inline">·</span>
-                <Badge variant="secondary" className="text-[9px] h-4 px-1.5 whitespace-nowrap">{chatModel.split("/").pop()}</Badge>
               </div>
             )}
-            <div
-              className="relative rounded-2xl border border-border/60 bg-background shadow-sm focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition data-[dragging=true]:border-primary data-[dragging=true]:ring-2 data-[dragging=true]:ring-primary/30"
-              onDragOver={(e) => {
-                if (e.dataTransfer.types.includes("application/x-aistudio-image") || e.dataTransfer.types.includes("text/uri-list") || e.dataTransfer.types.includes("Files")) {
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "copy";
-                  (e.currentTarget as HTMLElement).dataset.dragging = "true";
-                }
-              }}
-              onDragLeave={(e) => { (e.currentTarget as HTMLElement).dataset.dragging = "false"; }}
-              onDrop={(e) => {
-                (e.currentTarget as HTMLElement).dataset.dragging = "false";
-                const json = e.dataTransfer.getData("application/x-aistudio-image");
-                if (json) {
-                  e.preventDefault();
-                  try { const d = JSON.parse(json); if (d.url) addImageAsReference(d.url); } catch {}
-                  return;
-                }
-                const uri = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
-                if (uri && /^https?:\/\//.test(uri)) {
-                  e.preventDefault();
-                  addImageAsReference(uri);
-                  return;
-                }
-                if (e.dataTransfer.files && e.dataTransfer.files.length) {
-                  e.preventDefault();
-                  uploadFiles(e.dataTransfer.files);
-                }
-              }}
-            >
-              {pendingAttachments.length > 0 && (() => {
-                const offerRefs = pendingAttachments.filter(a => a.fromOffer);
-                const userRefs = pendingAttachments.filter(a => !a.fromOffer);
-                const isImg = (a: Attachment) => /image\//i.test(a.mime || "") || /\.(png|jpe?g|gif|webp|svg|heic|avif)$/i.test(a.name || "");
-                const groupByRole = (arr: Attachment[]) => {
-                  const g: Record<string, Attachment[]> = {};
-                  arr.forEach(a => {
-                    const key = a.role && a.role !== "reference" ? a.role : "reference";
-                    (g[key] ||= []).push(a);
-                  });
-                  return g;
-                };
-                const roleLabel = (k: string) => ({
-                  video_ad: "Video Ad References",
-                  static_ad: "Static Ad References",
-                  product: "Product",
-                  logo: "Logo",
-                  lifestyle: "Lifestyle",
-                  testimonial: "Testimonial",
-                  avatar: "Avatar",
-                  reference: "References",
-                } as Record<string, string>)[k] || k;
-                const groups = groupByRole(offerRefs);
-                const orderedKeys = ["video_ad", "static_ad", "product", "logo", "avatar", "lifestyle", "testimonial", "reference"]
-                  .filter(k => groups[k]?.length);
-                return (
-                  <div className="px-3 pt-2 space-y-2">
-                    {offerRefs.length > 0 && (
-                      <div className="rounded-lg border border-primary/30 bg-primary/5 p-2 space-y-2">
-                        <div className="flex items-center gap-1.5 text-[10px] text-primary">
-                          <Sparkles className="h-3 w-3" />
-                          <span className="font-semibold uppercase tracking-wide">
-                            {offerRefs.length} offer reference{offerRefs.length === 1 ? "" : "s"} auto-attached
-                          </span>
-                          {selectedOfferTitle && (
-                            <span className="text-muted-foreground normal-case">from "{selectedOfferTitle}"</span>
-                          )}
+            {aiStudioTab === "chat" && (
+              <>
+                {/* Video Styles bar moved to the composer — only renders when a video model is selected. */}
+                {selectedAgentMode === "video" && (
+                  <div className="px-4 sm:px-6 pt-3 space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setVideoFlow("master")}
+                        className={`px-2.5 py-1 rounded-full border text-[11px] transition ${videoFlow === "master" ? "border-primary bg-primary text-primary-foreground" : "border-border/60 text-muted-foreground hover:bg-muted"}`}
+                      >
+                        Master video (6 steps)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVideoFlow("legacy")}
+                        className={`px-2.5 py-1 rounded-full border text-[11px] transition ${videoFlow === "legacy" ? "border-primary bg-primary text-primary-foreground" : "border-border/60 text-muted-foreground hover:bg-muted"}`}
+                      >
+                        Quick chat line
+                      </button>
+                    </div>
+                    {videoFlow === "master" ? (
+                      conversationId ? (
+                        <MasterVideoWorkflow
+                          clientId={clientId}
+                          clientName={clientName}
+                          conversationId={conversationId}
+                        />
+                      ) : (
+                        <div className="rounded-2xl border p-5 space-y-3">
+                          <p className="text-sm">
+                            Start a video project to save your offer, style, avatar, frame and approvals together.
+                          </p>
+                          <Button onClick={() => void newThread()}>Start video project</Button>
                         </div>
-                        {orderedKeys.map(k => (
-                          <div key={k} className="space-y-1">
-                            <div className="text-[9px] uppercase tracking-wide text-muted-foreground font-medium">
-                              {roleLabel(k)} · {groups[k].length}
+                      )
+                    ) : (
+                      <VideoProductionLine
+                        aspect={videoAspectForAdFormat(adFormat)}
+                        selectedPresetIds={presetStyleIds}
+                        onTogglePreset={(id) =>
+                          setPresetStyleIds((curr) =>
+                            curr.includes(id) ? curr.filter((v) => v !== id) : [...curr, id],
+                          )
+                        }
+                        generating={loading > 0}
+                        onGenerateScripts={() => {
+                          const picks = VIDEO_STYLE_PRESETS.filter((p) => presetStyleIds.includes(p.id));
+                          if (!picks.length) return;
+                          const seconds = videoTotalDuration;
+                          const aspect = videoAspectForAdFormat(adFormat);
+                          void send(
+                            [
+                              `Write ${picks.length} video ad script${picks.length === 1 ? "" : "s"} for ${clientName} — one per reference style below, in this order: ${picks.map((p) => p.name).join(", ")}.`,
+                              `Each script targets ${seconds}s at ${aspect}, ~${paceWordBudget(seconds, speechPace)} words of voiceover at a ${speechPace} pace.`,
+                              "For each: a title line with the style name, the hook (0–2s), the beats with timecodes, the verbatim VO, and the visual direction drawn from that style's transcribed reference.",
+                              "Do not render anything yet — this is script work only.",
+                            ].join("\n"),
+                          );
+                        }}
+                        avatarName={selectedAvatar?.name || null}
+                        onOpenAvatars={() => setAiStudioTab("avatars")}
+                        produce={videoIntent === "produce"}
+                        onSetProduce={(p) => setVideoIntent(p ? "produce" : "chat")}
+                        summary={{
+                          model: VIDEO_MODELS.find((m) => m.value === videoModel)?.label || videoModel || "—",
+                          resolution: videoResolution,
+                          seconds: videoTotalDuration,
+                          cost: videoModel
+                            ? `$${(
+                                modelPricePerSecond(
+                                  videoModel,
+                                  videoResolution as VideoRes,
+                                  VIDEO_MODELS.find((m) => m.value === videoModel)?.pricePerSecond ?? 0.1,
+                                ) * videoTotalDuration
+                              ).toFixed(2)}`
+                            : null,
+                        }}
+                        hasFirstFrame={!!videoFrames?.firstFrameUrl}
+                        referenceCount={(videoFrames?.ingredientUrls || []).length}
+                      />
+                    )}
+                  </div>
+                )}
+
+                <ScrollArea className="flex-1" ref={scrollRef as any}>
+                  <div
+                    className={`px-4 sm:px-6 py-6 space-y-5 mx-auto w-full transition-[max-width] ${wideChat ? "max-w-6xl" : "max-w-3xl"}`}
+                  >
+                    {messages.length === 0 && hydrated && (
+                      <div className="py-8 space-y-6">
+                        <div className="space-y-2">
+                          <h2 className="text-2xl font-semibold tracking-tight">
+                            What can I build for {clientName.split(" ")[0]}?
+                          </h2>
+                          <p className="text-sm text-muted-foreground">
+                            Ask for ad creatives, scripts, copy, doc edits, or sheet queries. Visual results appear on
+                            the Canvas →
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {SUGGESTIONS.map((s) => (
+                            <button
+                              key={s.label}
+                              onClick={() => send(s.label)}
+                              className="group flex items-center gap-2 rounded-full border border-border/60 bg-background hover:bg-muted/60 hover:border-border transition px-3 py-1.5 text-xs text-left"
+                            >
+                              <span className="text-primary/80 group-hover:text-primary">{s.icon}</span>
+                              <span className="line-clamp-1">{s.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {messages.map((m, i) => {
+                      const isEmptyAssistant =
+                        m.role === "assistant" && !m.content && (!m.tools || m.tools.length === 0);
+                      if (isEmptyAssistant && !m.streaming) return null;
+                      // One production box per generated script. Script artifacts (one per
+                      // script) win; otherwise the whole reply is treated as a single script.
+                      const scriptReady =
+                        selectedAgentMode === "video" &&
+                        m.role === "assistant" &&
+                        !m.streaming &&
+                        !!(m.content && m.content.trim().length > 40);
+                      const artifactScripts: { title: string; content: string }[] = (m.tools || [])
+                        .filter((t: any) => (t?.name || t?.function?.name) === "create_text_artifact")
+                        .map((t: any) => {
+                          let args = t?.args ?? t?.arguments ?? t?.function?.arguments ?? {};
+                          if (typeof args === "string") {
+                            try {
+                              args = JSON.parse(args);
+                            } catch {
+                              args = {};
+                            }
+                          }
+                          return { title: String(args?.title || "Script"), content: String(args?.content || "") };
+                        })
+                        .filter((s) => s.content.trim().length > 40);
+                      const scriptCards =
+                        selectedAgentMode === "video" && m.role === "assistant" && !m.streaming
+                          ? artifactScripts.length
+                            ? artifactScripts
+                            : scriptReady
+                              ? [{ title: "Generated script", content: (m.content || "").trim() }]
+                              : []
+                          : [];
+                      return (
+                        <div key={m.id || i} className="space-y-1.5">
+                          <ChatMessage
+                            message={m}
+                            isStreaming={!!m.streaming && m.role === "assistant"}
+                            clientId={clientId}
+                            clientName={clientName}
+                            onApproveVideo={(plans) => {
+                              const list = (Array.isArray(plans) ? plans : [plans]).filter(Boolean);
+                              const lines = list.map((p: any, idx: number) =>
+                                [
+                                  `Clip ${idx + 1}:`,
+                                  p?.model ? `model="${p.model}"` : "",
+                                  p?.resolution ? `resolution="${p.resolution}"` : "",
+                                  p?.duration ? `duration=${p.duration}` : "",
+                                  p?.aspect_ratio ? `aspect_ratio="${p.aspect_ratio}"` : "",
+                                  p?.image_url ? `image_url="${p.image_url}"` : "",
+                                  p?.last_frame_url ? `last_frame_url="${p.last_frame_url}"` : "",
+                                  p?.prompt ? `\nprompt: ${p.prompt}` : "",
+                                ]
+                                  .filter(Boolean)
+                                  .join(" "),
+                              );
+                              send(
+                                `APPROVED — render the video(s) now exactly as proposed. Emit ${list.length} generate_seedance_video tool_call${list.length === 1 ? "" : "s"} in this same turn with these exact settings and no changes:\n\n${lines.join("\n\n")}`,
+                                { videoApproved: true },
+                              );
+                            }}
+                          />
+                          {scriptCards.map((sc, si) => (
+                            <ScriptRenderCard
+                              key={`${m.id || i}-script-${si}`}
+                              title={sc.title}
+                              script={sc.content}
+                              index={si}
+                              total={scriptCards.length}
+                              models={VIDEO_MODELS.map((vm) => ({ value: vm.value, label: vm.label, hint: vm.hint }))}
+                              resolutionsFor={(mv) => (VIDEO_MODEL_RES[mv] || ["720p"]) as unknown as string[]}
+                              maxSecondsFor={(mv) => VIDEO_MODEL_MAX_SECONDS[mv] ?? 15}
+                              minSecondsFor={(mv) => (mv === WAN_VIDEO_MODEL ? 2 : 4)}
+                              defaultModel={videoModel}
+                              defaultResolution={videoResolution}
+                              defaultAspect={videoAspectForAdFormat(adFormat) === "16:9" ? "16:9" : "9:16"}
+                              wordsPerMinute={SPEECH_PACES.find((p) => p.value === speechPace)?.wpm ?? 158}
+                              avatars={studioAvatars.map((a) => ({ id: a.id, name: a.name, image_url: a.image_url }))}
+                              defaultAvatarId={selectedAvatarId}
+                              clientId={clientId}
+                              offerDescription={goalOfferContext || undefined}
+                              busy={loading > 0}
+                              onGenerate={(req) => {
+                                setVideoIntent("produce");
+                                send(
+                                  [
+                                    `Produce the video for the script titled "${req.title}" below. Ignore every other script in this conversation.`,
+                                    "Turn it into ONE optimized render prompt: subject + wardrobe, setting, camera move, lighting, on-screen action beat by beat, and the spoken VO lines verbatim.",
+                                    req.firstFrameUrl
+                                      ? "Start the render from the supplied first frame image — keep that exact person, wardrobe and setting."
+                                      : "",
+                                    "Then call generate_seedance_video with the locked settings. Do not rewrite the script or ask follow-up questions first.",
+                                    "",
+                                    "SCRIPT:",
+                                    req.script,
+                                  ]
+                                    .filter(Boolean)
+                                    .join("\n"),
+                                  {
+                                    forceProduce: true,
+                                    videoApproved: true,
+                                    videoOverride: {
+                                      model: req.model,
+                                      resolution: req.resolution,
+                                      duration: req.duration,
+                                      aspect: req.aspect,
+                                      firstFrameUrl: req.firstFrameUrl,
+                                      avatarId: req.avatarId,
+                                    },
+                                  },
+                                );
+                              }}
+                            />
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+
+                <div className="px-3 sm:px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
+                  <div className={`mx-auto w-full transition-[max-width] ${wideChat ? "max-w-6xl" : "max-w-3xl"}`}>
+                    {/* Context usage + auto doc toggle */}
+                    {(() => {
+                      const limit = contextLimitFor(chatModel);
+                      const used = contextUsage?.tokens ?? 0;
+                      const pct = Math.min(100, Math.round((used / limit) * 100));
+                      const barColor = pct > 85 ? "bg-destructive" : pct > 60 ? "bg-amber-500" : "bg-primary";
+                      return (
+                        <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] text-muted-foreground">
+                          <div className="flex-1 min-w-[180px] flex items-center gap-2">
+                            <BookOpenCheck className="h-3 w-3" />
+                            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
                             </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {groups[k].map((a) => {
-                                const idx = pendingAttachments.indexOf(a);
-                                return (
-                                  <div key={a.url} className="relative group">
-                                    {isImg(a) ? (
-                                      <img
-                                        src={a.url}
-                                        alt={a.name}
-                                        title={a.name}
-                                        className="h-14 w-14 rounded-md object-cover border border-primary/40"
-                                        loading="lazy"
-                                      />
-                                    ) : (
-                                      <div className="h-14 w-14 rounded-md border border-primary/40 bg-background grid place-items-center text-[8px] text-muted-foreground p-1 text-center">
-                                        <Paperclip className="h-3 w-3 mb-0.5" />
-                                        <span className="truncate w-full leading-tight">{a.name.split(".").pop()}</span>
-                                      </div>
+                            <span className="tabular-nums whitespace-nowrap">
+                              {used.toLocaleString()} / {limit.toLocaleString()} tok ({pct}%)
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {/* Cost analysis based on model + usage for this client/conversation */}
+                    {messages.length > 0 && (
+                      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
+                        <DollarSign className="h-3 w-3" />
+                        <span className="tabular-nums whitespace-nowrap">
+                          ~${usageStats.cost.toFixed(4)} this convo
+                        </span>
+                        <span className="text-muted-foreground/60 hidden sm:inline">·</span>
+                        <span className="tabular-nums whitespace-nowrap">
+                          in {usageStats.inTok.toLocaleString()} · out {usageStats.outTok.toLocaleString()} tok
+                        </span>
+                        <span className="text-muted-foreground/60 hidden sm:inline">·</span>
+                        <Badge variant="secondary" className="text-[9px] h-4 px-1.5 whitespace-nowrap">
+                          {chatModel.split("/").pop()}
+                        </Badge>
+                      </div>
+                    )}
+                    <div
+                      className="relative rounded-2xl border border-border/60 bg-background shadow-sm focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition data-[dragging=true]:border-primary data-[dragging=true]:ring-2 data-[dragging=true]:ring-primary/30"
+                      onDragOver={(e) => {
+                        if (
+                          e.dataTransfer.types.includes("application/x-aistudio-image") ||
+                          e.dataTransfer.types.includes("text/uri-list") ||
+                          e.dataTransfer.types.includes("Files")
+                        ) {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "copy";
+                          (e.currentTarget as HTMLElement).dataset.dragging = "true";
+                        }
+                      }}
+                      onDragLeave={(e) => {
+                        (e.currentTarget as HTMLElement).dataset.dragging = "false";
+                      }}
+                      onDrop={(e) => {
+                        (e.currentTarget as HTMLElement).dataset.dragging = "false";
+                        const json = e.dataTransfer.getData("application/x-aistudio-image");
+                        if (json) {
+                          e.preventDefault();
+                          try {
+                            const d = JSON.parse(json);
+                            if (d.url) addImageAsReference(d.url);
+                          } catch {}
+                          return;
+                        }
+                        const uri = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
+                        if (uri && /^https?:\/\//.test(uri)) {
+                          e.preventDefault();
+                          addImageAsReference(uri);
+                          return;
+                        }
+                        if (e.dataTransfer.files && e.dataTransfer.files.length) {
+                          e.preventDefault();
+                          uploadFiles(e.dataTransfer.files);
+                        }
+                      }}
+                    >
+                      {pendingAttachments.length > 0 &&
+                        (() => {
+                          const offerRefs = pendingAttachments.filter((a) => a.fromOffer);
+                          const userRefs = pendingAttachments.filter((a) => !a.fromOffer);
+                          const isImg = (a: Attachment) =>
+                            /image\//i.test(a.mime || "") ||
+                            /\.(png|jpe?g|gif|webp|svg|heic|avif)$/i.test(a.name || "");
+                          const groupByRole = (arr: Attachment[]) => {
+                            const g: Record<string, Attachment[]> = {};
+                            arr.forEach((a) => {
+                              const key = a.role && a.role !== "reference" ? a.role : "reference";
+                              (g[key] ||= []).push(a);
+                            });
+                            return g;
+                          };
+                          const roleLabel = (k: string) =>
+                            (
+                              ({
+                                video_ad: "Video Ad References",
+                                static_ad: "Static Ad References",
+                                product: "Product",
+                                logo: "Logo",
+                                lifestyle: "Lifestyle",
+                                testimonial: "Testimonial",
+                                avatar: "Avatar",
+                                reference: "References",
+                              }) as Record<string, string>
+                            )[k] || k;
+                          const groups = groupByRole(offerRefs);
+                          const orderedKeys = [
+                            "video_ad",
+                            "static_ad",
+                            "product",
+                            "logo",
+                            "avatar",
+                            "lifestyle",
+                            "testimonial",
+                            "reference",
+                          ].filter((k) => groups[k]?.length);
+                          return (
+                            <div className="px-3 pt-2 space-y-2">
+                              {offerRefs.length > 0 && (
+                                <div className="rounded-lg border border-primary/30 bg-primary/5 p-2 space-y-2">
+                                  <div className="flex items-center gap-1.5 text-[10px] text-primary">
+                                    <Sparkles className="h-3 w-3" />
+                                    <span className="font-semibold uppercase tracking-wide">
+                                      {offerRefs.length} offer reference{offerRefs.length === 1 ? "" : "s"}{" "}
+                                      auto-attached
+                                    </span>
+                                    {selectedOfferTitle && (
+                                      <span className="text-muted-foreground normal-case">
+                                        from "{selectedOfferTitle}"
+                                      </span>
                                     )}
-                                    <button
-                                      onClick={() => setPendingAttachments(curr => curr.filter((_, j) => j !== idx))}
-                                      className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-background border border-border text-muted-foreground hover:text-destructive grid place-items-center opacity-0 group-hover:opacity-100 transition"
-                                      title="Remove"
-                                    >
-                                      <X className="h-2.5 w-2.5" />
-                                    </button>
                                   </div>
+                                  {orderedKeys.map((k) => (
+                                    <div key={k} className="space-y-1">
+                                      <div className="text-[9px] uppercase tracking-wide text-muted-foreground font-medium">
+                                        {roleLabel(k)} · {groups[k].length}
+                                      </div>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {groups[k].map((a) => {
+                                          const idx = pendingAttachments.indexOf(a);
+                                          return (
+                                            <div key={a.url} className="relative group">
+                                              {isImg(a) ? (
+                                                <img
+                                                  src={a.url}
+                                                  alt={a.name}
+                                                  title={a.name}
+                                                  className="h-14 w-14 rounded-md object-cover border border-primary/40"
+                                                  loading="lazy"
+                                                />
+                                              ) : (
+                                                <div className="h-14 w-14 rounded-md border border-primary/40 bg-background grid place-items-center text-[8px] text-muted-foreground p-1 text-center">
+                                                  <Paperclip className="h-3 w-3 mb-0.5" />
+                                                  <span className="truncate w-full leading-tight">
+                                                    {a.name.split(".").pop()}
+                                                  </span>
+                                                </div>
+                                              )}
+                                              <button
+                                                onClick={() =>
+                                                  setPendingAttachments((curr) => curr.filter((_, j) => j !== idx))
+                                                }
+                                                className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-background border border-border text-muted-foreground hover:text-destructive grid place-items-center opacity-0 group-hover:opacity-100 transition"
+                                                title="Remove"
+                                              >
+                                                <X className="h-2.5 w-2.5" />
+                                              </button>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {userRefs.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {userRefs.map((a) => {
+                                    const idx = pendingAttachments.indexOf(a);
+                                    return (
+                                      <div
+                                        key={idx}
+                                        className="flex items-center gap-1.5 text-[10px] rounded-md px-2 py-1 bg-muted"
+                                      >
+                                        {a.uploading ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <Paperclip className="h-3 w-3" />
+                                        )}
+                                        <span className="max-w-[140px] truncate">{a.name}</span>
+                                        <button
+                                          onClick={() =>
+                                            setPendingAttachments((curr) => curr.filter((_, j) => j !== idx))
+                                          }
+                                          className="hover:text-destructive"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      {(() => {
+                        const pickedAgent =
+                          selectedAgentId !== "off" &&
+                          selectedAgentId !== "master" &&
+                          !selectedAgentId.startsWith("slug:")
+                            ? (clientAgents as any[]).find((a) => a.id === selectedAgentId && a.enabled)
+                            : null;
+                        const effectiveModel = pickedAgencyAgent?.default_model || pickedAgent?.model || chatModel;
+                        const modelOverridden = !!(
+                          (pickedAgencyAgent?.default_model && pickedAgencyAgent.default_model !== chatModel) ||
+                          (pickedAgent?.model && pickedAgent.model !== chatModel)
+                        );
+                        const modelShort =
+                          CHAT_MODELS.find((m) => m.value === effectiveModel)?.label ||
+                          effectiveModel.split("/").pop() ||
+                          effectiveModel;
+                        const agentLabel =
+                          selectedAgentId === "off"
+                            ? null
+                            : selectedAgentId === "master"
+                              ? "Jarvis (AM)"
+                              : pickedAgencyAgent
+                                ? `@${pickedAgencyAgent.slug}`
+                                : pickedAgent
+                                  ? `@${pickedAgent.handle}`
+                                  : null;
+                        if (!agentLabel && !modelOverridden) return null;
+                        return (
+                          <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2 text-[10px]">
+                            <span className="text-muted-foreground uppercase tracking-wide">Next request:</span>
+                            {agentLabel && (
+                              <Badge variant="default" className="text-[10px] h-5 gap-1">
+                                <Bot className="h-3 w-3" /> {agentLabel}
+                              </Badge>
+                            )}
+                            <Badge
+                              variant={modelOverridden ? "default" : "secondary"}
+                              className="text-[10px] h-5"
+                              title={effectiveModel}
+                            >
+                              {modelOverridden ? "Model override · " : "Model · "}
+                              {modelShort}
+                            </Badge>
+                          </div>
+                        );
+                      })()}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files) uploadFiles(e.target.files);
+                          e.target.value = "";
+                        }}
+                        accept="image/*,application/pdf,.txt,.md,.json,.csv,.log,.tsv"
+                      />
+                      <div className="relative">
+                        <AgentMentionPopover
+                          value={input}
+                          caret={caretPos}
+                          agents={clientAgents as any}
+                          anchorRef={textareaRef}
+                          onInsert={(next, c) => {
+                            setInput(next);
+                            setCaretPos(c);
+                            requestAnimationFrame(() => {
+                              const ta = textareaRef.current;
+                              if (ta) {
+                                ta.focus();
+                                ta.setSelectionRange(c, c);
+                              }
+                            });
+                          }}
+                        />
+                        <Textarea
+                          ref={textareaRef}
+                          value={input}
+                          onChange={(e) => {
+                            setInput(e.target.value);
+                            setCaretPos(e.target.selectionStart ?? e.target.value.length);
+                          }}
+                          onKeyUp={(e) => setCaretPos((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
+                          onClick={(e) => setCaretPos((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              send(input);
+                            }
+                          }}
+                          onPaste={(e) => {
+                            const files = Array.from(e.clipboardData.files || []);
+                            if (files.length) {
+                              e.preventDefault();
+                              uploadFiles(files);
+                            }
+                          }}
+                          placeholder="Ask AI Studio to build, write, or edit anything…"
+                          style={{ height: composerHeight }}
+                          onMouseUp={(e) => {
+                            const h = (e.target as HTMLTextAreaElement).offsetHeight;
+                            if (h && Math.abs(h - composerHeight) > 4) setComposerHeight(h);
+                          }}
+                          className="resize-y min-h-[80px] max-h-[70vh] border-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent px-3 pt-3 pb-2 text-sm"
+                          rows={1}
+                        />
+                      </div>
+                      <div className="flex flex-col md:flex-row md:items-end gap-2 px-2 pb-2 pt-1 border-t border-border/40">
+                        <div className="order-2 md:order-1 flex-1 min-w-0 flex items-center gap-1.5 flex-wrap -mx-1 px-1 pb-1 md:pb-0">
+                          {isJeremyAgent && (
+                            <div className="flex items-center gap-1 pr-1.5 border-r border-border/60">
+                              <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Persona:</span>
+                              <Select
+                                value={effectivePersonaSlug ?? ""}
+                                onValueChange={(v) => setPersonaSlug(v)}
+                                disabled={activePersonas.length === 0}
+                              >
+                                <SelectTrigger className="h-7 text-[10px] gap-1 border-border/60 bg-muted/40 hover:bg-muted w-auto px-2 rounded-lg max-w-[200px]">
+                                  <SelectValue
+                                    placeholder={activePersonas.length ? "Pick a persona" : "None configured"}
+                                  />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {activePersonas.map((p: any) => (
+                                    <SelectItem key={p.slug} value={p.slug} className="text-xs">
+                                      {p.name}
+                                      {p.is_default ? " · default" : ""}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1 pr-1.5 border-r border-border/60">
+                            <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Offer:</span>
+                            <Select value={selectedOfferId} onValueChange={setSelectedOfferId}>
+                              <SelectTrigger className="h-7 text-[10px] gap-1 border-border/60 bg-muted/40 hover:bg-muted w-auto px-2 rounded-lg max-w-[220px]">
+                                <SelectValue placeholder="Pick an offer" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {clientOffers.map((o) => (
+                                  <SelectItem key={o.id} value={o.id} className="text-xs">
+                                    {o.title}
+                                  </SelectItem>
+                                ))}
+                                {clientOffers.length === 0 && (
+                                  <div className="px-2 py-1.5 text-[10px] text-muted-foreground">
+                                    No offers — add one in the Offers tab →
+                                  </div>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            title="Attach files (images, PDFs, text)"
+                            className="h-7 w-7 rounded-lg bg-muted/40 hover:bg-muted border border-border/60 grid place-items-center text-muted-foreground hover:text-foreground transition"
+                          >
+                            <Paperclip className="h-3.5 w-3.5" />
+                          </button>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                className="h-7 px-2 rounded-lg text-[10px] border border-border/60 bg-muted/40 hover:bg-muted inline-flex items-center gap-1"
+                                title="Chat model · pick extras to compare side-by-side"
+                              >
+                                <span className="truncate max-w-[140px]">
+                                  {CHAT_MODELS.find((m) => m.value === chatModel)?.label || chatModel.split("/").pop()}
+                                </span>
+                                {compareModels.length > 0 && (
+                                  <Badge variant="secondary" className="text-[9px] h-4 px-1.5">
+                                    +{compareModels.length} compare
+                                  </Badge>
+                                )}
+                                <ChevronDown className="h-3 w-3 opacity-60" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent align="start" className="w-72 p-2">
+                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-1 pb-1">
+                                Primary
+                              </div>
+                              <div className="space-y-0.5">
+                                {CHAT_MODELS.map((m) => (
+                                  <button
+                                    key={m.value}
+                                    type="button"
+                                    onClick={() => {
+                                      setChatModel(m.value);
+                                      setCompareModels((curr) => curr.filter((v) => v !== m.value));
+                                    }}
+                                    className={`w-full text-left text-xs px-2 py-1.5 rounded-md hover:bg-muted ${chatModel === m.value ? "bg-primary/10 text-foreground font-medium" : ""}`}
+                                  >
+                                    {chatModel === m.value ? "● " : "○ "}
+                                    {m.label}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="mt-2 pt-2 border-t border-border/60">
+                                <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-1 pb-1">
+                                  Also compare with
+                                </div>
+                                <div className="space-y-0.5 max-h-56 overflow-y-auto">
+                                  {CHAT_MODELS.filter((m) => m.value !== chatModel).map((m) => {
+                                    const on = compareModels.includes(m.value);
+                                    return (
+                                      <button
+                                        key={m.value}
+                                        type="button"
+                                        onClick={() =>
+                                          setCompareModels((curr) =>
+                                            on
+                                              ? curr.filter((v) => v !== m.value)
+                                              : curr.length >= 3
+                                                ? curr
+                                                : [...curr, m.value],
+                                          )
+                                        }
+                                        className={`w-full text-left text-xs px-2 py-1.5 rounded-md hover:bg-muted flex items-center gap-2 ${on ? "bg-primary/10" : ""}`}
+                                      >
+                                        <span
+                                          className={`h-3 w-3 rounded border ${on ? "bg-primary border-primary" : "border-border"} inline-flex items-center justify-center`}
+                                        >
+                                          {on && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                                        </span>
+                                        <span className="truncate">{m.label}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                {compareModels.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setCompareModels([])}
+                                    className="mt-1.5 w-full text-[10px] text-muted-foreground hover:text-foreground px-2 py-1 rounded-md hover:bg-muted"
+                                  >
+                                    Clear compare ({compareModels.length})
+                                  </button>
+                                )}
+                                <div className="mt-1 px-1 text-[10px] text-muted-foreground">
+                                  Up to 3 extras. Replies appear inline alongside the primary.
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                          {(selectedAgentMode === "static" ||
+                            (selectedAgentMode === "video" && videoIntent === "image")) && (
+                            <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
+                              <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Image:</span>
+                              {IMAGE_MODELS.map((m) => {
+                                const active = imageModels.includes(m.value);
+                                return (
+                                  <button
+                                    key={m.value}
+                                    type="button"
+                                    onClick={() => {
+                                      setImageModels((curr) => {
+                                        const next = curr.includes(m.value)
+                                          ? curr.filter((v) => v !== m.value)
+                                          : [...curr, m.value];
+                                        return next;
+                                      });
+                                    }}
+                                    title={`${m.label} — ${m.hint}\nEst. ${m.price}${active && imageModels.length > 1 ? "\n(in comparison)" : ""}`}
+                                    className={`px-2 py-1 rounded-lg text-[10px] border transition flex flex-col items-start leading-tight ${active ? "bg-primary text-primary-foreground border-primary" : "bg-muted/40 hover:bg-muted border-border/60 text-muted-foreground"}`}
+                                  >
+                                    <span>{m.label}</span>
+                                    <span
+                                      className={`text-[9px] ${active ? "text-primary-foreground/80" : "text-muted-foreground/70"}`}
+                                    >
+                                      {m.price.replace(/^~/, "")}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                              {imageModels.length > 1 && (
+                                <Badge variant="secondary" className="text-[9px] h-5">
+                                  compare ×{imageModels.length}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                          {selectedAgentMode === "video" && (
+                            <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
+                              <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Mode:</span>
+                              {[
+                                {
+                                  value: "chat" as const,
+                                  label: "Chat script",
+                                  hint: "Talk through the script, hooks and shot list — no renders, no spend.",
+                                },
+                                {
+                                  value: "image" as const,
+                                  label: "Generate image",
+                                  hint: "Create still images right here — pick the image model, style and avatar below. No video spend.",
+                                },
+                                {
+                                  value: "produce" as const,
+                                  label: "Produce video",
+                                  hint: "Render with the locked model, resolution, length, format and frames below.",
+                                },
+                              ].map((m) => {
+                                const active = videoIntent === m.value;
+                                return (
+                                  <button
+                                    key={m.value}
+                                    type="button"
+                                    onClick={() => {
+                                      setVideoIntent(m.value);
+                                      // Image mode needs at least one image model picked, otherwise
+                                      // the image tools stay disabled server-side.
+                                      if (m.value === "image" && imageModels.length === 0)
+                                        setImageModels(["nano-banana"]);
+                                    }}
+                                    title={m.hint}
+                                    className={`px-2 py-1 rounded-lg text-[10px] border transition leading-tight ${active ? "bg-primary text-primary-foreground border-primary" : "bg-muted/40 hover:bg-muted border-border/60 text-muted-foreground"}`}
+                                  >
+                                    {m.label}
+                                  </button>
                                 );
                               })}
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {userRefs.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {userRefs.map((a) => {
-                          const idx = pendingAttachments.indexOf(a);
-                          return (
-                            <div key={idx} className="flex items-center gap-1.5 text-[10px] rounded-md px-2 py-1 bg-muted">
-                              {a.uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />}
-                              <span className="max-w-[140px] truncate">{a.name}</span>
-                              <button onClick={() => setPendingAttachments(curr => curr.filter((_, j) => j !== idx))} className="hover:text-destructive"><X className="h-3 w-3" /></button>
+                          )}
+                          {selectedAgentMode === "video" && videoIntent === "produce" && (
+                            <div className="flex flex-wrap items-center gap-1 pl-1.5 border-l border-border/60">
+                              <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Video:</span>
+
+                              {VIDEO_MODELS.map((m) => {
+                                const active = videoModels.includes(m.value);
+                                // Reflect resolution-based pricing (Seedance Pro 4K ≈ 2.5×, 720p ≈ 0.7×).
+                                const supportedRes = VIDEO_MODEL_RES[m.value] || ["1080p"];
+                                const effectiveRes: VideoRes = supportedRes.includes(videoResolution)
+                                  ? videoResolution
+                                  : supportedRes[supportedRes.length - 1];
+                                const mult = resolutionMultiplier(effectiveRes);
+                                const perSec = modelPricePerSecond(m.value, effectiveRes, m.pricePerSecond);
+                                const clipCost = m.maxSeconds * perSec;
+                                return (
+                                  <button
+                                    key={m.value}
+                                    type="button"
+                                    onClick={() => {
+                                      // Single-select: tap to pick this model, tap again to turn video off.
+                                      // Video compare was removed — one model per request, batch generation later.
+                                      setVideoModels((curr) =>
+                                        curr.length === 1 && curr[0] === m.value ? [] : [m.value],
+                                      );
+                                    }}
+                                    title={`${m.label} — ${m.hint}\n${effectiveRes.toUpperCase()} · ${m.maxSeconds}s · ~$${clipCost.toFixed(2)} per clip\n(rate: $${perSec.toFixed(4)}/sec)`}
+                                    className={`px-2 py-1 rounded-lg text-[10px] border transition flex flex-col items-start leading-tight ${active ? "bg-primary text-primary-foreground border-primary" : "bg-muted/40 hover:bg-muted border-border/60 text-muted-foreground"}`}
+                                  >
+                                    <span>{m.label}</span>
+                                    <span
+                                      className={`text-[9px] ${active ? "text-primary-foreground/80" : "text-muted-foreground/70"}`}
+                                    >
+                                      {m.maxSeconds}s · {effectiveRes === "4k" ? "4K" : effectiveRes} · $
+                                      {clipCost.toFixed(2)}
+                                    </span>
+                                  </button>
+                                );
+                              })}
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-              {(() => {
-                const pickedAgent = selectedAgentId !== "off" && selectedAgentId !== "master" && !selectedAgentId.startsWith("slug:")
-                  ? (clientAgents as any[]).find(a => a.id === selectedAgentId && a.enabled)
-                  : null;
-                const effectiveModel = pickedAgencyAgent?.default_model || pickedAgent?.model || chatModel;
-                const modelOverridden = !!((pickedAgencyAgent?.default_model && pickedAgencyAgent.default_model !== chatModel) || (pickedAgent?.model && pickedAgent.model !== chatModel));
-                const modelShort = (CHAT_MODELS.find(m => m.value === effectiveModel)?.label) || effectiveModel.split("/").pop() || effectiveModel;
-                const agentLabel = selectedAgentId === "off"
-                  ? null
-                  : selectedAgentId === "master"
-                    ? "Jarvis (AM)"
-                    : pickedAgencyAgent
-                      ? `@${pickedAgencyAgent.slug}`
-                      : pickedAgent
-                        ? `@${pickedAgent.handle}`
-                        : null;
-                if (!agentLabel && !modelOverridden) return null;
-                return (
-                  <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2 text-[10px]">
-                    <span className="text-muted-foreground uppercase tracking-wide">Next request:</span>
-                    {agentLabel && (
-                      <Badge variant="default" className="text-[10px] h-5 gap-1">
-                        <Bot className="h-3 w-3" /> {agentLabel}
-                      </Badge>
-                    )}
-                    <Badge
-                      variant={modelOverridden ? "default" : "secondary"}
-                      className="text-[10px] h-5"
-                      title={effectiveModel}
-                    >
-                      {modelOverridden ? "Model override · " : "Model · "}{modelShort}
-                    </Badge>
-                  </div>
-                );
-              })()}
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                onChange={(e) => { if (e.target.files) uploadFiles(e.target.files); e.target.value = ""; }}
-                accept="image/*,application/pdf,.txt,.md,.json,.csv,.log,.tsv"
-              />
-              <div className="relative">
-              <AgentMentionPopover
-                value={input}
-                caret={caretPos}
-                agents={clientAgents as any}
-                anchorRef={textareaRef}
-                onInsert={(next, c) => {
-                  setInput(next);
-                  setCaretPos(c);
-                  requestAnimationFrame(() => {
-                    const ta = textareaRef.current;
-                    if (ta) {
-                      ta.focus();
-                      ta.setSelectionRange(c, c);
-                    }
-                  });
-                }}
-              />
-              <Textarea
-                ref={textareaRef}
-                value={input}
-                onChange={e => { setInput(e.target.value); setCaretPos(e.target.selectionStart ?? e.target.value.length); }}
-                onKeyUp={e => setCaretPos((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
-                onClick={e => setCaretPos((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
-                onPaste={(e) => {
-                  const files = Array.from(e.clipboardData.files || []);
-                  if (files.length) { e.preventDefault(); uploadFiles(files); }
-                }}
-                placeholder="Ask AI Studio to build, write, or edit anything…"
-                style={{ height: composerHeight }}
-                onMouseUp={(e) => {
-                  const h = (e.target as HTMLTextAreaElement).offsetHeight;
-                  if (h && Math.abs(h - composerHeight) > 4) setComposerHeight(h);
-                }}
-                className="resize-y min-h-[80px] max-h-[70vh] border-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent px-3 pt-3 pb-2 text-sm"
-                rows={1}
-              />
-              </div>
-              <div className="flex flex-col md:flex-row md:items-end gap-2 px-2 pb-2 pt-1 border-t border-border/40">
-                <div className="order-2 md:order-1 flex-1 min-w-0 flex items-center gap-1.5 flex-wrap -mx-1 px-1 pb-1 md:pb-0">
-                {isJeremyAgent && (
-                  <div className="flex items-center gap-1 pr-1.5 border-r border-border/60">
-                    <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Persona:</span>
-                    <Select
-                      value={effectivePersonaSlug ?? ""}
-                      onValueChange={(v) => setPersonaSlug(v)}
-                      disabled={activePersonas.length === 0}
-                    >
-                      <SelectTrigger className="h-7 text-[10px] gap-1 border-border/60 bg-muted/40 hover:bg-muted w-auto px-2 rounded-lg max-w-[200px]">
-                        <SelectValue placeholder={activePersonas.length ? "Pick a persona" : "None configured"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {activePersonas.map((p: any) => (
-                          <SelectItem key={p.slug} value={p.slug} className="text-xs">
-                            {p.name}{p.is_default ? " · default" : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                <div className="flex items-center gap-1 pr-1.5 border-r border-border/60">
-
-                  <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Offer:</span>
-                  <Select value={selectedOfferId} onValueChange={setSelectedOfferId}>
-                    <SelectTrigger className="h-7 text-[10px] gap-1 border-border/60 bg-muted/40 hover:bg-muted w-auto px-2 rounded-lg max-w-[220px]">
-                      <SelectValue placeholder="Pick an offer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clientOffers.map(o => (
-                        <SelectItem key={o.id} value={o.id} className="text-xs">
-                          {o.title}
-                        </SelectItem>
-                      ))}
-                      {clientOffers.length === 0 && (
-                        <div className="px-2 py-1.5 text-[10px] text-muted-foreground">No offers — add one in the Offers tab →</div>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  title="Attach files (images, PDFs, text)"
-                  className="h-7 w-7 rounded-lg bg-muted/40 hover:bg-muted border border-border/60 grid place-items-center text-muted-foreground hover:text-foreground transition"
-                >
-                  <Paperclip className="h-3.5 w-3.5" />
-                </button>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      className="h-7 px-2 rounded-lg text-[10px] border border-border/60 bg-muted/40 hover:bg-muted inline-flex items-center gap-1"
-                      title="Chat model · pick extras to compare side-by-side"
-                    >
-                      <span className="truncate max-w-[140px]">
-                        {(CHAT_MODELS.find(m => m.value === chatModel)?.label) || chatModel.split("/").pop()}
-                      </span>
-                      {compareModels.length > 0 && (
-                        <Badge variant="secondary" className="text-[9px] h-4 px-1.5">+{compareModels.length} compare</Badge>
-                      )}
-                      <ChevronDown className="h-3 w-3 opacity-60" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="w-72 p-2">
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-1 pb-1">Primary</div>
-                    <div className="space-y-0.5">
-                      {CHAT_MODELS.map(m => (
-                        <button
-                          key={m.value}
-                          type="button"
-                          onClick={() => {
-                            setChatModel(m.value);
-                            setCompareModels(curr => curr.filter(v => v !== m.value));
-                          }}
-                          className={`w-full text-left text-xs px-2 py-1.5 rounded-md hover:bg-muted ${chatModel === m.value ? "bg-primary/10 text-foreground font-medium" : ""}`}
-                        >
-                          {chatModel === m.value ? "● " : "○ "}{m.label}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="mt-2 pt-2 border-t border-border/60">
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-1 pb-1">Also compare with</div>
-                      <div className="space-y-0.5 max-h-56 overflow-y-auto">
-                        {CHAT_MODELS.filter(m => m.value !== chatModel).map(m => {
-                          const on = compareModels.includes(m.value);
-                          return (
-                            <button
-                              key={m.value}
-                              type="button"
-                              onClick={() => setCompareModels(curr => on ? curr.filter(v => v !== m.value) : (curr.length >= 3 ? curr : [...curr, m.value]))}
-                              className={`w-full text-left text-xs px-2 py-1.5 rounded-md hover:bg-muted flex items-center gap-2 ${on ? "bg-primary/10" : ""}`}
-                            >
-                              <span className={`h-3 w-3 rounded border ${on ? "bg-primary border-primary" : "border-border"} inline-flex items-center justify-center`}>
-                                {on && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                          )}
+                          {selectedAgentMode === "video" &&
+                            videoIntent === "produce" &&
+                            (() => {
+                              // Union of supported resolutions across selected models (Pro = 4K capable).
+                              const supportedSet = new Set<VideoRes>();
+                              for (const id of videoModels) {
+                                for (const r of VIDEO_MODEL_RES[id] || ["1080p"]) supportedSet.add(r);
+                              }
+                              const supported = (["480p", "720p", "1080p", "2k", "4k"] as VideoRes[]).filter((r) =>
+                                supportedSet.has(r),
+                              );
+                              if (supported.length === 0) return null;
+                              const activeRes = supported.includes(videoResolution)
+                                ? videoResolution
+                                : supported[supported.length - 1];
+                              if (activeRes !== videoResolution) {
+                                // auto-correct when user switches to a model that doesn't support current res
+                                setTimeout(() => setVideoResolution(activeRes), 0);
+                              }
+                              return (
+                                <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
+                                  <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Res:</span>
+                                  {supported.map((r) => {
+                                    const active = activeRes === r;
+                                    const proOnly = r === "4k";
+                                    return (
+                                      <button
+                                        key={r}
+                                        type="button"
+                                        onClick={() => setVideoResolution(r)}
+                                        title={
+                                          r === "2k"
+                                            ? "2K — MiniMax H3 native resolution (highest quality)"
+                                            : r === "720p"
+                                              ? "720p — faster and cheaper H3 render"
+                                              : r
+                                        }
+                                        className={`px-2 py-1 rounded-lg text-[10px] border transition leading-tight ${active ? "bg-primary text-primary-foreground border-primary" : "bg-muted/40 hover:bg-muted border-border/60 text-muted-foreground"}`}
+                                      >
+                                        {r === "4k" ? "4K" : r === "2k" ? "2K" : r}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })()}
+                          {selectedAgentMode === "video" &&
+                            videoIntent === "produce" &&
+                            (() => {
+                              const perClip = VIDEO_MODEL_MAX_SECONDS[videoModel] ?? 15;
+                              const clips = Math.max(1, Math.ceil(videoTotalDuration / perClip));
+                              const perSec = modelPricePerSecond(
+                                videoModel,
+                                videoResolution as VideoRes,
+                                VIDEO_MODELS.find((m) => m.value === videoModel)?.pricePerSecond ?? 0.1,
+                              );
+                              const est = videoTotalDuration * perSec;
+                              return (
+                                <div className="flex items-center gap-2 pl-1.5 border-l border-border/60">
+                                  <span className="text-[9px] text-muted-foreground uppercase tracking-wide">
+                                    Length:
+                                  </span>
+                                  <input
+                                    type="range"
+                                    min={videoModel === WAN_VIDEO_MODEL ? 2 : 4}
+                                    max={30}
+                                    step={1}
+                                    value={videoTotalDuration}
+                                    onChange={(e) => setVideoTotalDuration(Number(e.target.value))}
+                                    aria-label="Total video length in seconds"
+                                    title={`${videoTotalDuration}s total — ${clips === 1 ? "single clip" : `${clips} clips of up to ${perClip}s stitched for character consistency`}`}
+                                    className="w-24 h-1 accent-primary cursor-pointer"
+                                  />
+                                  <span className="text-[10px] font-medium tabular-nums text-foreground/90">
+                                    {videoTotalDuration}s
+                                  </span>
+                                  <span className="text-[9px] text-muted-foreground">
+                                    {clips > 1 ? `${clips}×${perClip}s · ` : ""}~$
+                                    {est < 1 ? est.toFixed(3) : est.toFixed(2)}
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                          {selectedAgentMode === "video" && videoIntent === "produce" && (
+                            <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
+                              <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Pace:</span>
+                              {SPEECH_PACES.map((p) => {
+                                const active = speechPace === p.value;
+                                return (
+                                  <button
+                                    key={p.value}
+                                    type="button"
+                                    onClick={() => setSpeechPace(p.value)}
+                                    title={`${p.hint} — fits ~${paceWordBudget(videoTotalDuration, p.value)} words in ${videoTotalDuration}s`}
+                                    className={`px-2 py-1 rounded-lg text-[10px] border transition leading-tight ${active ? "bg-primary text-primary-foreground border-primary" : "bg-muted/40 hover:bg-muted border-border/60 text-muted-foreground"}`}
+                                  >
+                                    {p.label}
+                                  </button>
+                                );
+                              })}
+                              <span className="text-[9px] text-muted-foreground">
+                                ~{paceWordBudget(videoTotalDuration, speechPace)}w
                               </span>
-                              <span className="truncate">{m.label}</span>
+                            </div>
+                          )}
+                          {(selectedAgentMode === "static" ||
+                            (selectedAgentMode === "video" && videoIntent === "image")) && (
+                            <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
+                              <span className="text-[9px] text-muted-foreground uppercase tracking-wide">
+                                Image Style:
+                              </span>
+                              <ImageStylesPopover
+                                styles={imageStyles.styles}
+                                setStyles={imageStyles.setStyles}
+                                selectedId={imageStyles.selectedId}
+                                setSelectedId={imageStyles.setSelectedId}
+                              />
+                            </div>
+                          )}
+                          {selectedAgentMode === "video" && (
+                            <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
+                              <span className="text-[9px] text-muted-foreground uppercase tracking-wide">
+                                Video Style:
+                              </span>
+                              <VideoStylesPopover
+                                styles={videoStyles.styles}
+                                setStyles={videoStyles.setStyles}
+                                selectedId={videoStyles.selectedId}
+                                setSelectedId={videoStyles.setSelectedId}
+                              />
+                            </div>
+                          )}
+                          {selectedAgentMode === "video" && (
+                            <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
+                              <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Frames:</span>
+                              <input
+                                ref={frameInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const files = Array.from(e.target.files || []);
+                                  const slot = frameSlotRef.current;
+                                  if (files.length && slot) uploadFrame(slot, slot === "ingredient" ? files : files[0]);
+                                  e.target.value = "";
+                                }}
+                                multiple
+                              />
+                              {[
+                                {
+                                  slot: "firstFrame" as const,
+                                  label: "First",
+                                  url: videoFrames.firstFrameUrl,
+                                  tip: "First frame — Seedance starts from this image",
+                                },
+                                {
+                                  slot: "lastFrame" as const,
+                                  label: "Last",
+                                  url: videoFrames.lastFrameUrl,
+                                  tip: "Last frame — Seedance ends on this image",
+                                },
+                                {
+                                  slot: "ingredient" as const,
+                                  label:
+                                    (videoFrames.ingredientUrls?.length || 0) > 1
+                                      ? `Ingredients ×${videoFrames.ingredientUrls!.length}`
+                                      : "Ingredient",
+                                  url: videoFrames.ingredientUrls?.[0] || videoFrames.ingredientUrl,
+                                  tip: "Product / ingredient references — select multiple images; Seedance 2.0 & 2.5 preserve all of them (up to 7)",
+                                },
+                              ].map(({ slot, label, url, tip }) => (
+                                <button
+                                  key={slot}
+                                  type="button"
+                                  title={tip}
+                                  onClick={() => {
+                                    frameSlotRef.current = slot;
+                                    frameInputRef.current?.click();
+                                  }}
+                                  className={`h-7 px-1.5 rounded-lg text-[10px] border transition inline-flex items-center gap-1 ${url ? "bg-primary/15 border-primary text-primary" : "bg-muted/40 hover:bg-muted border-border/60 text-muted-foreground"}`}
+                                >
+                                  {url ? (
+                                    <img src={url} alt="" className="h-5 w-5 rounded object-cover" />
+                                  ) : uploadingSlot === slot ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Paperclip className="h-3 w-3" />
+                                  )}
+                                  <span>{label}</span>
+                                  {url && (
+                                    <span
+                                      role="button"
+                                      onClick={(ev) => {
+                                        ev.stopPropagation();
+                                        setVideoFrames((curr) => ({
+                                          ...curr,
+                                          ...(slot === "firstFrame" ? { firstFrameUrl: undefined } : {}),
+                                          ...(slot === "lastFrame" ? { lastFrameUrl: undefined } : {}),
+                                          ...(slot === "ingredient"
+                                            ? { ingredientUrl: undefined, ingredientUrls: [] }
+                                            : {}),
+                                        }));
+                                      }}
+                                      className="ml-0.5 hover:text-destructive"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </span>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {(selectedAgentMode === "static" || selectedAgentMode === "video") && (
+                            <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
+                              <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Format:</span>
+                              <Select
+                                value={
+                                  selectedAgentMode === "video" && aspectForAdFormat(adFormat) === "1:1"
+                                    ? "reel_9x16"
+                                    : adFormat
+                                }
+                                onValueChange={(v) => {
+                                  if (selectedAgentMode === "video" && aspectForAdFormat(v) === "1:1")
+                                    setAdFormat("reel_9x16");
+                                  else setAdFormat(v);
+                                }}
+                              >
+                                <SelectTrigger className="h-7 text-[10px] gap-1 border-border/60 bg-muted/40 hover:bg-muted w-auto px-2 rounded-lg">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {(selectedAgentMode === "video"
+                                    ? AD_FORMATS.filter((f) => f.aspect !== "1:1")
+                                    : AD_FORMATS
+                                  ).map((f) => (
+                                    <SelectItem key={f.value} value={f.value} className="text-xs">
+                                      {f.label}
+                                      <span className="text-muted-foreground ml-1">— {f.hint}</span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                          {(selectedAgentMode === "static" || selectedAgentMode === "video") && (
+                            <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
+                              <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Avatar:</span>
+                              <Select
+                                value={selectedAvatarId || "none"}
+                                onValueChange={(v) => setSelectedAvatarId(v === "none" ? null : v)}
+                              >
+                                <SelectTrigger className="h-7 text-[10px] w-[160px]">
+                                  <SelectValue placeholder="No avatar" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none" className="text-xs">
+                                    No avatar
+                                  </SelectItem>
+                                  {studioAvatars.map((a) => (
+                                    <SelectItem key={a.id} value={a.id} className="text-xs">
+                                      <span className="inline-flex items-center gap-2">
+                                        {a.image_url ? (
+                                          <img src={a.image_url} alt="" className="h-4 w-4 rounded-full object-cover" />
+                                        ) : null}
+                                        {a.name}
+                                        {a.is_stock ? " · stock" : ""}
+                                      </span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {selectedAvatar && (
+                                <button
+                                  type="button"
+                                  onClick={() => setAiStudioTab("avatars")}
+                                  className="text-[10px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                                >
+                                  manage
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {selectedAgentMode === "video" && (
+                            <button
+                              type="button"
+                              onClick={() => setBatchScriptsOpen(true)}
+                              title="Render multiple video scripts in parallel — each auto-splits to fit the model's per-clip cap."
+                              className="h-7 px-2 rounded-lg text-[10px] inline-flex items-center gap-1 border border-border/60 bg-muted/40 hover:bg-muted hover:border-primary/40 transition text-muted-foreground hover:text-foreground"
+                            >
+                              <Film className="h-3 w-3" />
+                              Batch scripts
                             </button>
-                          );
-                        })}
-                      </div>
-                      {compareModels.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setCompareModels([])}
-                          className="mt-1.5 w-full text-[10px] text-muted-foreground hover:text-foreground px-2 py-1 rounded-md hover:bg-muted"
-                        >
-                          Clear compare ({compareModels.length})
-                        </button>
-                      )}
-                      <div className="mt-1 px-1 text-[10px] text-muted-foreground">
-                        Up to 3 extras. Replies appear inline alongside the primary.
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-                {(selectedAgentMode === "static" || (selectedAgentMode === "video" && videoIntent === "image")) && (
-                <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
-                  <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Image:</span>
-                  {IMAGE_MODELS.map(m => {
-                    const active = imageModels.includes(m.value);
-                    return (
-                      <button
-                        key={m.value}
-                        type="button"
-                        onClick={() => {
-                          setImageModels(curr => {
-                            const next = curr.includes(m.value) ? curr.filter(v => v !== m.value) : [...curr, m.value];
-                            return next;
-                          });
-                        }}
-                        title={`${m.label} — ${m.hint}\nEst. ${m.price}${active && imageModels.length > 1 ? "\n(in comparison)" : ""}`}
-                        className={`px-2 py-1 rounded-lg text-[10px] border transition flex flex-col items-start leading-tight ${active ? "bg-primary text-primary-foreground border-primary" : "bg-muted/40 hover:bg-muted border-border/60 text-muted-foreground"}`}
-                      >
-                        <span>{m.label}</span>
-                        <span className={`text-[9px] ${active ? "text-primary-foreground/80" : "text-muted-foreground/70"}`}>
-                          {m.price.replace(/^~/, "")}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {imageModels.length > 1 && (
-                    <Badge variant="secondary" className="text-[9px] h-5">compare ×{imageModels.length}</Badge>
-                  )}
-                </div>
-                )}
-                {selectedAgentMode === "video" && (
-                <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
-                  <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Mode:</span>
-                  {([
-                    { value: "chat" as const, label: "Chat script", hint: "Talk through the script, hooks and shot list — no renders, no spend." },
-                    { value: "image" as const, label: "Generate image", hint: "Create still images right here — pick the image model, style and avatar below. No video spend." },
-                    { value: "produce" as const, label: "Produce video", hint: "Render with the locked model, resolution, length, format and frames below." },
-                  ]).map((m) => {
-                    const active = videoIntent === m.value;
-                    return (
-                      <button
-                        key={m.value}
-                        type="button"
-                        onClick={() => {
-                          setVideoIntent(m.value);
-                          // Image mode needs at least one image model picked, otherwise
-                          // the image tools stay disabled server-side.
-                          if (m.value === "image" && imageModels.length === 0) setImageModels(["nano-banana"]);
-                        }}
-                        title={m.hint}
-                        className={`px-2 py-1 rounded-lg text-[10px] border transition leading-tight ${active ? "bg-primary text-primary-foreground border-primary" : "bg-muted/40 hover:bg-muted border-border/60 text-muted-foreground"}`}
-                      >
-                        {m.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                )}
-                {selectedAgentMode === "video" && videoIntent === "produce" && (
-                <div className="flex flex-wrap items-center gap-1 pl-1.5 border-l border-border/60">
-                  <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Video:</span>
-
-                  {VIDEO_MODELS.map((m) => {
-                    const active = videoModels.includes(m.value);
-                    // Reflect resolution-based pricing (Seedance Pro 4K ≈ 2.5×, 720p ≈ 0.7×).
-                    const supportedRes = VIDEO_MODEL_RES[m.value] || ["1080p"];
-                    const effectiveRes: VideoRes = supportedRes.includes(videoResolution)
-                      ? videoResolution
-                      : supportedRes[supportedRes.length - 1];
-                    const mult = resolutionMultiplier(effectiveRes);
-                    const perSec = modelPricePerSecond(m.value, effectiveRes, m.pricePerSecond);
-                    const clipCost = m.maxSeconds * perSec;
-                    return (
-                      <button
-                        key={m.value}
-                        type="button"
-                         onClick={() => {
-                           // Single-select: tap to pick this model, tap again to turn video off.
-                           // Video compare was removed — one model per request, batch generation later.
-                           setVideoModels((curr) => (curr.length === 1 && curr[0] === m.value ? [] : [m.value]));
-                         }}
-                         title={`${m.label} — ${m.hint}\n${effectiveRes.toUpperCase()} · ${m.maxSeconds}s · ~$${clipCost.toFixed(2)} per clip\n(rate: $${perSec.toFixed(4)}/sec)`}
-                        className={`px-2 py-1 rounded-lg text-[10px] border transition flex flex-col items-start leading-tight ${active ? "bg-primary text-primary-foreground border-primary" : "bg-muted/40 hover:bg-muted border-border/60 text-muted-foreground"}`}
-                      >
-                        <span>{m.label}</span>
-                        <span className={`text-[9px] ${active ? "text-primary-foreground/80" : "text-muted-foreground/70"}`}>
-                          {m.maxSeconds}s · {effectiveRes === "4k" ? "4K" : effectiveRes} · ${clipCost.toFixed(2)}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-                )}
-                {selectedAgentMode === "video" && videoIntent === "produce" && (() => {
-                  // Union of supported resolutions across selected models (Pro = 4K capable).
-                  const supportedSet = new Set<VideoRes>();
-                  for (const id of videoModels) {
-                    for (const r of (VIDEO_MODEL_RES[id] || ["1080p"])) supportedSet.add(r);
-                  }
-                  const supported = (["480p", "720p", "1080p", "2k", "4k"] as VideoRes[]).filter(r => supportedSet.has(r));
-                  if (supported.length === 0) return null;
-                  const activeRes = supported.includes(videoResolution) ? videoResolution : supported[supported.length - 1];
-                  if (activeRes !== videoResolution) {
-                    // auto-correct when user switches to a model that doesn't support current res
-                    setTimeout(() => setVideoResolution(activeRes), 0);
-                  }
-                  return (
-                    <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
-                      <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Res:</span>
-                      {supported.map((r) => {
-                        const active = activeRes === r;
-                        const proOnly = r === "4k";
-                        return (
-                          <button
-                            key={r}
-                            type="button"
-                            onClick={() => setVideoResolution(r)}
-                            title={r === "2k" ? "2K — MiniMax H3 native resolution (highest quality)" : r === "720p" ? "720p — faster and cheaper H3 render" : r}
-                            className={`px-2 py-1 rounded-lg text-[10px] border transition leading-tight ${active ? "bg-primary text-primary-foreground border-primary" : "bg-muted/40 hover:bg-muted border-border/60 text-muted-foreground"}`}
-                          >
-                            {r === "4k" ? "4K" : r === "2k" ? "2K" : r}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-                {selectedAgentMode === "video" && videoIntent === "produce" && (
-                  (() => {
-                    const perClip = VIDEO_MODEL_MAX_SECONDS[videoModel] ?? 15;
-                    const clips = Math.max(1, Math.ceil(videoTotalDuration / perClip));
-                    const perSec = modelPricePerSecond(
-                      videoModel,
-                      videoResolution as VideoRes,
-                      VIDEO_MODELS.find(m => m.value === videoModel)?.pricePerSecond ?? 0.1,
-                    );
-                    const est = videoTotalDuration * perSec;
-                    return (
-                      <div className="flex items-center gap-2 pl-1.5 border-l border-border/60">
-                        <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Length:</span>
-                        <input
-                          type="range"
-                          min={videoModel === WAN_VIDEO_MODEL ? 2 : 4}
-                          max={30}
-                          step={1}
-                          value={videoTotalDuration}
-                          onChange={(e) => setVideoTotalDuration(Number(e.target.value))}
-                          aria-label="Total video length in seconds"
-                          title={`${videoTotalDuration}s total — ${clips === 1 ? "single clip" : `${clips} clips of up to ${perClip}s stitched for character consistency`}`}
-                          className="w-24 h-1 accent-primary cursor-pointer"
-                        />
-                        <span className="text-[10px] font-medium tabular-nums text-foreground/90">
-                          {videoTotalDuration}s
-                        </span>
-                        <span className="text-[9px] text-muted-foreground">
-                          {clips > 1 ? `${clips}×${perClip}s · ` : ""}~${est < 1 ? est.toFixed(3) : est.toFixed(2)}
-                        </span>
-                      </div>
-                    );
-                  })()
-                )}
-                {selectedAgentMode === "video" && videoIntent === "produce" && (
-                  <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
-                    <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Pace:</span>
-                    {SPEECH_PACES.map((p) => {
-                      const active = speechPace === p.value;
-                      return (
-                        <button
-                          key={p.value}
-                          type="button"
-                          onClick={() => setSpeechPace(p.value)}
-                          title={`${p.hint} — fits ~${paceWordBudget(videoTotalDuration, p.value)} words in ${videoTotalDuration}s`}
-                          className={`px-2 py-1 rounded-lg text-[10px] border transition leading-tight ${active ? "bg-primary text-primary-foreground border-primary" : "bg-muted/40 hover:bg-muted border-border/60 text-muted-foreground"}`}
-                        >
-                          {p.label}
-                        </button>
-                      );
-                    })}
-                    <span className="text-[9px] text-muted-foreground">
-                      ~{paceWordBudget(videoTotalDuration, speechPace)}w
-                    </span>
-                  </div>
-                )}
-                {(selectedAgentMode === "static" || (selectedAgentMode === "video" && videoIntent === "image")) && (
-                  <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
-                    <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Image Style:</span>
-                    <ImageStylesPopover
-                      styles={imageStyles.styles}
-                      setStyles={imageStyles.setStyles}
-                      selectedId={imageStyles.selectedId}
-                      setSelectedId={imageStyles.setSelectedId}
-                    />
-                  </div>
-                )}
-                {selectedAgentMode === "video" && (
-                  <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
-                    <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Video Style:</span>
-                    <VideoStylesPopover
-                      styles={videoStyles.styles}
-                      setStyles={videoStyles.setStyles}
-                      selectedId={videoStyles.selectedId}
-                      setSelectedId={videoStyles.setSelectedId}
-                    />
-                  </div>
-                )}
-                {selectedAgentMode === "video" && (
-                  <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
-                    <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Frames:</span>
-                    <input
-                      ref={frameInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const files = Array.from(e.target.files || []);
-                        const slot = frameSlotRef.current;
-                        if (files.length && slot) uploadFrame(slot, slot === "ingredient" ? files : files[0]);
-                        e.target.value = "";
-                      }}
-                      multiple
-                    />
-                    {([
-                      { slot: "firstFrame" as const, label: "First", url: videoFrames.firstFrameUrl, tip: "First frame — Seedance starts from this image" },
-                      { slot: "lastFrame" as const,  label: "Last",  url: videoFrames.lastFrameUrl,  tip: "Last frame — Seedance ends on this image" },
-                      {
-                        slot: "ingredient" as const,
-                        label: (videoFrames.ingredientUrls?.length || 0) > 1 ? `Ingredients ×${videoFrames.ingredientUrls!.length}` : "Ingredient",
-                        url: videoFrames.ingredientUrls?.[0] || videoFrames.ingredientUrl,
-                        tip: "Product / ingredient references — select multiple images; Seedance 2.0 & 2.5 preserve all of them (up to 7)",
-                      },
-                    ]).map(({ slot, label, url, tip }) => (
-                      <button
-                        key={slot}
-                        type="button"
-                        title={tip}
-                        onClick={() => { frameSlotRef.current = slot; frameInputRef.current?.click(); }}
-                        className={`h-7 px-1.5 rounded-lg text-[10px] border transition inline-flex items-center gap-1 ${url ? "bg-primary/15 border-primary text-primary" : "bg-muted/40 hover:bg-muted border-border/60 text-muted-foreground"}`}
-                      >
-                        {url ? (
-                          <img src={url} alt="" className="h-5 w-5 rounded object-cover" />
-                        ) : uploadingSlot === slot ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Paperclip className="h-3 w-3" />
-                        )}
-                        <span>{label}</span>
-                        {url && (
-                          <span
-                            role="button"
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              setVideoFrames(curr => ({
-                                ...curr,
-                                ...(slot === "firstFrame" ? { firstFrameUrl: undefined } : {}),
-                                ...(slot === "lastFrame" ? { lastFrameUrl: undefined } : {}),
-                                ...(slot === "ingredient" ? { ingredientUrl: undefined, ingredientUrls: [] } : {}),
-                              }));
-                            }}
-                            className="ml-0.5 hover:text-destructive"
-                          >
-                            <X className="h-3 w-3" />
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {(selectedAgentMode === "static" || selectedAgentMode === "video") && (
-                  <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
-                    <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Format:</span>
-                    <Select value={selectedAgentMode === "video" && aspectForAdFormat(adFormat) === "1:1" ? "reel_9x16" : adFormat} onValueChange={(v) => {
-                      if (selectedAgentMode === "video" && aspectForAdFormat(v) === "1:1") setAdFormat("reel_9x16");
-                      else setAdFormat(v);
-                    }}>
-                      <SelectTrigger className="h-7 text-[10px] gap-1 border-border/60 bg-muted/40 hover:bg-muted w-auto px-2 rounded-lg">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(selectedAgentMode === "video" ? AD_FORMATS.filter(f => f.aspect !== "1:1") : AD_FORMATS).map(f => (
-                          <SelectItem key={f.value} value={f.value} className="text-xs">
-                            {f.label}<span className="text-muted-foreground ml-1">— {f.hint}</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                {(selectedAgentMode === "static" || selectedAgentMode === "video") && (
-                  <div className="flex items-center gap-1 pl-1.5 border-l border-border/60">
-                    <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Avatar:</span>
-                    <Select value={selectedAvatarId || "none"} onValueChange={(v) => setSelectedAvatarId(v === "none" ? null : v)}>
-                      <SelectTrigger className="h-7 text-[10px] w-[160px]">
-                        <SelectValue placeholder="No avatar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none" className="text-xs">No avatar</SelectItem>
-                        {studioAvatars.map((a) => (
-                          <SelectItem key={a.id} value={a.id} className="text-xs">
-                            <span className="inline-flex items-center gap-2">
-                              {a.image_url ? <img src={a.image_url} alt="" className="h-4 w-4 rounded-full object-cover" /> : null}
-                              {a.name}{a.is_stock ? " · stock" : ""}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {selectedAvatar && (
-                      <button type="button" onClick={() => setAiStudioTab("avatars")} className="text-[10px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline">
-                        manage
-                      </button>
-                    )}
-                  </div>
-                )}
-                {selectedAgentMode === "video" && (
-                  <button
-                    type="button"
-                    onClick={() => setBatchScriptsOpen(true)}
-                    title="Render multiple video scripts in parallel — each auto-splits to fit the model's per-clip cap."
-                    className="h-7 px-2 rounded-lg text-[10px] inline-flex items-center gap-1 border border-border/60 bg-muted/40 hover:bg-muted hover:border-primary/40 transition text-muted-foreground hover:text-foreground"
-                  >
-                    <Film className="h-3 w-3" />
-                    Batch scripts
-                  </button>
-                )}
-                {selectedAgentMode === "video" && videoModel && (
-                  <Badge
-                    variant="secondary"
-                    className="h-7 text-[9px] gap-1 border border-primary/40 bg-primary/10 text-primary"
-                    title="These settings are passed to the renderer exactly as selected — the agent cannot substitute a different model, resolution, length, format or avatar."
-                  >
-                    🔒 Locked: {VIDEO_MODELS.find(m => m.value === videoModel)?.label || videoModel} ·{" "}
-                    {videoResolution === "4k" ? "4K" : videoResolution} · {videoTotalDuration}s ·{" "}
-                    {videoAspectForAdFormat(adFormat)}
-                    {selectedAvatar ? ` · ${selectedAvatar.name}` : ""}
-                  </Badge>
-                )}
-                </div>
-                <div className="order-1 md:order-2 shrink-0 self-end ml-auto md:ml-0">
-                  {/* Send is always available so the user can queue new prompts while
+                          )}
+                          {selectedAgentMode === "video" && videoModel && (
+                            <Badge
+                              variant="secondary"
+                              className="h-7 text-[9px] gap-1 border border-primary/40 bg-primary/10 text-primary"
+                              title="These settings are passed to the renderer exactly as selected — the agent cannot substitute a different model, resolution, length, format or avatar."
+                            >
+                              🔒 Locked: {VIDEO_MODELS.find((m) => m.value === videoModel)?.label || videoModel} ·{" "}
+                              {videoResolution === "4k" ? "4K" : videoResolution} · {videoTotalDuration}s ·{" "}
+                              {videoAspectForAdFormat(adFormat)}
+                              {selectedAvatar ? ` · ${selectedAvatar.name}` : ""}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="order-1 md:order-2 shrink-0 self-end ml-auto md:ml-0">
+                          {/* Send is always available so the user can queue new prompts while
                       earlier generations stream in the background. A Stop-all control
                       appears alongside it whenever there is at least one in-flight run. */}
-                  <div className="flex items-center gap-1.5">
-                    <Button
-                      type="button"
-                      onClick={isRecording ? stopRecording : startRecording}
-                      size="icon"
-                      variant={isRecording ? "destructive" : "ghost"}
-                      className="h-11 w-11 md:h-9 md:w-9 rounded-xl"
-                      title={isRecording ? "Stop recording" : "Record voice"}
-                      disabled={isTranscribing}
-                    >
-                      {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin" /> : isRecording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                    </Button>
-                    {loading > 0 && (
-                      <Button
-                        onClick={stop}
-                        size="icon"
-                        variant="destructive"
-                        className="h-11 w-11 md:h-9 md:w-9 rounded-xl"
-                        title={`Stop ${loading} running ${loading === 1 ? "generation" : "generations"}`}
-                      >
-                        <Square className="h-4 w-4" />
-                      </Button>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              type="button"
+                              onClick={isRecording ? stopRecording : startRecording}
+                              size="icon"
+                              variant={isRecording ? "destructive" : "ghost"}
+                              className="h-11 w-11 md:h-9 md:w-9 rounded-xl"
+                              title={isRecording ? "Stop recording" : "Record voice"}
+                              disabled={isTranscribing}
+                            >
+                              {isTranscribing ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : isRecording ? (
+                                <Square className="h-4 w-4" />
+                              ) : (
+                                <Mic className="h-4 w-4" />
+                              )}
+                            </Button>
+                            {loading > 0 && (
+                              <Button
+                                onClick={stop}
+                                size="icon"
+                                variant="destructive"
+                                className="h-11 w-11 md:h-9 md:w-9 rounded-xl"
+                                title={`Stop ${loading} running ${loading === 1 ? "generation" : "generations"}`}
+                              >
+                                <Square className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              onClick={() => send(input)}
+                              disabled={!input.trim()}
+                              size="icon"
+                              className="h-11 w-11 md:h-9 md:w-9 rounded-xl shadow-sm"
+                              title={loading > 0 ? "Send (will run alongside current generations)" : "Send"}
+                            >
+                              <Send className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {followups.length > 0 && !loading && (
+                      <div className="mt-3 flex flex-wrap gap-2 justify-center">
+                        <span className="text-[10px] text-muted-foreground self-center mr-1">Try next:</span>
+                        {followups.map((s, i) => (
+                          <button
+                            key={i}
+                            onClick={() => send(s)}
+                            className="text-[11px] px-3 py-1.5 rounded-full border border-border/60 bg-muted/40 hover:bg-muted hover:border-primary/40 transition text-left"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
                     )}
-                    <Button onClick={() => send(input)} disabled={!input.trim()} size="icon" className="h-11 w-11 md:h-9 md:w-9 rounded-xl shadow-sm" title={loading > 0 ? "Send (will run alongside current generations)" : "Send"}>
-                      <Send className="h-4 w-4" />
-                    </Button>
                   </div>
                 </div>
-              </div>
-            </div>
-            {followups.length > 0 && !loading && (
-              <div className="mt-3 flex flex-wrap gap-2 justify-center">
-                <span className="text-[10px] text-muted-foreground self-center mr-1">Try next:</span>
-                {followups.map((s, i) => (
-                  <button key={i} onClick={() => send(s)} className="text-[11px] px-3 py-1.5 rounded-full border border-border/60 bg-muted/40 hover:bg-muted hover:border-primary/40 transition text-left">
-                    {s}
-                  </button>
-                ))}
-              </div>
+              </>
             )}
-          </div>
-        </div>
-        </>
+          </Card>
         )}
-      </Card>
-      )}
 
-      {/* RIGHT — Canvas */}
-      {showCanvas && (
-      <Card className={`${showChat && mobileView !== "canvas" ? "hidden lg:flex" : "flex"} flex-col overflow-hidden min-h-0 ${canvasFsClass}`}>
-        <Tabs value={studioTab} onValueChange={setStudioTab} className="flex-1 flex flex-col min-h-0">
-          <div className="flex items-center justify-between px-2 pt-2 gap-2">
-            <TabsList className="self-start flex-wrap h-auto">
-              <TabsTrigger value="canvas"><Sparkles className="h-4 w-4 mr-1" /> Canvas</TabsTrigger>
-              <TabsTrigger value="feed"><Layers className="h-4 w-4 mr-1" /> Feed</TabsTrigger>
-              <TabsTrigger value="onboarding"><Rocket className="h-4 w-4 mr-1" /> Onboarding</TabsTrigger>
-              <TabsTrigger value="offers"><FileText className="h-4 w-4 mr-1" /> Offers</TabsTrigger>
-              <TabsTrigger value="sheet"><TableIcon className="h-4 w-4 mr-1" /> Sheet</TabsTrigger>
-              <TabsTrigger value="references"><Library className="h-4 w-4 mr-1" /> Agent Training</TabsTrigger>
-              <TabsTrigger value="h3runs"><Film className="h-4 w-4 mr-1" /> H3 Runs</TabsTrigger>
-            </TabsList>
-            <div className="flex items-center gap-1 ml-auto">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 shrink-0"
-              onClick={() => setFullscreen(f => f === "canvas" ? "none" : "canvas")}
-              title={fullscreen === "canvas" ? "Exit fullscreen" : "Fullscreen canvas"}
-            >
-              {fullscreen === "canvas" ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 hidden lg:inline-flex shrink-0"
-              onClick={() => setShowChat(v => !v)}
-              title={showChat ? "Hide chat" : "Show chat"}
-            >
-              {showChat ? <PanelRightClose className="h-3.5 w-3.5 rotate-180" /> : <PanelRightOpen className="h-3.5 w-3.5 rotate-180" />}
-            </Button>
-            </div>
-          </div>
+        {/* RIGHT — Canvas */}
+        {showCanvas && (
+          <Card
+            className={`${showChat && mobileView !== "canvas" ? "hidden lg:flex" : "flex"} flex-col overflow-hidden min-h-0 ${canvasFsClass}`}
+          >
+            <Tabs value={studioTab} onValueChange={setStudioTab} className="flex-1 flex flex-col min-h-0">
+              <div className="flex items-center justify-between px-2 pt-2 gap-2">
+                <TabsList className="self-start flex-wrap h-auto">
+                  <TabsTrigger value="canvas">
+                    <Sparkles className="h-4 w-4 mr-1" /> Canvas
+                  </TabsTrigger>
+                  <TabsTrigger value="feed">
+                    <Layers className="h-4 w-4 mr-1" /> Feed
+                  </TabsTrigger>
+                  <TabsTrigger value="onboarding">
+                    <Rocket className="h-4 w-4 mr-1" /> Onboarding
+                  </TabsTrigger>
+                  <TabsTrigger value="offers">
+                    <FileText className="h-4 w-4 mr-1" /> Offers
+                  </TabsTrigger>
+                  <TabsTrigger value="sheet">
+                    <TableIcon className="h-4 w-4 mr-1" /> Sheet
+                  </TabsTrigger>
+                  <TabsTrigger value="references">
+                    <Library className="h-4 w-4 mr-1" /> Agent Training
+                  </TabsTrigger>
+                  <TabsTrigger value="h3runs">
+                    <Film className="h-4 w-4 mr-1" /> H3 Runs
+                  </TabsTrigger>
+                </TabsList>
+                <div className="flex items-center gap-1 ml-auto">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 shrink-0"
+                    onClick={() => setFullscreen((f) => (f === "canvas" ? "none" : "canvas"))}
+                    title={fullscreen === "canvas" ? "Exit fullscreen" : "Fullscreen canvas"}
+                  >
+                    {fullscreen === "canvas" ? (
+                      <Minimize2 className="h-3.5 w-3.5" />
+                    ) : (
+                      <Maximize2 className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 hidden lg:inline-flex shrink-0"
+                    onClick={() => setShowChat((v) => !v)}
+                    title={showChat ? "Hide chat" : "Show chat"}
+                  >
+                    {showChat ? (
+                      <PanelRightClose className="h-3.5 w-3.5 rotate-180" />
+                    ) : (
+                      <PanelRightOpen className="h-3.5 w-3.5 rotate-180" />
+                    )}
+                  </Button>
+                </div>
+              </div>
 
-          <TabsContent value="canvas" className="flex-1 m-0 overflow-hidden flex flex-col min-h-0 data-[state=active]:flex data-[state=inactive]:hidden">
-            <div className="flex-1 overflow-hidden min-h-0">
-            <AIStudioCanvas
-              entries={canvas}
-              clientId={clientId}
-              onSendMessage={(text) => send(text)}
-              onSendToCreatives={async (rows) => {
-                const res = await studioFetch({ action: "send_to_creatives", clientId, creativeRows: rows });
-                if (!res.ok) {
-                  const t = await res.text().catch(() => "");
-                  throw new Error(t || `Failed (${res.status})`);
-                }
-              }}
-              onEditVideo={(url, meta) => setEditVideo({ url, prompt: meta?.prompt, aspect_ratio: meta?.aspect_ratio })}
-              onAddCaptions={(url) => setCaptionsVideo({ url })}
-              onAddDisclaimer={(t) => setDisclaimerTarget(t)}
-              onDeleteItem={async (itemId) => {
-                // Optimistic remove; realtime DELETE event will also reconcile.
-                setCanvas(curr => curr.filter(c => ("__placeholder" in c) || (c as any).id !== itemId));
-                const { error } = await supabase.from("ai_studio_canvas_items").delete().eq("id", itemId);
-                if (error) {
-                  toast.error("Couldn't delete — refreshing");
-                  loadHistory();
-                } else {
-                  toast.success("Deleted from canvas");
-                }
-              }}
-              initialView={canvasView}
-              focusedItemId={focusedItemId}
-              onViewChange={(v) => {
-                setCanvasView(v);
-                if (conversationId) {
-                  studioFetch({ action: "settings", clientId, conversationId, docUrl: docUrl || null, sheetUrl: sheetUrl || null, quality, chatModel, activeReferenceIds, activeVideoReferenceIds, canvasView: v }).catch(() => {});
-                }
-              }}
-              onFocusItem={(id) => {
-                setFocusedItemId(id);
-                if (conversationId) {
-                  studioFetch({ action: "settings", clientId, conversationId, docUrl: docUrl || null, sheetUrl: sheetUrl || null, quality, chatModel, activeReferenceIds, activeVideoReferenceIds, focusedCanvasItemId: id }).catch(() => {});
-                }
-              }}
-              onCanvasItemUpdated={(updated) => {
-                setCanvas(curr => curr.map(c => ("__placeholder" in c) ? c : (c.id === updated.id ? updated : c)));
-              }}
-              onInlineEdit={inlineEdit}
-              onEditImage={(imageUrl, aspectRatio) => {
-                setInput(
-                  `Edit this ad on the canvas (source_image_url: ${imageUrl}, aspect_ratio: ${aspectRatio}).\n` +
-                  `Describe what to change — for example: new offer, new hook/headline, new colors (hex list), or new disclaimer text. ` +
-                  `Use the edit_static_ad tool.`
-                );
-                toast.success("Edit prompt loaded — refine and send");
-              }}
-            />
-            </div>
-            {/* Brand guardrails strip — defaults pulled from Company Info */}
-            <div className="shrink-0 border-t border-border/60 bg-background/80 backdrop-blur px-3 py-2 flex items-center gap-3 text-[11px] overflow-x-auto whitespace-nowrap">
-              <span className="uppercase tracking-wide text-[9px] text-muted-foreground font-medium">Brand lock</span>
-              {brandColors.length > 0 ? (
-                <div className="flex items-center gap-1.5">
-                  {brandColors.slice(0, 8).map((c, i) => (
-                    <div
-                      key={i}
-                      className="h-5 w-5 rounded-md border border-border/60 shadow-sm"
-                      style={{ backgroundColor: c }}
-                      title={c}
-                    />
-                  ))}
-                  <span className="text-muted-foreground ml-1 hidden sm:inline">
-                    {brandColors.slice(0, 4).join(" · ")}{brandColors.length > 4 ? ` +${brandColors.length - 4}` : ""}
+              <TabsContent
+                value="canvas"
+                className="flex-1 m-0 overflow-hidden flex flex-col min-h-0 data-[state=active]:flex data-[state=inactive]:hidden"
+              >
+                <div className="flex-1 overflow-hidden min-h-0">
+                  <AIStudioCanvas
+                    entries={canvas}
+                    clientId={clientId}
+                    onSendMessage={(text) => send(text)}
+                    onSendToCreatives={async (rows) => {
+                      const res = await studioFetch({ action: "send_to_creatives", clientId, creativeRows: rows });
+                      if (!res.ok) {
+                        const t = await res.text().catch(() => "");
+                        throw new Error(t || `Failed (${res.status})`);
+                      }
+                    }}
+                    onEditVideo={(url, meta) =>
+                      setEditVideo({ url, prompt: meta?.prompt, aspect_ratio: meta?.aspect_ratio })
+                    }
+                    onAddCaptions={(url) => setCaptionsVideo({ url })}
+                    onAddDisclaimer={(t) => setDisclaimerTarget(t)}
+                    onDeleteItem={async (itemId) => {
+                      // Optimistic remove; realtime DELETE event will also reconcile.
+                      setCanvas((curr) => curr.filter((c) => "__placeholder" in c || (c as any).id !== itemId));
+                      const { error } = await supabase.from("ai_studio_canvas_items").delete().eq("id", itemId);
+                      if (error) {
+                        toast.error("Couldn't delete — refreshing");
+                        loadHistory();
+                      } else {
+                        toast.success("Deleted from canvas");
+                      }
+                    }}
+                    initialView={canvasView}
+                    focusedItemId={focusedItemId}
+                    onViewChange={(v) => {
+                      setCanvasView(v);
+                      if (conversationId) {
+                        studioFetch({
+                          action: "settings",
+                          clientId,
+                          conversationId,
+                          docUrl: docUrl || null,
+                          sheetUrl: sheetUrl || null,
+                          quality,
+                          chatModel,
+                          activeReferenceIds,
+                          activeVideoReferenceIds,
+                          canvasView: v,
+                        }).catch(() => {});
+                      }
+                    }}
+                    onFocusItem={(id) => {
+                      setFocusedItemId(id);
+                      if (conversationId) {
+                        studioFetch({
+                          action: "settings",
+                          clientId,
+                          conversationId,
+                          docUrl: docUrl || null,
+                          sheetUrl: sheetUrl || null,
+                          quality,
+                          chatModel,
+                          activeReferenceIds,
+                          activeVideoReferenceIds,
+                          focusedCanvasItemId: id,
+                        }).catch(() => {});
+                      }
+                    }}
+                    onCanvasItemUpdated={(updated) => {
+                      setCanvas((curr) =>
+                        curr.map((c) => ("__placeholder" in c ? c : c.id === updated.id ? updated : c)),
+                      );
+                    }}
+                    onInlineEdit={inlineEdit}
+                    onEditImage={(imageUrl, aspectRatio) => {
+                      setInput(
+                        `Edit this ad on the canvas (source_image_url: ${imageUrl}, aspect_ratio: ${aspectRatio}).\n` +
+                          `Describe what to change — for example: new offer, new hook/headline, new colors (hex list), or new disclaimer text. ` +
+                          `Use the edit_static_ad tool.`,
+                      );
+                      toast.success("Edit prompt loaded — refine and send");
+                    }}
+                  />
+                </div>
+                {/* Brand guardrails strip — defaults pulled from Company Info */}
+                <div className="shrink-0 border-t border-border/60 bg-background/80 backdrop-blur px-3 py-2 flex items-center gap-3 text-[11px] overflow-x-auto whitespace-nowrap">
+                  <span className="uppercase tracking-wide text-[9px] text-muted-foreground font-medium">
+                    Brand lock
                   </span>
+                  {brandColors.length > 0 ? (
+                    <div className="flex items-center gap-1.5">
+                      {brandColors.slice(0, 8).map((c, i) => (
+                        <div
+                          key={i}
+                          className="h-5 w-5 rounded-md border border-border/60 shadow-sm"
+                          style={{ backgroundColor: c }}
+                          title={c}
+                        />
+                      ))}
+                      <span className="text-muted-foreground ml-1 hidden sm:inline">
+                        {brandColors.slice(0, 4).join(" · ")}
+                        {brandColors.length > 4 ? ` +${brandColors.length - 4}` : ""}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground italic">No brand colors — add in Company Info</span>
+                  )}
+                  <div className="h-4 w-px bg-border/60" />
+                  {brandFonts.length > 0 ? (
+                    <span className="text-foreground/80 truncate max-w-[260px]" style={{ fontFamily: brandFonts[0] }}>
+                      {brandFonts.join(" · ")}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground italic">No brand fonts set</span>
+                  )}
+                  <span className="ml-auto text-[10px] text-muted-foreground">Generations default to these</span>
                 </div>
-              ) : (
-                <span className="text-muted-foreground italic">No brand colors — add in Company Info</span>
-              )}
-              <div className="h-4 w-px bg-border/60" />
-              {brandFonts.length > 0 ? (
-                <span className="text-foreground/80 truncate max-w-[260px]" style={{ fontFamily: brandFonts[0] }}>
-                  {brandFonts.join(" · ")}
-                </span>
-              ) : (
-                <span className="text-muted-foreground italic">No brand fonts set</span>
-              )}
-              <span className="ml-auto text-[10px] text-muted-foreground">Generations default to these</span>
-            </div>
-          </TabsContent>
+              </TabsContent>
 
-          <TabsContent value="feed" className="flex-1 m-0 overflow-hidden p-3 data-[state=active]:flex data-[state=inactive]:hidden flex-col min-h-0">
-            <AgentCanvasFeed
-              studioFetch={studioFetch}
-              clientId={clientId}
-              onOpenThread={(cid, agentKey) => { setSelectedAgentId(agentKey); switchThread(cid); setStudioTab("canvas"); }}
-            />
-          </TabsContent>
+              <TabsContent
+                value="feed"
+                className="flex-1 m-0 overflow-hidden p-3 data-[state=active]:flex data-[state=inactive]:hidden flex-col min-h-0"
+              >
+                <AgentCanvasFeed
+                  studioFetch={studioFetch}
+                  clientId={clientId}
+                  onOpenThread={(cid, agentKey) => {
+                    setSelectedAgentId(agentKey);
+                    switchThread(cid);
+                    setStudioTab("canvas");
+                  }}
+                />
+              </TabsContent>
 
-          <TabsContent value="offers" className="flex-1 m-0 overflow-auto p-4">
-            <ClientOffersSection
-              clientId={clientId}
-              clientName={clientName}
-              brandColors={brandColors}
-              brandFonts={brandFonts}
-              clientDescription={(client as any)?.description ?? null}
-              websiteUrl={(client as any)?.website ?? null}
-              industry={(client as any)?.industry ?? null}
-              clientType={(client as any)?.client_type ?? null}
-            />
-          </TabsContent>
+              <TabsContent value="offers" className="flex-1 m-0 overflow-auto p-4">
+                <ClientOffersSection
+                  clientId={clientId}
+                  clientName={clientName}
+                  brandColors={brandColors}
+                  brandFonts={brandFonts}
+                  clientDescription={(client as any)?.description ?? null}
+                  websiteUrl={(client as any)?.website ?? null}
+                  industry={(client as any)?.industry ?? null}
+                  clientType={(client as any)?.client_type ?? null}
+                />
+              </TabsContent>
 
-          <TabsContent value="sheet" className="flex-1 m-0 overflow-hidden">
-            {sheetUrl ? (
-              <div className="h-full flex flex-col">
-                <div className="px-4 py-2 border-b flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground truncate">{sheetUrl}</span>
-                  <a href={sheetUrl} target="_blank" rel="noopener noreferrer" className="text-xs flex items-center gap-1 text-primary"><ExternalLink className="h-3 w-3" /> Open</a>
+              <TabsContent value="sheet" className="flex-1 m-0 overflow-hidden">
+                {sheetUrl ? (
+                  <div className="h-full flex flex-col">
+                    <div className="px-4 py-2 border-b flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground truncate">{sheetUrl}</span>
+                      <a
+                        href={sheetUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs flex items-center gap-1 text-primary"
+                      >
+                        <ExternalLink className="h-3 w-3" /> Open
+                      </a>
+                    </div>
+                    <iframe
+                      src={sheetUrl.replace(/\/edit.*$/, "/preview")}
+                      className="flex-1 w-full"
+                      title="Sheet preview"
+                    />
+                  </div>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                    Add a Google Sheet URL above.
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="references" className="flex-1 m-0 overflow-auto p-4">
+                <div className="max-w-3xl mx-auto space-y-3">
+                  <div>
+                    <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                      <Library className="h-4 w-4" /> Reference Library
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Toggle references on to have the AI use them as visual inspiration for new generations.
+                      Auto-approved client creatives also appear here.
+                    </p>
+                  </div>
+                  <AIStudioReferenceLibrary
+                    clientId={clientId}
+                    activeIds={activeReferenceIds}
+                    onToggle={setActiveReferenceIds}
+                    activeVideoIds={activeVideoReferenceIds}
+                    onToggleVideo={setActiveVideoReferenceIds}
+                  />
                 </div>
-                <iframe src={sheetUrl.replace(/\/edit.*$/, "/preview")} className="flex-1 w-full" title="Sheet preview" />
-              </div>
-            ) : (
-              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Add a Google Sheet URL above.</div>
-            )}
-          </TabsContent>
+              </TabsContent>
 
-          <TabsContent value="references" className="flex-1 m-0 overflow-auto p-4">
-            <div className="max-w-3xl mx-auto space-y-3">
-              <div>
-                <h3 className="text-sm font-semibold flex items-center gap-1.5"><Library className="h-4 w-4" /> Reference Library</h3>
-                <p className="text-xs text-muted-foreground">
-                  Toggle references on to have the AI use them as visual inspiration for new generations.
-                  Auto-approved client creatives also appear here.
-                </p>
-              </div>
-              <AIStudioReferenceLibrary clientId={clientId} activeIds={activeReferenceIds} onToggle={setActiveReferenceIds} activeVideoIds={activeVideoReferenceIds} onToggleVideo={setActiveVideoReferenceIds} />
-            </div>
-          </TabsContent>
+              <TabsContent value="h3runs" className="flex-1 m-0 overflow-auto p-4">
+                <H3RunManager clientId={clientId} />
+              </TabsContent>
 
-          <TabsContent value="h3runs" className="flex-1 m-0 overflow-auto p-4">
-            <H3RunManager clientId={clientId} />
-          </TabsContent>
-
-          <TabsContent value="onboarding" className="flex-1 m-0 overflow-hidden p-4 data-[state=active]:flex data-[state=inactive]:hidden">
-            <OnboardingPromptEditor clientId={clientId} clientName={clientName} />
-          </TabsContent>
-
-        </Tabs>
-      </Card>
-      )}
+              <TabsContent
+                value="onboarding"
+                className="flex-1 m-0 overflow-hidden p-4 data-[state=active]:flex data-[state=inactive]:hidden"
+              >
+                <OnboardingPromptEditor clientId={clientId} clientName={clientName} />
+              </TabsContent>
+            </Tabs>
+          </Card>
+        )}
       </div>
       {editVideo && (
         <VideoEditDialog
@@ -3675,29 +4699,40 @@ export function AIStudioTab({ clientId, clientName }: Props) {
           // Server-side handler validates and dispatches; results stream as
           // script_group + canvas_placeholder events.
           const lines: string[] = [];
-          lines.push(`Render this batch of ${payload.scripts.length} video script${payload.scripts.length === 1 ? "" : "s"} now using the generate_script_batch tool.`);
-          lines.push(`Pass model="${payload.model}", aspect_ratio="${payload.aspect_ratio}", resolution="${payload.resolution}".`);
+          lines.push(
+            `Render this batch of ${payload.scripts.length} video script${payload.scripts.length === 1 ? "" : "s"} now using the generate_script_batch tool.`,
+          );
+          lines.push(
+            `Pass model="${payload.model}", aspect_ratio="${payload.aspect_ratio}", resolution="${payload.resolution}".`,
+          );
           if (payload.use_avatar) {
             lines.push(`Use the selected avatar for every script (set use_avatar=true on each).`);
-            if (payload.force_seedance) lines.push(`Set force_model=true on every script (user explicitly opted out of Veo auto-routing).`);
+            if (payload.force_seedance)
+              lines.push(`Set force_model=true on every script (user explicitly opted out of Veo auto-routing).`);
           } else {
             lines.push(`Do NOT use the avatar (set use_avatar=false on each).`);
           }
           lines.push("");
           lines.push("```json");
-          lines.push(JSON.stringify({
-            scripts: payload.scripts.map(s => ({
-              title: s.title || undefined,
-              voiceover: s.voiceover,
-              environment: s.environment || undefined,
-              target_duration_s: s.target_duration_s,
-              use_avatar: payload.use_avatar,
-              force_model: payload.force_seedance,
-            })),
-            model: payload.model,
-            aspect_ratio: payload.aspect_ratio,
-            resolution: payload.resolution,
-          }, null, 2));
+          lines.push(
+            JSON.stringify(
+              {
+                scripts: payload.scripts.map((s) => ({
+                  title: s.title || undefined,
+                  voiceover: s.voiceover,
+                  environment: s.environment || undefined,
+                  target_duration_s: s.target_duration_s,
+                  use_avatar: payload.use_avatar,
+                  force_model: payload.force_seedance,
+                })),
+                model: payload.model,
+                aspect_ratio: payload.aspect_ratio,
+                resolution: payload.resolution,
+              },
+              null,
+              2,
+            ),
+          );
           lines.push("```");
           send(lines.join("\n"));
         }}
