@@ -1017,9 +1017,7 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
                           <button
                             type="button"
                             className="underline"
-                            onClick={() =>
-                              update({ script: v.script, videoPrompt: v.videoPrompt, disclosure: v.disclosure })
-                            }
+                            onClick={() => project.restoreScriptVersion(v.id)}
                           >
                             Bring back
                           </button>
