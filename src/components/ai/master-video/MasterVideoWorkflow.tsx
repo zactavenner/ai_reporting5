@@ -902,6 +902,7 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
                     const text = (await f.text()).trim();
                     if (!text) throw new Error("empty");
                     if (!sameScope(at)) return;
+                    project.snapshotScript("before script import");
                     update({ script: text });
                     toast.success("Script imported — edit it before approving");
                   } catch {
