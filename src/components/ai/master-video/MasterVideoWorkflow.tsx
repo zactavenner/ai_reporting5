@@ -74,7 +74,20 @@ async function uploadAsset(
   clientId: string | null,
 ): Promise<string> {
   const type = file.type || "";
-  const okType = kind === "image" ? type.startsWith("image/") : kind === "video" ? type.startsWith("video/") : !!type;
+  const okType =
+    kind === "image"
+      ? type.startsWith("image/")
+      : kind === "video"
+        ? type.startsWith("video/")
+        : [
+            "application/pdf",
+            "text/plain",
+            "text/markdown",
+            "text/csv",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          ].includes(type);
   if (!okType) throw new Error(`That file is not ${kind === "image" ? "an image" : `a ${kind}`}.`);
   if (file.size > MAX_UPLOAD_BYTES) throw new Error("That file is over the 50MB limit.");
   const ext = (file.name.split(".").pop() || (kind === "image" ? "png" : "bin")).toLowerCase().slice(0, 8);
@@ -112,7 +125,16 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
   const { data: offers = [] } = useClientOffers(clientId || undefined);
   const { data: avatars = [] } = useAvatars(clientId);
 
-  const [step, setStep] = useState<StepKey>("offer");
+  const [step, setStepState] = useState<StepKey>("offer");
+  const stepStorageKey = `master-video:step:${clientId || "shared"}:${conversationId || "new"}`;
+  const setStep = (next: StepKey) => {
+    setStepState(next);
+    try {
+      localStorage.setItem(stepStorageKey, next);
+    } catch {
+      /* optional local resume */
+    }
+  };
   const [busy, setBusy] = useState<null | "frame" | "frame-edit" | "script" | "generate">(null);
   const frameFile = useRef<HTMLInputElement>(null);
   const avatarFile = useRef<HTMLInputElement>(null);
