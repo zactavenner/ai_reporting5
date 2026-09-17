@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 
 /* ------------------------------------------------------------------ mocks --- */
 
@@ -77,8 +77,10 @@ vi.mock("sonner", () => ({
     error: (m: string) => toasts.push(`error:${m}`),
   },
 }));
-
-vi.mock("@/lib/dashboardAuthHeaders", () => ({ dashboardAuthHeaders: () => ({ "x-dashboard-token": "t" }) }));
+vi.mock("@/lib/dashboardAuthHeaders", () => ({
+  dashboardAuthHeaders: () => ({ "x-dashboard-token": "t" }),
+  normalizeDashboardError: async (e: unknown) => e,
+}));
 
 import MasterVideoWorkflow from "@/components/ai/master-video/MasterVideoWorkflow";
 import { createEmptyDraft, frameApprovalHash, scriptApprovalHash } from "@/lib/masterVideo";
