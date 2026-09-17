@@ -179,7 +179,14 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
   // Reset the local step when the scope changes so no draft state leaks across
   // clients or threads.
   useEffect(() => {
-    setStep("offer");
+    let resumed: StepKey = "offer";
+    try {
+      const saved = localStorage.getItem(stepStorageKey);
+      if (MASTER_VIDEO_STEPS.some((s) => s.key === saved)) resumed = saved as StepKey;
+    } catch {
+      /* optional local resume */
+    }
+    setStepState(resumed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, conversationId]);
 
