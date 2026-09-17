@@ -54,7 +54,9 @@ const labelCls = "text-[11px] uppercase tracking-wide text-muted-foreground";
 
 function pill(active: boolean) {
   return `px-2.5 py-1 rounded-full border text-[11px] transition ${
-    active ? "border-primary bg-primary text-primary-foreground" : "border-border/60 text-muted-foreground hover:bg-muted"
+    active
+      ? "border-primary bg-primary text-primary-foreground"
+      : "border-border/60 text-muted-foreground hover:bg-muted"
   }`;
 }
 
@@ -72,8 +74,7 @@ async function uploadAsset(
   clientId: string | null,
 ): Promise<string> {
   const type = file.type || "";
-  const okType =
-    kind === "image" ? type.startsWith("image/") : kind === "video" ? type.startsWith("video/") : !!type;
+  const okType = kind === "image" ? type.startsWith("image/") : kind === "video" ? type.startsWith("video/") : !!type;
   if (!okType) throw new Error(`That file is not ${kind === "image" ? "an image" : `a ${kind}`}.`);
   if (file.size > MAX_UPLOAD_BYTES) throw new Error("That file is over the 50MB limit.");
   const ext = (file.name.split(".").pop() || (kind === "image" ? "png" : "bin")).toLowerCase().slice(0, 8);
@@ -227,6 +228,8 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
   /* --------------------------------------------------------- script ------- */
 
   const draftScript = async () => {
+    const at = scopeRef.current;
+    project.snapshotScript("before AI redraft");
     setBusy("script");
     try {
       const style = VIDEO_STYLE_PRESETS.find((p) => p.id === draft.styleId);
@@ -257,6 +260,7 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
       const script = String(data?.script || "").trim();
       const videoPrompt = String(data?.videoPrompt || "").trim();
       if (!script) throw new Error("empty");
+      if (!sameScope(at)) return;
       update({ script, videoPrompt: videoPrompt || buildVideoPrompt(draft) });
       toast.success("Draft written — edit anything you want before approving");
     } catch {
@@ -283,7 +287,9 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
         headers: dashboardAuthHeaders(),
         body: {
           projectId: saved.projectId || project.projectId,
-          scriptHash: scriptApprovalHash(draft),
+          clientId,
+          conversationId,
+          scriptHash: retryOfGenerationId ? undefined : scriptApprovalHash(draft),
           retryOfGenerationId: retryOfGenerationId || undefined,
         },
       });
@@ -418,21 +424,39 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
               <div className={labelCls}>Production brief (does not change the saved offer)</div>
-              <Textarea rows={4} value={draft.brief} onChange={(e) => update({ brief: e.target.value })} placeholder="Angle for this specific ad, audience, what to lead with…" />
+              <Textarea
+                rows={4}
+                value={draft.brief}
+                onChange={(e) => update({ brief: e.target.value })}
+                placeholder="Angle for this specific ad, audience, what to lead with…"
+              />
             </div>
             <div className="space-y-1">
               <div className={labelCls}>Claims and proof allowed in this ad</div>
-              <Textarea rows={4} value={draft.claims} onChange={(e) => update({ claims: e.target.value })} placeholder="Only verified figures and proof points, with where they come from…" />
+              <Textarea
+                rows={4}
+                value={draft.claims}
+                onChange={(e) => update({ claims: e.target.value })}
+                placeholder="Only verified figures and proof points, with where they come from…"
+              />
             </div>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
               <div className={labelCls}>The one call to action</div>
-              <Input value={draft.cta} onChange={(e) => update({ cta: e.target.value })} placeholder="Book a call at…" />
+              <Input
+                value={draft.cta}
+                onChange={(e) => update({ cta: e.target.value })}
+                placeholder="Book a call at…"
+              />
             </div>
             <div className="space-y-1">
               <div className={labelCls}>Sources / references</div>
-              <Input value={draft.sourceNotes} onChange={(e) => update({ sourceNotes: e.target.value })} placeholder="Links or documents backing the claims" />
+              <Input
+                value={draft.sourceNotes}
+                onChange={(e) => update({ sourceNotes: e.target.value })}
+                placeholder="Links or documents backing the claims"
+              />
               <input
                 ref={offerFile}
                 type="file"
@@ -487,7 +511,9 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
                   });
                 }}
                 className={`group overflow-hidden rounded-xl border text-left transition ${
-                  draft.styleId === p.id ? "border-primary ring-2 ring-primary/30" : "border-border/60 hover:border-primary/40"
+                  draft.styleId === p.id
+                    ? "border-primary ring-2 ring-primary/30"
+                    : "border-border/60 hover:border-primary/40"
                 }`}
               >
                 <video
@@ -535,7 +561,11 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
             </Button>
             {draft.styleReferenceUrl && (
               <>
-                <img src={draft.styleReferenceUrl} alt="Style reference" className="h-10 w-10 rounded-md object-cover" />
+                <img
+                  src={draft.styleReferenceUrl}
+                  alt="Style reference"
+                  className="h-10 w-10 rounded-md object-cover"
+                />
                 <Button variant="ghost" size="sm" onClick={() => update({ styleReferenceUrl: null })}>
                   Remove
                 </Button>
@@ -544,7 +574,12 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
           </div>
           <div className="space-y-1">
             <div className={labelCls}>Extra style directions</div>
-            <Textarea rows={3} value={draft.styleDirections} onChange={(e) => update({ styleDirections: e.target.value })} placeholder="Lighting, pace, energy, anything the reference doesn't cover…" />
+            <Textarea
+              rows={3}
+              value={draft.styleDirections}
+              onChange={(e) => update({ styleDirections: e.target.value })}
+              placeholder="Lighting, pace, energy, anything the reference doesn't cover…"
+            />
           </div>
         </div>
       )}
@@ -554,7 +589,11 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
         <div className={cardCls + " space-y-3"}>
           <div className="flex flex-wrap items-center gap-1.5">
             <span className={labelCls + " w-full"}>Who is on camera?</span>
-            <button type="button" className={pill(draft.presenter === "avatar")} onClick={() => update({ presenter: "avatar" })}>
+            <button
+              type="button"
+              className={pill(draft.presenter === "avatar")}
+              onClick={() => update({ presenter: "avatar" })}
+            >
               A presenter
             </button>
             <button
@@ -575,7 +614,9 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
                     type="button"
                     onClick={() => update({ avatarId: a.id, avatarName: a.name, avatarImageUrl: a.image_url })}
                     className={`overflow-hidden rounded-xl border transition ${
-                      draft.avatarId === a.id ? "border-primary ring-2 ring-primary/30" : "border-border/60 hover:border-primary/40"
+                      draft.avatarId === a.id
+                        ? "border-primary ring-2 ring-primary/30"
+                        : "border-border/60 hover:border-primary/40"
                     }`}
                   >
                     <img src={a.image_url} alt={a.name} className="aspect-[3/4] w-full object-cover" />
@@ -619,7 +660,12 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
               </div>
               <div className="space-y-1">
                 <div className={labelCls}>How this person should come across</div>
-                <Textarea rows={2} value={draft.avatarDescription} onChange={(e) => update({ avatarDescription: e.target.value })} placeholder="Warm, credible advisor in her 40s…" />
+                <Textarea
+                  rows={2}
+                  value={draft.avatarDescription}
+                  onChange={(e) => update({ avatarDescription: e.target.value })}
+                  placeholder="Warm, credible advisor in her 40s…"
+                />
               </div>
             </>
           )}
@@ -627,15 +673,27 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
           <div className="grid gap-3 md:grid-cols-3">
             <div className="space-y-1">
               <div className={labelCls}>Wardrobe</div>
-              <Input value={draft.wardrobe} onChange={(e) => update({ wardrobe: e.target.value })} placeholder="Neutral linen blazer" />
+              <Input
+                value={draft.wardrobe}
+                onChange={(e) => update({ wardrobe: e.target.value })}
+                placeholder="Neutral linen blazer"
+              />
             </div>
             <div className="space-y-1">
               <div className={labelCls}>Location</div>
-              <Input value={draft.location} onChange={(e) => update({ location: e.target.value })} placeholder="Sunlit office, city behind" />
+              <Input
+                value={draft.location}
+                onChange={(e) => update({ location: e.target.value })}
+                placeholder="Sunlit office, city behind"
+              />
             </div>
             <div className="space-y-1">
               <div className={labelCls}>Camera & motion</div>
-              <Input value={draft.motion} onChange={(e) => update({ motion: e.target.value })} placeholder="Slow push in, handheld sway" />
+              <Input
+                value={draft.motion}
+                onChange={(e) => update({ motion: e.target.value })}
+                placeholder="Slow push in, handheld sway"
+              />
             </div>
           </div>
         </div>
@@ -650,7 +708,12 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
                 <div className={labelCls}>Opening frame prompt</div>
                 <div className="flex items-center gap-1.5">
                   {FRAME_IMAGE_MODELS.map((m) => (
-                    <button key={m.value} type="button" className={pill(frameModel === m.value)} onClick={() => setFrameModel(m.value)}>
+                    <button
+                      key={m.value}
+                      type="button"
+                      className={pill(frameModel === m.value)}
+                      onClick={() => setFrameModel(m.value)}
+                    >
                       {m.label}
                     </button>
                   ))}
@@ -660,17 +723,32 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" onClick={() => runFrameImage("create")} disabled={busy === "frame"}>
-                {busy === "frame" ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="mr-1.5 h-3.5 w-3.5" />}
+                {busy === "frame" ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ImagePlus className="mr-1.5 h-3.5 w-3.5" />
+                )}
                 Create frame
               </Button>
-              <Button variant="outline" size="sm" onClick={() => runFrameImage("edit")} disabled={busy === "frame-edit" || !frame}>
-                {busy === "frame-edit" ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => runFrameImage("edit")}
+                disabled={busy === "frame-edit" || !frame}
+              >
+                {busy === "frame-edit" ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                )}
                 Edit chosen frame
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => update({ framePrompt: buildFirstFramePrompt(draft, clientName), framePromptTouched: false })}
+                onClick={() =>
+                  update({ framePrompt: buildFirstFramePrompt(draft, clientName), framePromptTouched: false })
+                }
               >
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Rebuild prompt
               </Button>
@@ -697,7 +775,12 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
               <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 Format
                 {spec.aspectRatios.map((a) => (
-                  <button key={a} type="button" className={pill(draft.aspectRatio === a)} onClick={() => update({ aspectRatio: a })}>
+                  <button
+                    key={a}
+                    type="button"
+                    className={pill(draft.aspectRatio === a)}
+                    onClick={() => update({ aspectRatio: a })}
+                  >
                     {a}
                   </button>
                 ))}
@@ -714,11 +797,15 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
                       type="button"
                       onClick={() => update({ selectedFrameId: f.id })}
                       className={`overflow-hidden rounded-xl border transition ${
-                        draft.selectedFrameId === f.id ? "border-primary ring-2 ring-primary/30" : "border-border/60 hover:border-primary/40"
+                        draft.selectedFrameId === f.id
+                          ? "border-primary ring-2 ring-primary/30"
+                          : "border-border/60 hover:border-primary/40"
                       }`}
                     >
                       <img src={f.url} alt={`Frame v${f.version}`} className="aspect-[9/16] w-full object-cover" />
-                      <div className="p-1 text-[10px] text-muted-foreground">v{f.version} · {f.source}</div>
+                      <div className="p-1 text-[10px] text-muted-foreground">
+                        v{f.version} · {f.source}
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -740,7 +827,12 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
                 <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> {statusOf("frame").reason}
               </p>
             )}
-            <Button size="sm" className="w-full" disabled={!frame || statusOf("frame").complete} onClick={project.approveFrame}>
+            <Button
+              size="sm"
+              className="w-full"
+              disabled={!frame || statusOf("frame").complete}
+              onClick={project.approveFrame}
+            >
               <Check className="mr-1.5 h-3.5 w-3.5" />
               {statusOf("frame").complete ? "Frame approved" : "Approve this exact frame"}
             </Button>
@@ -754,7 +846,11 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
           <div className={cardCls + " space-y-3"}>
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" onClick={draftScript} disabled={busy === "script"}>
-                {busy === "script" ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                {busy === "script" ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                )}
                 Draft with AI
               </Button>
               <Button variant="outline" size="sm" onClick={() => update({ videoPrompt: buildVideoPrompt(draft) })}>
@@ -788,37 +884,69 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
                 <Upload className="mr-1.5 h-3.5 w-3.5" /> Import a script
               </Button>
               <span className="text-[11px] text-muted-foreground">
-                {scriptWordCount(draft.script)} words · about {estimatedReadSeconds(draft.script)}s to read · render is {draft.durationSeconds}s
+                {scriptWordCount(draft.script)} words · about {estimatedReadSeconds(draft.script)}s to read · render is{" "}
+                {draft.durationSeconds}s
               </span>
             </div>
             <div className="space-y-1">
               <div className={labelCls}>Spoken script — the exact words, nothing else</div>
-              <Textarea rows={8} value={draft.script} onChange={(e) => update({ script: e.target.value })} placeholder="Paste or write the words that are said out loud…" />
+              <Textarea
+                rows={8}
+                value={draft.script}
+                onChange={(e) => update({ script: e.target.value })}
+                placeholder="Paste or write the words that are said out loud…"
+              />
             </div>
             <div className="space-y-1">
               <div className={labelCls}>Camera, motion and audio directions</div>
-              <Textarea rows={5} value={draft.videoPrompt} onChange={(e) => update({ videoPrompt: e.target.value })} placeholder="Single continuous handheld shot, slow push in, room tone…" />
+              <Textarea
+                rows={5}
+                value={draft.videoPrompt}
+                onChange={(e) => update({ videoPrompt: e.target.value })}
+                placeholder="Single continuous handheld shot, slow push in, room tone…"
+              />
             </div>
             <div className="space-y-1">
               <div className={labelCls}>Disclosure (added on screen later, never spoken)</div>
-              <Textarea rows={2} value={draft.disclosure} onChange={(e) => update({ disclosure: e.target.value })} placeholder="Targeted returns are not guaranteed…" />
+              <Textarea
+                rows={2}
+                value={draft.disclosure}
+                onChange={(e) => update({ disclosure: e.target.value })}
+                placeholder="Targeted returns are not guaranteed…"
+              />
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <span className={labelCls + " w-full"}>Render settings</span>
               {MASTER_VIDEO_MODELS.map((m) => (
-                <button key={m.value} type="button" title={m.hint} className={pill(draft.model === m.value)} onClick={() => update({ model: m.value })}>
+                <button
+                  key={m.value}
+                  type="button"
+                  title={m.hint}
+                  className={pill(draft.model === m.value)}
+                  onClick={() => update({ model: m.value })}
+                >
                   {m.label}
                 </button>
               ))}
               <span className="mx-1 h-3 w-px bg-border/70" />
               {spec.resolutions.map((r) => (
-                <button key={r} type="button" className={pill(draft.resolution === r) + " uppercase"} onClick={() => update({ resolution: r })}>
+                <button
+                  key={r}
+                  type="button"
+                  className={pill(draft.resolution === r) + " uppercase"}
+                  onClick={() => update({ resolution: r })}
+                >
                   {r}
                 </button>
               ))}
               <span className="mx-1 h-3 w-px bg-border/70" />
               {spec.durations.map((d) => (
-                <button key={d} type="button" className={pill(draft.durationSeconds === d)} onClick={() => update({ durationSeconds: d })}>
+                <button
+                  key={d}
+                  type="button"
+                  className={pill(draft.durationSeconds === d)}
+                  onClick={() => update({ durationSeconds: d })}
+                >
                   {d}s
                 </button>
               ))}
@@ -875,7 +1003,12 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
             {statusOf("script").reason && !scriptApprovalStale(draft, approvals) && (
               <p className="text-[11px] text-muted-foreground">{statusOf("script").reason}</p>
             )}
-            <Button size="sm" className="w-full" disabled={statusOf("script").complete || !statusOf("frame").complete} onClick={project.approveScript}>
+            <Button
+              size="sm"
+              className="w-full"
+              disabled={statusOf("script").complete || !statusOf("frame").complete}
+              onClick={project.approveScript}
+            >
               <Check className="mr-1.5 h-3.5 w-3.5" />
               {statusOf("script").complete ? "Script approved" : "Approve script & directions"}
             </Button>
@@ -913,7 +1046,11 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
             )}
             <div className="flex flex-wrap items-center gap-2">
               <Button onClick={() => generate()} disabled={!gate.ok || busy === "generate" || !project.projectId}>
-                {busy === "generate" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Film className="mr-1.5 h-4 w-4" />}
+                {busy === "generate" ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Film className="mr-1.5 h-4 w-4" />
+                )}
                 Generate video
               </Button>
               <span className="text-[11px] text-muted-foreground">

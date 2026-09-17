@@ -28,8 +28,7 @@ export type MasterVideoGeneration = {
 };
 
 export type SaveResult = { ok: boolean; projectId: string | null; error?: string };
-
-const ACTIVE = new Set(["queued", "running"]);
+const ACTIVE = new Set(["queued", "running", "submission_unknown"]);
 
 /**
  * One recoverable draft per (person, client, thread).
@@ -98,7 +97,9 @@ export function useMasterVideoProject(clientId: string | null, conversationId: s
       }
       try {
         setApprovedBy(localStorage.getItem("team_member_id"));
-      } catch { /* nothing to attribute the approval to */ }
+      } catch {
+        /* nothing to attribute the approval to */
+      }
     })();
     return () => {
       cancelled = true;
@@ -211,9 +212,13 @@ export function useMasterVideoProject(clientId: string | null, conversationId: s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft, approvals, loading, scopeKey]);
 
-  const update = useCallback((patch: Partial<MasterVideoDraft>) => {
-    setDraft((prev) => clampRenderSettings({ ...prev, ...patch }));
-  }, []);
+  const update = useCallback(
+    (patch: Partial<MasterVideoDraft>) => {
+      if (scopeRef.current !== scopeKey) return;
+      setDraft((prev) => clampRenderSettings({ ...prev, ...patch }));
+    },
+    [scopeKey],
+  );
 
   /** Keeps the words that were there before an AI redraft or a paste. */
   const snapshotScript = useCallback((note: string) => {
@@ -231,7 +236,10 @@ export function useMasterVideoProject(clientId: string | null, conversationId: s
 
   const approveFrame = useCallback(() => {
     setDraft((d) => {
-      setApprovals((a) => ({ ...a, frame: { hash: frameApprovalHash(d), at: new Date().toISOString(), by: approvedBy } }));
+      setApprovals((a) => ({
+        ...a,
+        frame: { hash: frameApprovalHash(d), at: new Date().toISOString(), by: approvedBy },
+      }));
       return d;
     });
   }, [approvedBy]);
