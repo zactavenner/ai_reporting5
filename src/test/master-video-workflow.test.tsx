@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
+import { render, renderHook, act, screen, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 
@@ -81,8 +81,8 @@ vi.mock("@/lib/dashboardAuthHeaders", () => ({
   dashboardAuthHeaders: () => ({ "x-dashboard-token": "t" }),
   normalizeDashboardError: async (e: unknown) => e,
 }));
-
 import MasterVideoWorkflow from "@/components/ai/master-video/MasterVideoWorkflow";
+import { useMasterVideoProject } from "@/hooks/useMasterVideoProject";
 import { createEmptyDraft, frameApprovalHash, scriptApprovalHash } from "@/lib/masterVideo";
 
 /** A saved project row that is complete but NOT yet approved. */
