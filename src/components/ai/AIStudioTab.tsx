@@ -3449,7 +3449,13 @@ export function AIStudioTab({ clientId, clientName }: Props) {
                   </div>
                 </ScrollArea>
 
-                <div className="px-3 sm:px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
+                <div
+                  className={
+                    selectedAgentMode === "video" && videoFlow === "master"
+                      ? "hidden"
+                      : "px-3 sm:px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2"
+                  }
+                >
                   <div className={`mx-auto w-full transition-[max-width] ${wideChat ? "max-w-6xl" : "max-w-3xl"}`}>
                     {/* Context usage + auto doc toggle */}
                     {(() => {
