@@ -560,7 +560,9 @@ export function estimatedReadSeconds(script: string, wordsPerMinute = 150): numb
 
 /** Spoken words only — direction lines never count towards the read length. */
 export function scriptWordCount(script: string): number {
-  return norm(extractSpokenScript(script)).split(/\s+/).filter((w) => /[a-z0-9']/i.test(w)).length;
+  return norm(extractSpokenScript(script))
+    .split(/\s+/)
+    .filter((w) => /[a-z0-9']/i.test(w)).length;
 }
 
 /**
@@ -644,7 +646,10 @@ export function reviewSummary(
       value: draft.presenter === "none" ? "No presenter" : draft.avatarName || "Selected presenter",
     },
     { label: "First frame", value: frame ? `v${frame.version} (${frame.source})` : "Not set" },
-    { label: "Spoken script", value: `${scriptWordCount(draft.script)} words · about ${estimatedReadSeconds(draft.script)}s to read` },
+    {
+      label: "Spoken script",
+      value: `${scriptWordCount(draft.script)} words · about ${estimatedReadSeconds(draft.script)}s to read`,
+    },
     { label: "Call to action", value: norm(draft.cta) || "Not set" },
     {
       label: "Render",
@@ -710,9 +715,7 @@ export function authorizeGeneration(
 /** The provider's own prompt ceiling. Over it we refuse rather than trim. */
 export const PROVIDER_PROMPT_CHAR_LIMIT = 6000;
 
-export type ProviderBodyResult =
-  | { ok: true; body: Record<string, unknown> }
-  | { ok: false; error: string };
+export type ProviderBodyResult = { ok: true; body: Record<string, unknown> } | { ok: false; error: string };
 
 /**
  * Builds the exact request sent to OpenRouter. Nothing is silently corrected
@@ -721,18 +724,17 @@ export type ProviderBodyResult =
  * character ceiling all stop the request before any money is spent. Trimming an
  * approved prompt would mean rendering words nobody approved.
  */
-export function buildProviderBody(
-  draft: MasterVideoDraft,
-  prompt: string,
-  frameUrl: string,
-): ProviderBodyResult {
+export function buildProviderBody(draft: MasterVideoDraft, prompt: string, frameUrl: string): ProviderBodyResult {
   const spec = MASTER_VIDEO_MODELS.find((m) => m.value === draft.model);
   if (!spec) return { ok: false, error: `This video asks for a renderer we do not support (${draft.model}).` };
   if (!spec.aspectRatios.includes(draft.aspectRatio)) {
     return { ok: false, error: `${spec.label} cannot render ${draft.aspectRatio}. Pick a supported format.` };
   }
   if (!spec.resolutions.includes(draft.resolution)) {
-    return { ok: false, error: `${spec.label} cannot render ${draft.resolution}. Pick ${spec.resolutions.join(" or ")}.` };
+    return {
+      ok: false,
+      error: `${spec.label} cannot render ${draft.resolution}. Pick ${spec.resolutions.join(" or ")}.`,
+    };
   }
   if (!spec.durations.includes(draft.durationSeconds)) {
     return {
@@ -800,10 +802,18 @@ export function classifySubmitFailure(input: {
         "The renderer accepted this video but its reply could not be read, so it may already be running. It is being held for review — no new render will be charged until that is settled.",
     };
   }
+  const confirmedRejections = new Set([400, 401, 403, 404, 405, 413, 415, 422, 429]);
+  if (confirmedRejections.has(responseStatus)) {
+    return {
+      outcome: "rejected",
+      status: "failed",
+      message: `The renderer rejected this request (${responseStatus}). Review the error before trying again.`,
+    };
+  }
   return {
-    outcome: "rejected",
-    status: "failed",
-    message: `The renderer refused this video (${responseStatus}). Nothing was charged — you can try again.`,
+    outcome: "unknown",
+    status: "submission_unknown",
+    message: `The renderer returned ${responseStatus}, but we cannot confirm whether the video started. This attempt is held for review; do not submit another paid render until its outcome is known.`,
   };
 }
 
