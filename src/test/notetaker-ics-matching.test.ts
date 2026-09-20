@@ -39,7 +39,8 @@ describe('shadow invite matching keys', () => {
     const ics = buildShadowInviteIcs({ ...base, xProps: { 'X-HPA-CONTACT-EMAIL': 'jane@example.com' } });
     expect(ics).toContain('SUMMARY:Discovery Call with Jane Doe');
     expect(ics).toContain('mailto:zac@zactavenner.com');
-    const attendees = ics.split('\r\n').filter((l) => l.startsWith('ATTENDEE'));
+    const unfolded = ics.replace(/\r\n /g, '');
+    const attendees = unfolded.split('\r\n').filter((l) => l.startsWith('ATTENDEE'));
     expect(attendees).toHaveLength(1);
     expect(attendees[0]).toContain('theainotetaker@gmail.com');
   });
