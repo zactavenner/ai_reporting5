@@ -27,6 +27,12 @@ export interface ShadowInviteInput {
   organizerEmail: string;
   organizerName?: string | null;
   attendeeEmail: string;
+  /**
+   * Non-standard X- properties carried on the event so the notetaker meeting can
+   * be matched back to the exact client / location / appointment / contact.
+   * Invisible in calendar UIs and never emailed to anyone but the notetaker.
+   */
+  xProps?: Record<string, string | null | undefined>;
 }
 
 /** Stable UID space: one appointment ⇒ one calendar event, forever. */
