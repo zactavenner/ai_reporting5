@@ -311,10 +311,12 @@ async function runShadowInvite(args: {
   // Google Calendar silently ignores an invitation whose ORGANIZER is the same
   // mailbox as the ATTENDEE (a "self invite"). The SMTP envelope still uses the
   // working sender address; only the iCalendar organizer identity is distinct.
+  const configuredOrganizer =
+    (Deno.env.get('SHADOW_INVITE_ORGANIZER') || 'zac@zactavenner.com').trim().toLowerCase();
   const organizerEmail =
-    sender.from_email && sender.from_email.toLowerCase() !== String(botGuestEmail).toLowerCase()
-      ? sender.from_email
-      : (Deno.env.get('SHADOW_INVITE_ORGANIZER') || 'invites@highperformanceads.com');
+    configuredOrganizer && configuredOrganizer !== String(botGuestEmail).toLowerCase()
+      ? configuredOrganizer
+      : sender.from_email;
   const ics = buildShadowInviteIcs({
     uid,
     method,
@@ -330,6 +332,21 @@ async function runShadowInvite(args: {
     organizerEmail,
     organizerName: clientName || 'High Performance Ads',
     attendeeEmail: botGuestEmail,
+    // Invisible matching keys: everything needed to tie the notetaker meeting
+    // back to the exact client, CRM location, calendar, appointment and contact.
+    // The contact is NEVER added as an attendee, so nothing is emailed to leads.
+    xProps: {
+      'X-HPA-CLIENT-ID': config.clientId,
+      'X-HPA-CLIENT-NAME': clientName || null,
+      'X-HPA-LOCATION-ID': appointment.locationId || config.ghlLocationId || null,
+      'X-HPA-CALENDAR-ID': appointment.calendarId || config.ghlCalendarId || null,
+      'X-HPA-CALENDAR-NAME': appointment.calendarName || null,
+      'X-HPA-APPOINTMENT-ID': appointment.appointmentId,
+      'X-HPA-CONTACT-ID': appointment.attribution?.contactId || null,
+      'X-HPA-CONTACT-NAME': appointment.attribution?.contactName || null,
+      'X-HPA-CONTACT-EMAIL': appointment.attribution?.contactEmail || null,
+      'X-HPA-ASSIGNED-USER-EMAIL': appointment.attribution?.assignedUserEmail || null,
+    },
   });
 
   const result = await sendShadowInvite({

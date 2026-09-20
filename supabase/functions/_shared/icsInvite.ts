@@ -27,6 +27,12 @@ export interface ShadowInviteInput {
   organizerEmail: string;
   organizerName?: string | null;
   attendeeEmail: string;
+  /**
+   * Non-standard X- properties carried on the event so the notetaker meeting can
+   * be matched back to the exact client / location / appointment / contact.
+   * Invisible in calendar UIs and never emailed to anyone but the notetaker.
+   */
+  xProps?: Record<string, string | null | undefined>;
 }
 
 /** Stable UID space: one appointment ⇒ one calendar event, forever. */
@@ -140,6 +146,9 @@ export function buildShadowInviteIcs(input: ShadowInviteInput): string {
     `ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${input.attendeeEmail}`,
     input.method === 'CANCEL' ? 'STATUS:CANCELLED' : 'STATUS:CONFIRMED',
     'TRANSP:OPAQUE',
+    ...Object.entries(input.xProps || {})
+      .filter(([k, v]) => k && v != null && String(v).trim() !== '')
+      .map(([k, v]) => `${k.toUpperCase().startsWith('X-') ? k.toUpperCase() : `X-${k.toUpperCase()}`}:${escapeIcsText(String(v).trim())}`),
     'END:VEVENT',
     'END:VCALENDAR',
   ].filter(Boolean);
@@ -151,7 +160,7 @@ export function buildShadowInviteIcs(input: ShadowInviteInput): string {
  * upcoming linked appointment receives exactly one update into the new format
  * and then stays idempotent.
  */
-export const CALENDAR_PRESENTATION_VERSION = 'v2-natural';
+export const CALENDAR_PRESENTATION_VERSION = 'v3-matching';
 
 /** Signature used to detect reschedules (time change ⇒ SEQUENCE bump). */
 export function scheduleSignature(start: string | null, end: string | null, link?: string | null): string {

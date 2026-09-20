@@ -384,7 +384,8 @@ Deno.serve(async (req) => {
           .order('scheduled_start', { ascending: true })
           .limit(300);
         if (clientId) upcomingQ = upcomingQ.eq('client_id', clientId);
-        if (hasRange) upcomingQ = upcomingQ.gte('scheduled_start', rangeFrom!).lte('scheduled_start', rangeTo!);
+        // The date range filters the historical views only. Upcoming bookings are
+        // always in the future, so applying a past range here emptied the list.
         const { data: upcomingJobs } = await upcomingQ;
 
         let pastQ = supabase
