@@ -107,6 +107,11 @@ const navStructure = [
     icon: Plug,
   },
   {
+    title: 'Sendblue',
+    value: 'sendblue',
+    icon: MessageCircle,
+  },
+  {
     title: 'AI Meetings',
     value: 'ai-meetings',
     icon: Sparkles,
