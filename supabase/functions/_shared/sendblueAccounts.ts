@@ -195,3 +195,154 @@ export function connectionSignals(input: ConnectionSignalInput): ConnectionSigna
     fully_proven: credentials && Boolean(input.webhookSecretConfigured) && inbound && delivered,
   };
 }
+
+/* ---------------- webhook registration (append-only) ---------------- */
+
+/**
+ * Sendblue's webhook API: GET /api/account/webhooks lists them, POST **appends**
+ * one, PUT **replaces every** webhook. We therefore only ever POST, and only for
+ * the hooks that are genuinely missing — existing hooks and the account-level
+ * global secret are never touched.
+ */
+export const WEBHOOKS_ENDPOINT = '/api/account/webhooks';
+
+export type WebhookType = 'receive' | 'outbound';
+
+export interface ProviderWebhook {
+  url: string;
+  type: WebhookType | string;
+  has_secret: boolean;
+  raw: Record<string, unknown>;
+}
+
+/** Compares webhook URLs the way a provider would: case/trailing-slash tolerant. */
+export function canonicalWebhookUrl(url: unknown): string {
+  if (typeof url !== 'string') return '';
+  return url.trim().replace(/\/+$/, '').toLowerCase();
+}
+
+/** Reads the webhook list out of whatever wrapper Sendblue returns. */
+export function parseProviderWebhooks(payload: unknown): ProviderWebhook[] {
+  const container = payload as Record<string, unknown> | unknown[] | null;
+  let rows: unknown[] = [];
+  if (Array.isArray(container)) rows = container;
+  else if (container && typeof container === 'object') {
+    for (const key of ['webhooks', 'data', 'results', 'items', 'hooks']) {
+      const value = (container as Record<string, unknown>)[key];
+      if (Array.isArray(value)) {
+        rows = value;
+        break;
+      }
+    }
+  }
+
+  const out: ProviderWebhook[] = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const obj = row as Record<string, unknown>;
+    const url = pickString(obj, ['url', 'webhook_url', 'endpoint', 'target_url']);
+    if (!url) continue;
+    const type = pickString(obj, ['type', 'event', 'webhook_type', 'kind']) || '';
+    out.push({
+      url,
+      type: type.toLowerCase(),
+      has_secret: Boolean(pickString(obj, ['secret', 'signing_secret', 'webhook_secret'])),
+      raw: obj,
+    });
+  }
+  return out;
+}
+
+export interface WebhookPlanEntry {
+  url: string;
+  type: WebhookType;
+}
+
+export interface WebhookPlan {
+  toAppend: WebhookPlanEntry[];
+  alreadyPresent: WebhookPlanEntry[];
+  /** Hooks belonging to anything else — must survive untouched. */
+  preserved: ProviderWebhook[];
+}
+
+/**
+ * Decides which Reporting hooks still need appending. Any hook we do not own is
+ * listed under `preserved` so callers can prove nothing was removed.
+ */
+export function planWebhookRegistration(
+  existing: ProviderWebhook[],
+  desired: WebhookPlanEntry[],
+): WebhookPlan {
+  const plan: WebhookPlan = { toAppend: [], alreadyPresent: [], preserved: [] };
+  const desiredKeys = new Set<string>();
+
+  for (const want of desired) {
+    const key = `${canonicalWebhookUrl(want.url)}|${want.type}`;
+    if (desiredKeys.has(key)) continue;
+    desiredKeys.add(key);
+    const match = existing.find(
+      (e) => canonicalWebhookUrl(e.url) === canonicalWebhookUrl(want.url) && e.type === want.type,
+    );
+    if (match) plan.alreadyPresent.push(want);
+    else plan.toAppend.push(want);
+  }
+
+  for (const hook of existing) {
+    const key = `${canonicalWebhookUrl(hook.url)}|${hook.type}`;
+    if (!desiredKeys.has(key)) plan.preserved.push(hook);
+  }
+  return plan;
+}
+
+/** Confirms, from a fresh readback, that every desired hook is really there. */
+export function verifyWebhookReadback(
+  after: ProviderWebhook[],
+  desired: WebhookPlanEntry[],
+): { ok: boolean; missing: WebhookPlanEntry[]; registered: WebhookPlanEntry[] } {
+  const missing: WebhookPlanEntry[] = [];
+  const registered: WebhookPlanEntry[] = [];
+  for (const want of desired) {
+    const found = after.some(
+      (e) => canonicalWebhookUrl(e.url) === canonicalWebhookUrl(want.url) && e.type === want.type,
+    );
+    (found ? registered : missing).push(want);
+  }
+  return { ok: missing.length === 0, missing, registered };
+}
+
+export interface WebhookHealthInput {
+  receiveRegisteredAt: string | null;
+  outboundRegisteredAt: string | null;
+  firstInboundAt: string | null;
+  lastDeliveredAt: string | null;
+}
+
+export interface WebhookHealth {
+  receive_hook_registered: boolean;
+  outbound_hook_registered: boolean;
+  /** Registration is a setting; these two are real observed traffic. */
+  inbound_observed: boolean;
+  delivery_observed: boolean;
+  status: 'not_configured' | 'registered_no_traffic' | 'partially_registered' | 'live';
+}
+
+/**
+ * Keeps "the hook is registered with Sendblue" strictly separate from "a real
+ * message actually arrived" — a registered hook is never reported as live.
+ */
+export function webhookHealth(input: WebhookHealthInput): WebhookHealth {
+  const receive = Boolean(input.receiveRegisteredAt);
+  const outbound = Boolean(input.outboundRegisteredAt);
+  const inbound = Boolean(input.firstInboundAt);
+  const delivered = Boolean(input.lastDeliveredAt);
+  let status: WebhookHealth['status'] = 'not_configured';
+  if (receive && outbound) status = inbound || delivered ? 'live' : 'registered_no_traffic';
+  else if (receive || outbound) status = 'partially_registered';
+  return {
+    receive_hook_registered: receive,
+    outbound_hook_registered: outbound,
+    inbound_observed: inbound,
+    delivery_observed: delivered,
+    status,
+  };
+}
