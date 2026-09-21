@@ -374,11 +374,14 @@ serve(async (req) => {
 
     if (action === "process_pending") {
       const limit = Math.min(Number(body.limit ?? 10), 50);
+      // Only rows whose recording was confirmed fetchable get transcribed, so a
+      // missing/expired/too-short recording is never paid for again and again.
       const { data: pending, error } = await sb
         .from("phone_call_records")
         .select("*")
         .in("transcription_status", ["pending", "awaiting_recording", "failed"])
         .not("recording_url", "is", null)
+        .or("recording_status.is.null,recording_status.eq.available")
         .order("started_at", { ascending: false })
         .limit(limit);
       if (error) throw error;
