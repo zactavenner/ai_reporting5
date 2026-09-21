@@ -303,7 +303,19 @@ Deno.serve(async (req) => {
         ok: true,
         agency_credentials_configured: Boolean(ENV_CREDS.keyId && ENV_CREDS.secret),
         webhook_secret_configured: webhookSecretConfigured,
-        accounts: (accounts || []).map(publicAccount),
+        accounts: (accounts || []).map((a: any) => {
+          const own = (lines || []).filter((l: any) => l.account_id === a.id);
+          return {
+            ...publicAccount(a),
+            // Registration is a setting; traffic is observed reality. Kept apart.
+            webhook_health: webhookHealth({
+              receiveRegisteredAt: a.webhook_receive_registered_at || null,
+              outboundRegisteredAt: a.webhook_outbound_registered_at || null,
+              firstInboundAt: own.map((l: any) => l.first_inbound_at).filter(Boolean).sort()[0] || null,
+              lastDeliveredAt: own.map((l: any) => l.last_delivered_at).filter(Boolean).sort().pop() || null,
+            }),
+          };
+        }),
         coverage: {
           accounts_total: (accounts || []).length,
           accounts_verified: (accounts || []).filter((a: any) => a.status === 'connected').length,
