@@ -185,7 +185,24 @@ export interface SenderInfo {
 
 const FALLBACK_FROM_NAME = 'HPA Reporting';
 
+function fromName(): string {
+  return (Deno.env.get('SHADOW_INVITE_FROM_NAME') || FALLBACK_FROM_NAME).trim() || FALLBACK_FROM_NAME;
+}
+
+/**
+ * Preferred organizer mailbox. When ORGANIZER_SMTP_USER/PASSWORD are set the
+ * invite is authenticated and sent from that human mailbox (e.g. Zac's), so the
+ * email and the iCalendar ORGANIZER are the same real person — which is what
+ * makes Gmail treat it as an ordinary calendar invitation.
+ */
 function smtpConfig() {
+  const orgUser = Deno.env.get('ORGANIZER_SMTP_USER');
+  const orgPass = Deno.env.get('ORGANIZER_SMTP_PASSWORD');
+  if (orgUser && orgPass) {
+    const host = Deno.env.get('ORGANIZER_SMTP_HOST') || 'smtp.gmail.com';
+    const port = Number(Deno.env.get('ORGANIZER_SMTP_PORT') || '465');
+    return { host, port, user: orgUser, password: orgPass, from: orgUser };
+  }
   const host = Deno.env.get('SMTP_HOST');
   const user = Deno.env.get('SMTP_USER');
   const password = Deno.env.get('SMTP_PASSWORD');
@@ -283,7 +300,7 @@ function buildMime(args: { from: string; to: string; subject: string; bodyText: 
   // Sending it as a multipart/mixed *attachment* makes Gmail render a plain
   // .ics file attachment and never creates the event — that was the bug.
   return [
-    `From: ${FALLBACK_FROM_NAME} <${args.from}>`,
+    `From: ${fromName()} <${args.from}>`,
     `To: ${args.to}`,
     `Subject: ${args.subject}`,
     'MIME-Version: 1.0',
