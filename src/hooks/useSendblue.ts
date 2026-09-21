@@ -41,6 +41,21 @@ export interface SendblueAccount {
   last_error: string | null;
   notes: string | null;
   api_key_masked: string | null;
+  provider_slug?: string | null;
+  webhook_secret_configured?: boolean;
+  webhook_status?: 'not_configured' | 'partially_registered' | 'registered';
+  webhook_receive_registered_at?: string | null;
+  webhook_outbound_registered_at?: string | null;
+  webhook_last_checked_at?: string | null;
+  webhook_last_error?: string | null;
+  webhook_last_event_at?: string | null;
+  webhook_health?: {
+    receive_hook_registered: boolean;
+    outbound_hook_registered: boolean;
+    inbound_observed: boolean;
+    delivery_observed: boolean;
+    status: 'not_configured' | 'registered_no_traffic' | 'partially_registered' | 'live';
+  };
   created_at: string;
 }
 
