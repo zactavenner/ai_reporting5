@@ -89,6 +89,7 @@ const StaticCreativesInline = lazy(() => import('@/pages/StaticCreativesPage'));
 const AvatarAdGenInline = lazy(() => Promise.resolve({ default: () => <AvatarAdProvider><AvatarAdWizard /></AvatarAdProvider> }));
 import { TopPerformersSection } from '@/components/creative/TopPerformersSection';
 import { CreativeLibraryTab } from '@/components/creative/CreativeLibraryTab';
+const SendblueTab = lazy(() => import('@/components/sendblue/SendblueTab').then(m => ({ default: m.SendblueTab })));
 import { TopPerformerUploadsSection } from '@/components/creative/TopPerformerUploadsSection';
 
 const Index = () => {
