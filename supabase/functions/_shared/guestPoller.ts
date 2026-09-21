@@ -314,7 +314,7 @@ async function runShadowInvite(args: {
   const bot = String(botGuestEmail).toLowerCase();
   const sendingMailbox = String(sender.from_email).trim().toLowerCase();
   const configuredOrganizer =
-    (Deno.env.get('SHADOW_INVITE_ORGANIZER') || 'zac@zactavenner.com').trim().toLowerCase();
+    (Deno.env.get('SHADOW_INVITE_ORGANIZER') || 'zac@highperformanceads.com').trim().toLowerCase();
   // Best case: the mailbox we authenticate as IS the human organizer, so the
   // email From and the iCalendar ORGANIZER match and Gmail accepts it as a
   // normal invitation. Otherwise fall back to the configured organizer identity.
