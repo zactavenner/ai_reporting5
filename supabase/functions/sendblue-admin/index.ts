@@ -118,6 +118,15 @@ function publicAccount(row: any) {
     last_error: row.last_error,
     notes: row.notes,
     api_key_masked: maskSecret(row.api_key_id),
+    provider_slug: row.provider_slug || null,
+    // Never the secret itself — only whether one exists.
+    webhook_secret_configured: Boolean(row.webhook_secret),
+    webhook_status: row.webhook_status || 'not_configured',
+    webhook_receive_registered_at: row.webhook_receive_registered_at || null,
+    webhook_outbound_registered_at: row.webhook_outbound_registered_at || null,
+    webhook_last_checked_at: row.webhook_last_checked_at || null,
+    webhook_last_error: row.webhook_last_error || null,
+    webhook_last_event_at: row.webhook_last_event_at || null,
     created_at: row.created_at,
   };
 }
