@@ -26,6 +26,14 @@ import {
   normalizeE164,
   sendblueHeaders,
 } from '../_shared/sendblue.ts';
+import {
+  VERIFY_ENDPOINTS,
+  classifyProbe,
+  connectionSignals,
+  extractProviderLines,
+  isLineEndpoint,
+  planLineImport,
+} from '../_shared/sendblueAccounts.ts';
 import { runMirrors } from '../_shared/sendblueMirror.ts';
 
 const corsHeaders = {
