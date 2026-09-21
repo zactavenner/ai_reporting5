@@ -5110,6 +5110,83 @@ export type Database = {
           },
         ]
       }
+      call_recording_capture_state: {
+        Row: {
+          client_id: string
+          consent_confirmed_at: string | null
+          consent_confirmed_by: string | null
+          created_at: string
+          enabled: boolean
+          last_conversation_id: string | null
+          last_cursor_at: string | null
+          last_error: string | null
+          last_run_at: string | null
+          last_run_stats: Json
+          lease_expires_at: string | null
+          lease_owner: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          consent_confirmed_at?: string | null
+          consent_confirmed_by?: string | null
+          created_at?: string
+          enabled?: boolean
+          last_conversation_id?: string | null
+          last_cursor_at?: string | null
+          last_error?: string | null
+          last_run_at?: string | null
+          last_run_stats?: Json
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          consent_confirmed_at?: string | null
+          consent_confirmed_by?: string | null
+          created_at?: string
+          enabled?: boolean
+          last_conversation_id?: string | null
+          last_cursor_at?: string | null
+          last_error?: string | null
+          last_run_at?: string | null
+          last_run_stats?: Json
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_recording_capture_state_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "call_recording_capture_state_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_recording_capture_state_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "call_recording_capture_state_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       calls: {
         Row: {
           appointment_status: string | null
@@ -19968,6 +20045,9 @@ export type Database = {
           provider: string | null
           qualified: boolean | null
           raw_payload: Json | null
+          recording_attempts: number
+          recording_checked_at: string | null
+          recording_status: string | null
           recording_url: string | null
           sentiment: string | null
           speaker_segments: Json | null
@@ -20023,6 +20103,9 @@ export type Database = {
           provider?: string | null
           qualified?: boolean | null
           raw_payload?: Json | null
+          recording_attempts?: number
+          recording_checked_at?: string | null
+          recording_status?: string | null
           recording_url?: string | null
           sentiment?: string | null
           speaker_segments?: Json | null
@@ -20078,6 +20161,9 @@ export type Database = {
           provider?: string | null
           qualified?: boolean | null
           raw_payload?: Json | null
+          recording_attempts?: number
+          recording_checked_at?: string | null
+          recording_status?: string | null
           recording_url?: string | null
           sentiment?: string | null
           speaker_segments?: Json | null
@@ -23725,6 +23811,53 @@ export type Database = {
           status_code: number | null
         }
         Relationships: []
+      }
+      v_client_call_recording_coverage: {
+        Row: {
+          calls: number | null
+          client_id: string | null
+          day: string | null
+          no_recording_in_crm: number | null
+          recording_available: number | null
+          recording_expired: number | null
+          recording_unreachable: number | null
+          scored: number | null
+          too_short: number | null
+          transcribed: number | null
+          transcription_failed: number | null
+          transcription_queued: number | null
+          with_recording: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phone_call_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "phone_call_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phone_call_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "phone_call_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+        ]
       }
       v_client_enrichment_coverage: {
         Row: {
