@@ -782,6 +782,19 @@ const Index = () => {
               </SectionErrorBoundary>
             )}
 
+            {/* Sendblue */}
+            {activeTab === 'sendblue' && (
+              <SectionErrorBoundary sectionName="Sendblue">
+                <div className="mb-4">
+                  <h2 className="text-lg font-bold">Sendblue</h2>
+                  <p className="text-sm text-muted-foreground">Texting numbers, conversations and CRM notes.</p>
+                </div>
+                <Suspense fallback={<div className="animate-pulse h-64 bg-muted/30 rounded-lg" />}>
+                  <SendblueTab clients={clients} />
+                </Suspense>
+              </SectionErrorBoundary>
+            )}
+
 
             {/* Top Performers */}
             {activeTab === 'top-performers' && (

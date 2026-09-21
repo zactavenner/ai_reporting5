@@ -667,6 +667,14 @@ export default function ClientDetail() {
 
 
 
+          {/* ─── SENDBLUE TAB ─── */}
+          <TabsContent value="sendblue" className="space-y-6">
+            <SectionErrorBoundary sectionName="Sendblue">
+              <h2 className="text-lg font-bold mb-3">Sendblue</h2>
+              <SendblueTab clientId={clientId!} clients={client ? [{ id: client.id, name: client.name }] : []} />
+            </SectionErrorBoundary>
+          </TabsContent>
+
           {/* ─── ACTIVITY TAB ─── */}
           <TabsContent value="activity" className="space-y-6">
             <SectionErrorBoundary sectionName="Activity">
