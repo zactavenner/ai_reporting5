@@ -256,6 +256,14 @@ export function SendblueAccounts({ accounts, lines, coverage, webhookConfigured,
                       </Badge>
                     </div>
                     {account.last_error && <p className="text-destructive">{account.last_error}</p>}
+                    {account.webhook_last_error && (
+                      <p className="text-destructive">Webhooks: {account.webhook_last_error}</p>
+                    )}
+                    {account.webhook_health?.status === 'registered_no_traffic' && (
+                      <p className="text-muted-foreground">
+                        Webhooks are registered with Sendblue, but no real message has come through yet.
+                      </p>
+                    )}
                     <p className="text-muted-foreground">
                       Last checked: {account.last_checked_at ? new Date(account.last_checked_at).toLocaleString() : 'never'}
                     </p>
