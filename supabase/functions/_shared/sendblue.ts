@@ -15,7 +15,9 @@
  * also lists api.sendblue.co; SENDBLUE_API_BASE can override this if an account
  * is served from that host.
  */
-export const SENDBLUE_BASE = (Deno.env.get('SENDBLUE_API_BASE') || 'https://api.sendblue.com').replace(/\/+$/, '');
+const envBase =
+  typeof Deno !== 'undefined' && Deno?.env ? Deno.env.get('SENDBLUE_API_BASE') : undefined;
+export const SENDBLUE_BASE = (envBase || 'https://api.sendblue.com').replace(/\/+$/, '');
 
 export interface SendblueCredentials {
   keyId: string;
