@@ -57,6 +57,6 @@ describe('shadow invite matching keys', () => {
 
   it('bumps the presentation version so existing invites get exactly one update', () => {
     expect(CALENDAR_PRESENTATION_VERSION).toBe('v4-organizer-mailbox');
-    expect(scheduleSignature(base.start, base.end, base.meetingUrl)).toContain('v3-matching');
+    expect(scheduleSignature(base.start, base.end, base.meetingUrl)).toContain('v4-organizer-mailbox');
   });
 });
