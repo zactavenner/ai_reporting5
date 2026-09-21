@@ -225,18 +225,33 @@ Deno.serve(async (req) => {
         recent = recentRes.data || [];
       }
 
+      let accountQuery = admin.from('sendblue_accounts').select('*').order('created_at', { ascending: true });
+      if (body.client_id) accountQuery = accountQuery.eq('client_id', body.client_id);
+      const { data: accounts } = await accountQuery;
+      const webhookSecretConfigured = Boolean(Deno.env.get('SENDBLUE_WEBHOOK_SECRET'));
+
       const health = (lines || []).map((line: any) => {
         const mine = recent.filter((m) => m.line_id === line.id);
         const lastInbound = mine.find((m) => m.direction === 'inbound');
         const lastOutbound = mine.find((m) => m.direction === 'outbound');
+        const delivered = mine.find((m) => m.direction === 'outbound' && (m.status === 'delivered' || m.status === 'sent'));
+        const account = (accounts || []).find((a: any) => a.id === line.account_id);
+        const signals = connectionSignals({
+          credentialsVerifiedAt: line.status === 'connected' ? line.last_tested_at || account?.verified_at || null : null,
+          webhookSecretConfigured,
+          firstInboundAt: line.first_inbound_at || lastInbound?.created_at || null,
+          lastDeliveredAt: line.last_delivered_at || delivered?.created_at || null,
+        });
         return {
           line_id: line.id,
           client_id: line.client_id,
+          account_id: line.account_id || null,
           credentials_ok: line.status === 'connected',
-          webhook_receiving: Boolean(lastInbound),
-          last_inbound_at: lastInbound?.created_at || null,
+          webhook_receiving: signals.first_inbound_received,
+          last_inbound_at: signals.first_inbound_at,
           last_outbound_at: lastOutbound?.created_at || null,
           message_count: mine.length,
+          signals,
         };
       });
 
