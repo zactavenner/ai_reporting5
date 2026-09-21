@@ -338,6 +338,20 @@ export function useVerifySendblueAccount() {
   );
 }
 
+/**
+ * Registers only the Reporting hooks that are missing on the account. Existing
+ * hooks (and the account's global secret) are never replaced.
+ */
+export function useConfigureSendblueWebhooks() {
+  return useAdminMutation<{ account_id: string }>(
+    (vars) => ({ action: 'configure_webhooks', ...vars }),
+    (res) =>
+      res?.ok
+        ? `Reporting webhooks registered${res?.preserved_other_hooks ? ` — ${res.preserved_other_hooks} existing webhook(s) left untouched` : ''}`
+        : `Not registered: ${res?.detail || 'Sendblue did not confirm the webhooks'}`,
+  );
+}
+
 export function useDiscoverSendblueLines() {
   const qc = useQueryClient();
   return useMutation({
