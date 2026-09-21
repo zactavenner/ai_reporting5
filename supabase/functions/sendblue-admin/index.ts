@@ -779,8 +779,10 @@ Deno.serve(async (req) => {
         headers: sendblueHeaders({ keyId: creds.keyId, secret: creds.secret }),
       });
       const listText = await listRes.text();
-      if (!listRes.ok) {
-        const outcome = classifyProbe(listRes.status, listText);
+      // A 2xx with a body-level ERROR is still a failure — classifyProbe decides.
+      const listOutcome = classifyProbe(listRes.status, listText);
+      if (!listOutcome.ok) {
+        const outcome = listOutcome;
         await admin
           .from('sendblue_accounts')
           .update({ webhook_last_checked_at: new Date().toISOString(), webhook_last_error: outcome.detail })

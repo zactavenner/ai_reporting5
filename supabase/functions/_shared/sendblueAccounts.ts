@@ -150,6 +150,14 @@ export function extractProviderLines(payload: unknown): DiscoveredLine[] {
   const seen = new Set<string>();
   const out: DiscoveredLine[] = [];
   for (const row of rows) {
+    // GET /api/lines is documented as returning plain E.164 strings.
+    if (typeof row === 'string') {
+      const phone = normalizeE164(row);
+      if (!phone || seen.has(phone)) continue;
+      seen.add(phone);
+      out.push({ phone_e164: phone, label: null, provider_line_id: null, raw: { number: row } });
+      continue;
+    }
     if (!row || typeof row !== 'object') continue;
     const obj = row as Record<string, unknown>;
     const phone = normalizeE164(
