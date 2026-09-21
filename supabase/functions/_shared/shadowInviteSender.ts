@@ -300,7 +300,7 @@ function buildMime(args: { from: string; to: string; subject: string; bodyText: 
   // Sending it as a multipart/mixed *attachment* makes Gmail render a plain
   // .ics file attachment and never creates the event — that was the bug.
   return [
-    `From: ${FALLBACK_FROM_NAME} <${args.from}>`,
+    `From: ${fromName()} <${args.from}>`,
     `To: ${args.to}`,
     `Subject: ${args.subject}`,
     'MIME-Version: 1.0',
