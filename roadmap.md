@@ -50,3 +50,11 @@ Plan: `.lovable/plan/week-4-ai-marketing-inside-reporting-5-0-2026-09-21.md`
 - [ ] Per-client cost and media caps; labor/vendor costs for margin.
 - [x] Runner→artifact map: account_manager 0 completed / 7,879 failed, copywriter / video_ads / static_ads 0 completed — all pointed at an AI model name the provider rejects (400 invalid model id, 1,292 failures in 7 days). Corrected to the working model in the agent records and in the app/backends; `ai-studio` and `test-agent` redeployed. media_buyer / reporting / sales_agent / jeremy_ai do produce completed runs.
 - [ ] Remaining 963 provider "user not found" (401) failures in the last 7 days — needs the AI provider account/key checked by the owner; no key was touched.
+
+## Call recording capture (built, off by default)
+- [x] `_shared/ghlCallRecordings.ts` pure rules + 14 tests (call detection, reason codes, duration floor, bounded retries, cursors, run budget).
+- [x] `ghl-call-recordings` function: read-only `audit`, bounded `capture` (per-client lease, cursor, budget), single-call `webhook`, per-client `state` (enable + consent).
+- [x] Migration: `call_recording_capture_state` (backend-only), `phone_call_records.recording_status/checked_at/attempts`, `v_client_call_recording_coverage`.
+- [x] `call-transcription` pending queue now only takes rows with a confirmed-fetchable recording.
+- [x] Read-only audit proves recordings exist: AMT 2/8, Atlas Parker 4/8, Clear Summit 2/7, Clever Capital 2/3 available; most gaps are calls under 30s.
+- [ ] Owner decisions before capture is enabled for any client: pilot client, recording consent confirmation, retention, backfill window (default 30 days).
