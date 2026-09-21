@@ -19,12 +19,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { CheckCircle2, Loader2, Plus, RefreshCw, Search, ShieldCheck, XCircle } from 'lucide-react';
+import { CheckCircle2, Loader2, Plus, RefreshCw, Search, ShieldCheck, Webhook, XCircle } from 'lucide-react';
 import {
   SendblueAccount,
   SendblueCoverage,
   SendblueDiscoveredLine,
   SendblueLine,
+  useConfigureSendblueWebhooks,
   useDiscoverSendblueLines,
   useImportSendblueLines,
   useSaveSendblueAccount,
@@ -59,6 +60,7 @@ export function SendblueAccounts({ accounts, lines, coverage, webhookConfigured,
   const save = useSaveSendblueAccount();
   const update = useUpdateSendblueAccount();
   const verify = useVerifySendblueAccount();
+  const configureWebhooks = useConfigureSendblueWebhooks();
   const discover = useDiscoverSendblueLines();
   const importLines = useImportSendblueLines();
 
