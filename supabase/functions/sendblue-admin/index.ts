@@ -33,6 +33,12 @@ import {
   extractProviderLines,
   isLineEndpoint,
   planLineImport,
+  WEBHOOKS_ENDPOINT,
+  WebhookPlanEntry,
+  parseProviderWebhooks,
+  planWebhookRegistration,
+  verifyWebhookReadback,
+  webhookHealth,
 } from '../_shared/sendblueAccounts.ts';
 import { runMirrors } from '../_shared/sendblueMirror.ts';
 
@@ -112,6 +118,15 @@ function publicAccount(row: any) {
     last_error: row.last_error,
     notes: row.notes,
     api_key_masked: maskSecret(row.api_key_id),
+    provider_slug: row.provider_slug || null,
+    // Never the secret itself — only whether one exists.
+    webhook_secret_configured: Boolean(row.webhook_secret),
+    webhook_status: row.webhook_status || 'not_configured',
+    webhook_receive_registered_at: row.webhook_receive_registered_at || null,
+    webhook_outbound_registered_at: row.webhook_outbound_registered_at || null,
+    webhook_last_checked_at: row.webhook_last_checked_at || null,
+    webhook_last_error: row.webhook_last_error || null,
+    webhook_last_event_at: row.webhook_last_event_at || null,
     created_at: row.created_at,
   };
 }
@@ -176,6 +191,20 @@ async function discoverLines(keyId: string, secret: string) {
     }
   }
   return { ok: true, supported: false, verification, lines: [] as ReturnType<typeof extractProviderLines> };
+}
+
+function safeJson(text: string): unknown {
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The public receiver Sendblue should call. Same URL for both hook types. */
+function reportingWebhookUrl(): string {
+  const base = (Deno.env.get('SUPABASE_URL') || '').replace(/\/+$/, '');
+  return `${base}/functions/v1/sendblue-webhook`;
 }
 
 async function accountCredentials(accountId: string | null | undefined) {
@@ -274,7 +303,19 @@ Deno.serve(async (req) => {
         ok: true,
         agency_credentials_configured: Boolean(ENV_CREDS.keyId && ENV_CREDS.secret),
         webhook_secret_configured: webhookSecretConfigured,
-        accounts: (accounts || []).map(publicAccount),
+        accounts: (accounts || []).map((a: any) => {
+          const own = (lines || []).filter((l: any) => l.account_id === a.id);
+          return {
+            ...publicAccount(a),
+            // Registration is a setting; traffic is observed reality. Kept apart.
+            webhook_health: webhookHealth({
+              receiveRegisteredAt: a.webhook_receive_registered_at || null,
+              outboundRegisteredAt: a.webhook_outbound_registered_at || null,
+              firstInboundAt: own.map((l: any) => l.first_inbound_at).filter(Boolean).sort()[0] || null,
+              lastDeliveredAt: own.map((l: any) => l.last_delivered_at).filter(Boolean).sort().pop() || null,
+            }),
+          };
+        }),
         coverage: {
           accounts_total: (accounts || []).length,
           accounts_verified: (accounts || []).filter((a: any) => a.status === 'connected').length,
@@ -704,6 +745,134 @@ Deno.serve(async (req) => {
         skipped_already_imported: plan.alreadyImported,
         skipped_unknown: plan.invalid,
         lines: inserted,
+      });
+    }
+
+    /* ---------------- webhook registration (append-only) ---------------- */
+
+    if (action === 'configure_webhooks') {
+      const id = String(body.account_id || '');
+      const creds = await accountCredentials(id);
+      if (!creds) return json({ error: 'Account not found or has no credentials saved' }, 404);
+
+      const { data: account } = await admin
+        .from('sendblue_accounts')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (!account) return json({ error: 'Account not found' }, 404);
+
+      const receiverUrl = reportingWebhookUrl();
+      const desired: WebhookPlanEntry[] = [
+        { url: receiverUrl, type: 'receive' },
+        { url: receiverUrl, type: 'outbound' },
+      ];
+
+      // 1. Read what is already registered. Never guess — a failed read stops here.
+      const listRes = await fetch(`${SENDBLUE_BASE}${WEBHOOKS_ENDPOINT}`, {
+        headers: sendblueHeaders({ keyId: creds.keyId, secret: creds.secret }),
+      });
+      const listText = await listRes.text();
+      if (!listRes.ok) {
+        const outcome = classifyProbe(listRes.status, listText);
+        await admin
+          .from('sendblue_accounts')
+          .update({ webhook_last_checked_at: new Date().toISOString(), webhook_last_error: outcome.detail })
+          .eq('id', id);
+        return json({ ok: false, detail: outcome.detail }, 200);
+      }
+      let existing = parseProviderWebhooks(safeJson(listText));
+      const plan = planWebhookRegistration(existing, desired);
+
+      // 2. Per-account signing secret, created once and kept server-side only.
+      const webhookSecret: string = account.webhook_secret || crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+      if (!account.webhook_secret) {
+        await admin.from('sendblue_accounts').update({ webhook_secret: webhookSecret }).eq('id', id);
+      }
+
+      // 3. Append ONLY the missing hooks. POST appends; PUT would replace every
+      //    hook on the account, so it is never used here.
+      const appendErrors: string[] = [];
+      for (const hook of plan.toAppend) {
+        const res = await fetch(`${SENDBLUE_BASE}${WEBHOOKS_ENDPOINT}`, {
+          method: 'POST',
+          headers: sendblueHeaders({ keyId: creds.keyId, secret: creds.secret }),
+          body: JSON.stringify({ url: hook.url, secret: webhookSecret, type: hook.type }),
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          appendErrors.push(`${hook.type}: ${classifyProbe(res.status, text).detail}`);
+        } else {
+          await res.text();
+        }
+      }
+
+      // 4. Prove it by reading the list back.
+      const readbackRes = await fetch(`${SENDBLUE_BASE}${WEBHOOKS_ENDPOINT}`, {
+        headers: sendblueHeaders({ keyId: creds.keyId, secret: creds.secret }),
+      });
+      const readbackText = await readbackRes.text();
+      const after = readbackRes.ok ? parseProviderWebhooks(safeJson(readbackText)) : existing;
+      const check = verifyWebhookReadback(after, desired);
+      const now = new Date().toISOString();
+
+      const receiveOk = check.registered.some((r) => r.type === 'receive');
+      const outboundOk = check.registered.some((r) => r.type === 'outbound');
+      const detail = check.ok
+        ? null
+        : appendErrors.length
+          ? appendErrors.join(' · ')
+          : `Sendblue still does not list: ${check.missing.map((m) => m.type).join(', ')}`;
+
+      const { data: updated } = await admin
+        .from('sendblue_accounts')
+        .update({
+          webhook_receive_registered_at: receiveOk ? account.webhook_receive_registered_at || now : null,
+          webhook_outbound_registered_at: outboundOk ? account.webhook_outbound_registered_at || now : null,
+          webhook_registered_urls: after.map((h) => ({ url: h.url, type: h.type })),
+          webhook_status: check.ok ? 'registered' : receiveOk || outboundOk ? 'partially_registered' : 'not_configured',
+          webhook_last_checked_at: now,
+          webhook_last_error: detail,
+        })
+        .eq('id', id)
+        .select('*')
+        .single();
+
+      return json({
+        ok: check.ok,
+        detail,
+        checked_at: now,
+        receiver_url: receiverUrl,
+        appended: plan.toAppend.filter((h) => check.registered.some((r) => r.type === h.type)).map((h) => h.type),
+        already_present: plan.alreadyPresent.map((h) => h.type),
+        preserved_other_hooks: plan.preserved.length,
+        registered: check.registered.map((h) => h.type),
+        missing: check.missing.map((h) => h.type),
+        account: updated ? publicAccount(updated) : null,
+      });
+    }
+
+    if (action === 'webhook_status') {
+      const id = String(body.account_id || '');
+      const creds = await accountCredentials(id);
+      if (!creds) return json({ error: 'Account not found or has no credentials saved' }, 404);
+      const res = await fetch(`${SENDBLUE_BASE}${WEBHOOKS_ENDPOINT}`, {
+        headers: sendblueHeaders({ keyId: creds.keyId, secret: creds.secret }),
+      });
+      const text = await res.text();
+      if (!res.ok) return json({ ok: false, detail: classifyProbe(res.status, text).detail }, 200);
+      const hooks = parseProviderWebhooks(safeJson(text));
+      const receiverUrl = reportingWebhookUrl();
+      const check = verifyWebhookReadback(hooks, [
+        { url: receiverUrl, type: 'receive' },
+        { url: receiverUrl, type: 'outbound' },
+      ]);
+      return json({
+        ok: check.ok,
+        receiver_url: receiverUrl,
+        registered: check.registered.map((h) => h.type),
+        missing: check.missing.map((h) => h.type),
+        total_hooks_on_account: hooks.length,
       });
     }
 

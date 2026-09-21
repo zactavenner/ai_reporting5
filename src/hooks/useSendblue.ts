@@ -41,6 +41,21 @@ export interface SendblueAccount {
   last_error: string | null;
   notes: string | null;
   api_key_masked: string | null;
+  provider_slug?: string | null;
+  webhook_secret_configured?: boolean;
+  webhook_status?: 'not_configured' | 'partially_registered' | 'registered';
+  webhook_receive_registered_at?: string | null;
+  webhook_outbound_registered_at?: string | null;
+  webhook_last_checked_at?: string | null;
+  webhook_last_error?: string | null;
+  webhook_last_event_at?: string | null;
+  webhook_health?: {
+    receive_hook_registered: boolean;
+    outbound_hook_registered: boolean;
+    inbound_observed: boolean;
+    delivery_observed: boolean;
+    status: 'not_configured' | 'registered_no_traffic' | 'partially_registered' | 'live';
+  };
   created_at: string;
 }
 
@@ -320,6 +335,20 @@ export function useVerifySendblueAccount() {
       res?.ok
         ? `Credentials verified ${res?.verified_at ? new Date(res.verified_at).toLocaleString() : ''}`
         : `Not verified: ${res?.detail || 'Sendblue did not accept these keys'}`,
+  );
+}
+
+/**
+ * Registers only the Reporting hooks that are missing on the account. Existing
+ * hooks (and the account's global secret) are never replaced.
+ */
+export function useConfigureSendblueWebhooks() {
+  return useAdminMutation<{ account_id: string }>(
+    (vars) => ({ action: 'configure_webhooks', ...vars }),
+    (res) =>
+      res?.ok
+        ? `Reporting webhooks registered${res?.preserved_other_hooks ? ` — ${res.preserved_other_hooks} existing webhook(s) left untouched` : ''}`
+        : `Not registered: ${res?.detail || 'Sendblue did not confirm the webhooks'}`,
   );
 }
 

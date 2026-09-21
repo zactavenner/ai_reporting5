@@ -21020,10 +21020,19 @@ export type Database = {
           last_checked_at: string | null
           last_error: string | null
           notes: string | null
+          provider_slug: string | null
           status: string
           updated_at: string
           verified_at: string | null
           verify_endpoint: string | null
+          webhook_last_checked_at: string | null
+          webhook_last_error: string | null
+          webhook_last_event_at: string | null
+          webhook_outbound_registered_at: string | null
+          webhook_receive_registered_at: string | null
+          webhook_registered_urls: Json
+          webhook_secret: string | null
+          webhook_status: string
         }
         Insert: {
           active?: boolean
@@ -21036,10 +21045,19 @@ export type Database = {
           last_checked_at?: string | null
           last_error?: string | null
           notes?: string | null
+          provider_slug?: string | null
           status?: string
           updated_at?: string
           verified_at?: string | null
           verify_endpoint?: string | null
+          webhook_last_checked_at?: string | null
+          webhook_last_error?: string | null
+          webhook_last_event_at?: string | null
+          webhook_outbound_registered_at?: string | null
+          webhook_receive_registered_at?: string | null
+          webhook_registered_urls?: Json
+          webhook_secret?: string | null
+          webhook_status?: string
         }
         Update: {
           active?: boolean
@@ -21052,10 +21070,19 @@ export type Database = {
           last_checked_at?: string | null
           last_error?: string | null
           notes?: string | null
+          provider_slug?: string | null
           status?: string
           updated_at?: string
           verified_at?: string | null
           verify_endpoint?: string | null
+          webhook_last_checked_at?: string | null
+          webhook_last_error?: string | null
+          webhook_last_event_at?: string | null
+          webhook_outbound_registered_at?: string | null
+          webhook_receive_registered_at?: string | null
+          webhook_registered_urls?: Json
+          webhook_secret?: string | null
+          webhook_status?: string
         }
         Relationships: [
           {

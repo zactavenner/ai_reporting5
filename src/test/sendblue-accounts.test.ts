@@ -6,6 +6,10 @@ import {
   extractProviderLines,
   isLineEndpoint,
   planLineImport,
+  planWebhookRegistration,
+  parseProviderWebhooks,
+  verifyWebhookReadback,
+  webhookHealth,
 } from '../../supabase/functions/_shared/sendblueAccounts.ts';
 
 describe('credential verification is truthful', () => {
@@ -107,5 +111,87 @@ describe('connection proofs stay separate', () => {
     });
     expect(s.fully_proven).toBe(true);
     expect(s.credentials_verified_at).toBe('2026-09-21T10:00:00.000Z');
+  });
+});
+
+describe('webhook registration is append-only', () => {
+  const RECEIVE = { url: 'https://api.example.com/functions/v1/sendblue-webhook', type: 'receive' as const };
+  const OUTBOUND = { url: 'https://api.example.com/functions/v1/sendblue-webhook', type: 'outbound' as const };
+
+  it('reads the provider list out of a wrapper and a bare array alike', () => {
+    const wrapped = parseProviderWebhooks({
+      webhooks: [
+        { url: 'https://client.example.com/hook', type: 'receive', secret: 'abc' },
+        { url: 'https://client.example.com/out', type: 'OUTBOUND' },
+        { type: 'receive' },
+      ],
+    });
+    expect(wrapped).toHaveLength(2);
+    expect(wrapped[0].has_secret).toBe(true);
+    expect(wrapped[1].type).toBe('outbound');
+    expect(parseProviderWebhooks([{ webhook_url: 'https://a.test/x', event: 'receive' }])).toHaveLength(1);
+  });
+
+  it('only appends the hooks that are missing and never rewrites the others', () => {
+    const existing = parseProviderWebhooks({
+      webhooks: [
+        { url: 'https://client-crm.example.com/inbound', type: 'receive', secret: 'theirs' },
+        { url: 'https://api.example.com/functions/v1/sendblue-webhook/', type: 'receive' },
+      ],
+    });
+    const plan = planWebhookRegistration(existing, [RECEIVE, OUTBOUND]);
+    expect(plan.alreadyPresent.map((p) => p.type)).toEqual(['receive']);
+    expect(plan.toAppend.map((p) => p.type)).toEqual(['outbound']);
+    expect(plan.preserved.map((p) => p.url)).toEqual(['https://client-crm.example.com/inbound']);
+  });
+
+  it('appends both hooks on a fresh account and duplicates nothing when asked twice', () => {
+    const fresh = planWebhookRegistration([], [RECEIVE, OUTBOUND, RECEIVE]);
+    expect(fresh.toAppend).toHaveLength(2);
+    expect(fresh.preserved).toHaveLength(0);
+  });
+
+  it('verifies registration only from a readback', () => {
+    const after = parseProviderWebhooks({ webhooks: [{ url: RECEIVE.url, type: 'receive' }] });
+    const check = verifyWebhookReadback(after, [RECEIVE, OUTBOUND]);
+    expect(check.ok).toBe(false);
+    expect(check.missing.map((m) => m.type)).toEqual(['outbound']);
+    expect(check.registered.map((m) => m.type)).toEqual(['receive']);
+
+    const complete = verifyWebhookReadback(
+      parseProviderWebhooks({ webhooks: [{ url: RECEIVE.url, type: 'receive' }, { url: RECEIVE.url, type: 'outbound' }] }),
+      [RECEIVE, OUTBOUND],
+    );
+    expect(complete.ok).toBe(true);
+  });
+
+  it('never reports a registered hook as live traffic', () => {
+    expect(webhookHealth({ receiveRegisteredAt: null, outboundRegisteredAt: null, firstInboundAt: null, lastDeliveredAt: null }).status)
+      .toBe('not_configured');
+    const registered = webhookHealth({
+      receiveRegisteredAt: '2026-09-21T10:00:00.000Z',
+      outboundRegisteredAt: '2026-09-21T10:00:00.000Z',
+      firstInboundAt: null,
+      lastDeliveredAt: null,
+    });
+    expect(registered.status).toBe('registered_no_traffic');
+    expect(registered.inbound_observed).toBe(false);
+    expect(registered.delivery_observed).toBe(false);
+    expect(
+      webhookHealth({
+        receiveRegisteredAt: '2026-09-21T10:00:00.000Z',
+        outboundRegisteredAt: null,
+        firstInboundAt: null,
+        lastDeliveredAt: null,
+      }).status,
+    ).toBe('partially_registered');
+    expect(
+      webhookHealth({
+        receiveRegisteredAt: '2026-09-21T10:00:00.000Z',
+        outboundRegisteredAt: '2026-09-21T10:00:00.000Z',
+        firstInboundAt: '2026-09-21T11:00:00.000Z',
+        lastDeliveredAt: null,
+      }).status,
+    ).toBe('live');
   });
 });

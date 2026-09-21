@@ -19,12 +19,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { CheckCircle2, Loader2, Plus, RefreshCw, Search, ShieldCheck, XCircle } from 'lucide-react';
+import { CheckCircle2, Loader2, Plus, RefreshCw, Search, ShieldCheck, Webhook, XCircle } from 'lucide-react';
 import {
   SendblueAccount,
   SendblueCoverage,
   SendblueDiscoveredLine,
   SendblueLine,
+  useConfigureSendblueWebhooks,
   useDiscoverSendblueLines,
   useImportSendblueLines,
   useSaveSendblueAccount,
@@ -59,6 +60,7 @@ export function SendblueAccounts({ accounts, lines, coverage, webhookConfigured,
   const save = useSaveSendblueAccount();
   const update = useUpdateSendblueAccount();
   const verify = useVerifySendblueAccount();
+  const configureWebhooks = useConfigureSendblueWebhooks();
   const discover = useDiscoverSendblueLines();
   const importLines = useImportSendblueLines();
 
@@ -236,8 +238,15 @@ export function SendblueAccounts({ accounts, lines, coverage, webhookConfigured,
                           ? `Credentials verified ${account.verified_at ? new Date(account.verified_at).toLocaleString() : ''}`
                           : 'Credentials not verified'}
                       </Badge>
-                      <Badge variant={webhookConfigured ? 'secondary' : 'outline'}>
-                        {webhookConfigured ? 'Webhook secret configured' : 'Webhook not configured'}
+                      <Badge variant={account.webhook_health?.receive_hook_registered ? 'secondary' : 'outline'}>
+                        {account.webhook_health?.receive_hook_registered
+                          ? 'Incoming webhook registered with Sendblue'
+                          : 'Incoming webhook not registered'}
+                      </Badge>
+                      <Badge variant={account.webhook_health?.outbound_hook_registered ? 'secondary' : 'outline'}>
+                        {account.webhook_health?.outbound_hook_registered
+                          ? 'Delivery webhook registered with Sendblue'
+                          : 'Delivery webhook not registered'}
                       </Badge>
                       <Badge variant={accountLines.some((l) => l.first_inbound_at) ? 'secondary' : 'outline'}>
                         {accountLines.some((l) => l.first_inbound_at) ? 'Incoming message received' : 'No incoming message yet'}
@@ -247,6 +256,14 @@ export function SendblueAccounts({ accounts, lines, coverage, webhookConfigured,
                       </Badge>
                     </div>
                     {account.last_error && <p className="text-destructive">{account.last_error}</p>}
+                    {account.webhook_last_error && (
+                      <p className="text-destructive">Webhooks: {account.webhook_last_error}</p>
+                    )}
+                    {account.webhook_health?.status === 'registered_no_traffic' && (
+                      <p className="text-muted-foreground">
+                        Webhooks are registered with Sendblue, but no real message has come through yet.
+                      </p>
+                    )}
                     <p className="text-muted-foreground">
                       Last checked: {account.last_checked_at ? new Date(account.last_checked_at).toLocaleString() : 'never'}
                     </p>
@@ -260,6 +277,24 @@ export function SendblueAccounts({ accounts, lines, coverage, webhookConfigured,
                       >
                         {verify.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
                         Test connection
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => configureWebhooks.mutate({ account_id: account.id })}
+                        disabled={configureWebhooks.isPending || account.status !== 'connected'}
+                        title={
+                          account.status === 'connected'
+                            ? 'Adds only the missing Reporting webhooks — existing ones stay as they are'
+                            : 'Verify the credentials first'
+                        }
+                      >
+                        {configureWebhooks.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Webhook className="mr-2 h-4 w-4" />
+                        )}
+                        Configure Reporting webhooks
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => runDiscover(account.id)} disabled={discover.isPending}>
                         {discover.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
