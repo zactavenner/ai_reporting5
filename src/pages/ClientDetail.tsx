@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, lazy, Suspense, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Settings, DollarSign, Upload, History, Plus, ExternalLink, X, Phone, Video, BarChart3, Palette, Layers, Cog, FileText, ClipboardList, CheckSquare, Building2, Copy, Sparkles, FolderOpen, Plug, Pencil, Users, Rocket, CalendarClock } from 'lucide-react';
+import { ArrowLeft, Settings, DollarSign, Upload, History, Plus, ExternalLink, X, Phone, Video, BarChart3, Palette, Layers, Cog, FileText, ClipboardList, CheckSquare, Building2, Copy, Sparkles, FolderOpen, Plug, Pencil, Users, Rocket, CalendarClock, MessageCircle } from 'lucide-react';
 import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal';
 import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
 import { AdSpendDrillDownModal } from '@/components/drilldown/AdSpendDrillDownModal';
@@ -469,6 +469,10 @@ export default function ClientDetail() {
                 AI Caller
               </TabsTrigger>
             )}
+            <TabsTrigger value="sendblue" className="gap-2 whitespace-nowrap">
+              <MessageCircle className="h-4 w-4" />
+              Sendblue
+            </TabsTrigger>
             <TabsTrigger value="activity" className="gap-2 whitespace-nowrap">
               <ActivityIcon className="h-4 w-4" />
               Activity
