@@ -23,7 +23,40 @@ export interface SendblueLine {
   notes: string | null;
   has_own_credentials: boolean;
   api_key_masked: string | null;
+  account_id: string | null;
+  first_inbound_at: string | null;
+  last_delivered_at: string | null;
   created_at: string;
+}
+
+export interface SendblueAccount {
+  id: string;
+  client_id: string | null;
+  label: string;
+  active: boolean;
+  status: 'unverified' | 'connected' | 'credentials_rejected' | 'error' | 'disabled';
+  verified_at: string | null;
+  verify_endpoint: string | null;
+  last_checked_at: string | null;
+  last_error: string | null;
+  notes: string | null;
+  api_key_masked: string | null;
+  created_at: string;
+}
+
+export interface SendblueCoverage {
+  accounts_total: number;
+  accounts_verified: number;
+  clients_total: number;
+  clients_with_account: number;
+  clients_missing_account: number;
+}
+
+export interface SendblueDiscoveredLine {
+  phone_e164: string;
+  label: string | null;
+  provider_line_id: string | null;
+  already_imported: boolean;
 }
 
 export interface SendblueLineHealth {
