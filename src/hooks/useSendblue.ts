@@ -124,6 +124,21 @@ async function callAdmin<T>(payload: Record<string, unknown>): Promise<T> {
   return data as T;
 }
 
+export function useSendblueAccounts(clientId?: string) {
+  return useQuery({
+    queryKey: ['sendblue-accounts', clientId ?? 'all'],
+    queryFn: async () => {
+      const res = await callAdmin<{ accounts: SendblueAccount[] }>({
+        action: 'accounts',
+        client_id: clientId ?? null,
+      });
+      return res.accounts;
+    },
+    retry: false,
+    staleTime: 30_000,
+  });
+}
+
 export function useSendblueOverview(clientId?: string) {
   return useQuery({
     queryKey: ['sendblue-overview', clientId ?? 'all'],
