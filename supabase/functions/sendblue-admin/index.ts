@@ -184,6 +184,20 @@ async function discoverLines(keyId: string, secret: string) {
   return { ok: true, supported: false, verification, lines: [] as ReturnType<typeof extractProviderLines> };
 }
 
+function safeJson(text: string): unknown {
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The public receiver Sendblue should call. Same URL for both hook types. */
+function reportingWebhookUrl(): string {
+  const base = (Deno.env.get('SUPABASE_URL') || '').replace(/\/+$/, '');
+  return `${base}/functions/v1/sendblue-webhook`;
+}
+
 async function accountCredentials(accountId: string | null | undefined) {
   if (!accountId) return null;
   const { data } = await admin
