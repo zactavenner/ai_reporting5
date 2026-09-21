@@ -311,12 +311,19 @@ async function runShadowInvite(args: {
   // Google Calendar silently ignores an invitation whose ORGANIZER is the same
   // mailbox as the ATTENDEE (a "self invite"). The SMTP envelope still uses the
   // working sender address; only the iCalendar organizer identity is distinct.
+  const bot = String(botGuestEmail).toLowerCase();
+  const sendingMailbox = String(sender.from_email).trim().toLowerCase();
   const configuredOrganizer =
     (Deno.env.get('SHADOW_INVITE_ORGANIZER') || 'zac@zactavenner.com').trim().toLowerCase();
+  // Best case: the mailbox we authenticate as IS the human organizer, so the
+  // email From and the iCalendar ORGANIZER match and Gmail accepts it as a
+  // normal invitation. Otherwise fall back to the configured organizer identity.
   const organizerEmail =
-    configuredOrganizer && configuredOrganizer !== String(botGuestEmail).toLowerCase()
-      ? configuredOrganizer
-      : sender.from_email;
+    sendingMailbox && sendingMailbox !== bot
+      ? sendingMailbox
+      : configuredOrganizer && configuredOrganizer !== bot
+        ? configuredOrganizer
+        : sender.from_email;
   const ics = buildShadowInviteIcs({
     uid,
     method,
