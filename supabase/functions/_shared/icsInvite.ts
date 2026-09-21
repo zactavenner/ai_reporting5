@@ -160,7 +160,7 @@ export function buildShadowInviteIcs(input: ShadowInviteInput): string {
  * upcoming linked appointment receives exactly one update into the new format
  * and then stays idempotent.
  */
-export const CALENDAR_PRESENTATION_VERSION = 'v3-matching';
+export const CALENDAR_PRESENTATION_VERSION = 'v4-organizer-mailbox';
 
 /** Signature used to detect reschedules (time change ⇒ SEQUENCE bump). */
 export function scheduleSignature(start: string | null, end: string | null, link?: string | null): string {
