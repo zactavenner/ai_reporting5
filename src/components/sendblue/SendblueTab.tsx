@@ -6,6 +6,7 @@ import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { useSendblueOverview, useRunSendblueMirrors } from '@/hooks/useSendblue';
 import { SendblueInbox } from './SendblueInbox';
 import { SendblueLines } from './SendblueLines';
+import { SendblueAccounts } from './SendblueAccounts';
 
 interface Props {
   /** When set, everything is scoped to this client's numbers only. */
@@ -66,6 +67,7 @@ export function SendblueTab({ clientId, clients }: Props) {
       <Tabs defaultValue="inbox">
         <TabsList>
           <TabsTrigger value="inbox">Messages</TabsTrigger>
+          <TabsTrigger value="accounts">Accounts</TabsTrigger>
           <TabsTrigger value="lines">Numbers</TabsTrigger>
           <TabsTrigger value="health">Connection</TabsTrigger>
         </TabsList>
@@ -73,6 +75,18 @@ export function SendblueTab({ clientId, clients }: Props) {
         <TabsContent value="inbox" className="mt-4">
           <SendblueInbox lines={lines} clientId={clientId} clients={clients} />
         </TabsContent>
+
+        <TabsContent value="accounts" className="mt-4">
+          <SendblueAccounts
+            accounts={data.accounts || []}
+            lines={lines}
+            coverage={data.coverage}
+            webhookConfigured={data.webhook_secret_configured}
+            clientId={clientId}
+            clients={clients}
+          />
+        </TabsContent>
+
 
         <TabsContent value="lines" className="mt-4">
           <SendblueLines lines={lines} clientId={clientId} clients={clients} />

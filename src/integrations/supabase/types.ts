@@ -21008,6 +21008,86 @@ export type Database = {
           },
         ]
       }
+      sendblue_accounts: {
+        Row: {
+          active: boolean
+          api_key_id: string
+          api_secret: string
+          client_id: string | null
+          created_at: string
+          id: string
+          label: string
+          last_checked_at: string | null
+          last_error: string | null
+          notes: string | null
+          status: string
+          updated_at: string
+          verified_at: string | null
+          verify_endpoint: string | null
+        }
+        Insert: {
+          active?: boolean
+          api_key_id: string
+          api_secret: string
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          label: string
+          last_checked_at?: string | null
+          last_error?: string | null
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          verified_at?: string | null
+          verify_endpoint?: string | null
+        }
+        Update: {
+          active?: boolean
+          api_key_id?: string
+          api_secret?: string
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          label?: string
+          last_checked_at?: string | null
+          last_error?: string | null
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          verified_at?: string | null
+          verify_endpoint?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sendblue_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sendblue_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       sendblue_conversations: {
         Row: {
           client_id: string | null
@@ -21184,60 +21264,79 @@ export type Database = {
       }
       sendblue_lines: {
         Row: {
+          account_id: string | null
           active: boolean
           api_key_id: string | null
           api_secret: string | null
           client_id: string | null
           created_at: string
+          first_inbound_at: string | null
           id: string
           label: string
+          last_delivered_at: string | null
           last_error: string | null
           last_tested_at: string | null
           notes: string | null
           phone_e164: string
           plan_type: string
           provider_line_id: string | null
+          provider_metadata: Json | null
           provisioned_via: string
           status: string
           updated_at: string
         }
         Insert: {
+          account_id?: string | null
           active?: boolean
           api_key_id?: string | null
           api_secret?: string | null
           client_id?: string | null
           created_at?: string
+          first_inbound_at?: string | null
           id?: string
           label: string
+          last_delivered_at?: string | null
           last_error?: string | null
           last_tested_at?: string | null
           notes?: string | null
           phone_e164: string
           plan_type?: string
           provider_line_id?: string | null
+          provider_metadata?: Json | null
           provisioned_via?: string
           status?: string
           updated_at?: string
         }
         Update: {
+          account_id?: string | null
           active?: boolean
           api_key_id?: string | null
           api_secret?: string | null
           client_id?: string | null
           created_at?: string
+          first_inbound_at?: string | null
           id?: string
           label?: string
+          last_delivered_at?: string | null
           last_error?: string | null
           last_tested_at?: string | null
           notes?: string | null
           phone_e164?: string
           plan_type?: string
           provider_line_id?: string | null
+          provider_metadata?: Json | null
           provisioned_via?: string
           status?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sendblue_lines_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "sendblue_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sendblue_lines_client_id_fkey"
             columns: ["client_id"]
