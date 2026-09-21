@@ -262,10 +262,23 @@ Deno.serve(async (req) => {
         failed: mirrors.filter((m) => m.status === 'failed').length,
       };
 
+      const { data: allClients } = await admin.from('clients').select('id').eq('status', 'active');
+      const configuredClientIds = new Set(
+        (accounts || []).filter((a: any) => a.client_id && a.active).map((a: any) => a.client_id),
+      );
+
       return json({
         ok: true,
         agency_credentials_configured: Boolean(ENV_CREDS.keyId && ENV_CREDS.secret),
-        webhook_secret_configured: Boolean(Deno.env.get('SENDBLUE_WEBHOOK_SECRET')),
+        webhook_secret_configured: webhookSecretConfigured,
+        accounts: (accounts || []).map(publicAccount),
+        coverage: {
+          accounts_total: (accounts || []).length,
+          accounts_verified: (accounts || []).filter((a: any) => a.status === 'connected').length,
+          clients_total: (allClients || []).length,
+          clients_with_account: configuredClientIds.size,
+          clients_missing_account: Math.max((allClients || []).length - configuredClientIds.size, 0),
+        },
         lines: (lines || []).map(publicLine),
         health,
         mirrors: mirrorSummary,
