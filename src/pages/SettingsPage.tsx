@@ -57,6 +57,7 @@ import { UsageDashboard } from '@/components/settings/UsageDashboard';
 import { StyleSettingsView } from '@/components/project/StyleSettingsView';
 import { ApiKeysSection } from '@/components/settings/ApiKeysSection';
 import { OnboardingTemplatesSection } from '@/components/settings/OnboardingTemplatesSection';
+import { SendblueAccountsSettingsCard } from '@/components/sendblue/SendblueAccountsSettingsCard';
 
 interface Reference {
   id: string;
