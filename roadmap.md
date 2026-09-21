@@ -48,3 +48,5 @@ Plan: `.lovable/plan/week-4-ai-marketing-inside-reporting-5-0-2026-09-21.md`
 - [ ] Approved claims/disclosures, qualification criteria, CPQL and lag values per pilot client.
 - [ ] Channel/consent/handoff rules and recipient roles for reports and nurture.
 - [ ] Per-client cost and media caps; labor/vendor costs for margin.
+- [x] Runner→artifact map: account_manager 0 completed / 7,879 failed, copywriter / video_ads / static_ads 0 completed — all pointed at an AI model name the provider rejects (400 invalid model id, 1,292 failures in 7 days). Corrected to the working model in the agent records and in the app/backends; `ai-studio` and `test-agent` redeployed. media_buyer / reporting / sales_agent / jeremy_ai do produce completed runs.
+- [ ] Remaining 963 provider "user not found" (401) failures in the last 7 days — needs the AI provider account/key checked by the owner; no key was touched.
