@@ -96,6 +96,96 @@ async function probeCredentials(keyId: string, secret: string) {
   }
 }
 
+function publicAccount(row: any) {
+  return {
+    id: row.id,
+    client_id: row.client_id,
+    label: row.label,
+    active: row.active,
+    status: row.status,
+    verified_at: row.verified_at,
+    verify_endpoint: row.verify_endpoint,
+    last_checked_at: row.last_checked_at,
+    last_error: row.last_error,
+    notes: row.notes,
+    api_key_masked: maskSecret(row.api_key_id),
+    created_at: row.created_at,
+  };
+}
+
+/**
+ * Real read-only verification: walks the candidate GET endpoints and stops at
+ * the first 2xx, recording which endpoint proved the credentials. A 401/403 is
+ * reported as rejected immediately — retrying other endpoints cannot change it.
+ */
+async function verifyCredentials(keyId: string, secret: string) {
+  let last = { ok: false, status: 'error', detail: 'Sendblue could not be reached.', endpoint: null as string | null, payload: null as unknown };
+  for (const endpoint of VERIFY_ENDPOINTS) {
+    try {
+      const res = await fetch(`${SENDBLUE_BASE}${endpoint}`, { headers: sendblueHeaders({ keyId, secret }) });
+      const text = await res.text();
+      const outcome = classifyProbe(res.status, text);
+      if (outcome.ok) {
+        let payload: unknown = null;
+        try {
+          payload = text ? JSON.parse(text) : null;
+        } catch {
+          payload = null;
+        }
+        return { ok: true, status: 'connected', detail: null as string | null, endpoint, payload };
+      }
+      last = { ...outcome, endpoint, payload: null };
+      if (outcome.status === 'credentials_rejected') return last;
+    } catch (err) {
+      last = {
+        ok: false,
+        status: 'error',
+        detail: err instanceof Error ? err.message : 'network error',
+        endpoint,
+        payload: null,
+      };
+    }
+  }
+  return last;
+}
+
+/** Read-only line discovery. Returns supported:false when the plan exposes none. */
+async function discoverLines(keyId: string, secret: string) {
+  const verification = await verifyCredentials(keyId, secret);
+  if (!verification.ok) {
+    return { ok: false, supported: false, verification, lines: [] as ReturnType<typeof extractProviderLines> };
+  }
+  if (isLineEndpoint(verification.endpoint)) {
+    const lines = extractProviderLines(verification.payload);
+    if (lines.length > 0) return { ok: true, supported: true, verification, lines };
+  }
+  // Credentials are good but the proving endpoint carried no lines; try the
+  // dedicated listing endpoints explicitly before reporting "not available".
+  for (const endpoint of ['/api/v2/lines', '/api/v2/numbers', '/api/v2/accounts/lines']) {
+    if (endpoint === verification.endpoint) continue;
+    try {
+      const res = await fetch(`${SENDBLUE_BASE}${endpoint}`, { headers: sendblueHeaders({ keyId, secret }) });
+      if (!res.ok) continue;
+      const lines = extractProviderLines(await res.json().catch(() => null));
+      if (lines.length > 0) return { ok: true, supported: true, verification: { ...verification, endpoint }, lines };
+    } catch {
+      // keep probing
+    }
+  }
+  return { ok: true, supported: false, verification, lines: [] as ReturnType<typeof extractProviderLines> };
+}
+
+async function accountCredentials(accountId: string | null | undefined) {
+  if (!accountId) return null;
+  const { data } = await admin
+    .from('sendblue_accounts')
+    .select('id, api_key_id, api_secret, client_id, label')
+    .eq('id', accountId)
+    .maybeSingle();
+  if (!data?.api_key_id || !data?.api_secret) return null;
+  return { keyId: data.api_key_id as string, secret: data.api_secret as string, row: data };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
