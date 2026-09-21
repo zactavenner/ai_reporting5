@@ -89,6 +89,7 @@ const StaticCreativesInline = lazy(() => import('@/pages/StaticCreativesPage'));
 const AvatarAdGenInline = lazy(() => Promise.resolve({ default: () => <AvatarAdProvider><AvatarAdWizard /></AvatarAdProvider> }));
 import { TopPerformersSection } from '@/components/creative/TopPerformersSection';
 import { CreativeLibraryTab } from '@/components/creative/CreativeLibraryTab';
+const SendblueTab = lazy(() => import('@/components/sendblue/SendblueTab').then(m => ({ default: m.SendblueTab })));
 import { TopPerformerUploadsSection } from '@/components/creative/TopPerformerUploadsSection';
 
 const Index = () => {
@@ -778,6 +779,19 @@ const Index = () => {
               <SectionErrorBoundary sectionName="Creative Library">
                 <Suspense fallback={<div className="animate-pulse h-64 bg-muted/30 rounded-lg" />}>
                   <CreativeLibraryTab clients={clients} />
+                </Suspense>
+              </SectionErrorBoundary>
+            )}
+
+            {/* Sendblue */}
+            {activeTab === 'sendblue' && (
+              <SectionErrorBoundary sectionName="Sendblue">
+                <div className="mb-4">
+                  <h2 className="text-lg font-bold">Sendblue</h2>
+                  <p className="text-sm text-muted-foreground">Texting numbers, conversations and CRM notes.</p>
+                </div>
+                <Suspense fallback={<div className="animate-pulse h-64 bg-muted/30 rounded-lg" />}>
+                  <SendblueTab clients={clients} />
                 </Suspense>
               </SectionErrorBoundary>
             )}

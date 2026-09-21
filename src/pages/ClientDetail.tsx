@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, lazy, Suspense, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Settings, DollarSign, Upload, History, Plus, ExternalLink, X, Phone, Video, BarChart3, Palette, Layers, Cog, FileText, ClipboardList, CheckSquare, Building2, Copy, Sparkles, FolderOpen, Plug, Pencil, Users, Rocket, CalendarClock } from 'lucide-react';
+import { ArrowLeft, Settings, DollarSign, Upload, History, Plus, ExternalLink, X, Phone, Video, BarChart3, Palette, Layers, Cog, FileText, ClipboardList, CheckSquare, Building2, Copy, Sparkles, FolderOpen, Plug, Pencil, Users, Rocket, CalendarClock, MessageCircle } from 'lucide-react';
 import { LeadsDrillDownModal } from '@/components/drilldown/LeadsDrillDownModal';
 import { CallsDrillDownModal } from '@/components/drilldown/CallsDrillDownModal';
 import { AdSpendDrillDownModal } from '@/components/drilldown/AdSpendDrillDownModal';
@@ -52,6 +52,7 @@ const WeeklyCallTab = lazy(() => import('@/components/weekly-call/WeeklyCallTab'
 const PropertyManagerTab = lazy(() => import('@/components/properties/PropertyManagerTab').then(m => ({ default: m.PropertyManagerTab })));
 const AIStudioTab = lazy(() => import('@/components/ai/AIStudioTab').then(m => ({ default: m.AIStudioTab })));
 const ClientFolderTab = lazy(() => import('@/components/folder/ClientFolderTab').then(m => ({ default: m.ClientFolderTab })));
+const SendblueTab = lazy(() => import('@/components/sendblue/SendblueTab').then(m => ({ default: m.SendblueTab })));
 const ConnectionsTab = lazy(() => import('@/components/client/ConnectionsTab'));
 const ClientDatabaseTab = lazy(() => import('@/components/client/ClientDatabaseTab').then(m => ({ default: m.ClientDatabaseTab })));
 const ClientWorkflowsTab = lazy(() => import('@/components/ghl/ClientWorkflowsTab').then(m => ({ default: m.ClientWorkflowsTab })));
@@ -468,6 +469,10 @@ export default function ClientDetail() {
                 AI Caller
               </TabsTrigger>
             )}
+            <TabsTrigger value="sendblue" className="gap-2 whitespace-nowrap">
+              <MessageCircle className="h-4 w-4" />
+              Sendblue
+            </TabsTrigger>
             <TabsTrigger value="activity" className="gap-2 whitespace-nowrap">
               <ActivityIcon className="h-4 w-4" />
               Activity
@@ -661,6 +666,14 @@ export default function ClientDetail() {
           )}
 
 
+
+          {/* ─── SENDBLUE TAB ─── */}
+          <TabsContent value="sendblue" className="space-y-6">
+            <SectionErrorBoundary sectionName="Sendblue">
+              <h2 className="text-lg font-bold mb-3">Sendblue</h2>
+              <SendblueTab clientId={clientId!} clients={client ? [{ id: client.id, name: client.name }] : []} />
+            </SectionErrorBoundary>
+          </TabsContent>
 
           {/* ─── ACTIVITY TAB ─── */}
           <TabsContent value="activity" className="space-y-6">
