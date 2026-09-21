@@ -14,9 +14,11 @@ import {
 } from '../../supabase/functions/_shared/sendblueAccounts.ts';
 
 describe('credential verification is truthful', () => {
-  it('only claims connected on a real 2xx', () => {
-    expect(classifyProbe(200)).toEqual({ ok: true, status: 'connected', detail: null });
-    expect(classifyProbe(204)).toEqual({ ok: true, status: 'connected', detail: null });
+  it('needs a real success body, not just a 2xx', () => {
+    expect(classifyProbe(200, JSON.stringify({ lines: [] }))).toEqual({ ok: true, status: 'connected', detail: null });
+    // A bare 2xx with no readable body proves nothing.
+    expect(classifyProbe(200).ok).toBe(false);
+    expect(classifyProbe(204).ok).toBe(false);
   });
   it('separates rejected credentials from other failures', () => {
     expect(classifyProbe(401).status).toBe('credentials_rejected');
@@ -26,7 +28,7 @@ describe('credential verification is truthful', () => {
   });
   it('probes read-only endpoints only', () => {
     for (const endpoint of VERIFY_ENDPOINTS) expect(endpoint.startsWith('/api/')).toBe(true);
-    expect(isLineEndpoint('/api/v2/lines')).toBe(true);
+    expect(isLineEndpoint('/api/lines')).toBe(true);
     expect(isLineEndpoint('/api/v2/contacts?limit=1')).toBe(false);
     expect(isLineEndpoint(null)).toBe(false);
   });
