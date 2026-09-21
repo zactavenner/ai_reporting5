@@ -31,6 +31,7 @@ import {
   classifyProbe,
   connectionSignals,
   extractProviderLines,
+  LINE_ENDPOINTS,
   isLineEndpoint,
   planLineImport,
   WEBHOOKS_ENDPOINT,
@@ -87,22 +88,28 @@ function publicLine(row: any) {
   };
 }
 
+/**
+ * Read-only credential probe against the documented endpoints. Verification is
+ * judged by classifyProbe, which also rejects a 2xx carrying a body-level ERROR.
+ */
 async function probeCredentials(keyId: string, secret: string) {
-  try {
-    const res = await fetch(`${SENDBLUE_BASE}/api/v2/messages?limit=1`, {
-      headers: sendblueHeaders({ keyId, secret }),
-    });
-    const text = await res.text();
-    if (res.status === 401 || res.status === 403) {
-      return { ok: false, status: 'credentials_rejected', detail: `Sendblue rejected the credentials (${res.status}).` };
+  let last = { ok: false, status: 'error', detail: 'No Sendblue endpoint answered.' as string | null };
+  for (const endpoint of VERIFY_ENDPOINTS) {
+    try {
+      const res = await fetch(`${SENDBLUE_BASE}${endpoint}`, {
+        headers: sendblueHeaders({ keyId, secret }),
+      });
+      const text = await res.text();
+      const outcome = classifyProbe(res.status, text);
+      if (outcome.ok) return { ...outcome, endpoint };
+      last = { ...outcome, endpoint } as typeof last;
+      // Rejected keys are final — no point trying the other endpoints.
+      if (outcome.status === 'credentials_rejected') return last;
+    } catch (err) {
+      last = { ok: false, status: 'error', detail: err instanceof Error ? err.message : 'network error' };
     }
-    if (!res.ok) {
-      return { ok: false, status: 'error', detail: `Sendblue returned ${res.status}: ${text.slice(0, 160)}` };
-    }
-    return { ok: true, status: 'connected', detail: null as string | null };
-  } catch (err) {
-    return { ok: false, status: 'error', detail: err instanceof Error ? err.message : 'network error' };
   }
+  return last;
 }
 
 function publicAccount(row: any) {
@@ -133,8 +140,9 @@ function publicAccount(row: any) {
 
 /**
  * Real read-only verification: walks the candidate GET endpoints and stops at
- * the first 2xx, recording which endpoint proved the credentials. A 401/403 is
- * reported as rejected immediately — retrying other endpoints cannot change it.
+ * the first genuinely successful answer (2xx that parses as JSON and carries no
+ * body-level ERROR), recording which endpoint proved the credentials. A 401/403,
+ * or a body-level authentication error, is reported as rejected immediately.
  */
 async function verifyCredentials(keyId: string, secret: string) {
   let last = { ok: false, status: 'error', detail: 'Sendblue could not be reached.', endpoint: null as string | null, payload: null as unknown };
@@ -177,14 +185,16 @@ async function discoverLines(keyId: string, secret: string) {
     const lines = extractProviderLines(verification.payload);
     if (lines.length > 0) return { ok: true, supported: true, verification, lines };
   }
-  // Credentials are good but the proving endpoint carried no lines; try the
-  // dedicated listing endpoints explicitly before reporting "not available".
-  for (const endpoint of ['/api/v2/lines', '/api/v2/numbers', '/api/v2/accounts/lines']) {
+  // Credentials are good but the proving endpoint carried no lines; ask the
+  // documented assigned-numbers endpoint explicitly before reporting
+  // "not available". GET /api/lines is the only documented listing.
+  for (const endpoint of LINE_ENDPOINTS) {
     if (endpoint === verification.endpoint) continue;
     try {
       const res = await fetch(`${SENDBLUE_BASE}${endpoint}`, { headers: sendblueHeaders({ keyId, secret }) });
-      if (!res.ok) continue;
-      const lines = extractProviderLines(await res.json().catch(() => null));
+      const text = await res.text();
+      if (!classifyProbe(res.status, text).ok) continue;
+      const lines = extractProviderLines(safeJson(text));
       if (lines.length > 0) return { ok: true, supported: true, verification: { ...verification, endpoint }, lines };
     } catch {
       // keep probing
@@ -773,8 +783,10 @@ Deno.serve(async (req) => {
         headers: sendblueHeaders({ keyId: creds.keyId, secret: creds.secret }),
       });
       const listText = await listRes.text();
-      if (!listRes.ok) {
-        const outcome = classifyProbe(listRes.status, listText);
+      // A 2xx with a body-level ERROR is still a failure — classifyProbe decides.
+      const listOutcome = classifyProbe(listRes.status, listText);
+      if (!listOutcome.ok) {
+        const outcome = listOutcome;
         await admin
           .from('sendblue_accounts')
           .update({ webhook_last_checked_at: new Date().toISOString(), webhook_last_error: outcome.detail })
@@ -799,12 +811,9 @@ Deno.serve(async (req) => {
           headers: sendblueHeaders({ keyId: creds.keyId, secret: creds.secret }),
           body: JSON.stringify({ url: hook.url, secret: webhookSecret, type: hook.type }),
         });
-        if (!res.ok) {
-          const text = await res.text();
-          appendErrors.push(`${hook.type}: ${classifyProbe(res.status, text).detail}`);
-        } else {
-          await res.text();
-        }
+        const text = await res.text();
+        const outcome = classifyProbe(res.status, text);
+        if (!outcome.ok) appendErrors.push(`${hook.type}: ${outcome.detail}`);
       }
 
       // 4. Prove it by reading the list back.
@@ -812,7 +821,8 @@ Deno.serve(async (req) => {
         headers: sendblueHeaders({ keyId: creds.keyId, secret: creds.secret }),
       });
       const readbackText = await readbackRes.text();
-      const after = readbackRes.ok ? parseProviderWebhooks(safeJson(readbackText)) : existing;
+      const readbackOk = classifyProbe(readbackRes.status, readbackText).ok;
+      const after = readbackOk ? parseProviderWebhooks(safeJson(readbackText)) : existing;
       const check = verifyWebhookReadback(after, desired);
       const now = new Date().toISOString();
 
@@ -860,7 +870,8 @@ Deno.serve(async (req) => {
         headers: sendblueHeaders({ keyId: creds.keyId, secret: creds.secret }),
       });
       const text = await res.text();
-      if (!res.ok) return json({ ok: false, detail: classifyProbe(res.status, text).detail }, 200);
+      const statusOutcome = classifyProbe(res.status, text);
+      if (!statusOutcome.ok) return json({ ok: false, detail: statusOutcome.detail }, 200);
       const hooks = parseProviderWebhooks(safeJson(text));
       const receiverUrl = reportingWebhookUrl();
       const check = verifyWebhookReadback(hooks, [

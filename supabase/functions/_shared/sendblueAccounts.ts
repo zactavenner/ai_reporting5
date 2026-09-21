@@ -13,19 +13,19 @@
 import { normalizeE164 } from './sendblue.ts';
 
 /**
- * Read-only endpoints used to prove credentials, in order. The first 2xx wins
- * and is recorded as the proof. All are GETs and none mutate anything.
+ * Read-only endpoints used to prove credentials, in order. All are documented in
+ * the official Sendblue API v2 reference (https://docs.sendblue.com/api-v2):
+ * assigned numbers live at GET /api/lines — not under /api/v2 — while messages
+ * and contacts are the documented /api/v2 collections. Nothing here mutates.
  */
 export const VERIFY_ENDPOINTS = [
-  '/api/v2/lines',
-  '/api/v2/numbers',
-  '/api/v2/accounts/lines',
-  '/api/v2/contacts?limit=1',
+  '/api/lines',
   '/api/v2/messages?limit=1',
+  '/api/v2/contacts?limit=1',
 ] as const;
 
-/** Subset of the above that can actually return phone lines. */
-export const LINE_ENDPOINTS = ['/api/v2/lines', '/api/v2/numbers', '/api/v2/accounts/lines'] as const;
+/** The documented endpoint that returns the account's assigned phone lines. */
+export const LINE_ENDPOINTS = ['/api/lines'] as const;
 
 export function isLineEndpoint(endpoint: string | null | undefined): boolean {
   if (!endpoint) return false;
@@ -36,9 +36,15 @@ export type ProbeOutcome =
   | { ok: true; status: 'connected'; detail: null }
   | { ok: false; status: 'credentials_rejected' | 'error'; detail: string };
 
-/** Turns one HTTP response into a truthful verification outcome. */
+/**
+ * Turns one HTTP response into a truthful verification outcome.
+ *
+ * A 2xx alone is NOT proof: Sendblue answers some failures with HTTP 200 and a
+ * body-level `status: "ERROR"`, and a misrouted request can return HTML. So the
+ * body must parse as JSON and must not carry an error status before we claim the
+ * credentials are verified.
+ */
 export function classifyProbe(httpStatus: number, bodyText = ''): ProbeOutcome {
-  if (httpStatus >= 200 && httpStatus < 300) return { ok: true, status: 'connected', detail: null };
   if (httpStatus === 401 || httpStatus === 403) {
     return {
       ok: false,
@@ -46,11 +52,65 @@ export function classifyProbe(httpStatus: number, bodyText = ''): ProbeOutcome {
       detail: `Sendblue rejected these credentials (${httpStatus}).`,
     };
   }
-  return {
-    ok: false,
-    status: 'error',
-    detail: `Sendblue returned ${httpStatus}${bodyText ? `: ${bodyText.slice(0, 160)}` : ''}`,
-  };
+  if (httpStatus < 200 || httpStatus >= 300) {
+    const bodyError = bodyLevelError(bodyText);
+    return {
+      ok: false,
+      status: 'error',
+      detail: `Sendblue returned ${httpStatus}${bodyError ? `: ${bodyError}` : bodyText ? `: ${bodyText.slice(0, 160)}` : ''}`,
+    };
+  }
+
+  const text = (bodyText || '').trim();
+  if (!text) {
+    return { ok: false, status: 'error', detail: 'Sendblue returned an empty response — not treated as verified.' };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return {
+      ok: false,
+      status: 'error',
+      detail: `Sendblue returned a non-JSON response (${text.slice(0, 80)}) — not treated as verified.`,
+    };
+  }
+  const bodyError = bodyLevelErrorFrom(parsed);
+  if (bodyError) {
+    // Body-level ERROR with a 2xx: authentication failures surface this way.
+    const rejected = /api key|api secret|unauthor|forbidden|credential|authenticat/i.test(bodyError);
+    return {
+      ok: false,
+      status: rejected ? 'credentials_rejected' : 'error',
+      detail: `Sendblue reported an error: ${bodyError}`,
+    };
+  }
+  return { ok: true, status: 'connected', detail: null };
+}
+
+/** Reads Sendblue's body-level error status, whatever wording it uses. */
+export function bodyLevelErrorFrom(parsed: unknown): string | null {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const obj = parsed as Record<string, unknown>;
+  const status = typeof obj.status === 'string' ? obj.status.trim().toUpperCase() : '';
+  const message =
+    pickString(obj, ['error_message', 'error', 'message', 'detail', 'errorMessage']) || '';
+  const isError =
+    status === 'ERROR' ||
+    status === 'FAILED' ||
+    status === 'FAILURE' ||
+    obj.success === false ||
+    Boolean(pickString(obj, ['error_message', 'errorMessage']));
+  if (!isError) return null;
+  return message || `status ${status || 'ERROR'}`;
+}
+
+function bodyLevelError(bodyText: string): string | null {
+  try {
+    return bodyLevelErrorFrom(JSON.parse(bodyText));
+  } catch {
+    return null;
+  }
 }
 
 export interface DiscoveredLine {
@@ -90,6 +150,14 @@ export function extractProviderLines(payload: unknown): DiscoveredLine[] {
   const seen = new Set<string>();
   const out: DiscoveredLine[] = [];
   for (const row of rows) {
+    // GET /api/lines is documented as returning plain E.164 strings.
+    if (typeof row === 'string') {
+      const phone = normalizeE164(row);
+      if (!phone || seen.has(phone)) continue;
+      seen.add(phone);
+      out.push({ phone_e164: phone, label: null, provider_line_id: null, raw: { number: row } });
+      continue;
+    }
     if (!row || typeof row !== 'object') continue;
     const obj = row as Record<string, unknown>;
     const phone = normalizeE164(

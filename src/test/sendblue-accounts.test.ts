@@ -6,6 +6,7 @@ import {
   extractProviderLines,
   isLineEndpoint,
   planLineImport,
+  LINE_ENDPOINTS,
   planWebhookRegistration,
   parseProviderWebhooks,
   verifyWebhookReadback,
@@ -13,9 +14,11 @@ import {
 } from '../../supabase/functions/_shared/sendblueAccounts.ts';
 
 describe('credential verification is truthful', () => {
-  it('only claims connected on a real 2xx', () => {
-    expect(classifyProbe(200)).toEqual({ ok: true, status: 'connected', detail: null });
-    expect(classifyProbe(204)).toEqual({ ok: true, status: 'connected', detail: null });
+  it('needs a real success body, not just a 2xx', () => {
+    expect(classifyProbe(200, JSON.stringify({ lines: [] }))).toEqual({ ok: true, status: 'connected', detail: null });
+    // A bare 2xx with no readable body proves nothing.
+    expect(classifyProbe(200).ok).toBe(false);
+    expect(classifyProbe(204).ok).toBe(false);
   });
   it('separates rejected credentials from other failures', () => {
     expect(classifyProbe(401).status).toBe('credentials_rejected');
@@ -25,7 +28,7 @@ describe('credential verification is truthful', () => {
   });
   it('probes read-only endpoints only', () => {
     for (const endpoint of VERIFY_ENDPOINTS) expect(endpoint.startsWith('/api/')).toBe(true);
-    expect(isLineEndpoint('/api/v2/lines')).toBe(true);
+    expect(isLineEndpoint('/api/lines')).toBe(true);
     expect(isLineEndpoint('/api/v2/contacts?limit=1')).toBe(false);
     expect(isLineEndpoint(null)).toBe(false);
   });
@@ -193,5 +196,54 @@ describe('webhook registration is append-only', () => {
         lastDeliveredAt: null,
       }).status,
     ).toBe('live');
+  });
+});
+
+describe('documented Sendblue API v2 contract', () => {
+  it('uses the documented endpoints only', () => {
+    // GET /api/lines is the documented assigned-numbers endpoint (not /api/v2/lines).
+    expect(LINE_ENDPOINTS).toEqual(['/api/lines']);
+    expect(VERIFY_ENDPOINTS).toEqual(['/api/lines', '/api/v2/messages?limit=1', '/api/v2/contacts?limit=1']);
+    expect(isLineEndpoint('/api/lines')).toBe(true);
+    expect(isLineEndpoint('/api/v2/lines')).toBe(false);
+    expect(isLineEndpoint('/api/v2/numbers')).toBe(false);
+  });
+
+  it('never treats a 2xx carrying a body-level ERROR as verified', () => {
+    const errored = classifyProbe(200, JSON.stringify({ status: 'ERROR', error_message: 'Invalid API key' }));
+    expect(errored.ok).toBe(false);
+    expect(errored.status).toBe('credentials_rejected');
+    expect(errored.detail).toContain('Invalid API key');
+
+    const otherError = classifyProbe(200, JSON.stringify({ status: 'ERROR', error_message: 'Plan does not include lines' }));
+    expect(otherError.ok).toBe(false);
+    expect(otherError.status).toBe('error');
+
+    expect(classifyProbe(200, JSON.stringify({ success: false, message: 'nope' })).ok).toBe(false);
+  });
+
+  it('never treats a non-JSON or empty 2xx as verified', () => {
+    expect(classifyProbe(200, '<html>Not Found</html>').ok).toBe(false);
+    expect(classifyProbe(200, '').ok).toBe(false);
+    expect(classifyProbe(204, '').ok).toBe(false);
+  });
+
+  it('accepts a real documented success body', () => {
+    expect(classifyProbe(200, JSON.stringify({ lines: ['+15551234567'] })).ok).toBe(true);
+    expect(classifyProbe(200, JSON.stringify([])).ok).toBe(true);
+    expect(classifyProbe(200, JSON.stringify({ status: 'QUEUED', messages: [] })).ok).toBe(true);
+  });
+
+  it('reads numbers from the documented GET /api/lines shapes', () => {
+    // Documented shape: plain E.164 strings.
+    const plain = extractProviderLines({ lines: ['+15551234567', '+1 (555) 765-4321', '+15551234567'] });
+    expect(plain.map((l) => l.phone_e164)).toEqual(['+15551234567', '+15557654321']);
+    expect(plain[0].label).toBeNull();
+
+    // Object rows remain supported for accounts that return richer records.
+    const objects = extractProviderLines({ lines: [{ number: '+15550001111', label: 'Main' }] });
+    expect(objects[0]).toMatchObject({ phone_e164: '+15550001111', label: 'Main' });
+
+    expect(extractProviderLines({ status: 'ERROR', error_message: 'no access' })).toEqual([]);
   });
 });
