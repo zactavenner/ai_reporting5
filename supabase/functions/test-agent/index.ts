@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
     }
     sys.push(`\nYou are being tested inside the Agent Workforce template. Answer directly, follow the memory/instructions above precisely, and be concise. This is a live test — respond as the agent, not as a generic assistant.`);
 
-    const model = agent.default_model || "openrouter/deepseek/deepseek-v4-flash-latest";
+    const model = agent.default_model || "openrouter/owl-alpha";
     // OpenRouter serves the DeepSeek "-latest" pointer under its tilde-aliased id.
     const CHAT_MODEL_ALIASES: Record<string, string> = {
       "deepseek/deepseek-v4-flash-latest": "~deepseek/deepseek-v4-flash-latest",

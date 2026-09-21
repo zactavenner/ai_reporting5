@@ -27,7 +27,7 @@ const GATEWAY = "https://connector-gateway.lovable.dev";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const DEFAULT_CHAT_MODEL = "openrouter/deepseek/deepseek-v4-flash-latest";
+const DEFAULT_CHAT_MODEL = "openrouter/owl-alpha";
 
 function getOpenRouterKey(context = "OpenRouter") {
   const key = (OPENROUTER_API_KEY || "").trim().replace(/^['"]|['"]$/g, "");
