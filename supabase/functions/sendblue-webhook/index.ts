@@ -35,16 +35,45 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
 
-  const secret = Deno.env.get('SENDBLUE_WEBHOOK_SECRET');
   const raw = await req.text();
-  if (!secret) {
-    console.error('sendblue-webhook rejected: signing secret not configured');
+
+  // Candidate signing secrets: the agency-wide one plus each account's own
+  // per-account secret created when its Reporting webhooks were registered.
+  const envSecret = Deno.env.get('SENDBLUE_WEBHOOK_SECRET');
+  const { data: secretRows } = await admin
+    .from('sendblue_accounts')
+    .select('id, webhook_secret')
+    .eq('active', true)
+    .not('webhook_secret', 'is', null);
+
+  const candidates: { accountId: string | null; secret: string }[] = [];
+  if (envSecret) candidates.push({ accountId: null, secret: envSecret });
+  for (const row of secretRows || []) {
+    if (row.webhook_secret) candidates.push({ accountId: row.id, secret: row.webhook_secret });
+  }
+  if (candidates.length === 0) {
+    console.error('sendblue-webhook rejected: no signing secret configured');
     return json({ error: 'Webhook signing secret not configured' }, 503);
   }
-  const verified = await verifyWebhookSignature(secret, raw, req.headers);
+
+  let matchedAccountId: string | null = null;
+  let verified = false;
+  for (const candidate of candidates) {
+    if (await verifyWebhookSignature(candidate.secret, raw, req.headers)) {
+      verified = true;
+      matchedAccountId = candidate.accountId;
+      break;
+    }
+  }
   if (!verified) {
     console.error('sendblue-webhook rejected: signature verification failed');
     return json({ error: 'Signature verification failed' }, 401);
+  }
+  if (matchedAccountId) {
+    await admin
+      .from('sendblue_accounts')
+      .update({ webhook_last_event_at: new Date().toISOString() })
+      .eq('id', matchedAccountId);
   }
 
   let payload: any;
