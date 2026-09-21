@@ -183,14 +183,16 @@ async function discoverLines(keyId: string, secret: string) {
     const lines = extractProviderLines(verification.payload);
     if (lines.length > 0) return { ok: true, supported: true, verification, lines };
   }
-  // Credentials are good but the proving endpoint carried no lines; try the
-  // dedicated listing endpoints explicitly before reporting "not available".
-  for (const endpoint of ['/api/v2/lines', '/api/v2/numbers', '/api/v2/accounts/lines']) {
+  // Credentials are good but the proving endpoint carried no lines; ask the
+  // documented assigned-numbers endpoint explicitly before reporting
+  // "not available". GET /api/lines is the only documented listing.
+  for (const endpoint of LINE_ENDPOINTS) {
     if (endpoint === verification.endpoint) continue;
     try {
       const res = await fetch(`${SENDBLUE_BASE}${endpoint}`, { headers: sendblueHeaders({ keyId, secret }) });
-      if (!res.ok) continue;
-      const lines = extractProviderLines(await res.json().catch(() => null));
+      const text = await res.text();
+      if (!classifyProbe(res.status, text).ok) continue;
+      const lines = extractProviderLines(safeJson(text));
       if (lines.length > 0) return { ok: true, supported: true, verification: { ...verification, endpoint }, lines };
     } catch {
       // keep probing
