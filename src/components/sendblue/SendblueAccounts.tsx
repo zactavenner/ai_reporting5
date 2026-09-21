@@ -268,6 +268,24 @@ export function SendblueAccounts({ accounts, lines, coverage, webhookConfigured,
                         {verify.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
                         Test connection
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => configureWebhooks.mutate({ account_id: account.id })}
+                        disabled={configureWebhooks.isPending || account.status !== 'connected'}
+                        title={
+                          account.status === 'connected'
+                            ? 'Adds only the missing Reporting webhooks — existing ones stay as they are'
+                            : 'Verify the credentials first'
+                        }
+                      >
+                        {configureWebhooks.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Webhook className="mr-2 h-4 w-4" />
+                        )}
+                        Configure Reporting webhooks
+                      </Button>
                       <Button size="sm" variant="outline" onClick={() => runDiscover(account.id)} disabled={discover.isPending}>
                         {discover.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
                         Find this account's numbers
