@@ -501,6 +501,212 @@ Deno.serve(async (req) => {
       return json({ ok: true, supported: true, stage: 'created', line: publicLine(data) });
     }
 
+    /* ---------------- account onboarding ---------------- */
+
+    if (action === 'accounts') {
+      let query = admin.from('sendblue_accounts').select('*').order('created_at', { ascending: true });
+      if (body.client_id) query = query.eq('client_id', body.client_id);
+      const { data, error } = await query;
+      if (error) throw error;
+      return json({ ok: true, accounts: (data || []).map(publicAccount) });
+    }
+
+    if (action === 'save_account') {
+      const label = String(body.label || '').trim();
+      const keyId = String(body.api_key_id || '').trim();
+      const secret = String(body.api_secret || '').trim();
+      if (!label) return json({ error: 'A label is required' }, 400);
+      if (!keyId || !secret) return json({ error: 'Both the API key id and API secret are required' }, 400);
+
+      const verification = await verifyCredentials(keyId, secret);
+      const now = new Date().toISOString();
+      const { data, error } = await admin
+        .from('sendblue_accounts')
+        .upsert(
+          {
+            client_id: body.client_id || null,
+            label,
+            api_key_id: keyId,
+            api_secret: secret,
+            status: verification.status,
+            verified_at: verification.ok ? now : null,
+            verify_endpoint: verification.ok ? verification.endpoint : null,
+            last_checked_at: now,
+            last_error: verification.ok ? null : verification.detail,
+            notes: body.notes ? String(body.notes) : null,
+            active: true,
+          },
+          { onConflict: 'api_key_id' },
+        )
+        .select('*')
+        .single();
+      if (error) throw error;
+      return json({
+        ok: true,
+        verified: verification.ok,
+        detail: verification.ok ? null : verification.detail,
+        account: publicAccount(data),
+      });
+    }
+
+    if (action === 'update_account') {
+      const id = String(body.account_id || '');
+      if (!id) return json({ error: 'account_id is required' }, 400);
+      const patch: Record<string, unknown> = {};
+      if (body.label !== undefined) patch.label = String(body.label);
+      if (body.client_id !== undefined) patch.client_id = body.client_id || null;
+      if (body.notes !== undefined) patch.notes = body.notes ? String(body.notes) : null;
+      if (body.active !== undefined) {
+        patch.active = Boolean(body.active);
+        if (!body.active) patch.status = 'disabled';
+      }
+      if (body.api_key_id && body.api_secret) {
+        const verification = await verifyCredentials(String(body.api_key_id), String(body.api_secret));
+        patch.api_key_id = String(body.api_key_id);
+        patch.api_secret = String(body.api_secret);
+        patch.status = verification.status;
+        patch.verified_at = verification.ok ? new Date().toISOString() : null;
+        patch.verify_endpoint = verification.ok ? verification.endpoint : null;
+        patch.last_error = verification.ok ? null : verification.detail;
+        patch.last_checked_at = new Date().toISOString();
+      }
+      const { data, error } = await admin.from('sendblue_accounts').update(patch).eq('id', id).select('*').single();
+      if (error) throw error;
+      return json({ ok: true, account: publicAccount(data) });
+    }
+
+    if (action === 'verify_account') {
+      const id = String(body.account_id || '');
+      const creds = await accountCredentials(id);
+      if (!creds) return json({ error: 'Account not found or has no credentials saved' }, 404);
+      const verification = await verifyCredentials(creds.keyId, creds.secret);
+      const now = new Date().toISOString();
+      const { data } = await admin
+        .from('sendblue_accounts')
+        .update({
+          status: verification.status,
+          verified_at: verification.ok ? now : null,
+          verify_endpoint: verification.ok ? verification.endpoint : null,
+          last_checked_at: now,
+          last_error: verification.ok ? null : verification.detail,
+        })
+        .eq('id', id)
+        .select('*')
+        .single();
+      // Keep the account's lines honest about their credential state too.
+      await admin
+        .from('sendblue_lines')
+        .update({
+          status: verification.ok ? 'connected' : verification.status,
+          last_error: verification.ok ? null : verification.detail,
+          last_tested_at: now,
+        })
+        .eq('account_id', id);
+      return json({
+        ok: verification.ok,
+        status: verification.status,
+        detail: verification.ok ? null : verification.detail,
+        checked_at: now,
+        verified_at: verification.ok ? now : null,
+        endpoint: verification.ok ? verification.endpoint : null,
+        account: data ? publicAccount(data) : null,
+      });
+    }
+
+    if (action === 'discover_lines') {
+      const id = String(body.account_id || '');
+      const creds = await accountCredentials(id);
+      if (!creds) return json({ error: 'Account not found or has no credentials saved' }, 404);
+      const result = await discoverLines(creds.keyId, creds.secret);
+      const now = new Date().toISOString();
+      await admin
+        .from('sendblue_accounts')
+        .update({
+          status: result.verification.status,
+          verified_at: result.verification.ok ? now : null,
+          verify_endpoint: result.verification.ok ? result.verification.endpoint : null,
+          last_checked_at: now,
+          last_error: result.verification.ok ? null : result.verification.detail,
+        })
+        .eq('id', id);
+
+      const { data: existing } = await admin.from('sendblue_lines').select('phone_e164, account_id, client_id');
+      const existingPhones = new Set((existing || []).map((l: any) => l.phone_e164));
+      return json({
+        ok: result.verification.ok,
+        supported: result.supported,
+        checked_at: now,
+        detail: result.verification.ok
+          ? result.supported
+            ? null
+            : 'Sendblue did not return any phone lines for this account, so numbers have to be entered by hand.'
+          : result.verification.detail,
+        lines: result.lines.map((l) => ({
+          phone_e164: l.phone_e164,
+          label: l.label,
+          provider_line_id: l.provider_line_id,
+          already_imported: existingPhones.has(l.phone_e164),
+        })),
+      });
+    }
+
+    if (action === 'import_lines') {
+      const id = String(body.account_id || '');
+      const creds = await accountCredentials(id);
+      if (!creds) return json({ error: 'Account not found or has no credentials saved' }, 404);
+      const requested: unknown[] = Array.isArray(body.phones) ? body.phones : [];
+      if (requested.length === 0) return json({ error: 'Pick at least one number to import' }, 400);
+
+      const result = await discoverLines(creds.keyId, creds.secret);
+      if (!result.verification.ok) {
+        return json({ ok: false, detail: result.verification.detail, imported: 0 }, 200);
+      }
+      const { data: existing } = await admin.from('sendblue_lines').select('phone_e164');
+      const plan = planLineImport(
+        result.lines,
+        requested,
+        (existing || []).map((l: any) => l.phone_e164),
+        creds.row.label || 'Sendblue line',
+      );
+
+      const clientId = body.client_id !== undefined ? body.client_id || null : creds.row.client_id || null;
+      const planType = body.plan_type === 'outbound' ? 'outbound' : 'inbound_only';
+      const inserted: any[] = [];
+      for (const entry of plan.toInsert) {
+        const { data, error } = await admin
+          .from('sendblue_lines')
+          .insert({
+            client_id: clientId,
+            account_id: id,
+            label: entry.label,
+            phone_e164: entry.phone_e164,
+            plan_type: planType,
+            provisioned_via: 'imported',
+            provider_line_id: entry.provider_line_id,
+            provider_metadata: entry.raw,
+            status: 'connected',
+            last_tested_at: new Date().toISOString(),
+            active: true,
+          })
+          .select('*')
+          .single();
+        if (error) {
+          // A concurrent import already registered it — never duplicate.
+          plan.alreadyImported.push(entry.phone_e164);
+          continue;
+        }
+        inserted.push(publicLine(data));
+      }
+
+      return json({
+        ok: true,
+        imported: inserted.length,
+        skipped_already_imported: plan.alreadyImported,
+        skipped_unknown: plan.invalid,
+        lines: inserted,
+      });
+    }
+
     if (action === 'run_mirrors') {
       const outcomes = await runMirrors(admin, Math.min(Number(body.limit) || 25, 100));
       return json({ ok: true, outcomes });
