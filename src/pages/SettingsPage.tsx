@@ -460,6 +460,8 @@ export default function SettingsPage() {
 
             <UsageDashboard />
 
+            <SendblueAccountsSettingsCard />
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">How to get API keys & understand tiers</CardTitle>
