@@ -393,7 +393,7 @@ class Runner {
   async webhook() {
     const messageId = String(this.body.message_id || this.body.messageId || "").trim();
     const clientId = String(this.body.client_id || "").trim();
-    if (!messageId || !clientId) return json({ error: "message_id and client_id are required" }, 400);
+    if (!messageId || !clientId) return { ok: false, error: "message_id and client_id are required" };
 
     const { apiKey, locationId } = await getMappedGhl(this.sb, clientId);
     if (!apiKey || !locationId) return { ok: false, error: "no CRM credentials" };
