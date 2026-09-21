@@ -21008,6 +21008,410 @@ export type Database = {
           },
         ]
       }
+      sendblue_conversations: {
+        Row: {
+          client_id: string | null
+          contact_name: string | null
+          contact_phone: string
+          created_at: string
+          ghl_contact_id: string | null
+          id: string
+          last_message_at: string | null
+          last_message_preview: string | null
+          line_id: string
+          match_checked_at: string | null
+          match_state: string
+          unread_count: number
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          contact_name?: string | null
+          contact_phone: string
+          created_at?: string
+          ghl_contact_id?: string | null
+          id?: string
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          line_id: string
+          match_checked_at?: string | null
+          match_state?: string
+          unread_count?: number
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          contact_name?: string | null
+          contact_phone?: string
+          created_at?: string
+          ghl_contact_id?: string | null
+          id?: string
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          line_id?: string
+          match_checked_at?: string | null
+          match_state?: string
+          unread_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sendblue_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sendblue_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_conversations_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "sendblue_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sendblue_ghl_mirrors: {
+        Row: {
+          attempts: number
+          client_id: string | null
+          completed_at: string | null
+          created_at: string
+          ghl_contact_id: string | null
+          ghl_note_id: string | null
+          id: string
+          last_error: string | null
+          lease_expires_at: string | null
+          lease_owner: string | null
+          marker: string
+          message_id: string
+          skipped_reason: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          ghl_contact_id?: string | null
+          ghl_note_id?: string | null
+          id?: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          marker: string
+          message_id: string
+          skipped_reason?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          ghl_contact_id?: string | null
+          ghl_note_id?: string | null
+          id?: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          marker?: string
+          message_id?: string
+          skipped_reason?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sendblue_ghl_mirrors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_ghl_mirrors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sendblue_ghl_mirrors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_ghl_mirrors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_ghl_mirrors_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: true
+            referencedRelation: "sendblue_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sendblue_lines: {
+        Row: {
+          active: boolean
+          api_key_id: string | null
+          api_secret: string | null
+          client_id: string | null
+          created_at: string
+          id: string
+          label: string
+          last_error: string | null
+          last_tested_at: string | null
+          notes: string | null
+          phone_e164: string
+          plan_type: string
+          provider_line_id: string | null
+          provisioned_via: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          api_key_id?: string | null
+          api_secret?: string | null
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          label: string
+          last_error?: string | null
+          last_tested_at?: string | null
+          notes?: string | null
+          phone_e164: string
+          plan_type?: string
+          provider_line_id?: string | null
+          provisioned_via?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          api_key_id?: string | null
+          api_secret?: string | null
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          label?: string
+          last_error?: string | null
+          last_tested_at?: string | null
+          notes?: string | null
+          phone_e164?: string
+          plan_type?: string
+          provider_line_id?: string | null
+          provisioned_via?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sendblue_lines_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_lines_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sendblue_lines_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_lines_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      sendblue_messages: {
+        Row: {
+          body: string | null
+          campaign_id: string | null
+          channel: string
+          client_id: string | null
+          conversation_id: string
+          created_at: string
+          delivered_at: string | null
+          direction: string
+          error_message: string | null
+          id: string
+          idempotency_key: string | null
+          line_id: string
+          media_urls: Json
+          provider_message_handle: string | null
+          provider_message_id: string | null
+          received_at: string | null
+          sent_at: string | null
+          sent_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          campaign_id?: string | null
+          channel?: string
+          client_id?: string | null
+          conversation_id: string
+          created_at?: string
+          delivered_at?: string | null
+          direction: string
+          error_message?: string | null
+          id?: string
+          idempotency_key?: string | null
+          line_id: string
+          media_urls?: Json
+          provider_message_handle?: string | null
+          provider_message_id?: string | null
+          received_at?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          campaign_id?: string | null
+          channel?: string
+          client_id?: string | null
+          conversation_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          direction?: string
+          error_message?: string | null
+          id?: string
+          idempotency_key?: string | null
+          line_id?: string
+          media_urls?: Json
+          provider_message_handle?: string | null
+          provider_message_id?: string | null
+          received_at?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sendblue_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sendblue_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "sendblue_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sendblue_messages_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "sendblue_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sendblue_optouts: {
+        Row: {
+          created_at: string
+          id: string
+          line_id: string | null
+          phone_e164: string
+          source: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          line_id?: string | null
+          phone_e164: string
+          source?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          line_id?: string | null
+          phone_e164?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sendblue_optouts_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "sendblue_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sheet_audit_runs: {
         Row: {
           accuracy_delta_count: number
