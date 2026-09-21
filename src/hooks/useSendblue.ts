@@ -287,3 +287,72 @@ export function useSendSendblueMessage() {
     onError: (err: any) => toast.error(err?.message || 'Send failed'),
   });
 }
+
+/* ---------------- account onboarding ---------------- */
+
+export function useSaveSendblueAccount() {
+  return useAdminMutation<{
+    label: string;
+    api_key_id: string;
+    api_secret: string;
+    client_id?: string | null;
+    notes?: string;
+  }>(
+    (vars) => ({ action: 'save_account', ...vars }),
+    (res) =>
+      res?.verified
+        ? 'Account saved and credentials verified with Sendblue'
+        : `Account saved, but Sendblue did not accept the keys: ${res?.detail || 'unknown reason'}`,
+  );
+}
+
+export function useUpdateSendblueAccount() {
+  return useAdminMutation<Record<string, unknown> & { account_id: string }>(
+    (vars) => ({ action: 'update_account', ...vars }),
+    () => 'Account updated',
+  );
+}
+
+export function useVerifySendblueAccount() {
+  return useAdminMutation<{ account_id: string }>(
+    (vars) => ({ action: 'verify_account', ...vars }),
+    (res) =>
+      res?.ok
+        ? `Credentials verified ${res?.verified_at ? new Date(res.verified_at).toLocaleString() : ''}`
+        : `Not verified: ${res?.detail || 'Sendblue did not accept these keys'}`,
+  );
+}
+
+export function useDiscoverSendblueLines() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { account_id: string }) =>
+      callAdmin<{ ok: boolean; supported: boolean; detail: string | null; lines: SendblueDiscoveredLine[] }>({
+        action: 'discover_lines',
+        ...vars,
+      }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['sendblue-accounts'] });
+      if (!res.ok) toast.error(res.detail || 'Sendblue did not accept these keys');
+      else if (!res.supported) toast.warning(res.detail || 'Sendblue returned no numbers for this account');
+      else toast.success(`${res.lines.length} number${res.lines.length === 1 ? '' : 's'} found`);
+    },
+    onError: (err: any) => toast.error(err?.message || 'Lookup failed'),
+  });
+}
+
+export function useImportSendblueLines() {
+  return useAdminMutation<{
+    account_id: string;
+    phones: string[];
+    client_id?: string | null;
+    plan_type?: 'inbound_only' | 'outbound';
+  }>(
+    (vars) => ({ action: 'import_lines', ...vars }),
+    (res) => {
+      if (!res?.ok) return res?.detail || 'Numbers were not added';
+      const skipped = (res.skipped_already_imported?.length || 0) + (res.skipped_unknown?.length || 0);
+      return `${res.imported} number${res.imported === 1 ? '' : 's'} added${skipped ? `, ${skipped} skipped` : ''}`;
+    },
+  );
+}
