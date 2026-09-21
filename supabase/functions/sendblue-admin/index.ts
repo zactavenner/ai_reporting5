@@ -31,6 +31,7 @@ import {
   classifyProbe,
   connectionSignals,
   extractProviderLines,
+  LINE_ENDPOINTS,
   isLineEndpoint,
   planLineImport,
   WEBHOOKS_ENDPOINT,
@@ -139,8 +140,9 @@ function publicAccount(row: any) {
 
 /**
  * Real read-only verification: walks the candidate GET endpoints and stops at
- * the first 2xx, recording which endpoint proved the credentials. A 401/403 is
- * reported as rejected immediately — retrying other endpoints cannot change it.
+ * the first genuinely successful answer (2xx that parses as JSON and carries no
+ * body-level ERROR), recording which endpoint proved the credentials. A 401/403,
+ * or a body-level authentication error, is reported as rejected immediately.
  */
 async function verifyCredentials(keyId: string, secret: string) {
   let last = { ok: false, status: 'error', detail: 'Sendblue could not be reached.', endpoint: null as string | null, payload: null as unknown };
@@ -819,7 +821,8 @@ Deno.serve(async (req) => {
         headers: sendblueHeaders({ keyId: creds.keyId, secret: creds.secret }),
       });
       const readbackText = await readbackRes.text();
-      const after = readbackRes.ok ? parseProviderWebhooks(safeJson(readbackText)) : existing;
+      const readbackOk = classifyProbe(readbackRes.status, readbackText).ok;
+      const after = readbackOk ? parseProviderWebhooks(safeJson(readbackText)) : existing;
       const check = verifyWebhookReadback(after, desired);
       const now = new Date().toISOString();
 
@@ -867,7 +870,8 @@ Deno.serve(async (req) => {
         headers: sendblueHeaders({ keyId: creds.keyId, secret: creds.secret }),
       });
       const text = await res.text();
-      if (!res.ok) return json({ ok: false, detail: classifyProbe(res.status, text).detail }, 200);
+      const statusOutcome = classifyProbe(res.status, text);
+      if (!statusOutcome.ok) return json({ ok: false, detail: statusOutcome.detail }, 200);
       const hooks = parseProviderWebhooks(safeJson(text));
       const receiverUrl = reportingWebhookUrl();
       const check = verifyWebhookReadback(hooks, [
