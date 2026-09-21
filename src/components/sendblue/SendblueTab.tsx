@@ -6,6 +6,7 @@ import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { useSendblueOverview, useRunSendblueMirrors } from '@/hooks/useSendblue';
 import { SendblueInbox } from './SendblueInbox';
 import { SendblueLines } from './SendblueLines';
+import { SendblueAccounts } from './SendblueAccounts';
 
 interface Props {
   /** When set, everything is scoped to this client's numbers only. */
