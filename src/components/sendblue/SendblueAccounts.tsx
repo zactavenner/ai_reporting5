@@ -236,8 +236,15 @@ export function SendblueAccounts({ accounts, lines, coverage, webhookConfigured,
                           ? `Credentials verified ${account.verified_at ? new Date(account.verified_at).toLocaleString() : ''}`
                           : 'Credentials not verified'}
                       </Badge>
-                      <Badge variant={webhookConfigured ? 'secondary' : 'outline'}>
-                        {webhookConfigured ? 'Webhook secret configured' : 'Webhook not configured'}
+                      <Badge variant={account.webhook_health?.receive_hook_registered ? 'secondary' : 'outline'}>
+                        {account.webhook_health?.receive_hook_registered
+                          ? 'Incoming webhook registered with Sendblue'
+                          : 'Incoming webhook not registered'}
+                      </Badge>
+                      <Badge variant={account.webhook_health?.outbound_hook_registered ? 'secondary' : 'outline'}>
+                        {account.webhook_health?.outbound_hook_registered
+                          ? 'Delivery webhook registered with Sendblue'
+                          : 'Delivery webhook not registered'}
                       </Badge>
                       <Badge variant={accountLines.some((l) => l.first_inbound_at) ? 'secondary' : 'outline'}>
                         {accountLines.some((l) => l.first_inbound_at) ? 'Incoming message received' : 'No incoming message yet'}
