@@ -190,6 +190,7 @@ function useAdminMutation<TVars>(
     onSuccess: (res, vars) => {
       qc.invalidateQueries({ queryKey: ['sendblue-overview'] });
       qc.invalidateQueries({ queryKey: ['sendblue-conversations'] });
+      qc.invalidateQueries({ queryKey: ['sendblue-accounts'] });
       const msg = successMessage(res, vars);
       if (msg) toast.success(msg);
     },
