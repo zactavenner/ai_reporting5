@@ -87,22 +87,28 @@ function publicLine(row: any) {
   };
 }
 
+/**
+ * Read-only credential probe against the documented endpoints. Verification is
+ * judged by classifyProbe, which also rejects a 2xx carrying a body-level ERROR.
+ */
 async function probeCredentials(keyId: string, secret: string) {
-  try {
-    const res = await fetch(`${SENDBLUE_BASE}/api/v2/messages?limit=1`, {
-      headers: sendblueHeaders({ keyId, secret }),
-    });
-    const text = await res.text();
-    if (res.status === 401 || res.status === 403) {
-      return { ok: false, status: 'credentials_rejected', detail: `Sendblue rejected the credentials (${res.status}).` };
+  let last = { ok: false, status: 'error', detail: 'No Sendblue endpoint answered.' as string | null };
+  for (const endpoint of VERIFY_ENDPOINTS) {
+    try {
+      const res = await fetch(`${SENDBLUE_BASE}${endpoint}`, {
+        headers: sendblueHeaders({ keyId, secret }),
+      });
+      const text = await res.text();
+      const outcome = classifyProbe(res.status, text);
+      if (outcome.ok) return { ...outcome, endpoint };
+      last = { ...outcome, endpoint } as typeof last;
+      // Rejected keys are final — no point trying the other endpoints.
+      if (outcome.status === 'credentials_rejected') return last;
+    } catch (err) {
+      last = { ok: false, status: 'error', detail: err instanceof Error ? err.message : 'network error' };
     }
-    if (!res.ok) {
-      return { ok: false, status: 'error', detail: `Sendblue returned ${res.status}: ${text.slice(0, 160)}` };
-    }
-    return { ok: true, status: 'connected', detail: null as string | null };
-  } catch (err) {
-    return { ok: false, status: 'error', detail: err instanceof Error ? err.message : 'network error' };
   }
+  return last;
 }
 
 function publicAccount(row: any) {
