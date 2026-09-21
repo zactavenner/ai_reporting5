@@ -71,6 +71,8 @@ export interface SendblueLineHealth {
 
 export interface SendblueOverview {
   ok: boolean;
+  accounts?: SendblueAccount[];
+  coverage?: SendblueCoverage;
   agency_credentials_configured: boolean;
   webhook_secret_configured: boolean;
   lines: SendblueLine[];
