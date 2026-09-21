@@ -58,3 +58,10 @@ Plan: `.lovable/plan/week-4-ai-marketing-inside-reporting-5-0-2026-09-21.md`
 - [x] `call-transcription` pending queue now only takes rows with a confirmed-fetchable recording.
 - [x] Read-only audit proves recordings exist: AMT 2/8, Atlas Parker 4/8, Clear Summit 2/7, Clever Capital 2/3 available; most gaps are calls under 30s.
 - [ ] Owner decisions before capture is enabled for any client: pilot client, recording consent confirmation, retention, backfill window (default 30 days).
+
+## Sendblue (texting) — built Sep 21
+- Tab live on the main menu and inside every client account (Messages / Numbers / Connection).
+- Numbers registry: add an existing Sendblue number or request a new one (preview then confirm).
+- Sending: replies always allowed after an inbound message; starting a new conversation requires an outbound-capable number; opt-outs block every send.
+- Every message is mirrored into the client's CRM contact as an internal note only (exact phone match; ambiguous or unmatched are skipped, never guessed).
+- Open: agency Sendblue API key + secret, the webhook signing secret, and a first pilot client for end-to-end proof.
