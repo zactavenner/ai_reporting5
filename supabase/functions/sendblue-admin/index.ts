@@ -807,12 +807,9 @@ Deno.serve(async (req) => {
           headers: sendblueHeaders({ keyId: creds.keyId, secret: creds.secret }),
           body: JSON.stringify({ url: hook.url, secret: webhookSecret, type: hook.type }),
         });
-        if (!res.ok) {
-          const text = await res.text();
-          appendErrors.push(`${hook.type}: ${classifyProbe(res.status, text).detail}`);
-        } else {
-          await res.text();
-        }
+        const text = await res.text();
+        const outcome = classifyProbe(res.status, text);
+        if (!outcome.ok) appendErrors.push(`${hook.type}: ${outcome.detail}`);
       }
 
       // 4. Prove it by reading the list back.
