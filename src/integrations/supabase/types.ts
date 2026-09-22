@@ -5110,6 +5110,48 @@ export type Database = {
           },
         ]
       }
+      call_intel_sweeps: {
+        Row: {
+          created_at: string
+          id: string
+          message: string | null
+          per_client: Json
+          recipient: string | null
+          sms_error: string | null
+          sms_status: string
+          sweep_date: string
+          timezone: string
+          totals: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          per_client?: Json
+          recipient?: string | null
+          sms_error?: string | null
+          sms_status?: string
+          sweep_date: string
+          timezone?: string
+          totals?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          per_client?: Json
+          recipient?: string | null
+          sms_error?: string | null
+          sms_status?: string
+          sweep_date?: string
+          timezone?: string
+          totals?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       call_recording_capture_state: {
         Row: {
           client_id: string
@@ -17102,15 +17144,20 @@ export type Database = {
       }
       meeting_records: {
         Row: {
+          accredited: string | null
           action_items: Json
+          analyzed_at: string | null
           attributed_at: string | null
           attribution_method: string | null
           client_id: string | null
+          commitment_level: string | null
           contact_email: string | null
           contact_name: string | null
           created_at: string
+          creative_briefs: Json
           duration_minutes: number | null
           ended_at: string | null
+          follow_up_date: string | null
           ghl_appointment_id: string | null
           ghl_calendar_id: string | null
           ghl_calendar_name: string | null
@@ -17119,33 +17166,53 @@ export type Database = {
           guest_invite_job_id: string | null
           host_email: string | null
           id: string
+          important_quotes: Json
+          intent_score: number | null
+          investment_amount: number | null
+          investment_range: string | null
+          investment_timeline: string | null
           language: string | null
           meeting_external_id: string
+          missed_follow_ups: Json
+          next_step: string | null
+          objections: Json
+          outcome: string | null
           participants: Json
           provider: string
+          qualification_evidence: Json
+          qualification_score: number | null
           raw: Json
           recording_url: string | null
+          rep_coaching: Json
           sales_agent_id: string | null
           sales_agent_name: string | null
+          score_breakdown: Json
+          sentiment: string | null
           source_url: string | null
           started_at: string | null
           status: string | null
           summary: string | null
+          tags: Json
           title: string | null
           transcript_text: string | null
           transcript_url: string | null
           updated_at: string
         }
         Insert: {
+          accredited?: string | null
           action_items?: Json
+          analyzed_at?: string | null
           attributed_at?: string | null
           attribution_method?: string | null
           client_id?: string | null
+          commitment_level?: string | null
           contact_email?: string | null
           contact_name?: string | null
           created_at?: string
+          creative_briefs?: Json
           duration_minutes?: number | null
           ended_at?: string | null
+          follow_up_date?: string | null
           ghl_appointment_id?: string | null
           ghl_calendar_id?: string | null
           ghl_calendar_name?: string | null
@@ -17154,33 +17221,53 @@ export type Database = {
           guest_invite_job_id?: string | null
           host_email?: string | null
           id?: string
+          important_quotes?: Json
+          intent_score?: number | null
+          investment_amount?: number | null
+          investment_range?: string | null
+          investment_timeline?: string | null
           language?: string | null
           meeting_external_id: string
+          missed_follow_ups?: Json
+          next_step?: string | null
+          objections?: Json
+          outcome?: string | null
           participants?: Json
           provider?: string
+          qualification_evidence?: Json
+          qualification_score?: number | null
           raw?: Json
           recording_url?: string | null
+          rep_coaching?: Json
           sales_agent_id?: string | null
           sales_agent_name?: string | null
+          score_breakdown?: Json
+          sentiment?: string | null
           source_url?: string | null
           started_at?: string | null
           status?: string | null
           summary?: string | null
+          tags?: Json
           title?: string | null
           transcript_text?: string | null
           transcript_url?: string | null
           updated_at?: string
         }
         Update: {
+          accredited?: string | null
           action_items?: Json
+          analyzed_at?: string | null
           attributed_at?: string | null
           attribution_method?: string | null
           client_id?: string | null
+          commitment_level?: string | null
           contact_email?: string | null
           contact_name?: string | null
           created_at?: string
+          creative_briefs?: Json
           duration_minutes?: number | null
           ended_at?: string | null
+          follow_up_date?: string | null
           ghl_appointment_id?: string | null
           ghl_calendar_id?: string | null
           ghl_calendar_name?: string | null
@@ -17189,18 +17276,33 @@ export type Database = {
           guest_invite_job_id?: string | null
           host_email?: string | null
           id?: string
+          important_quotes?: Json
+          intent_score?: number | null
+          investment_amount?: number | null
+          investment_range?: string | null
+          investment_timeline?: string | null
           language?: string | null
           meeting_external_id?: string
+          missed_follow_ups?: Json
+          next_step?: string | null
+          objections?: Json
+          outcome?: string | null
           participants?: Json
           provider?: string
+          qualification_evidence?: Json
+          qualification_score?: number | null
           raw?: Json
           recording_url?: string | null
+          rep_coaching?: Json
           sales_agent_id?: string | null
           sales_agent_name?: string | null
+          score_breakdown?: Json
+          sentiment?: string | null
           source_url?: string | null
           started_at?: string | null
           status?: string | null
           summary?: string | null
+          tags?: Json
           title?: string | null
           transcript_text?: string | null
           transcript_url?: string | null
@@ -20026,6 +20128,7 @@ export type Database = {
           contact_name: string | null
           contact_phone: string | null
           created_at: string
+          creative_briefs: Json
           direction: string | null
           duration_seconds: number | null
           ended_at: string | null
@@ -20039,16 +20142,21 @@ export type Database = {
           investment_range: string | null
           investment_timeline: string | null
           is_ai_caller: boolean
+          missed_follow_ups: Json
           next_step: string | null
           objections: Json | null
           outcome: string | null
           provider: string | null
+          qualification_evidence: Json
+          qualification_score: number | null
           qualified: boolean | null
           raw_payload: Json | null
           recording_attempts: number
           recording_checked_at: string | null
           recording_status: string | null
           recording_url: string | null
+          rep_coaching: Json
+          score_breakdown: Json
           sentiment: string | null
           speaker_segments: Json | null
           started_at: string | null
@@ -20084,6 +20192,7 @@ export type Database = {
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string
+          creative_briefs?: Json
           direction?: string | null
           duration_seconds?: number | null
           ended_at?: string | null
@@ -20097,16 +20206,21 @@ export type Database = {
           investment_range?: string | null
           investment_timeline?: string | null
           is_ai_caller?: boolean
+          missed_follow_ups?: Json
           next_step?: string | null
           objections?: Json | null
           outcome?: string | null
           provider?: string | null
+          qualification_evidence?: Json
+          qualification_score?: number | null
           qualified?: boolean | null
           raw_payload?: Json | null
           recording_attempts?: number
           recording_checked_at?: string | null
           recording_status?: string | null
           recording_url?: string | null
+          rep_coaching?: Json
+          score_breakdown?: Json
           sentiment?: string | null
           speaker_segments?: Json | null
           started_at?: string | null
@@ -20142,6 +20256,7 @@ export type Database = {
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string
+          creative_briefs?: Json
           direction?: string | null
           duration_seconds?: number | null
           ended_at?: string | null
@@ -20155,16 +20270,21 @@ export type Database = {
           investment_range?: string | null
           investment_timeline?: string | null
           is_ai_caller?: boolean
+          missed_follow_ups?: Json
           next_step?: string | null
           objections?: Json | null
           outcome?: string | null
           provider?: string | null
+          qualification_evidence?: Json
+          qualification_score?: number | null
           qualified?: boolean | null
           raw_payload?: Json | null
           recording_attempts?: number
           recording_checked_at?: string | null
           recording_status?: string | null
           recording_url?: string | null
+          rep_coaching?: Json
+          score_breakdown?: Json
           sentiment?: string | null
           speaker_segments?: Json | null
           started_at?: string | null
@@ -24764,24 +24884,33 @@ export type Database = {
           contact_name: string | null
           contact_phone: string | null
           created_at: string | null
+          creative_briefs: Json | null
           direction: string | null
           duration_seconds: number | null
           ended_at: string | null
           follow_up_date: string | null
           ghl_synced_at: string | null
+          has_recording: boolean | null
+          has_transcript: boolean | null
           id: string | null
           important_quotes: Json | null
           intent_score: number | null
           investment_amount: number | null
           investment_range: string | null
           investment_timeline: string | null
+          is_scored: boolean | null
           media_kind: string | null
+          missed_follow_ups: Json | null
           next_step: string | null
           objections: Json | null
           outcome: string | null
           participants: Json | null
           provider: string | null
+          qualification_evidence: Json | null
+          qualification_score: number | null
           recording_url: string | null
+          rep_coaching: Json | null
+          score_breakdown: Json | null
           sentiment: string | null
           source: string | null
           source_url: string | null
