@@ -65,3 +65,5 @@ Plan: `.lovable/plan/week-4-ai-marketing-inside-reporting-5-0-2026-09-21.md`
 - Sending: replies always allowed after an inbound message; starting a new conversation requires an outbound-capable number; opt-outs block every send.
 - Every message is mirrored into the client's CRM contact as an internal note only (exact phone match; ambiguous or unmatched are skipped, never guessed).
 - Open: agency Sendblue API key + secret, the webhook signing secret, and a first pilot client for end-to-end proof.
+
+- [ ] Send Atlas Parker ad spend Sep 16 - Sep 21 to its reporting sheet (requested Sep 22)
