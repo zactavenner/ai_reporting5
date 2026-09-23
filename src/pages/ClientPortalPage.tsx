@@ -14,6 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertCircle, CalendarDays, CheckCircle2, Clock3, Loader2, LogOut, MessageSquare, Plus, RefreshCw } from 'lucide-react';
 import {
+  ClientPortalComment,
   ClientPortalTask,
   useAddClientPortalComment,
   useClientPortal,
@@ -68,7 +69,7 @@ export default function ClientPortalPage() {
     [data?.tasks, activeClientId],
   );
   const commentsByTask = useMemo(() => {
-    const map = new Map<string, typeof data.comments>();
+    const map = new Map<string, ClientPortalComment[]>();
     for (const row of data?.comments || []) {
       const list = map.get(row.task_id) || [];
       list.push(row);
