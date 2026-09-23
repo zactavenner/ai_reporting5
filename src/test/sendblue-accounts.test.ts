@@ -292,8 +292,8 @@ describe('official webhook payload shapes', () => {
     ];
     const good = verifyWebhookReadback(
       [
-        { url: receiver, type: 'receive', secret: 'ours' },
-        { url: receiver, type: 'outbound', secret: 'ours' },
+        { url: receiver, type: 'receive', has_secret: true, secret: 'ours', raw: {} },
+        { url: receiver, type: 'outbound', has_secret: true, secret: 'ours', raw: {} },
       ],
       desired,
       'ours',
@@ -303,8 +303,8 @@ describe('official webhook payload shapes', () => {
 
     const wrong = verifyWebhookReadback(
       [
-        { url: receiver, type: 'receive', secret: 'someone-elses' },
-        { url: receiver, type: 'outbound', secret: 'ours' },
+        { url: receiver, type: 'receive', has_secret: true, secret: 'someone-elses', raw: {} },
+        { url: receiver, type: 'outbound', has_secret: true, secret: 'ours', raw: {} },
       ],
       desired,
       'ours',
@@ -315,8 +315,8 @@ describe('official webhook payload shapes', () => {
     // A read that exposes no secret is reported as unverifiable, never as proven.
     const silent = verifyWebhookReadback(
       [
-        { url: receiver, type: 'receive', secret: null },
-        { url: receiver, type: 'outbound', secret: null },
+        { url: receiver, type: 'receive', has_secret: false, secret: null, raw: {} },
+        { url: receiver, type: 'outbound', has_secret: false, secret: null, raw: {} },
       ],
       desired,
       'ours',

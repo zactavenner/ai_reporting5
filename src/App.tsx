@@ -46,6 +46,8 @@ const LeadQualityPage = lazyRetry(() => import("./pages/LeadQualityPage"));
 const WeeklyParityPage = lazyRetry(() => import("./pages/WeeklyParityPage"));
 const UnsubscribePage = lazyRetry(() => import("./pages/UnsubscribePage"));
 const LoginPage = lazyRetry(() => import("./pages/LoginPage"));
+const ClientPortalLogin = lazyRetry(() => import("./pages/ClientPortalLogin"));
+const ClientPortalPage = lazyRetry(() => import("./pages/ClientPortalPage"));
 const OAuthConsent = lazyRetry(() => import("./pages/OAuthConsent"));
 const HuddlePage = lazyRetry(() => import("./pages/HuddlePage"));
 const SetterPage = lazyRetry(() => import("./pages/SetterPage"));
@@ -115,6 +117,8 @@ const App = () => (
             <Route path="/taskurl" element={<PublicTaskUrl />} />
             <Route path="/unsubscribe" element={<UnsubscribePage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/client-login" element={<ClientPortalLogin />} />
+            <Route path="/client-portal" element={<ClientPortalPage />} />
             <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
 
             <Route path="*" element={<NotFound />} />
