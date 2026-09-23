@@ -810,7 +810,8 @@ Deno.serve(async (req) => {
           .eq('id', id);
         return json({ ok: false, detail: outcome.detail }, 200);
       }
-      let existing = parseProviderWebhooks(safeJson(listText));
+      const before = parseWebhookResponse(safeJson(listText));
+      const existing = before.hooks;
       const plan = planWebhookRegistration(existing, desired);
 
       // 2. Per-account signing secret, created once and kept server-side only.
@@ -819,37 +820,55 @@ Deno.serve(async (req) => {
         await admin.from('sendblue_accounts').update({ webhook_secret: webhookSecret }).eq('id', id);
       }
 
-      // 3. Append ONLY the missing hooks. POST appends; PUT would replace every
-      //    hook on the account, so it is never used here.
+      // 3. Append ONLY the missing hooks, in the documented body shape:
+      //    { webhooks: [{ url, secret }], type }. POST appends; PUT would replace
+      //    every hook on the account, so it is never used here.
       const appendErrors: string[] = [];
       for (const hook of plan.toAppend) {
         const res = await fetch(`${SENDBLUE_BASE}${WEBHOOKS_ENDPOINT}`, {
           method: 'POST',
           headers: sendblueHeaders({ keyId: creds.keyId, secret: creds.secret }),
-          body: JSON.stringify({ url: hook.url, secret: webhookSecret, type: hook.type }),
+          body: JSON.stringify(buildWebhookAppendBody([{ url: hook.url }], webhookSecret, hook.type)),
         });
         const text = await res.text();
         const outcome = classifyProbe(res.status, text);
         if (!outcome.ok) appendErrors.push(`${hook.type}: ${outcome.detail}`);
       }
 
-      // 4. Prove it by reading the list back.
+      // 4. Prove it by reading the list back. A failed or error-bodied read can
+      //    never mark anything registered.
       const readbackRes = await fetch(`${SENDBLUE_BASE}${WEBHOOKS_ENDPOINT}`, {
         headers: sendblueHeaders({ keyId: creds.keyId, secret: creds.secret }),
       });
       const readbackText = await readbackRes.text();
-      const readbackOk = classifyProbe(readbackRes.status, readbackText).ok;
-      const after = readbackOk ? parseProviderWebhooks(safeJson(readbackText)) : existing;
-      const check = verifyWebhookReadback(after, desired);
-      const now = new Date().toISOString();
+      const readbackOutcome = classifyProbe(readbackRes.status, readbackText);
+      const nowTs = new Date().toISOString();
+      if (!readbackOutcome.ok) {
+        const detail = `Could not confirm with Sendblue: ${readbackOutcome.detail}${appendErrors.length ? ` · ${appendErrors.join(' · ')}` : ''}`;
+        await admin
+          .from('sendblue_accounts')
+          .update({ webhook_last_checked_at: nowTs, webhook_last_error: detail })
+          .eq('id', id);
+        return json({ ok: false, detail, checked_at: nowTs, receiver_url: receiverUrl, registered: [], missing: desired.map((d) => d.type) }, 200);
+      }
 
-      const receiveOk = check.registered.some((r) => r.type === 'receive');
-      const outboundOk = check.registered.some((r) => r.type === 'outbound');
+      const afterParsed = parseWebhookResponse(safeJson(readbackText));
+      const after = afterParsed.hooks;
+      // The secret comparison happens here, server-side; it is never returned.
+      const check = verifyWebhookReadback(after, desired, webhookSecret);
+      const now = nowTs;
+
+      const proven = (type: string) =>
+        check.registered.some((r) => r.type === type) && !check.secret_mismatch.some((r) => r.type === type);
+      const receiveOk = proven('receive');
+      const outboundOk = proven('outbound');
       const detail = check.ok
         ? null
         : appendErrors.length
           ? appendErrors.join(' · ')
-          : `Sendblue still does not list: ${check.missing.map((m) => m.type).join(', ')}`;
+          : check.secret_mismatch.length
+            ? `Sendblue lists a different signing secret for: ${check.secret_mismatch.map((m) => m.type).join(', ')}`
+            : `Sendblue still does not list: ${check.missing.map((m) => m.type).join(', ')}`;
 
       const { data: updated } = await admin
         .from('sendblue_accounts')
@@ -870,10 +889,14 @@ Deno.serve(async (req) => {
         detail,
         checked_at: now,
         receiver_url: receiverUrl,
-        appended: plan.toAppend.filter((h) => check.registered.some((r) => r.type === h.type)).map((h) => h.type),
+        appended: plan.toAppend.filter((h) => proven(h.type)).map((h) => h.type),
         already_present: plan.alreadyPresent.map((h) => h.type),
         preserved_other_hooks: plan.preserved.length,
+        account_global_secret_present: afterParsed.global_secret_present,
         registered: check.registered.map((h) => h.type),
+        secret_verified: check.secret_verified.map((h) => h.type),
+        secret_mismatch: check.secret_mismatch.map((h) => h.type),
+        secret_unverifiable: check.secret_unknown.map((h) => h.type),
         missing: check.missing.map((h) => h.type),
         account: updated ? publicAccount(updated) : null,
       });
@@ -883,23 +906,37 @@ Deno.serve(async (req) => {
       const id = String(body.account_id || '');
       const creds = await accountCredentials(id);
       if (!creds) return json({ error: 'Account not found or has no credentials saved' }, 404);
+      const { data: accountRow } = await admin
+        .from('sendblue_accounts')
+        .select('webhook_secret')
+        .eq('id', id)
+        .maybeSingle();
       const res = await fetch(`${SENDBLUE_BASE}${WEBHOOKS_ENDPOINT}`, {
         headers: sendblueHeaders({ keyId: creds.keyId, secret: creds.secret }),
       });
       const text = await res.text();
       const statusOutcome = classifyProbe(res.status, text);
       if (!statusOutcome.ok) return json({ ok: false, detail: statusOutcome.detail }, 200);
-      const hooks = parseProviderWebhooks(safeJson(text));
+      const parsed = parseWebhookResponse(safeJson(text));
+      const hooks = parsed.hooks;
       const receiverUrl = reportingWebhookUrl();
-      const check = verifyWebhookReadback(hooks, [
-        { url: receiverUrl, type: 'receive' },
-        { url: receiverUrl, type: 'outbound' },
-      ]);
+      const check = verifyWebhookReadback(
+        hooks,
+        [
+          { url: receiverUrl, type: 'receive' },
+          { url: receiverUrl, type: 'outbound' },
+        ],
+        accountRow?.webhook_secret || null,
+      );
       return json({
         ok: check.ok,
         receiver_url: receiverUrl,
         registered: check.registered.map((h) => h.type),
+        secret_verified: check.secret_verified.map((h) => h.type),
+        secret_mismatch: check.secret_mismatch.map((h) => h.type),
+        secret_unverifiable: check.secret_unknown.map((h) => h.type),
         missing: check.missing.map((h) => h.type),
+        account_global_secret_present: parsed.global_secret_present,
         total_hooks_on_account: hooks.length,
       });
     }
