@@ -338,12 +338,17 @@ Deno.serve(async (req) => {
             }),
           };
         }),
+        accounts_with_credentials: accountsWithOwnCredentials,
         coverage: {
           accounts_total: (accounts || []).length,
           accounts_verified: (accounts || []).filter((a: any) => a.status === 'connected').length,
-          clients_total: (allClients || []).length,
+          accounts_with_credentials: accountsWithOwnCredentials,
+          // Denominator and numerator are the same population: ACTIVE clients.
+          clients_population: 'active',
+          clients_total: activeClientIds.size,
+          clients_all_total: (clientRows || []).length,
           clients_with_account: configuredClientIds.size,
-          clients_missing_account: Math.max((allClients || []).length - configuredClientIds.size, 0),
+          clients_missing_account: Math.max(activeClientIds.size - configuredClientIds.size, 0),
         },
         lines: (lines || []).map(publicLine),
         health,
