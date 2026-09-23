@@ -7917,6 +7917,99 @@ export type Database = {
           },
         ]
       }
+      client_portal_access: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          portal_profile_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          portal_profile_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          portal_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_portal_access_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_portal_access_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_portal_access_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_portal_access_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_portal_access_portal_profile_id_fkey"
+            columns: ["portal_profile_id"]
+            isOneToOne: false
+            referencedRelation: "client_portal_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_portal_profiles: {
+        Row: {
+          created_at: string
+          email: string
+          email_normalized: string | null
+          id: string
+          last_login_at: string | null
+          name: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          email_normalized?: string | null
+          id?: string
+          last_login_at?: string | null
+          name: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          email_normalized?: string | null
+          id?: string
+          last_login_at?: string | null
+          name?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       client_references: {
         Row: {
           client_id: string
