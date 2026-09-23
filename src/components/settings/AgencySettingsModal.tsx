@@ -23,6 +23,7 @@ import { Brain, Settings2, Key, DollarSign, Eye, EyeOff, Video, Copy, RefreshCw,
 import { ApiReferenceTab } from './ApiReferenceTab';
 import { HermesIntegrationTab } from './HermesIntegrationTab';
 import { MCPIntegrationTab } from './MCPIntegrationTab';
+import { SendblueAccountsSettingsCard } from '@/components/sendblue/SendblueAccountsSettingsCard';
 
 const OPENAI_MODELS = [
   { value: 'gpt-5', label: 'GPT-5' },
@@ -470,6 +471,8 @@ export function AgencySettingsModal({ open, onOpenChange }: AgencySettingsModalP
                 <li>Gemini Pro: ~${(parseFloat(apiUsageLimit) * 0.3).toFixed(0)} allocated</li>
               </ul>
             </div>
+
+            <SendblueAccountsSettingsCard />
           </TabsContent>
 
           <TabsContent value="integrations" className="space-y-6 mt-4">
