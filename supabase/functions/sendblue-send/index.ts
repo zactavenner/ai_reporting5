@@ -196,6 +196,17 @@ Deno.serve(async (req) => {
   const { data: line } = await admin.from('sendblue_lines').select('*').eq('id', lineId).maybeSingle();
   if (!line) return json({ error: 'Line not found' }, 404);
 
+  // Imported numbers carry no keys of their own — they belong to an account.
+  let account: any = null;
+  if (line.account_id) {
+    const { data: acct } = await admin
+      .from('sendblue_accounts')
+      .select('id, api_key_id, api_secret, active, status')
+      .eq('id', line.account_id)
+      .maybeSingle();
+    account = acct || null;
+  }
+
   const targets: SendTarget[] = Array.isArray(body.recipients) && body.recipients.length
     ? body.recipients.slice(0, 500).map((r: any) => ({ phone: String(r.phone || r), contact_name: r.contact_name || null }))
     : body.phone
@@ -208,7 +219,7 @@ Deno.serve(async (req) => {
 
   const results = [];
   for (const target of targets) {
-    results.push(await sendOne(line, target, message, kind, sentBy, body.campaign_id || null));
+    results.push(await sendOne(line, account, target, message, kind, sentBy, body.campaign_id || null));
   }
 
   // Mirror right away so the CRM note appears with the message.

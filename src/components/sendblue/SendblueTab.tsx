@@ -52,8 +52,18 @@ export function SendblueTab({ clientId, clients }: Props) {
     <div className="space-y-4">
       {!clientId && (
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={data.agency_credentials_configured ? 'secondary' : 'destructive'}>
-            {data.agency_credentials_configured ? 'Sendblue account keys saved' : 'Sendblue account keys missing'}
+          <Badge
+            variant={
+              (data.accounts_with_credentials ?? 0) > 0 || data.agency_credentials_configured
+                ? 'secondary'
+                : 'destructive'
+            }
+          >
+            {(data.accounts_with_credentials ?? 0) > 0
+              ? `${data.accounts_with_credentials} account${data.accounts_with_credentials === 1 ? '' : 's'} with keys saved`
+              : data.agency_credentials_configured
+                ? 'Agency-wide keys saved'
+                : 'No Sendblue keys saved yet'}
           </Badge>
           <Badge variant={data.webhook_secret_configured ? 'secondary' : 'destructive'}>
             {data.webhook_secret_configured ? 'Incoming messages verified' : 'Incoming message secret missing'}
