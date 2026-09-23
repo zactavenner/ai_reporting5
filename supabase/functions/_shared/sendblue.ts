@@ -43,6 +43,69 @@ export function credentialsFor(
   return { keyId, secret };
 }
 
+export interface SendblueLineCredentialInput {
+  api_key_id?: string | null;
+  api_secret?: string | null;
+  account_id?: string | null;
+}
+
+export interface SendblueAccountCredentialInput {
+  id?: string | null;
+  api_key_id?: string | null;
+  api_secret?: string | null;
+  active?: boolean | null;
+  status?: string | null;
+}
+
+export type CredentialResolution =
+  | { ok: true; credentials: SendblueCredentials; source: 'line' | 'account' | 'agency' }
+  | { ok: false; reason: 'account_missing' | 'account_disabled' | 'account_rejected' | 'account_no_credentials' | 'no_credentials'; detail: string };
+
+/**
+ * Credentials for a send, resolved in the only order that is safe:
+ *   1. the line's own keys,
+ *   2. the keys of the ACTIVE account the line was imported from,
+ *   3. the agency environment keys — and ONLY for lines with no linked account.
+ *
+ * A line linked to a disabled, rejected or credential-less account fails closed.
+ * It never borrows an unrelated account's or the agency's keys, because that
+ * would text from one client's number using another client's Sendblue account.
+ */
+export function resolveSendCredentials(
+  line: SendblueLineCredentialInput | null,
+  account: SendblueAccountCredentialInput | null,
+  env: { keyId?: string | null; secret?: string | null },
+): CredentialResolution {
+  if (line?.api_key_id && line?.api_secret) {
+    return { ok: true, credentials: { keyId: line.api_key_id, secret: line.api_secret }, source: 'line' };
+  }
+
+  if (line?.account_id) {
+    if (!account) {
+      return { ok: false, reason: 'account_missing', detail: 'The Sendblue account this number belongs to could not be found.' };
+    }
+    if (account.active === false) {
+      return { ok: false, reason: 'account_disabled', detail: 'The Sendblue account this number belongs to is switched off.' };
+    }
+    const status = String(account.status || '').toLowerCase();
+    if (status === 'disabled') {
+      return { ok: false, reason: 'account_disabled', detail: 'The Sendblue account this number belongs to is switched off.' };
+    }
+    if (status === 'credentials_rejected' || status === 'error') {
+      return { ok: false, reason: 'account_rejected', detail: 'Sendblue is rejecting this account\u2019s keys, so nothing can be sent from its numbers.' };
+    }
+    if (!account.api_key_id || !account.api_secret) {
+      return { ok: false, reason: 'account_no_credentials', detail: 'No keys are saved for the Sendblue account this number belongs to.' };
+    }
+    return { ok: true, credentials: { keyId: account.api_key_id, secret: account.api_secret }, source: 'account' };
+  }
+
+  if (env.keyId && env.secret) {
+    return { ok: true, credentials: { keyId: env.keyId, secret: env.secret }, source: 'agency' };
+  }
+  return { ok: false, reason: 'no_credentials', detail: 'No Sendblue keys are saved for this number.' };
+}
+
 /** Strict US/E.164 normalization. Returns null when the input cannot be trusted. */
 export function normalizeE164(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
