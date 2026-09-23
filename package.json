@@ -23,6 +23,7 @@
     "@ffmpeg/util": "^0.12.2",
     "@hookform/resolvers": "^3.10.0",
     "@hyperframes/player": "^0.6.88",
+    "@lovable.dev/cloud-auth-js": "^1.1.2",
     "@lovable.dev/mcp-js": "^0.20.0",
     "@playwright/test": "^1.57.0",
     "@radix-ui/react-accordion": "^1.2.11",
