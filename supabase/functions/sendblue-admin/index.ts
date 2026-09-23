@@ -36,7 +36,8 @@ import {
   planLineImport,
   WEBHOOKS_ENDPOINT,
   WebhookPlanEntry,
-  parseProviderWebhooks,
+  parseWebhookResponse,
+  buildWebhookAppendBody,
   planWebhookRegistration,
   verifyWebhookReadback,
   webhookHealth,
@@ -304,10 +305,21 @@ Deno.serve(async (req) => {
         failed: mirrors.filter((m) => m.status === 'failed').length,
       };
 
-      const { data: allClients } = await admin.from('clients').select('id').eq('status', 'active');
-      const configuredClientIds = new Set(
-        (accounts || []).filter((a: any) => a.client_id && a.active).map((a: any) => a.client_id),
+      // Coverage counts ONE population: active clients. An account attached to a
+      // non-active client is counted under accounts, never against this denominator.
+      const { data: clientRows } = await admin.from('clients').select('id, status');
+      const activeClientIds = new Set(
+        (clientRows || []).filter((c: any) => c.status === 'active').map((c: any) => c.id),
       );
+      const configuredClientIds = new Set(
+        (accounts || [])
+          .filter((a: any) => a.client_id && a.active && activeClientIds.has(a.client_id))
+          .map((a: any) => a.client_id),
+      );
+      const accountsWithOwnCredentials = (accounts || []).filter(
+        (a: any) => a.api_key_id && a.api_secret,
+      ).length;
+
 
       return json({
         ok: true,
