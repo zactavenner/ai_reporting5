@@ -184,11 +184,12 @@ export default function ClientPortalPage() {
               </Card>
             </section>
 
-            <div className="grid gap-4 lg:grid-cols-7">
-              {stages.map((stage) => {
-                const stageTasks = visibleTasks.filter((task) => task.stage === stage.id);
-                return (
-                  <Card key={stage.id} className="min-h-[220px]">
+            <div className="overflow-x-auto pb-4">
+              <div className="flex min-w-max items-start gap-4">
+                {stages.map((stage) => {
+                  const stageTasks = visibleTasks.filter((task) => task.stage === stage.id);
+                  return (
+                    <Card key={stage.id} className="min-h-[220px] w-[18rem] flex-none sm:w-80">
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center justify-between text-sm">
                         <span>{stage.label}</span>
@@ -219,9 +220,10 @@ export default function ClientPortalPage() {
                         </button>
                       ))}
                     </CardContent>
-                  </Card>
-                );
-              })}
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
           </>
         )}
