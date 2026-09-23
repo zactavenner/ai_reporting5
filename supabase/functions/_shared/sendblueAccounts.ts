@@ -424,20 +424,61 @@ export function planWebhookRegistration(
   return plan;
 }
 
-/** Confirms, from a fresh readback, that every desired hook is really there. */
+export interface WebhookReadback {
+  ok: boolean;
+  missing: WebhookPlanEntry[];
+  registered: WebhookPlanEntry[];
+  /** Hooks present with our exact signing secret. */
+  secret_verified: WebhookPlanEntry[];
+  /** Present, but Sendblue registered a different secret than ours. */
+  secret_mismatch: WebhookPlanEntry[];
+  /** Present, but the read gave no secret to compare — never claimed as proven. */
+  secret_unknown: WebhookPlanEntry[];
+}
+
+/**
+ * Confirms, from a fresh readback, that every desired hook is really there — and,
+ * when the read exposes the per-hook secret, that it is OUR secret. The secret
+ * itself is compared here and never returned.
+ */
 export function verifyWebhookReadback(
   after: ProviderWebhook[],
   desired: WebhookPlanEntry[],
-): { ok: boolean; missing: WebhookPlanEntry[]; registered: WebhookPlanEntry[] } {
+  expectedSecret?: string | null,
+): WebhookReadback {
   const missing: WebhookPlanEntry[] = [];
   const registered: WebhookPlanEntry[] = [];
+  const secretVerified: WebhookPlanEntry[] = [];
+  const secretMismatch: WebhookPlanEntry[] = [];
+  const secretUnknown: WebhookPlanEntry[] = [];
+
   for (const want of desired) {
-    const found = after.some(
+    const matches = after.filter(
       (e) => canonicalWebhookUrl(e.url) === canonicalWebhookUrl(want.url) && e.type === want.type,
     );
-    (found ? registered : missing).push(want);
+    if (matches.length === 0) {
+      missing.push(want);
+      continue;
+    }
+    registered.push(want);
+    if (!expectedSecret) {
+      secretUnknown.push(want);
+      continue;
+    }
+    const withSecret = matches.filter((m) => Boolean(m.secret));
+    if (withSecret.length === 0) secretUnknown.push(want);
+    else if (withSecret.some((m) => m.secret === expectedSecret)) secretVerified.push(want);
+    else secretMismatch.push(want);
   }
-  return { ok: missing.length === 0, missing, registered };
+
+  return {
+    ok: missing.length === 0 && secretMismatch.length === 0,
+    missing,
+    registered,
+    secret_verified: secretVerified,
+    secret_mismatch: secretMismatch,
+    secret_unknown: secretUnknown,
+  };
 }
 
 export interface WebhookHealthInput {
