@@ -9,9 +9,9 @@ import { corsHeaders as sdkCors } from 'npm:@supabase/supabase-js@2.115.0/cors';
 import { authorizeOperator } from '../_shared/operatorAuth.ts';
 import {
   SENDBLUE_BASE,
-  credentialsFor,
   mapProviderStatus,
   normalizeE164,
+  resolveSendCredentials,
   sendGuard,
   sendGuardMessage,
   sendblueHeaders,
@@ -49,6 +49,7 @@ interface SendTarget {
 
 async function sendOne(
   line: any,
+  account: any,
   target: SendTarget,
   message: string,
   kind: SendKind,
@@ -78,8 +79,9 @@ async function sendOne(
     return { phone, ok: false, reason: guard.reason, detail: sendGuardMessage(guard.reason) };
   }
 
-  const creds = credentialsFor(line, ENV_CREDS);
-  if (!creds) return { phone, ok: false, reason: 'no_credentials', detail: 'No Sendblue credentials for this line.' };
+  const resolved = resolveSendCredentials(line, account, ENV_CREDS);
+  if (!resolved.ok) return { phone, ok: false, reason: resolved.reason, detail: resolved.detail };
+  const creds = resolved.credentials;
 
   let convoId = conversation?.id as string | undefined;
   if (!convoId) {
