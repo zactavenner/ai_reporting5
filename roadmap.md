@@ -67,3 +67,6 @@ Plan: `.lovable/plan/week-4-ai-marketing-inside-reporting-5-0-2026-09-21.md`
 - Open: agency Sendblue API key + secret, the webhook signing secret, and a first pilot client for end-to-end proof.
 
 - [ ] Send Atlas Parker ad spend Sep 16 - Sep 21 to its reporting sheet (requested Sep 22)
+
+# Client project access (requested Sep 23)
+- [ ] Add scoped client logins for Clear Summit Investments and Five Wins so client users can view and add tasks only inside their own project/client area — waiting for test email and approval to build.
