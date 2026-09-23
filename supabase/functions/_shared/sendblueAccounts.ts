@@ -280,7 +280,15 @@ export interface ProviderWebhook {
   url: string;
   type: WebhookType | string;
   has_secret: boolean;
+  /** Server-side only. Never returned to a browser — used to prove our secret is the one registered. */
+  secret: string | null;
   raw: Record<string, unknown>;
+}
+
+export interface ParsedWebhookResponse {
+  hooks: ProviderWebhook[];
+  /** The account's own account-level secret, which we must never overwrite. */
+  global_secret_present: boolean;
 }
 
 /** Compares webhook URLs the way a provider would: case/trailing-slash tolerant. */
@@ -289,36 +297,90 @@ export function canonicalWebhookUrl(url: unknown): string {
   return url.trim().replace(/\/+$/, '').toLowerCase();
 }
 
-/** Reads the webhook list out of whatever wrapper Sendblue returns. */
-export function parseProviderWebhooks(payload: unknown): ProviderWebhook[] {
+function webhookFromEntry(entry: unknown, typeHint: string): ProviderWebhook | null {
+  // Documented entries are either a plain URL string or { url, secret }.
+  if (typeof entry === 'string') {
+    const url = entry.trim();
+    if (!url) return null;
+    return { url, type: typeHint, has_secret: false, secret: null, raw: { url } };
+  }
+  if (!entry || typeof entry !== 'object') return null;
+  const obj = entry as Record<string, unknown>;
+  const url = pickString(obj, ['url', 'webhook_url', 'endpoint', 'target_url']);
+  if (!url) return null;
+  const secret = pickString(obj, ['secret', 'signing_secret', 'webhook_secret']);
+  const type = (pickString(obj, ['type', 'event', 'webhook_type', 'kind']) || typeHint).toLowerCase();
+  return { url, type, has_secret: Boolean(secret), secret: secret || null, raw: obj };
+}
+
+/**
+ * Reads the documented GET /api/account/webhooks shape:
+ *   { status: 'OK', webhooks: { receive: [...], outbound: [...], globalSecret: '...' } }
+ * where each entry is either a URL string or { url, secret }. Legacy/flat array
+ * wrappers are still accepted so nothing regresses.
+ */
+export function parseWebhookResponse(payload: unknown): ParsedWebhookResponse {
+  const out: ProviderWebhook[] = [];
+  let globalSecret = false;
+
+  const pushAll = (value: unknown, typeHint: string) => {
+    if (!Array.isArray(value)) return;
+    for (const entry of value) {
+      const hook = webhookFromEntry(entry, typeHint);
+      if (hook) out.push(hook);
+    }
+  };
+
   const container = payload as Record<string, unknown> | unknown[] | null;
-  let rows: unknown[] = [];
-  if (Array.isArray(container)) rows = container;
-  else if (container && typeof container === 'object') {
-    for (const key of ['webhooks', 'data', 'results', 'items', 'hooks']) {
-      const value = (container as Record<string, unknown>)[key];
-      if (Array.isArray(value)) {
-        rows = value;
-        break;
-      }
+  if (Array.isArray(container)) {
+    pushAll(container, '');
+    return { hooks: out, global_secret_present: false };
+  }
+  if (!container || typeof container !== 'object') return { hooks: out, global_secret_present: false };
+
+  const wrappers = ['webhooks', 'data', 'results', 'items', 'hooks'];
+  let handled = false;
+  for (const key of wrappers) {
+    const value = (container as Record<string, unknown>)[key];
+    if (Array.isArray(value)) {
+      pushAll(value, '');
+      handled = true;
+      break;
+    }
+    if (value && typeof value === 'object') {
+      const keyed = value as Record<string, unknown>;
+      pushAll(keyed.receive, 'receive');
+      pushAll(keyed.outbound, 'outbound');
+      globalSecret = Boolean(pickString(keyed, ['globalSecret', 'global_secret', 'secret']));
+      handled = true;
+      break;
     }
   }
-
-  const out: ProviderWebhook[] = [];
-  for (const row of rows) {
-    if (!row || typeof row !== 'object') continue;
-    const obj = row as Record<string, unknown>;
-    const url = pickString(obj, ['url', 'webhook_url', 'endpoint', 'target_url']);
-    if (!url) continue;
-    const type = pickString(obj, ['type', 'event', 'webhook_type', 'kind']) || '';
-    out.push({
-      url,
-      type: type.toLowerCase(),
-      has_secret: Boolean(pickString(obj, ['secret', 'signing_secret', 'webhook_secret'])),
-      raw: obj,
-    });
+  if (!handled) {
+    // The documented keys may sit at the root.
+    pushAll((container as Record<string, unknown>).receive, 'receive');
+    pushAll((container as Record<string, unknown>).outbound, 'outbound');
+    globalSecret = Boolean(pickString(container as Record<string, unknown>, ['globalSecret', 'global_secret']));
   }
-  return out;
+
+  return { hooks: out, global_secret_present: globalSecret };
+}
+
+/** Back-compatible list-only reader. */
+export function parseProviderWebhooks(payload: unknown): ProviderWebhook[] {
+  return parseWebhookResponse(payload).hooks;
+}
+
+/**
+ * The documented POST body: a `webhooks` array of { url, secret } plus the hook
+ * `type` at the root. Never a root-level { url, secret, type }.
+ */
+export function buildWebhookAppendBody(
+  hooks: { url: string }[],
+  secret: string,
+  type: WebhookType,
+): { webhooks: { url: string; secret: string }[]; type: WebhookType } {
+  return { webhooks: hooks.map((h) => ({ url: h.url, secret })), type };
 }
 
 export interface WebhookPlanEntry {
@@ -362,20 +424,61 @@ export function planWebhookRegistration(
   return plan;
 }
 
-/** Confirms, from a fresh readback, that every desired hook is really there. */
+export interface WebhookReadback {
+  ok: boolean;
+  missing: WebhookPlanEntry[];
+  registered: WebhookPlanEntry[];
+  /** Hooks present with our exact signing secret. */
+  secret_verified: WebhookPlanEntry[];
+  /** Present, but Sendblue registered a different secret than ours. */
+  secret_mismatch: WebhookPlanEntry[];
+  /** Present, but the read gave no secret to compare — never claimed as proven. */
+  secret_unknown: WebhookPlanEntry[];
+}
+
+/**
+ * Confirms, from a fresh readback, that every desired hook is really there — and,
+ * when the read exposes the per-hook secret, that it is OUR secret. The secret
+ * itself is compared here and never returned.
+ */
 export function verifyWebhookReadback(
   after: ProviderWebhook[],
   desired: WebhookPlanEntry[],
-): { ok: boolean; missing: WebhookPlanEntry[]; registered: WebhookPlanEntry[] } {
+  expectedSecret?: string | null,
+): WebhookReadback {
   const missing: WebhookPlanEntry[] = [];
   const registered: WebhookPlanEntry[] = [];
+  const secretVerified: WebhookPlanEntry[] = [];
+  const secretMismatch: WebhookPlanEntry[] = [];
+  const secretUnknown: WebhookPlanEntry[] = [];
+
   for (const want of desired) {
-    const found = after.some(
+    const matches = after.filter(
       (e) => canonicalWebhookUrl(e.url) === canonicalWebhookUrl(want.url) && e.type === want.type,
     );
-    (found ? registered : missing).push(want);
+    if (matches.length === 0) {
+      missing.push(want);
+      continue;
+    }
+    registered.push(want);
+    if (!expectedSecret) {
+      secretUnknown.push(want);
+      continue;
+    }
+    const withSecret = matches.filter((m) => Boolean(m.secret));
+    if (withSecret.length === 0) secretUnknown.push(want);
+    else if (withSecret.some((m) => m.secret === expectedSecret)) secretVerified.push(want);
+    else secretMismatch.push(want);
   }
-  return { ok: missing.length === 0, missing, registered };
+
+  return {
+    ok: missing.length === 0 && secretMismatch.length === 0,
+    missing,
+    registered,
+    secret_verified: secretVerified,
+    secret_mismatch: secretMismatch,
+    secret_unknown: secretUnknown,
+  };
 }
 
 export interface WebhookHealthInput {

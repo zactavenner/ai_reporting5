@@ -9,9 +9,12 @@ import {
   LINE_ENDPOINTS,
   planWebhookRegistration,
   parseProviderWebhooks,
+  parseWebhookResponse,
+  buildWebhookAppendBody,
   verifyWebhookReadback,
   webhookHealth,
 } from '../../supabase/functions/_shared/sendblueAccounts.ts';
+import { resolveSendCredentials } from '../../supabase/functions/_shared/sendblue.ts';
 
 describe('credential verification is truthful', () => {
   it('needs a real success body, not just a 2xx', () => {
@@ -245,5 +248,111 @@ describe('documented Sendblue API v2 contract', () => {
     expect(objects[0]).toMatchObject({ phone_e164: '+15550001111', label: 'Main' });
 
     expect(extractProviderLines({ status: 'ERROR', error_message: 'no access' })).toEqual([]);
+  });
+});
+
+describe('official webhook payload shapes', () => {
+  const receiver = 'https://example.supabase.co/functions/v1/sendblue-webhook';
+
+  it('reads the documented keyed webhooks object', () => {
+    const parsed = parseWebhookResponse({
+      status: 'OK',
+      webhooks: {
+        receive: [receiver, { url: 'https://client.example.com/in', secret: 'theirs' }],
+        outbound: [{ url: receiver, secret: 'ours' }],
+        globalSecret: 'account-global',
+      },
+    });
+    expect(parsed.global_secret_present).toBe(true);
+    expect(parsed.hooks).toHaveLength(3);
+    expect(parsed.hooks.filter((h) => h.type === 'receive')).toHaveLength(2);
+    const outbound = parsed.hooks.find((h) => h.type === 'outbound');
+    expect(outbound?.secret).toBe('ours');
+    // String entries expose no secret, so none is invented.
+    expect(parsed.hooks.find((h) => h.type === 'receive' && h.url === receiver)?.secret).toBeNull();
+  });
+
+  it('still reads legacy array wrappers and rejects error bodies', () => {
+    expect(parseWebhookResponse({ webhooks: [{ url: receiver, type: 'receive' }] }).hooks).toHaveLength(1);
+    expect(parseWebhookResponse({ status: 'ERROR', error_message: 'no access' }).hooks).toEqual([]);
+    expect(parseWebhookResponse(null).hooks).toEqual([]);
+  });
+
+  it('builds the documented append body', () => {
+    expect(buildWebhookAppendBody([{ url: receiver }], 's3cret', 'receive')).toEqual({
+      webhooks: [{ url: receiver, secret: 's3cret' }],
+      type: 'receive',
+    });
+  });
+
+  it('proves the readback carries our own secret', () => {
+    const desired = [
+      { url: receiver, type: 'receive' as const },
+      { url: receiver, type: 'outbound' as const },
+    ];
+    const good = verifyWebhookReadback(
+      [
+        { url: receiver, type: 'receive', secret: 'ours' },
+        { url: receiver, type: 'outbound', secret: 'ours' },
+      ],
+      desired,
+      'ours',
+    );
+    expect(good.ok).toBe(true);
+    expect(good.secret_verified.map((h) => h.type)).toEqual(['receive', 'outbound']);
+
+    const wrong = verifyWebhookReadback(
+      [
+        { url: receiver, type: 'receive', secret: 'someone-elses' },
+        { url: receiver, type: 'outbound', secret: 'ours' },
+      ],
+      desired,
+      'ours',
+    );
+    expect(wrong.ok).toBe(false);
+    expect(wrong.secret_mismatch.map((h) => h.type)).toEqual(['receive']);
+
+    // A read that exposes no secret is reported as unverifiable, never as proven.
+    const silent = verifyWebhookReadback(
+      [
+        { url: receiver, type: 'receive', secret: null },
+        { url: receiver, type: 'outbound', secret: null },
+      ],
+      desired,
+      'ours',
+    );
+    expect(silent.secret_verified).toEqual([]);
+    expect(silent.secret_unknown).toHaveLength(2);
+
+    const absent = verifyWebhookReadback([], desired, 'ours');
+    expect(absent.ok).toBe(false);
+    expect(absent.missing).toHaveLength(2);
+  });
+});
+
+describe('send credentials resolve through the linked account', () => {
+  const env = { keyId: 'agency-key', secret: 'agency-secret' };
+  const account = { id: 'acct', api_key_id: 'acct-key', api_secret: 'acct-secret', active: true, status: 'connected' };
+
+  it('uses the account keys for an imported line that has none of its own', () => {
+    const r = resolveSendCredentials({ account_id: 'acct' }, account, env);
+    expect(r).toMatchObject({ ok: true, source: 'account', credentials: { keyId: 'acct-key', secret: 'acct-secret' } });
+  });
+
+  it('prefers the line\u2019s own keys', () => {
+    const r = resolveSendCredentials({ account_id: 'acct', api_key_id: 'line-key', api_secret: 'line-secret' }, account, env);
+    expect(r).toMatchObject({ ok: true, source: 'line' });
+  });
+
+  it('fails closed and never borrows agency keys when the account is unusable', () => {
+    expect(resolveSendCredentials({ account_id: 'acct' }, null, env)).toMatchObject({ ok: false, reason: 'account_missing' });
+    expect(resolveSendCredentials({ account_id: 'acct' }, { ...account, active: false }, env)).toMatchObject({ ok: false, reason: 'account_disabled' });
+    expect(resolveSendCredentials({ account_id: 'acct' }, { ...account, status: 'credentials_rejected' }, env)).toMatchObject({ ok: false, reason: 'account_rejected' });
+    expect(resolveSendCredentials({ account_id: 'acct' }, { ...account, api_secret: null }, env)).toMatchObject({ ok: false, reason: 'account_no_credentials' });
+  });
+
+  it('allows the agency keys only for a line with no linked account', () => {
+    expect(resolveSendCredentials({}, null, env)).toMatchObject({ ok: true, source: 'agency' });
+    expect(resolveSendCredentials({}, null, { keyId: null, secret: null })).toMatchObject({ ok: false, reason: 'no_credentials' });
   });
 });
