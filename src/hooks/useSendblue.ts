@@ -62,7 +62,11 @@ export interface SendblueAccount {
 export interface SendblueCoverage {
   accounts_total: number;
   accounts_verified: number;
+  accounts_with_credentials?: number;
+  /** Which client population the counts below describe. */
+  clients_population?: 'active';
   clients_total: number;
+  clients_all_total?: number;
   clients_with_account: number;
   clients_missing_account: number;
 }
@@ -89,6 +93,7 @@ export interface SendblueOverview {
   accounts?: SendblueAccount[];
   coverage?: SendblueCoverage;
   agency_credentials_configured: boolean;
+  accounts_with_credentials?: number;
   webhook_secret_configured: boolean;
   lines: SendblueLine[];
   health: SendblueLineHealth[];
