@@ -69,4 +69,5 @@ Plan: `.lovable/plan/week-4-ai-marketing-inside-reporting-5-0-2026-09-21.md`
 - [ ] Send Atlas Parker ad spend Sep 16 - Sep 21 to its reporting sheet (requested Sep 22)
 
 # Client project access (requested Sep 23)
-- [ ] Add scoped client logins for Clear Summit Investments and Five Wins so client users can view and add tasks only inside their own project/client area — waiting for test email and approval to build.
+- [x] Add scoped client login for Emily across Clear Summit Investments and 5 Winds, limited to viewing and adding tasks in those client projects.
+- [x] Keep each task column readable with fixed-width columns and horizontal board scrolling.
