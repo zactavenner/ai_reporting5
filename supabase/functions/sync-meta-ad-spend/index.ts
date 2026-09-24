@@ -412,11 +412,25 @@ Deno.serve(async (req) => {
           timeZone: 'America/Los_Angeles', hour: 'numeric', hour12: false,
         }).format(new Date())
       );
-      if (laHour !== SEND_HOUR_LA) {
+      // Window 8–10 AM LA so a failed 8 AM trigger (e.g. network/DNS blip)
+      // is retried at 9 and 10; skip once yesterday already synced.
+      if (laHour < SEND_HOUR_LA || laHour > SEND_HOUR_LA + 2) {
         return new Response(
-          JSON.stringify({ ok: true, skipped: true, reason: `local hour ${laHour} != ${SEND_HOUR_LA}`, tz: 'America/Los_Angeles' }),
+          JSON.stringify({ ok: true, skipped: true, reason: `local hour ${laHour} outside ${SEND_HOUR_LA}-${SEND_HOUR_LA + 2}`, tz: 'America/Los_Angeles' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+      if (laHour > SEND_HOUR_LA) {
+        const sbc = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+        const { count } = await sbc.from('ad_spend_sync_runs')
+          .select('id', { count: 'exact', head: true })
+          .eq('sync_date', yesterdayISO()).eq('triggered_by', 'daily');
+        if ((count ?? 0) > 0) {
+          return new Response(
+            JSON.stringify({ ok: true, skipped: true, reason: 'daily run already done' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       }
     }
     const daysBack = Math.max(0, Math.min(30, Number(body.days_back ?? 0)));
