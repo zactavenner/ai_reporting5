@@ -182,6 +182,38 @@ class Runner {
   }
 
   /** Write the signed playback link to the contact's "Last Call Recording" field. Never messages the contact. */
+  /** Before overwriting Last Call Recording, save the existing link as a contact note (deduped by URL). */
+  async preserveOldLink(contactId: string, fieldId: string, newLink: string, apiKey: string) {
+    const h = { Authorization: `Bearer ${apiKey}`, Version: GHL_VERSION, Accept: "application/json", "Content-Type": "application/json" };
+    const cRes = await fetch(`${GHL_BASE}/contacts/${contactId}`, { headers: h });
+    if (!cRes.ok) throw new Error(`contact_get_${cRes.status}`);
+    const cj = await cRes.json();
+    const cf = (cj?.contact?.customFields || cj?.contact?.customField || []) as any[];
+    const oldLink = String(cf.find((f) => f?.id === fieldId)?.value ?? cf.find((f) => f?.id === fieldId)?.field_value ?? "").trim();
+    if (!oldLink || oldLink === newLink) return "nothing_to_preserve";
+    const nRes = await fetch(`${GHL_BASE}/contacts/${contactId}/notes`, { headers: h });
+    if (!nRes.ok) throw new Error(`notes_get_${nRes.status}`);
+    const nj = await nRes.json();
+    if ((nj?.notes || []).some((n: any) => String(n?.body || "").includes(oldLink))) return "already_noted";
+    let rec: any = null;
+    const oldId = (() => { try { return new URL(oldLink).searchParams.get("c"); } catch { return null; } })();
+    if (oldId) {
+      const { data } = await this.sb.from("phone_call_records")
+        .select("started_at, direction, duration_seconds").eq("call_id", oldId).maybeSingle();
+      rec = data;
+    }
+    const lines = ["Call Recording", `Recording URL: ${oldLink}`];
+    if (rec?.started_at) lines.push(`Call date/time: ${new Date(rec.started_at).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })} PT`);
+    if (rec?.direction) lines.push(`Direction: ${String(rec.direction).toLowerCase().startsWith("in") ? "Inbound" : "Outbound"}`);
+    if (rec?.duration_seconds != null) {
+      const d = Number(rec.duration_seconds);
+      lines.push(`Duration: ${Math.floor(d / 60)}m ${d % 60}s`);
+    }
+    const pRes = await fetch(`${GHL_BASE}/contacts/${contactId}/notes`, { method: "POST", headers: h, body: JSON.stringify({ body: lines.join("\n") }) });
+    if (!pRes.ok) throw new Error(`note_post_${pRes.status}`);
+    return "noted";
+  }
+
   async pushLink(callId: string, clientId: string, contactId: string | null, apiKey: string, locationId: string) {
     if (!contactId) return "no_contact";
     // Field holds only the newest recording: never let an older call overwrite a newer one.
@@ -195,6 +227,12 @@ class Runner {
     const fieldId = await this.recordingFieldId(locationId, apiKey);
     if (!fieldId) return "field_missing";
     const link = await playbackLink(callId);
+    const preserved = await this.preserveOldLink(contactId, fieldId, link, apiKey).catch((e) => {
+      console.warn(`[ghl-call-recordings] preserve note failed: ${String(e?.message || e).slice(0, 120)}`);
+      return "error";
+    });
+    // Never overwrite an old link we couldn't save as a note.
+    if (preserved === "error") return "preserve_failed";
     const res = await fetch(`${GHL_BASE}/contacts/${contactId}`, {
       method: "PUT",
       headers: { Authorization: `Bearer ${apiKey}`, Version: GHL_VERSION, Accept: "application/json", "Content-Type": "application/json" },
