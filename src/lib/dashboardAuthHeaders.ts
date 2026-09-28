@@ -5,12 +5,22 @@
  * nothing, and an expired token returns 401 so the operator signs in again.
  */
 export function dashboardAuthHeaders(): Record<string, string> {
+  let token: string | null = null;
+  let role = '';
   try {
-    const token = localStorage.getItem('dashboard_session_token');
-    return token ? { 'x-dashboard-token': token } : {};
+    token = localStorage.getItem('dashboard_session_token');
+    role = (localStorage.getItem('team_member_role') || '').trim().toLowerCase();
   } catch {
     return {};
   }
+  // Admin-only features: a signed-in non-admin would only get a 403 back, so
+  // stop before sending the request. The server still enforces this check.
+  if (token && role && role !== 'admin' && role !== 'owner') {
+    const err = new Error('This feature is only available to agency admins.');
+    (err as any).code = 'not_operator';
+    throw err;
+  }
+  return token ? { 'x-dashboard-token': token } : {};
 }
 
 /**
