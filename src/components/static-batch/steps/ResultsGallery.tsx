@@ -20,7 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import type { GeneratedAd, AdStyle, AspectRatio } from '@/types';
-import { dashboardAuthHeaders } from '@/lib/dashboardAuthHeaders';
+import { dashboardTokenHeaders } from '@/lib/dashboardAuthHeaders';
 
 interface ResultsGalleryProps {
   generatedAds: GeneratedAd[];
@@ -176,7 +176,7 @@ export function ResultsGallery({
     
     try {
       const { data, error } = await supabase.functions.invoke('generate-video-from-image', {
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
         body: {
           imageUrl: animateDialogAd.imageUrl,
           prompt: videoPrompt.trim(),

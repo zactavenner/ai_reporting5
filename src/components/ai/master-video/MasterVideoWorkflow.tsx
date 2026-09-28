@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { dashboardAuthHeaders } from "@/lib/dashboardAuthHeaders";
+import { dashboardTokenHeaders } from "@/lib/dashboardAuthHeaders";
 import { toast } from "sonner";
 import {
   Check,
@@ -228,7 +228,7 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
         draft.presenter === "avatar" ? draft.avatarImageUrl : null,
       ].filter((u): u is string => !!u);
       const { data, error } = await supabase.functions.invoke("generate-static-ad", {
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
         body: {
           prompt: framePrompt.trim(),
           imageModel: frameModel,
@@ -313,7 +313,7 @@ export default function MasterVideoWorkflow({ clientId, clientName, conversation
       const saved = await project.saveNow();
       if (!saved.ok) throw new Error(saved.error || "Your changes could not be saved, so nothing was sent.");
       const { data, error } = await supabase.functions.invoke("master-video-generate", {
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
         body: {
           projectId: saved.projectId || project.projectId,
           clientId,

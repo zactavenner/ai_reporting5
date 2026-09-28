@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Brain, Loader2, Play, Pause, TrendingUp, Check, X, RefreshCw, AlertTriangle, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { dashboardAuthHeaders } from '@/lib/dashboardAuthHeaders';
+import { dashboardTokenHeaders } from '@/lib/dashboardAuthHeaders';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -94,7 +94,7 @@ export function JeremyReviewTab({ clientId, clientName }: { clientId: string; cl
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('jeremy-media-buyer-review', {
         body: { client_id: clientId },
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Review failed');
@@ -111,7 +111,7 @@ export function JeremyReviewTab({ clientId, clientName }: { clientId: string; cl
     mutationFn: async (id: string) => {
       const { data, error } = await supabase.functions.invoke('meta-apply-recommendation', {
         body: { recommendation_id: id },
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Apply failed');

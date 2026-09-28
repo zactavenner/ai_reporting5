@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Clapperboard, ImageIcon, Loader2, Check, RefreshCw, Sparkles, ChevronDown } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { dashboardAuthHeaders } from "@/lib/dashboardAuthHeaders";
+import { dashboardTokenHeaders } from "@/lib/dashboardAuthHeaders";
 import { countSpokenWords } from "@/lib/spokenScript";
 import { toast } from "sonner";
 
@@ -152,7 +152,7 @@ export function ScriptRenderCard(props: Props) {
     setGenImg(true);
     try {
       const { data, error } = await supabase.functions.invoke("generate-static-ad", {
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
         body: {
           prompt: prompt.trim(),
           imageModel,

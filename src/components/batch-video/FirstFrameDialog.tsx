@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Sparkles, Check, ImageIcon, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
-import { dashboardAuthHeaders } from '@/lib/dashboardAuthHeaders';
+import { dashboardTokenHeaders } from '@/lib/dashboardAuthHeaders';
 import { toast } from 'sonner';
 import type { BackgroundStyle, VisualQuality } from '@/types/batch-video';
 
@@ -102,7 +102,7 @@ export function FirstFrameDialog({
     setGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-static-ad', {
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
         body: {
           prompt: prompt.trim(),
           aspectRatio: aspectRatio === '9:16' ? '9:16' : aspectRatio === '1:1' ? '1:1' : '16:9',

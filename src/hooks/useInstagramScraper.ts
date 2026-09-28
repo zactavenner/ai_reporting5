@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { dashboardAuthHeaders } from '@/lib/dashboardAuthHeaders';
+import { dashboardTokenHeaders } from '@/lib/dashboardAuthHeaders';
 
 export function useApifySettings() {
   return useQuery({
@@ -57,7 +57,7 @@ export function useTestApifyConnection() {
   return useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('test-apify-connection', {
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
       });
       if (error) throw error;
       return data as { success: boolean; username?: string; plan?: string; error?: string };
@@ -108,7 +108,7 @@ export function useQuoteInstagramScrape() {
           targets: params.targets,
           resultsLimit: params.resultsLimit,
         },
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
       });
       if (error) throw error;
       if (data?.success === false) throw new Error(data.error);
@@ -142,7 +142,7 @@ export function useRunInstagramScrape() {
           targets: params.targets,
           resultsLimit: params.resultsLimit,
         },
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
       });
       if (error) throw error;
       if (data?.success === false) throw new Error(data.error);
