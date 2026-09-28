@@ -706,19 +706,20 @@ Deno.serve(async (req) => {
       // Cap to 2 extras (3 accounts total including the primary)
       const fanoutTargets = extras.slice(0, 2);
       for (const acct of fanoutTargets) {
-        try {
-          await fetch(`${supabaseUrl}/functions/v1/sync-meta-ads`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${supabaseKey}`,
-            },
-            body: JSON.stringify({ clientId, startDate, endDate, adAccountOverride: acct }),
-          });
-          console.log(`[fanout] Triggered sync for extra Meta account ${acct}`);
-        } catch (e) {
-          console.warn(`[fanout] Failed to trigger sync for ${acct}:`, e);
-        }
+        // Fire-and-forget: awaiting the full extra-account sync blocked the
+        // primary account from ever syncing before the function timed out.
+        const p = fetch(`${supabaseUrl}/functions/v1/sync-meta-ads`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${supabaseKey}`,
+          },
+          body: JSON.stringify({ clientId, startDate, endDate, adAccountOverride: acct }),
+        })
+          .then((r) => r.body?.cancel())
+          .catch((e) => console.warn(`[fanout] Failed to trigger sync for ${acct}:`, e));
+        try { (globalThis as any).EdgeRuntime?.waitUntil?.(p); } catch { /* noop */ }
+        console.log(`[fanout] Triggered sync for extra Meta account ${acct}`);
       }
     }
 

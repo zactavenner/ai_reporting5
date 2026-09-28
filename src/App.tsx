@@ -69,7 +69,16 @@ const queryClient = new QueryClient({
       staleTime: 1000 * 60 * 5,
       gcTime: 1000 * 60 * 30,
       refetchOnWindowFocus: false,
-      retry: 2,
+      // Never retry permission/session failures (401/403, not_operator): they won't
+      // succeed on retry and only repeat the error. Other failures retry twice.
+      retry: (failureCount, error: any) => {
+        const msg = String(error?.message ?? '');
+        const status = error?.context?.status ?? error?.status;
+        if (status === 401 || status === 403 || /\b(401|403)\b|not_operator|invalid_token|Not authenticated/i.test(msg)) {
+          return false;
+        }
+        return failureCount < 2;
+      },
     },
   },
 });
