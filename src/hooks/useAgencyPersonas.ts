@@ -36,10 +36,19 @@ export function useAgencyPersonas() {
   return useQuery({
     queryKey: ['agency-personas'],
     queryFn: async () => {
-      const d = await callPersonas<{ personas: AgencyPersona[] }>({ action: 'list' });
-      return d.personas ?? [];
+      // Non-admin or signed-out sessions: show an empty list instead of crashing.
+      const { data, error } = await supabase.functions.invoke('agency-personas', {
+        body: { action: 'list' },
+        headers: dashboardAuthHeaders(),
+      });
+      if (error || (data as any)?.error) {
+        console.warn('[agency-personas] unavailable:', (data as any)?.error || error?.message);
+        return [] as AgencyPersona[];
+      }
+      return ((data as any)?.personas ?? []) as AgencyPersona[];
     },
     staleTime: 60_000,
+    retry: false,
   });
 }
 
