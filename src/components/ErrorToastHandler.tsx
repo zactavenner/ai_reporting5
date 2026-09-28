@@ -7,6 +7,12 @@ export function ErrorToastHandler() {
     const handler = (e: PromiseRejectionEvent) => {
       const msg = e.reason?.message || 'An unexpected error occurred';
 
+      // Background request from a non-admin dashboard session: not a crash.
+      if (/returned 403|not_operator|not an agency admin/i.test(msg)) {
+        e.preventDefault();
+        return;
+      }
+
       // Expired/missing sign-in from a background request: handle gracefully
       // instead of letting it surface as an uncaught crash.
       if (
