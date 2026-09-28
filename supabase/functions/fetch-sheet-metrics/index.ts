@@ -992,12 +992,16 @@ Deno.serve(async (req) => {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('fetch-sheet-metrics error:', msg);
     const rateLimited = /\[429\]/.test(msg);
-    // Rate limits are expected and transient: answer 200 so the dashboard shows
-    // a "try again shortly" state instead of treating it as a crash.
-    return new Response(JSON.stringify(rateLimited
+    const noAccess = /\[(403|404)\]/.test(msg);
+    // Rate limits and unshared/missing sheets are expected states: answer 200 so
+    // the dashboard shows a clear message instead of treating it as a crash.
+    const payload = rateLimited
       ? { error: 'Google Sheets is busy — try again in a minute.', rate_limited: true, daily: [], aggregated: null }
-      : { error: msg }), {
-      status: rateLimited ? 200 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      : noAccess
+        ? { error: 'This Google Sheet is not shared with the reporting account, or it no longer exists.', permission_denied: true, daily: [], aggregated: null }
+        : { error: msg };
+    return new Response(JSON.stringify(payload), {
+      status: rateLimited || noAccess ? 200 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
