@@ -991,8 +991,13 @@ Deno.serve(async (req) => {
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('fetch-sheet-metrics error:', msg);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: /\[429\]/.test(msg) ? 429 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    const rateLimited = /\[429\]/.test(msg);
+    // Rate limits are expected and transient: answer 200 so the dashboard shows
+    // a "try again shortly" state instead of treating it as a crash.
+    return new Response(JSON.stringify(rateLimited
+      ? { error: 'Google Sheets is busy — try again in a minute.', rate_limited: true, daily: [], aggregated: null }
+      : { error: msg }), {
+      status: rateLimited ? 200 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
