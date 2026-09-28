@@ -50,7 +50,13 @@ function json(body: unknown, status = 200) {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (req.method === "GET") return json({ ok: true, service: "ghl-call-recordings" });
+  if (req.method === "GET") {
+    const u = new URL(req.url);
+    if (u.searchParams.get("action") === "play") {
+      return await playRecording(String(u.searchParams.get("c") || ""), String(u.searchParams.get("s") || ""));
+    }
+    return json({ ok: true, service: "ghl-call-recordings" });
+  }
 
   let body: any = {};
   try {
