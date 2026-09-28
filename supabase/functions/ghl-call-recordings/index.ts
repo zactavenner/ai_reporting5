@@ -61,6 +61,9 @@ serve(async (req) => {
   const url = new URL(req.url);
   for (const [k, v] of url.searchParams.entries()) if (body[k] === undefined) body[k] = v;
 
+  // Signed playback link (the link written to the CRM "Last Call Recording" field).
+  if (body.action === "play") return await playRecording(String(body.c || ""), String(body.s || ""));
+
   if ((body.password || req.headers.get("x-hpa-webhook-token")) !== INTERNAL_PASSWORD) {
     return json({ error: "unauthorized" }, 401);
   }
@@ -76,6 +79,8 @@ serve(async (req) => {
         return json(await runner.capture());
       case "webhook":
         return json(await runner.webhook());
+      case "push_links":
+        return json(await runner.pushLinks());
       case "state":
         return json(await runner.setState());
       default:
@@ -86,6 +91,36 @@ serve(async (req) => {
     return json({ error: (e as Error).message }, 500);
   }
 });
+
+const FIELD_NAME = "last call recording";
+const FUNCTIONS_BASE = `${Deno.env.get("SUPABASE_URL")}/functions/v1/ghl-call-recordings`;
+
+async function sign(callId: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(`${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}::call-playback`),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(callId));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 40);
+}
+
+async function playbackLink(callId: string) {
+  return `${FUNCTIONS_BASE}?action=play&c=${encodeURIComponent(callId)}&s=${await sign(callId)}`;
+}
+
+async function playRecording(callId: string, sig: string): Promise<Response> {
+  if (!callId || !sig || sig !== (await sign(callId))) return new Response("Link invalid", { status: 403, headers: corsHeaders });
+  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const { data: rec } = await sb.from("phone_call_records").select("client_id, recording_url").eq("call_id", callId).maybeSingle();
+  if (!rec?.recording_url) return new Response("Recording not found", { status: 404, headers: corsHeaders });
+  const { apiKey } = await getMappedGhl(sb, rec.client_id);
+  if (!apiKey) return new Response("Recording unavailable", { status: 404, headers: corsHeaders });
+  const up = await fetch(rec.recording_url, { headers: { Authorization: `Bearer ${apiKey}`, Version: GHL_VERSION } });
+  if (!up.ok || !up.body) return new Response("Recording unavailable", { status: 502, headers: corsHeaders });
+  return new Response(up.body, {
+    headers: { ...corsHeaders, "Content-Type": up.headers.get("content-type") || "audio/wav", "Cache-Control": "private, max-age=300" },
+  });
+}
 
 interface ClientRow {
   id: string;
@@ -123,6 +158,67 @@ class Runner {
       return res;
     }
     return null;
+  }
+
+  private fieldIds = new Map<string, string | null>();
+
+  private async recordingFieldId(locationId: string, apiKey: string): Promise<string | null> {
+    if (this.fieldIds.has(locationId)) return this.fieldIds.get(locationId)!;
+    const res = await this.ghl(`/locations/${locationId}/customFields`, apiKey, "customFields");
+    let id: string | null = null;
+    if (res?.ok) {
+      const j = await res.json().catch(() => ({}));
+      const f = (j?.customFields || []).find((x: any) => String(x?.name || "").trim().toLowerCase() === FIELD_NAME);
+      id = f?.id || null;
+    } else await res?.body?.cancel().catch(() => {});
+    this.fieldIds.set(locationId, id);
+    return id;
+  }
+
+  /** Write the signed playback link to the contact's "Last Call Recording" field. Never messages the contact. */
+  async pushLink(callId: string, clientId: string, contactId: string | null, apiKey: string, locationId: string) {
+    if (!contactId) return "no_contact";
+    const fieldId = await this.recordingFieldId(locationId, apiKey);
+    if (!fieldId) return "field_missing";
+    const link = await playbackLink(callId);
+    const res = await fetch(`${GHL_BASE}/contacts/${contactId}`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${apiKey}`, Version: GHL_VERSION, Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ customFields: [{ id: fieldId, field_value: link }] }),
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      console.warn(`[ghl-call-recordings] field push ${res.status} for client ${clientId}`);
+      return `push_failed_${res.status}`;
+    }
+    const { data: rec } = await this.sb.from("phone_call_records").select("raw_payload").eq("call_id", callId).maybeSingle();
+    await this.sb.from("phone_call_records")
+      .update({ raw_payload: { ...(rec?.raw_payload || {}), ghl_field_pushed_at: new Date().toISOString() } })
+      .eq("call_id", callId);
+    void text;
+    return "pushed";
+  }
+
+  /** Backfill: push links for available recordings not yet written to the CRM. */
+  async pushLinks() {
+    let q = this.sb.from("phone_call_records")
+      .select("call_id, client_id, contact_id, started_at, raw_payload")
+      .not("recording_url", "is", null)
+      .order("started_at", { ascending: true })
+      .limit(Math.min(Number(this.body.limit ?? 200), 500));
+    if (this.body.client_id) q = q.eq("client_id", this.body.client_id);
+    const { data: rows, error } = await q;
+    if (error) throw error;
+    const out: Record<string, number> = {};
+    const creds = new Map<string, { apiKey: string | null; locationId: string | null }>();
+    for (const r of rows || []) {
+      if (r.raw_payload?.ghl_field_pushed_at) { out.already_pushed = (out.already_pushed || 0) + 1; continue; }
+      if (!creds.has(r.client_id)) creds.set(r.client_id, await getMappedGhl(this.sb, r.client_id));
+      const c = creds.get(r.client_id)!;
+      const res = c.apiKey && c.locationId ? await this.pushLink(r.call_id, r.client_id, r.contact_id, c.apiKey, c.locationId) : "no_crm_credentials";
+      out[res] = (out[res] || 0) + 1;
+    }
+    return { ok: true, checked: rows?.length || 0, results: out };
   }
 
   /** Probe the recording endpoint without downloading the whole file. */
@@ -372,7 +468,10 @@ class Runner {
       if (error) throw error;
       if (existing) stats.updated++;
       else stats.new++;
-      if (reason === "available") stats.eligible++;
+      if (reason === "available") {
+        stats.eligible++;
+        await this.pushLink(callId, client.id, contactId, apiKey, locationId).catch(() => null);
+      }
     }
 
     await this.sb
@@ -445,7 +544,10 @@ class Runner {
       { onConflict: "call_id" },
     );
     if (error) throw error;
-    return { ok: true, call_id: callId, recording_status: reason };
+    const crm_field = reason === "available"
+      ? await this.pushLink(callId, clientId, this.body.contact_id || null, apiKey, locationId).catch(() => "push_failed")
+      : "no_recording";
+    return { ok: true, call_id: callId, recording_status: reason, crm_field };
   }
 
   // ---------------------------------------------------------------- per-client state
