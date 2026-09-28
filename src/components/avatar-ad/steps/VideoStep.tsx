@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { buildVideoPrompt } from '@/lib/avatar-ad-prompts';
 import type { DealInput, VideoSegment } from '@/types/avatar-ad';
-import { dashboardAuthHeaders } from '@/lib/dashboardAuthHeaders';
+import { dashboardTokenHeaders } from '@/lib/dashboardAuthHeaders';
 
 export function VideoStep() {
   const { state, setStep, setVideoSegments, updateVideoSegment } = useAvatarAd();
@@ -77,7 +77,7 @@ export function VideoStep() {
       const prompt = buildVideoPrompt(seg.text, seg.type, state.avatarConfig.gender, deal);
 
       const { data, error } = await supabase.functions.invoke('generate-video-from-image', {
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
         body: {
           prompt,
           imageUrl: state.avatar.imageUrl,

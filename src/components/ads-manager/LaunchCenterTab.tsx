@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Rocket, Loader2, CheckCircle2, AlertTriangle, RefreshCw, Trophy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { dashboardAuthHeaders } from '@/lib/dashboardAuthHeaders';
+import { dashboardTokenHeaders } from '@/lib/dashboardAuthHeaders';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -198,7 +198,7 @@ export function LaunchCenterTab({ clientId, clientName }: { clientId: string; cl
 
       const { data, error } = await supabase.functions.invoke('meta-launch-center', {
         body: { launch_id: inserted.id },
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.errors?.join(', ') || data?.error || 'Publish failed');
@@ -217,7 +217,7 @@ export function LaunchCenterTab({ clientId, clientName }: { clientId: string; cl
     mutationFn: async (launchId: string) => {
       const { data, error } = await supabase.functions.invoke('meta-launch-center', {
         body: { launch_id: launchId },
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Retry failed');

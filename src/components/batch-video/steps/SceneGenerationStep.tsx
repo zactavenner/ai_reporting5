@@ -18,7 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSaveAssetFromUrl } from '@/hooks/useAssets';
 import type { ScriptSegment, BatchVideoScene, BatchVideoConfig, BackgroundStyle } from '@/types/batch-video';
-import { dashboardAuthHeaders } from '@/lib/dashboardAuthHeaders';
+import { dashboardTokenHeaders } from '@/lib/dashboardAuthHeaders';
 
 const BACKGROUNDS: { id: BackgroundStyle; label: string }[] = [
   { id: 'animated-gradient', label: 'Animated Gradient' },
@@ -80,7 +80,7 @@ export function SceneGenerationStep({
         : `Cinematic B-roll (NO people): ${prompt}. ${scene.segment.sceneDescription || ''}. ${config.offerDescription ? `Context: ${config.offerDescription}` : ''}`;
 
       const { data, error } = await supabase.functions.invoke('generate-static-ad', {
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
         body: {
           prompt: enhancedPrompt,
           aspectRatio: config.aspectRatio || '16:9',

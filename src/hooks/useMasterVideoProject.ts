@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { dashboardAuthHeaders, normalizeDashboardError } from "@/lib/dashboardAuthHeaders";
+import { dashboardTokenHeaders, normalizeDashboardError } from "@/lib/dashboardAuthHeaders";
 import {
   createEmptyDraft,
   clampRenderSettings,
@@ -110,7 +110,7 @@ export function useMasterVideoProject(clientId: string | null, conversationId: s
     async (payload: Record<string, unknown>) => {
       const { data, error } = await supabase.functions.invoke("master-video-generate", {
         body: { clientId: clientId || null, conversationId: conversationId || null, ...payload },
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
       });
       if (error) throw await normalizeDashboardError(error);
       if ((data as any)?.error) throw new Error(String((data as any).error));

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useApiRateLimiter, type ServiceType } from './useApiRateLimiter';
-import { dashboardAuthHeaders } from '@/lib/dashboardAuthHeaders';
+import { dashboardTokenHeaders } from '@/lib/dashboardAuthHeaders';
 
 type AspectRatio = '16:9' | '9:16' | '1:1' | '4:5';
 
@@ -242,7 +242,7 @@ export function useBrollGeneration() {
       apiKey = available.key || undefined;
 
       const { data, error } = await supabase.functions.invoke('generate-video-from-image', {
-        headers: dashboardAuthHeaders(),
+        headers: dashboardTokenHeaders(),
         body: {
           prompt: generatedPrompt,
           imageUrl: startImageUrl,
