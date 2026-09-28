@@ -70,8 +70,21 @@ serve(async (req) => {
   // Signed playback link (the link written to the CRM "Last Call Recording" field).
   if (body.action === "play") return await playRecording(String(body.c || ""), String(body.s || ""));
 
-  if ((body.password || req.headers.get("x-hpa-webhook-token")) !== INTERNAL_PASSWORD) {
-    return json({ error: "unauthorized" }, 401);
+  // GHL's Custom Webhook action may send the token as a header, a query param or a
+  // body field, sometimes with stray whitespace, quotes or a "Bearer " prefix.
+  const clean = (v: unknown) =>
+    String(v ?? "").trim().replace(/^bearer\s+/i, "").replace(/^["']|["']$/g, "").trim();
+  const candidates = [
+    body.password, body.token, body.webhook_token, body["x-hpa-webhook-token"],
+    req.headers.get("x-hpa-webhook-token"), req.headers.get("x-webhook-token"),
+  ].map(clean).filter(Boolean);
+  if (!candidates.includes(INTERNAL_PASSWORD)) {
+    console.warn("ghl-call-recordings unauthorized", {
+      action: body.action ?? null,
+      has_header: !!req.headers.get("x-hpa-webhook-token"),
+      has_body_token: !!(body.password || body.token),
+    });
+    return json({ error: "unauthorized", hint: "Send header x-hpa-webhook-token or query ?token= with the internal password" }, 401);
   }
 
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
