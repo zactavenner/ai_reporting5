@@ -809,7 +809,7 @@ Deno.serve(async (req) => {
           return payload;
         })();
         inflight.set(cacheKey, pending);
-        pending.finally(() => inflight.delete(cacheKey));
+        pending.then(() => inflight.delete(cacheKey), () => inflight.delete(cacheKey));
       }
       try {
         baseParsed = await pending;
@@ -992,7 +992,7 @@ Deno.serve(async (req) => {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('fetch-sheet-metrics error:', msg);
     return new Response(JSON.stringify({ error: msg }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: /\[429\]/.test(msg) ? 429 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
