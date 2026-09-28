@@ -55,8 +55,16 @@ export function ErrorToastHandler() {
       }
     };
 
+    const errHandler = (e: ErrorEvent) => {
+      const msg = e.error?.message || e.message || '';
+      if (/returned 403|not_operator|not an agency admin/i.test(msg)) e.preventDefault();
+    };
     window.addEventListener('unhandledrejection', handler);
-    return () => window.removeEventListener('unhandledrejection', handler);
+    window.addEventListener('error', errHandler);
+    return () => {
+      window.removeEventListener('unhandledrejection', handler);
+      window.removeEventListener('error', errHandler);
+    };
   }, []);
 
   return null;

@@ -391,9 +391,17 @@ class Runner {
 
   // ---------------------------------------------------------------- webhook (one call)
   async webhook() {
-    const messageId = String(this.body.message_id || this.body.messageId || "").trim();
-    const clientId = String(this.body.client_id || "").trim();
-    if (!messageId || !clientId) return { ok: false, error: "message_id and client_id are required" };
+    const b = this.body;
+    const messageId = String(b.message_id || b.messageId || b.message?.id || b.call?.messageId || "").trim();
+    let clientId = String(b.client_id || "").trim();
+    const loc = String(b.location_id || b.locationId || b.location?.id || "").trim();
+    if (!clientId && loc) {
+      const { data: c } = await this.sb.from("clients").select("id").eq("ghl_location_id", loc).maybeSingle();
+      clientId = c?.id || "";
+    }
+    if (!this.body.contact_id) this.body.contact_id = b.contactId || b.contact?.id || null;
+    if (this.body.duration_seconds == null) this.body.duration_seconds = b.callDuration ?? b.call?.duration ?? b.duration;
+    if (!messageId || !clientId) return { ok: false, error: "message_id and client_id (or a known location_id) are required" };
 
     const { apiKey, locationId } = await getMappedGhl(this.sb, clientId);
     if (!apiKey || !locationId) return { ok: false, error: "no CRM credentials" };
