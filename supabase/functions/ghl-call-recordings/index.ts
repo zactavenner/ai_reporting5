@@ -184,12 +184,21 @@ class Runner {
   /** Write the signed playback link to the contact's "Last Call Recording" field. Never messages the contact. */
   async pushLink(callId: string, clientId: string, contactId: string | null, apiKey: string, locationId: string) {
     if (!contactId) return "no_contact";
+    // Field holds only the newest recording: never let an older call overwrite a newer one.
+    const { data: cur } = await this.sb.from("phone_call_records").select("started_at").eq("call_id", callId).maybeSingle();
+    if (cur?.started_at) {
+      const { data: newer } = await this.sb.from("phone_call_records").select("call_id")
+        .eq("client_id", clientId).eq("contact_id", contactId).not("recording_url", "is", null)
+        .gt("started_at", cur.started_at).limit(1);
+      if (newer && newer.length) return "superseded_by_newer";
+    }
     const fieldId = await this.recordingFieldId(locationId, apiKey);
     if (!fieldId) return "field_missing";
     const link = await playbackLink(callId);
     const res = await fetch(`${GHL_BASE}/contacts/${contactId}`, {
       method: "PUT",
       headers: { Authorization: `Bearer ${apiKey}`, Version: GHL_VERSION, Accept: "application/json", "Content-Type": "application/json" },
+      // Single value replaces whatever was there (overwrite, never append).
       body: JSON.stringify({ customFields: [{ id: fieldId, field_value: link }] }),
     });
     const text = await res.text();
