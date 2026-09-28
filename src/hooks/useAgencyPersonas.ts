@@ -37,15 +37,26 @@ export function useAgencyPersonas() {
     queryKey: ['agency-personas'],
     queryFn: async () => {
       // Non-admin or signed-out sessions: show an empty list instead of crashing.
-      const { data, error } = await supabase.functions.invoke('agency-personas', {
-        body: { action: 'list' },
-        headers: dashboardAuthHeaders(),
-      });
-      if (error || (data as any)?.error) {
-        console.warn('[agency-personas] unavailable:', (data as any)?.error || error?.message);
+      // Plain fetch so a 403 is handled here, not surfaced as an uncaught error.
+      const auth = dashboardAuthHeaders();
+      if (!auth['x-dashboard-token']) return [] as AgencyPersona[];
+      try {
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agency-personas`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            ...auth,
+          },
+          body: JSON.stringify({ action: 'list' }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || data?.error) return [] as AgencyPersona[];
+        return (data?.personas ?? []) as AgencyPersona[];
+      } catch {
         return [] as AgencyPersona[];
       }
-      return ((data as any)?.personas ?? []) as AgencyPersona[];
     },
     staleTime: 60_000,
     retry: false,
