@@ -38,7 +38,8 @@ export function useAgencyPersonas() {
     queryFn: async () => {
       // Non-admin or signed-out sessions: show an empty list instead of crashing.
       // Plain fetch so a 403 is handled here, not surfaced as an uncaught error.
-      const auth = dashboardAuthHeaders();
+      let auth: Record<string, string>;
+      try { auth = dashboardAuthHeaders(); } catch { return [] as AgencyPersona[]; }
       if (!auth['x-dashboard-token']) return [] as AgencyPersona[];
       try {
         const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agency-personas`, {

@@ -44,3 +44,13 @@ export async function normalizeDashboardError(error: unknown): Promise<Error> {
   }
   return new Error(message);
 }
+
+/** Token header without the admin-only check, for features any team member may use. */
+export function dashboardTokenHeaders(): Record<string, string> {
+  try {
+    const token = localStorage.getItem('dashboard_session_token');
+    return token ? { 'x-dashboard-token': token } : {};
+  } catch {
+    return {};
+  }
+}

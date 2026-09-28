@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { dashboardAuthHeaders } from '@/lib/dashboardAuthHeaders';
+import { dashboardAuthHeaders, dashboardTokenHeaders } from '@/lib/dashboardAuthHeaders';
 import type { VideoClip, Caption, TextOverlay } from '@/hooks/useVideoEditor';
 import { validateRenderSpec } from '../../../supabase/functions/_shared/hyperframes-spec.mjs';
 
@@ -23,7 +23,7 @@ export interface HyperframesExportProps {
 }
 interface RenderJob { id: string; status: string; error?: string; output_url?: string; creative_id?: string }
 async function invoke(body: Record<string, unknown>) {
-  const headers = dashboardAuthHeaders();
+  const headers = dashboardTokenHeaders();
   if (!headers['x-dashboard-token']) throw new Error('Sign in to the dashboard again to enable server rendering');
   const { data, error } = await supabase.functions.invoke('hyperframes-jobs', { body, headers });
   if (error) {
