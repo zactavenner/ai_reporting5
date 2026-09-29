@@ -241,3 +241,7 @@ verify_jwt = false
 
 [functions.linq-bridge]
 verify_jwt = false
+
+[functions.pilot-readiness]
+# The handler verifies the existing signed dashboard token and current admin role.
+verify_jwt = false
