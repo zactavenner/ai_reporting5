@@ -170,6 +170,8 @@ async function runTool(sb: SB, session: any, name: ToolName, args: Record<string
       const { data: slot } = await sb.from('ai_setter_slots').select('*').eq('id', hold.slot_id).maybeSingle();
       const slotLocal = slot ? utcToZoned(slot.starts_at, details.timezone) : null;
       if (!slotLocal || slotLocal.date !== details.date || slotLocal.time !== details.time) return { status: 'rejected', reason: 'details_mismatch_slot' };
+      // Recheck availability immediately before the durable claim + external write.
+      if (!(await cal.isFree(slot.id))) return { status: 'rejected', reason: 'slot_taken' };
       // Durable booking claim before any calendar write.
       const { data: booking, error: bErr } = await sb.from('ai_setter_bookings').insert({
         client_id: session.client_id, session_id: session.id, queue_id: session.queue_id, slot_id: slot.id, hold_id: hold.id,
@@ -177,7 +179,6 @@ async function runTool(sb: SB, session: any, name: ToolName, args: Record<string
         timezone: details.timezone, provider: cal.name, is_demo: session.is_demo,
       }).select('*').maybeSingle();
       if (bErr || !booking) return { status: 'rejected', reason: 'already_booked' };
-      if (!(await cal.isFree(slot.id).then(() => true))) return { status: 'rejected', reason: 'slot_taken' };
       let providerId: string;
       try {
         providerId = (await cal.book({ clientId: session.client_id, slot, contactName: details.contact_name })).providerId;
