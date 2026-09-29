@@ -39,3 +39,15 @@ Redeploy this folder to Railway / Fly using the existing `railway.json` /
 `fly.toml`. After first deploy open the **WhatsApp** tab in Lovable, click
 **Refresh**, and scan the QR from your phone (WhatsApp → Settings → Linked
 Devices → Link a Device).
+
+## AI Outbound Setter voice module (`voice.go`)
+
+Long-lived OpenAI GPT-Live sideband for outbound SIP calls created by the
+`ai-setter-place-call` edge function. Voice is disabled unless all are set:
+
+- `OPENAI_API_KEY`
+- `AI_SETTER_BRIDGE_SECRET` — same value as the backend secret
+- `AI_SETTER_TOOLS_URL` — `https://<proj>.supabase.co/functions/v1/ai-setter-tools`
+
+Endpoints: `GET /voice/health`, `GET /voice/ready` (503 until configured),
+`POST /voice/attach` (Bearer `AI_SETTER_BRIDGE_SECRET`).
