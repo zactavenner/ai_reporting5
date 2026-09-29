@@ -72,17 +72,26 @@ serve(async (req) => {
 
   // GHL's Custom Webhook action may send the token as a header, a query param or a
   // body field, sometimes with stray whitespace, quotes or a "Bearer " prefix.
-  const clean = (v: unknown) =>
-    String(v ?? "").trim().replace(/^bearer\s+/i, "").replace(/^["']|["']$/g, "").trim();
+  const clean = (v: unknown) => {
+    let s = String(v ?? "").trim().replace(/^bearer\s+/i, "").replace(/^["']|["']$/g, "").trim();
+    try { if (/%[0-9a-f]{2}/i.test(s)) s = decodeURIComponent(s).trim(); } catch { /* keep */ }
+    return s;
+  };
+  // Query params are checked explicitly: GHL's payload can carry its own
+  // "token"/"password" keys that would otherwise shadow the URL token.
   const candidates = [
+    url.searchParams.get("token"), url.searchParams.get("password"),
     body.password, body.token, body.webhook_token, body["x-hpa-webhook-token"],
+    body.customData?.token, body.customData?.password,
     req.headers.get("x-hpa-webhook-token"), req.headers.get("x-webhook-token"),
+    req.headers.get("authorization"),
   ].map(clean).filter(Boolean);
   if (!candidates.includes(INTERNAL_PASSWORD)) {
     console.warn("ghl-call-recordings unauthorized", {
       action: body.action ?? null,
       has_header: !!req.headers.get("x-hpa-webhook-token"),
-      has_body_token: !!(body.password || body.token),
+      has_query_token: url.searchParams.has("token"),
+      candidate_lengths: candidates.map((c) => c.length),
     });
     return json({ error: "unauthorized", hint: "Send header x-hpa-webhook-token or query ?token= with the internal password" }, 401);
   }
