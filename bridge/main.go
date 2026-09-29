@@ -472,6 +472,9 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
+	mux.HandleFunc("/voice/health", voiceHealthHandler)
+	mux.HandleFunc("/voice/ready", voiceReadyHandler)
+	mux.HandleFunc("/voice/attach", voiceAttachHandler)
 	mux.HandleFunc("/status", statusHandler)
 	mux.HandleFunc("/groups", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodPost {

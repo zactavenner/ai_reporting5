@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { exportToCSV } from '@/lib/exportUtils';
 import { AiCallRecord, useAiCallerCalls } from '@/hooks/useAiCallerCalls';
 import { AICallerDetail } from './AICallerDetail';
+import { OutboundSetter } from './setter/OutboundSetter';
 import {
   APPOINTMENT_STATUSES,
   CALL_OUTCOMES,
@@ -47,7 +48,7 @@ interface Props {
   clientName: string;
 }
 
-export function AICallerTab({ clientId, clientName }: Props) {
+function AICallerAnalytics({ clientId, clientName }: Props) {
   const [preset, setPreset] = useState('30d');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
@@ -505,5 +506,18 @@ function FunnelRow({
         <div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} />
       </div>
     </div>
+  );
+}
+
+export function AICallerTab({ clientId, clientName }: Props) {
+  return (
+    <Tabs defaultValue="analytics" className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        <TabsTrigger value="setter">Outbound Setter</TabsTrigger>
+      </TabsList>
+      <TabsContent value="analytics"><AICallerAnalytics clientId={clientId} clientName={clientName} /></TabsContent>
+      <TabsContent value="setter"><OutboundSetter clientId={clientId} /></TabsContent>
+    </Tabs>
   );
 }
