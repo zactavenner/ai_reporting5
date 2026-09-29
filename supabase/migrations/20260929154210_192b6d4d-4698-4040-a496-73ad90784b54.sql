@@ -1,0 +1,1 @@
+ALTER TABLE public.client_assignments ADD COLUMN IF NOT EXISTS setter text;

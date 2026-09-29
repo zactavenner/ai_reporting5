@@ -7150,6 +7150,7 @@ export type Database = {
           client_id: string
           created_at: string
           media_buyer: string | null
+          setter: string | null
           updated_at: string
         }
         Insert: {
@@ -7157,6 +7158,7 @@ export type Database = {
           client_id: string
           created_at?: string
           media_buyer?: string | null
+          setter?: string | null
           updated_at?: string
         }
         Update: {
@@ -7164,6 +7166,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           media_buyer?: string | null
+          setter?: string | null
           updated_at?: string
         }
         Relationships: []
