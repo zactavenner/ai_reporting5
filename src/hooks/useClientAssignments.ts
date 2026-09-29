@@ -5,6 +5,7 @@ export interface ClientAssignment {
   client_id: string;
   media_buyer: string | null;
   account_manager: string | null;
+  setter: string | null;
 }
 
 export function useClientAssignments() {
@@ -13,7 +14,7 @@ export function useClientAssignments() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('client_assignments')
-        .select('client_id, media_buyer, account_manager');
+        .select('client_id, media_buyer, account_manager, setter');
 
       if (error) throw error;
 
@@ -31,10 +32,11 @@ export function useUpdateClientAssignment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, media_buyer, account_manager }: { id: string; media_buyer?: string | null; account_manager?: string | null }) => {
+    mutationFn: async ({ id, media_buyer, account_manager, setter }: { id: string; media_buyer?: string | null; account_manager?: string | null; setter?: string | null }) => {
       const updates: Record<string, any> = { client_id: id };
       if (media_buyer !== undefined) updates.media_buyer = media_buyer;
       if (account_manager !== undefined) updates.account_manager = account_manager;
+      if (setter !== undefined) updates.setter = setter;
 
       const { error } = await supabase
         .from('client_assignments')
