@@ -2026,15 +2026,17 @@ export function AIStudioTab({ clientId, clientName }: Props) {
           setCanvas([]);
         }
       } catch (e) {
-        console.error("AI Studio history load failed", e);
         const msg = String((e as any)?.message || "");
         if (msg.includes("Not authenticated") || msg.includes("401")) {
-          // Dashboard session token is missing/expired/invalid — force re-login
+          // Expired dashboard session: ask the operator to sign in again instead
+          // of crashing or silently reloading the page.
+          console.warn("AI Studio: dashboard session expired");
           try {
             localStorage.removeItem("dashboard_session_token");
-            localStorage.removeItem("dashboard_auth");
           } catch {}
-          if (typeof window !== "undefined") window.location.reload();
+          toast.error("Your session expired. Please sign in again to use AI Studio.");
+        } else {
+          console.warn("AI Studio history load failed", e);
         }
         setConversationId(null);
         setMessages([]);
