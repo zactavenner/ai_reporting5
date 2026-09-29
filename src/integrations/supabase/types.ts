@@ -2829,6 +2829,891 @@ export type Database = {
           },
         ]
       }
+      ai_setter_attempt_claims: {
+        Row: {
+          attempt_number: number
+          client_id: string
+          created_at: string
+          id: string
+          idempotency_key: string
+          queue_id: string
+          session_id: string | null
+          status: string
+        }
+        Insert: {
+          attempt_number: number
+          client_id: string
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          queue_id: string
+          session_id?: string | null
+          status?: string
+        }
+        Update: {
+          attempt_number?: number
+          client_id?: string
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          queue_id?: string
+          session_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_setter_attempt_claims_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_attempt_claims_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_attempt_claims_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_attempt_claims_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_attempt_claims_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "ai_setter_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_attempt_claims_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "ai_setter_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_setter_bookings: {
+        Row: {
+          client_id: string
+          contact_name: string
+          created_at: string
+          failure_detail: string | null
+          hold_id: string | null
+          id: string
+          is_demo: boolean
+          provider: string
+          provider_booking_id: string | null
+          queue_id: string | null
+          service_type: string
+          session_id: string | null
+          slot_id: string | null
+          starts_at: string
+          status: string
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          contact_name: string
+          created_at?: string
+          failure_detail?: string | null
+          hold_id?: string | null
+          id?: string
+          is_demo?: boolean
+          provider?: string
+          provider_booking_id?: string | null
+          queue_id?: string | null
+          service_type: string
+          session_id?: string | null
+          slot_id?: string | null
+          starts_at: string
+          status?: string
+          timezone: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          contact_name?: string
+          created_at?: string
+          failure_detail?: string | null
+          hold_id?: string | null
+          id?: string
+          is_demo?: boolean
+          provider?: string
+          provider_booking_id?: string | null
+          queue_id?: string | null
+          service_type?: string
+          session_id?: string | null
+          slot_id?: string | null
+          starts_at?: string
+          status?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_setter_bookings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_bookings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_bookings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_bookings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_bookings_hold_id_fkey"
+            columns: ["hold_id"]
+            isOneToOne: true
+            referencedRelation: "ai_setter_holds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_bookings_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "ai_setter_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_bookings_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "ai_setter_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_bookings_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "ai_setter_slots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_setter_campaigns: {
+        Row: {
+          activated_at: string | null
+          activated_by: string | null
+          active: boolean
+          client_id: string
+          created_at: string
+          id: string
+          is_demo: boolean
+          name: string
+          service_name: string
+          service_type: string
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string | null
+          activated_by?: string | null
+          active?: boolean
+          client_id: string
+          created_at?: string
+          id?: string
+          is_demo?: boolean
+          name: string
+          service_name: string
+          service_type: string
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string | null
+          activated_by?: string | null
+          active?: boolean
+          client_id?: string
+          created_at?: string
+          id?: string
+          is_demo?: boolean
+          name?: string
+          service_name?: string
+          service_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_setter_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      ai_setter_events: {
+        Row: {
+          client_id: string
+          created_at: string
+          event_type: string
+          id: number
+          is_demo: boolean
+          payload: Json | null
+          session_id: string
+          task_revision: number | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          event_type: string
+          id?: number
+          is_demo?: boolean
+          payload?: Json | null
+          session_id: string
+          task_revision?: number | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          event_type?: string
+          id?: number
+          is_demo?: boolean
+          payload?: Json | null
+          session_id?: string
+          task_revision?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_setter_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_events_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "ai_setter_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_setter_holds: {
+        Row: {
+          client_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          is_demo: boolean
+          session_id: string
+          slot_id: string
+          status: string
+          task_revision: number
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          is_demo?: boolean
+          session_id: string
+          slot_id: string
+          status?: string
+          task_revision: number
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_demo?: boolean
+          session_id?: string
+          slot_id?: string
+          status?: string
+          task_revision?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_setter_holds_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_holds_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_holds_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_holds_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_holds_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "ai_setter_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_holds_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "ai_setter_slots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_setter_queue: {
+        Row: {
+          attempts: number
+          campaign_id: string
+          client_id: string
+          consent_at: string | null
+          consent_evidence: Json | null
+          contact_email: string | null
+          contact_name: string
+          contact_phone: string | null
+          created_at: string
+          dnc: boolean
+          dnc_reason: string | null
+          id: string
+          is_demo: boolean
+          last_attempt_at: string | null
+          last_result: string | null
+          lead_id: string | null
+          status: string
+          timezone: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          campaign_id: string
+          client_id: string
+          consent_at?: string | null
+          consent_evidence?: Json | null
+          contact_email?: string | null
+          contact_name: string
+          contact_phone?: string | null
+          created_at?: string
+          dnc?: boolean
+          dnc_reason?: string | null
+          id?: string
+          is_demo?: boolean
+          last_attempt_at?: string | null
+          last_result?: string | null
+          lead_id?: string | null
+          status?: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          campaign_id?: string
+          client_id?: string
+          consent_at?: string | null
+          consent_evidence?: Json | null
+          contact_email?: string | null
+          contact_name?: string
+          contact_phone?: string | null
+          created_at?: string
+          dnc?: boolean
+          dnc_reason?: string | null
+          id?: string
+          is_demo?: boolean
+          last_attempt_at?: string | null
+          last_result?: string | null
+          lead_id?: string | null
+          status?: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_setter_queue_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "ai_setter_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      ai_setter_sessions: {
+        Row: {
+          campaign_id: string | null
+          client_id: string
+          confirmation: Json | null
+          created_at: string
+          ended_at: string | null
+          failure_code: string | null
+          failure_detail: string | null
+          finalization: string
+          id: string
+          is_demo: boolean
+          model: string | null
+          openai_session_id: string | null
+          preferences: Json
+          queue_id: string | null
+          reconciliation_required: boolean
+          started_at: string
+          started_by: string | null
+          status: string
+          task_revision: number
+          transport: string
+          updated_at: string
+          usage: Json | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          client_id: string
+          confirmation?: Json | null
+          created_at?: string
+          ended_at?: string | null
+          failure_code?: string | null
+          failure_detail?: string | null
+          finalization?: string
+          id?: string
+          is_demo?: boolean
+          model?: string | null
+          openai_session_id?: string | null
+          preferences?: Json
+          queue_id?: string | null
+          reconciliation_required?: boolean
+          started_at?: string
+          started_by?: string | null
+          status?: string
+          task_revision?: number
+          transport: string
+          updated_at?: string
+          usage?: Json | null
+        }
+        Update: {
+          campaign_id?: string | null
+          client_id?: string
+          confirmation?: Json | null
+          created_at?: string
+          ended_at?: string | null
+          failure_code?: string | null
+          failure_detail?: string | null
+          finalization?: string
+          id?: string
+          is_demo?: boolean
+          model?: string | null
+          openai_session_id?: string | null
+          preferences?: Json
+          queue_id?: string | null
+          reconciliation_required?: boolean
+          started_at?: string
+          started_by?: string | null
+          status?: string
+          task_revision?: number
+          transport?: string
+          updated_at?: string
+          usage?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_setter_sessions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "ai_setter_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_sessions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_sessions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_sessions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_sessions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_sessions_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "ai_setter_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_setter_settings: {
+        Row: {
+          allowed_countries: string[]
+          approved_questions: Json
+          business_name: string | null
+          calendar_mapping_verified: boolean
+          calendar_provider: string
+          call_window_end: number
+          call_window_start: number
+          caller_number: string | null
+          caller_number_verified: boolean
+          candidate_script: string | null
+          client_id: string
+          created_at: string
+          daily_call_limit: number
+          id: string
+          investor_script: string | null
+          is_demo: boolean
+          max_attempts: number
+          outbound_enabled: boolean
+          recording_enabled: boolean
+          timezone: string
+          updated_at: string
+          voice: string
+        }
+        Insert: {
+          allowed_countries?: string[]
+          approved_questions?: Json
+          business_name?: string | null
+          calendar_mapping_verified?: boolean
+          calendar_provider?: string
+          call_window_end?: number
+          call_window_start?: number
+          caller_number?: string | null
+          caller_number_verified?: boolean
+          candidate_script?: string | null
+          client_id: string
+          created_at?: string
+          daily_call_limit?: number
+          id?: string
+          investor_script?: string | null
+          is_demo?: boolean
+          max_attempts?: number
+          outbound_enabled?: boolean
+          recording_enabled?: boolean
+          timezone?: string
+          updated_at?: string
+          voice?: string
+        }
+        Update: {
+          allowed_countries?: string[]
+          approved_questions?: Json
+          business_name?: string | null
+          calendar_mapping_verified?: boolean
+          calendar_provider?: string
+          call_window_end?: number
+          call_window_start?: number
+          caller_number?: string | null
+          caller_number_verified?: boolean
+          candidate_script?: string | null
+          client_id?: string
+          created_at?: string
+          daily_call_limit?: number
+          id?: string
+          investor_script?: string | null
+          is_demo?: boolean
+          max_attempts?: number
+          outbound_enabled?: boolean
+          recording_enabled?: boolean
+          timezone?: string
+          updated_at?: string
+          voice?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_setter_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      ai_setter_slots: {
+        Row: {
+          client_id: string
+          created_at: string
+          duration_minutes: number
+          id: string
+          is_demo: boolean
+          service_type: string
+          starts_at: string
+          timezone: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          is_demo?: boolean
+          service_type: string
+          starts_at: string
+          timezone: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          is_demo?: boolean
+          service_type?: string
+          starts_at?: string
+          timezone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_setter_slots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_slots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_slots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_slots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      ai_setter_tool_runs: {
+        Row: {
+          arguments: Json | null
+          call_ref: string
+          client_id: string
+          created_at: string
+          id: string
+          is_demo: boolean
+          result: Json | null
+          session_id: string
+          status: string
+          task_revision: number
+          tool_call_id: string
+          tool_name: string
+          updated_at: string
+        }
+        Insert: {
+          arguments?: Json | null
+          call_ref: string
+          client_id: string
+          created_at?: string
+          id?: string
+          is_demo?: boolean
+          result?: Json | null
+          session_id: string
+          status?: string
+          task_revision: number
+          tool_call_id: string
+          tool_name: string
+          updated_at?: string
+        }
+        Update: {
+          arguments?: Json | null
+          call_ref?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          is_demo?: boolean
+          result?: Json | null
+          session_id?: string
+          status?: string
+          task_revision?: number
+          tool_call_id?: string
+          tool_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_setter_tool_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_tool_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_setter_tool_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_tool_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_tool_runs_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "ai_setter_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_studio_canvas_items: {
         Row: {
           actor_member_id: string | null
@@ -20225,6 +21110,7 @@ export type Database = {
           direction: string | null
           duration_seconds: number | null
           ended_at: string | null
+          error_detail: string | null
           follow_up_date: string | null
           follow_up_required: boolean
           ghl_synced_at: string | null
@@ -20238,6 +21124,7 @@ export type Database = {
           missed_follow_ups: Json
           next_step: string | null
           objections: Json | null
+          openai_session_id: string | null
           outcome: string | null
           provider: string | null
           qualification_evidence: Json
@@ -20251,6 +21138,7 @@ export type Database = {
           rep_coaching: Json
           score_breakdown: Json
           sentiment: string | null
+          setter_session_id: string | null
           speaker_segments: Json | null
           started_at: string | null
           summary: string | null
@@ -20259,6 +21147,7 @@ export type Database = {
           transcript: string | null
           transcription_error: string | null
           transcription_status: string
+          transport: string | null
           updated_at: string
         }
         Insert: {
@@ -20289,6 +21178,7 @@ export type Database = {
           direction?: string | null
           duration_seconds?: number | null
           ended_at?: string | null
+          error_detail?: string | null
           follow_up_date?: string | null
           follow_up_required?: boolean
           ghl_synced_at?: string | null
@@ -20302,6 +21192,7 @@ export type Database = {
           missed_follow_ups?: Json
           next_step?: string | null
           objections?: Json | null
+          openai_session_id?: string | null
           outcome?: string | null
           provider?: string | null
           qualification_evidence?: Json
@@ -20315,6 +21206,7 @@ export type Database = {
           rep_coaching?: Json
           score_breakdown?: Json
           sentiment?: string | null
+          setter_session_id?: string | null
           speaker_segments?: Json | null
           started_at?: string | null
           summary?: string | null
@@ -20323,6 +21215,7 @@ export type Database = {
           transcript?: string | null
           transcription_error?: string | null
           transcription_status?: string
+          transport?: string | null
           updated_at?: string
         }
         Update: {
@@ -20353,6 +21246,7 @@ export type Database = {
           direction?: string | null
           duration_seconds?: number | null
           ended_at?: string | null
+          error_detail?: string | null
           follow_up_date?: string | null
           follow_up_required?: boolean
           ghl_synced_at?: string | null
@@ -20366,6 +21260,7 @@ export type Database = {
           missed_follow_ups?: Json
           next_step?: string | null
           objections?: Json | null
+          openai_session_id?: string | null
           outcome?: string | null
           provider?: string | null
           qualification_evidence?: Json
@@ -20379,6 +21274,7 @@ export type Database = {
           rep_coaching?: Json
           score_breakdown?: Json
           sentiment?: string | null
+          setter_session_id?: string | null
           speaker_segments?: Json | null
           started_at?: string | null
           summary?: string | null
@@ -20387,6 +21283,7 @@ export type Database = {
           transcript?: string | null
           transcription_error?: string | null
           transcription_status?: string
+          transport?: string | null
           updated_at?: string
         }
         Relationships: [
