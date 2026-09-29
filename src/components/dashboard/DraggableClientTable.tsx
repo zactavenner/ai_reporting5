@@ -52,6 +52,8 @@ import { ClientApiStatus } from '@/hooks/useApiConnectionTest';
 import { ApiConnectionStatus } from '@/components/settings/ApiConnectionStatus';
 import { SyncHistoryModal } from '@/components/dashboard/SyncHistoryModal';
 
+const SETTERS = ['Raquel', 'Mike', 'Terrance'];
+
 interface DraggableClientTableProps {
   clients: Client[];
   metrics: Record<string, AggregatedMetrics>;
@@ -408,6 +410,9 @@ export function DraggableClientTable({
       if (sortConfig.column === 'mediaBuyer') {
         return strSort(assignments[a.client.id]?.media_buyer || '', assignments[b.client.id]?.media_buyer || '');
       }
+      if (sortConfig.column === 'setter') {
+        return strSort(assignments[a.client.id]?.setter || '', assignments[b.client.id]?.setter || '');
+      }
       if (sortConfig.column === 'accountManager') {
         return strSort(assignments[a.client.id]?.account_manager || '', assignments[b.client.id]?.account_manager || '');
       }
@@ -555,6 +560,7 @@ export function DraggableClientTable({
               <SortableHeader column="status" label="Status" sortConfig={sortConfig} onSort={handleSort} align="center" />
               <SortableHeader column="mediaBuyer" label="MB" sortConfig={sortConfig} onSort={handleSort} align="center" />
               <SortableHeader column="accountManager" label="AM" sortConfig={sortConfig} onSort={handleSort} align="center" />
+              <SortableHeader column="setter" label="Setter" sortConfig={sortConfig} onSort={handleSort} align="center" />
               <SortableHeader column="adSpend" label="Monthly $" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="dailyTarget" label="$/Day" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="rollupSpend" label="Spend" sortConfig={sortConfig} onSort={handleSort} />
@@ -699,6 +705,24 @@ export function DraggableClientTable({
                           <SelectItem value="_none"><span className="text-muted-foreground">None</span></SelectItem>
                           {agencyMembers.filter((m: any) => m.pod?.name === 'Account Management').map((m: any) => (
                             <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+
+                    {/* Setter */}
+                    <TableCell className="text-center py-0 px-0.5" onClick={(e) => e.stopPropagation()}>
+                      <Select
+                        value={assignments[client.id]?.setter || '_none'}
+                        onValueChange={(val) => updateAssignment.mutateAsync({ id: client.id, setter: val === '_none' ? null : val })}
+                      >
+                        <SelectTrigger className="h-5 w-[75px] text-[9px] border-0 bg-transparent p-0 justify-center [&>svg]:h-2.5 [&>svg]:w-2.5">
+                          <span className="truncate">{assignments[client.id]?.setter || '—'}</span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_none"><span className="text-muted-foreground">None</span></SelectItem>
+                          {SETTERS.map((name) => (
+                            <SelectItem key={name} value={name}>{name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
