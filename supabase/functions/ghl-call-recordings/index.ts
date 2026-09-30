@@ -314,9 +314,31 @@ class Runner {
     let q = this.sb.from("clients").select("id, name").not("ghl_api_key", "is", null).not("ghl_location_id", "is", null);
     if (this.body.client_id) q = q.eq("id", this.body.client_id);
     else q = q.eq("status", "active");
-    const { data, error } = await q.order("name").limit(this.budget.maxClients);
+    const { data, error } = await q.order("name");
     if (error) throw error;
-    return (data || []) as ClientRow[];
+    const rows = (data || []) as ClientRow[];
+    if (this.body.client_id) return rows.slice(0, this.budget.maxClients);
+
+    // Rotate: only enabled, not-currently-leased clients; least-recently checked first.
+    const { data: states } = await this.sb
+      .from("call_recording_capture_state")
+      .select("client_id, enabled, lease_expires_at, last_run_at")
+      .in("client_id", rows.map((r) => r.id));
+    const byId = new Map((states || []).map((s: any) => [s.client_id, s]));
+    const now = Date.now();
+    return rows
+      .filter((r) => {
+        const s: any = byId.get(r.id);
+        if (!s) return true; // leaseClient creates the state row
+        if (!s.enabled && this.body.force !== true) return false;
+        return !(s.lease_expires_at && new Date(s.lease_expires_at).getTime() > now);
+      })
+      .sort((a, b) => {
+        const ta = (byId.get(a.id) as any)?.last_run_at ? new Date((byId.get(a.id) as any).last_run_at).getTime() : 0;
+        const tb = (byId.get(b.id) as any)?.last_run_at ? new Date((byId.get(b.id) as any).last_run_at).getTime() : 0;
+        return ta - tb;
+      })
+      .slice(0, this.budget.maxClients);
   }
 
   /** Walk conversations → call messages for one client, bounded by the run budget. */
