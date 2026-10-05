@@ -20,7 +20,10 @@ import { AgencyActivityLog } from "./AgencyActivityLog";
 export function AgencyAIStudioTab() {
   const { data: clients = [] } = useClients();
   const sorted = useMemo(
-    () => [...clients].sort((a, b) => a.name.localeCompare(b.name)),
+    () =>
+      clients
+        .filter((c) => c.status === "active" || c.status === "onboarding")
+        .sort((a, b) => a.name.localeCompare(b.name)),
     [clients]
   );
 

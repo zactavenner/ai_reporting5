@@ -1783,6 +1783,8 @@ export function AIStudioTab({ clientId, clientName }: Props) {
           uploaded.push(pub.publicUrl);
         }
         if (!uploaded.length) return;
+        // Quick chat line: a pinned first frame means "render my script from this frame".
+        if (slot === "firstFrame" && videoFlow === "legacy") setVideoIntent("produce");
         setVideoFrames((curr) => {
           if (slot === "firstFrame") return { ...curr, firstFrameUrl: uploaded[0] };
           if (slot === "lastFrame") return { ...curr, lastFrameUrl: uploaded[0] };
@@ -1926,10 +1928,24 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     return { token, dashboardToken };
   }, []);
 
+  const authToastAt = useRef(0);
   const studioFetch = useCallback(
     async (body: Record<string, any>, signal?: AbortSignal) => {
-      const { token, dashboardToken } = await getStudioAuth(true);
-      return fetch(aiStudioUrl, {
+      const { token, dashboardToken } = await getStudioAuth(false);
+      const signedOut = () => {
+        if (Date.now() - authToastAt.current > 30_000) {
+          authToastAt.current = Date.now();
+          toast.error("Your session expired. Please sign in again to use AI Studio.");
+        }
+        return new Response(JSON.stringify({ error: "Not authenticated" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        });
+      };
+      // Never throw on a missing sign-in: callers read res.ok, so a 401 response
+      // degrades quietly instead of becoming an uncaught crash.
+      if (!token && !dashboardToken) return signedOut();
+      const res = await fetch(aiStudioUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1939,6 +1955,12 @@ export function AIStudioTab({ clientId, clientName }: Props) {
         body: JSON.stringify({ ...body, dashboardToken }),
         signal,
       });
+      if (res.status === 401 && dashboardToken && !token) {
+        // Stale dashboard token: drop it so background saves stop re-sending it.
+        localStorage.removeItem("dashboard_session_token");
+        signedOut();
+      }
+      return res;
     },
     [aiStudioUrl, getStudioAuth],
   );
@@ -3218,7 +3240,11 @@ export function AIStudioTab({ clientId, clientName }: Props) {
               <>
                 {/* Video Styles bar moved to the composer — only renders when a video model is selected. */}
                 {selectedAgentMode === "video" && (
-                  <div className="px-4 sm:px-6 pt-3 space-y-2">
+                  <div
+                    className={`px-4 sm:px-6 pt-3 space-y-2 ${
+                      videoFlow === "master" ? "flex-1 min-h-0 overflow-y-auto overscroll-contain pb-6" : "max-h-[45vh] overflow-y-auto"
+                    }`}
+                  >
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
