@@ -285,7 +285,19 @@ async function ensureTab(spreadsheetId: string) {
 
 type SheetIndex = { rowIndexByKey: Map<string, number>; nextRow: number };
 
-const rowKey = (r: any[]) => `${r?.[0] ?? ''}|${r?.[12] ?? ''}|${r?.[13] ?? ''}`;
+// Sheets re-displays our ISO dates as M/D/YYYY and rounds long campaign ids,
+// so match on a normalized date + campaign name + account instead of raw text.
+function normDate(v: unknown): string {
+  const s = String(v ?? '').trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return `${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;
+  return s;
+}
+const keyOf = (date: unknown, campaignName: unknown, account: unknown) =>
+  `${normDate(date)}|${String(campaignName ?? '').trim().toLowerCase()}|${String(account ?? '').trim()}`;
+const rowKey = (r: any[]) => keyOf(r?.[0], r?.[1], r?.[13]);
 
 // Removes pre-existing duplicate rows for the same date+campaign+account,
 // keeping the most recent (last) occurrence. Deletions run bottom-up so the
@@ -367,7 +379,7 @@ async function mirrorToSheet(
       r.frequency, r.ctr, r.reach, r.cpm, r.cpc,
       r.leads, costPerLead, r.campaign_id, acct.ad_account_id, now,
     ];
-    const key = `${date}|${r.campaign_id}|${acct.ad_account_id}`;
+    const key = keyOf(date, r.campaign_name, acct.ad_account_id);
     const existingRow = rowIndexByKey.get(key);
     if (existingRow) {
       updates.push({ range: `${SHEET_TAB}!A${existingRow}:${LAST_COL}${existingRow}`, values: [row] });
