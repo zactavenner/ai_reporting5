@@ -1928,10 +1928,24 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     return { token, dashboardToken };
   }, []);
 
+  const authToastAt = useRef(0);
   const studioFetch = useCallback(
     async (body: Record<string, any>, signal?: AbortSignal) => {
-      const { token, dashboardToken } = await getStudioAuth(true);
-      return fetch(aiStudioUrl, {
+      const { token, dashboardToken } = await getStudioAuth(false);
+      const signedOut = () => {
+        if (Date.now() - authToastAt.current > 30_000) {
+          authToastAt.current = Date.now();
+          toast.error("Your session expired. Please sign in again to use AI Studio.");
+        }
+        return new Response(JSON.stringify({ error: "Not authenticated" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        });
+      };
+      // Never throw on a missing sign-in: callers read res.ok, so a 401 response
+      // degrades quietly instead of becoming an uncaught crash.
+      if (!token && !dashboardToken) return signedOut();
+      const res = await fetch(aiStudioUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1941,6 +1955,12 @@ export function AIStudioTab({ clientId, clientName }: Props) {
         body: JSON.stringify({ ...body, dashboardToken }),
         signal,
       });
+      if (res.status === 401 && dashboardToken && !token) {
+        // Stale dashboard token: drop it so background saves stop re-sending it.
+        localStorage.removeItem("dashboard_session_token");
+        signedOut();
+      }
+      return res;
     },
     [aiStudioUrl, getStudioAuth],
   );
