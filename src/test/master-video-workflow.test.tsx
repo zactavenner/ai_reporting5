@@ -79,6 +79,7 @@ vi.mock("sonner", () => ({
 }));
 vi.mock("@/lib/dashboardAuthHeaders", () => ({
   dashboardAuthHeaders: () => ({ "x-dashboard-token": "t" }),
+  dashboardTokenHeaders: () => ({ "x-dashboard-token": "t" }),
   normalizeDashboardError: async (e: unknown) => e,
 }));
 import MasterVideoWorkflow from "@/components/ai/master-video/MasterVideoWorkflow";
