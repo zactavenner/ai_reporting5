@@ -1783,6 +1783,8 @@ export function AIStudioTab({ clientId, clientName }: Props) {
           uploaded.push(pub.publicUrl);
         }
         if (!uploaded.length) return;
+        // Quick chat line: a pinned first frame means "render my script from this frame".
+        if (slot === "firstFrame" && videoFlow === "legacy") setVideoIntent("produce");
         setVideoFrames((curr) => {
           if (slot === "firstFrame") return { ...curr, firstFrameUrl: uploaded[0] };
           if (slot === "lastFrame") return { ...curr, lastFrameUrl: uploaded[0] };
@@ -3218,7 +3220,11 @@ export function AIStudioTab({ clientId, clientName }: Props) {
               <>
                 {/* Video Styles bar moved to the composer — only renders when a video model is selected. */}
                 {selectedAgentMode === "video" && (
-                  <div className="px-4 sm:px-6 pt-3 space-y-2">
+                  <div
+                    className={`px-4 sm:px-6 pt-3 space-y-2 ${
+                      videoFlow === "master" ? "flex-1 min-h-0 overflow-y-auto overscroll-contain pb-6" : "max-h-[45vh] overflow-y-auto"
+                    }`}
+                  >
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
