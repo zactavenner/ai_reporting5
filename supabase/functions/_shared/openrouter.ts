@@ -201,16 +201,31 @@ export async function callOpenRouterJSON<T = any>(
   messages: ORMessage[],
   opts: CallOpts = {},
 ): Promise<{ data: T; model: string }> {
-  const res = await callOpenRouter(messages, {
-    ...opts,
-    response_format: { type: "json_object" },
-  });
-  const cleaned = res.text.replace(/```json\s*/gi, "").replace(/```\s*/gi, "").trim();
-  try {
-    return { data: JSON.parse(cleaned) as T, model: res.model };
-  } catch {
-    throw new Error(`Model ${res.model} returned non-JSON: ${cleaned.slice(0, 300)}`);
+  // Empty or non-JSON replies fall through to the next model in the chain.
+  const models = opts.models?.length ? opts.models : TEXT_MODELS;
+  let lastErr = "";
+  for (const model of models) {
+    let res: CallResult;
+    try {
+      res = await callOpenRouter(messages, {
+        ...opts,
+        models: [model],
+        response_format: { type: "json_object" },
+      });
+    } catch (e) {
+      lastErr = String(e);
+      continue;
+    }
+    const cleaned = res.text.replace(/```json\s*/gi, "").replace(/```\s*/gi, "").trim();
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    try {
+      return { data: JSON.parse(match ? match[0] : cleaned) as T, model: res.model };
+    } catch {
+      lastErr = `Model ${res.model} returned non-JSON: ${cleaned.slice(0, 300)}`;
+      console.warn(lastErr);
+    }
   }
+  throw new Error(lastErr || "All models failed to return JSON");
 }
 
 /**

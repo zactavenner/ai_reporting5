@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { callOpenRouterJSON } from '../_shared/openrouter.ts';
+import { callOpenRouterJSON, TEXT_MODELS } from '../_shared/openrouter.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,7 +23,8 @@ serve(async (req) => {
 
     try {
       const { data } = await callOpenRouterJSON([{ role: 'user', content: prompt }], {
-        models: model ? [model] : undefined,
+        // Requested model goes first, but the default chain stays as backup.
+        models: model ? [model, ...TEXT_MODELS.filter((m) => m !== model)] : undefined,
       });
       return new Response(JSON.stringify(data), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
