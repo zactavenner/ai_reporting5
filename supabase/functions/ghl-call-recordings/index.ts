@@ -489,16 +489,17 @@ class Runner {
       return { acquired: false, reason: "already_running" };
     }
 
-    const { data: leased } = await this.sb
+    // Compare-and-swap on the previous owner. `.is()` only matches NULL, so an
+    // expired lease with a stale owner string must be matched with `.eq()`.
+    let q = this.sb
       .from("call_recording_capture_state")
       .update({
         lease_owner: this.owner,
         lease_expires_at: new Date(Date.now() + LEASE_SECONDS * 1000).toISOString(),
       })
-      .eq("client_id", clientId)
-      .is("lease_owner", existing.lease_owner)
-      .select("lease_owner")
-      .maybeSingle();
+      .eq("client_id", clientId);
+    q = existing.lease_owner == null ? q.is("lease_owner", null) : q.eq("lease_owner", existing.lease_owner);
+    const { data: leased } = await q.select("lease_owner").maybeSingle();
 
     return leased?.lease_owner === this.owner ? { acquired: true } : { acquired: false, reason: "already_running" };
   }
