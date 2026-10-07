@@ -57,6 +57,7 @@ const ConnectionsTab = lazy(() => import('@/components/client/ConnectionsTab'));
 const ClientDatabaseTab = lazy(() => import('@/components/client/ClientDatabaseTab').then(m => ({ default: m.ClientDatabaseTab })));
 const ClientWorkflowsTab = lazy(() => import('@/components/ghl/ClientWorkflowsTab').then(m => ({ default: m.ClientWorkflowsTab })));
 const AdsManagerTab = lazy(() => import('@/components/ads-manager/AdsManagerTab').then(m => ({ default: m.AdsManagerTab })));
+const QualityFeedbackClientTab = lazy(() => import('@/components/quality-feedback/QualityFeedbackClientTab').then(m => ({ default: m.QualityFeedbackClientTab })));
 const AICallerTab = lazy(() => import('@/components/ai-caller/AICallerTab').then(m => ({ default: m.AICallerTab })));
 const FundLaunchReviewTab = lazy(() => import('@/components/client/FundLaunchReviewTab'));
 import { BrandGuideSection } from '@/components/clients/BrandGuideSection';
@@ -469,6 +470,10 @@ export default function ClientDetail() {
                 AI Caller
               </TabsTrigger>
             )}
+            <TabsTrigger value="quality-feedback" className="gap-2 whitespace-nowrap">
+              <CheckSquare className="h-4 w-4" />
+              Quality Feedback
+            </TabsTrigger>
             <TabsTrigger value="sendblue" className="gap-2 whitespace-nowrap">
               <MessageCircle className="h-4 w-4" />
               Sendblue
@@ -666,6 +671,12 @@ export default function ClientDetail() {
           )}
 
 
+
+          <TabsContent value="quality-feedback" className="space-y-6">
+            <SectionErrorBoundary sectionName="Quality Feedback">
+              <QualityFeedbackClientTab clientId={client.id} />
+            </SectionErrorBoundary>
+          </TabsContent>
 
           {/* ─── SENDBLUE TAB ─── */}
           <TabsContent value="sendblue" className="space-y-6">

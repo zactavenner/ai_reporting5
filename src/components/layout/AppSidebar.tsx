@@ -1,3 +1,4 @@
+import { ShieldCheck } from 'lucide-react';
 import {
   LayoutDashboard,
   BarChart3,
@@ -133,6 +134,7 @@ const navStructure = [
       { title: 'Agents', value: 'agents', icon: Cpu },
       { title: 'Agent Infrastructure', value: 'agent-infrastructure', icon: Cpu, href: '/agent-infrastructure' },
       { title: 'Enrichment', value: 'enrichment', icon: Sparkles },
+      { title: 'Quality Feedback', value: 'quality-feedback', icon: ShieldCheck },
     ],
   },
   {

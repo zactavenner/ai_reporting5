@@ -21593,6 +21593,414 @@ export type Database = {
           },
         ]
       }
+      quality_eval_queue: {
+        Row: {
+          attempts: number
+          client_id: string
+          enqueued_at: string
+          finished_at: string | null
+          id: string
+          last_error: string | null
+          lead_id: string
+          lease_expires_at: string | null
+          lease_owner: string | null
+          reason: string
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          client_id: string
+          enqueued_at?: string
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          lead_id: string
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          reason: string
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          client_id?: string
+          enqueued_at?: string
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          lead_id?: string
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          reason?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      quality_evaluations: {
+        Row: {
+          client_id: string
+          evaluated_at: string
+          evidence: Json
+          evidence_hash: string | null
+          id: string
+          is_current: boolean
+          lead_captured_at: string | null
+          lead_id: string
+          milestone: string
+          occurred_at: string | null
+          occurrence_ref: string | null
+          reasons: Json
+          rule_version_id: string | null
+          run_kind: string
+          status: string
+        }
+        Insert: {
+          client_id: string
+          evaluated_at?: string
+          evidence?: Json
+          evidence_hash?: string | null
+          id?: string
+          is_current?: boolean
+          lead_captured_at?: string | null
+          lead_id: string
+          milestone: string
+          occurred_at?: string | null
+          occurrence_ref?: string | null
+          reasons?: Json
+          rule_version_id?: string | null
+          run_kind?: string
+          status: string
+        }
+        Update: {
+          client_id?: string
+          evaluated_at?: string
+          evidence?: Json
+          evidence_hash?: string | null
+          id?: string
+          is_current?: boolean
+          lead_captured_at?: string | null
+          lead_id?: string
+          milestone?: string
+          occurred_at?: string | null
+          occurrence_ref?: string | null
+          reasons?: Json
+          rule_version_id?: string | null
+          run_kind?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      quality_event_attempts: {
+        Row: {
+          attempted_at: string
+          client_id: string
+          http_status: number | null
+          id: string
+          outbox_id: string
+          outcome: string
+          response_redacted: Json | null
+        }
+        Insert: {
+          attempted_at?: string
+          client_id: string
+          http_status?: number | null
+          id?: string
+          outbox_id: string
+          outcome: string
+          response_redacted?: Json | null
+        }
+        Update: {
+          attempted_at?: string
+          client_id?: string
+          http_status?: number | null
+          id?: string
+          outbox_id?: string
+          outcome?: string
+          response_redacted?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_event_attempts_outbox_id_fkey"
+            columns: ["outbox_id"]
+            isOneToOne: false
+            referencedRelation: "quality_event_outbox"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quality_event_outbox: {
+        Row: {
+          attempts: number
+          client_id: string
+          created_at: string
+          destination_dataset_id: string
+          dispatched_at: string | null
+          evaluation_id: string | null
+          event_time: string
+          evidence_hash: string | null
+          hold_reason: string | null
+          id: string
+          idempotency_key: string
+          is_test: boolean
+          last_error: string | null
+          lead_id: string
+          lease_expires_at: string | null
+          lease_owner: string | null
+          meta_event_name: string
+          milestone: string
+          next_attempt_at: string
+          occurrence_ref: string
+          receipt: Json | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          client_id: string
+          created_at?: string
+          destination_dataset_id: string
+          dispatched_at?: string | null
+          evaluation_id?: string | null
+          event_time: string
+          evidence_hash?: string | null
+          hold_reason?: string | null
+          id?: string
+          idempotency_key: string
+          is_test?: boolean
+          last_error?: string | null
+          lead_id: string
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          meta_event_name: string
+          milestone: string
+          next_attempt_at?: string
+          occurrence_ref: string
+          receipt?: Json | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          client_id?: string
+          created_at?: string
+          destination_dataset_id?: string
+          dispatched_at?: string | null
+          evaluation_id?: string | null
+          event_time?: string
+          evidence_hash?: string | null
+          hold_reason?: string | null
+          id?: string
+          idempotency_key?: string
+          is_test?: boolean
+          last_error?: string | null
+          lead_id?: string
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          meta_event_name?: string
+          milestone?: string
+          next_attempt_at?: string
+          occurrence_ref?: string
+          receipt?: Json | null
+          status?: string
+        }
+        Relationships: []
+      }
+      quality_feedback_audit: {
+        Row: {
+          action: string
+          actor: string | null
+          client_id: string | null
+          created_at: string
+          details: Json
+          id: string
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          client_id?: string | null
+          created_at?: string
+          details?: Json
+          id?: string
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          client_id?: string | null
+          created_at?: string
+          details?: Json
+          id?: string
+        }
+        Relationships: []
+      }
+      quality_feedback_clients: {
+        Row: {
+          campaign_rollout: Json
+          client_id: string
+          created_at: string
+          destination_ad_account_id: string | null
+          destination_dataset_id: string | null
+          destination_verified: boolean
+          destination_verified_at: string | null
+          event_source: string
+          live_activated_at: string | null
+          live_activated_by: string | null
+          meta_event_name: string | null
+          milestone: string
+          mode: string
+          sharing_consent_evidence: string | null
+          sharing_consent_status: string
+          updated_at: string
+          volume_advisory_monthly: number
+        }
+        Insert: {
+          campaign_rollout?: Json
+          client_id: string
+          created_at?: string
+          destination_ad_account_id?: string | null
+          destination_dataset_id?: string | null
+          destination_verified?: boolean
+          destination_verified_at?: string | null
+          event_source?: string
+          live_activated_at?: string | null
+          live_activated_by?: string | null
+          meta_event_name?: string | null
+          milestone?: string
+          mode?: string
+          sharing_consent_evidence?: string | null
+          sharing_consent_status?: string
+          updated_at?: string
+          volume_advisory_monthly?: number
+        }
+        Update: {
+          campaign_rollout?: Json
+          client_id?: string
+          created_at?: string
+          destination_ad_account_id?: string | null
+          destination_dataset_id?: string | null
+          destination_verified?: boolean
+          destination_verified_at?: string | null
+          event_source?: string
+          live_activated_at?: string | null
+          live_activated_by?: string | null
+          meta_event_name?: string | null
+          milestone?: string
+          mode?: string
+          sharing_consent_evidence?: string | null
+          sharing_consent_status?: string
+          updated_at?: string
+          volume_advisory_monthly?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_feedback_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "quality_feedback_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_feedback_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "quality_feedback_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      quality_feedback_global: {
+        Row: {
+          emergency_stop: boolean
+          id: number
+          live_enabled: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          emergency_stop?: boolean
+          id?: number
+          live_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          emergency_stop?: boolean
+          id?: number
+          live_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      quality_rule_versions: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          rules: Json
+          version: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          rules: Json
+          version: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          rules?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_rule_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "quality_rule_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_rule_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "quality_rule_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       quiz_questions: {
         Row: {
           created_at: string | null
@@ -26216,6 +26624,65 @@ export type Database = {
       normalize_appointment_status: {
         Args: { p_status: string }
         Returns: string
+      }
+      qf_claim_eval_jobs: {
+        Args: { p_lease_seconds: number; p_limit: number; p_owner: string }
+        Returns: {
+          attempts: number
+          client_id: string
+          enqueued_at: string
+          finished_at: string | null
+          id: string
+          last_error: string | null
+          lead_id: string
+          lease_expires_at: string | null
+          lease_owner: string | null
+          reason: string
+          status: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "quality_eval_queue"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      qf_claim_outbox: {
+        Args: { p_lease_seconds: number; p_limit: number; p_owner: string }
+        Returns: {
+          attempts: number
+          client_id: string
+          created_at: string
+          destination_dataset_id: string
+          dispatched_at: string | null
+          evaluation_id: string | null
+          event_time: string
+          evidence_hash: string | null
+          hold_reason: string | null
+          id: string
+          idempotency_key: string
+          is_test: boolean
+          last_error: string | null
+          lead_id: string
+          lease_expires_at: string | null
+          lease_owner: string | null
+          meta_event_name: string
+          milestone: string
+          next_attempt_at: string
+          occurrence_ref: string
+          receipt: Json | null
+          status: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "quality_event_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      qf_enqueue: {
+        Args: { p_client: string; p_lead: string; p_reason: string }
+        Returns: undefined
       }
       queue_client_sync: {
         Args: { p_client_id: string; p_days_back?: number }
