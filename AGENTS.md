@@ -1,0 +1,1 @@
+- Quality Feedback (Meta quality signals) lives in `supabase/functions/_shared/qualityFeedback/` (pure core + DB store), `quality-feedback-api` (operator-only) and `quality-feedback-worker` (trigger-fed queue + hourly reconciliation + gated outbox). Why: keeps evaluation off the lead-intake path and every send behind global gate + per-client activation.
