@@ -71,3 +71,4 @@ Plan: `.lovable/plan/week-4-ai-marketing-inside-reporting-5-0-2026-09-21.md`
 # Client project access (requested Sep 23)
 - [x] Add scoped client login for Emily across Clear Summit Investments and 5 Winds, limited to viewing and adding tasks in those client projects.
 - [x] Keep each task column readable with fixed-width columns and horizontal board scrolling.
+- [x] Add ad account 1948413122522274 to Lansing Capital
