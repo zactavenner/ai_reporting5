@@ -61,7 +61,8 @@ async function loadAccounts(sb: any, clientId?: string): Promise<AccountRow[]> {
     .select('id, name, status, meta_ad_account_id, meta_ad_account_ids, meta_access_token, meta_system_user_token');
   // Explicit single-client runs (manual/backfill) bypass the status filter so
   // onboarding/paused clients can still be synced on demand.
-  if (clientId) q.eq('id', clientId); else q.eq('status', 'active');
+  // Onboarding clients run live ads too, so the daily pull includes them.
+  if (clientId) q.eq('id', clientId); else q.in('status', ['active', 'onboarding']);
   const { data, error } = await q;
   if (error) throw error;
 
