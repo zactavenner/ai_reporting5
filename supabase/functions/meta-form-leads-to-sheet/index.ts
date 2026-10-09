@@ -105,28 +105,49 @@ Deno.serve(async (req) => {
 
     const existing = await gw(`/spreadsheets/${sheetId}/values/${TAB}!A2:F5000`);
     const emails = new Set<string>(); const phones = new Set<string>();
-    for (const r of existing.values ?? []) {
-      if (r[4]) emails.add(String(r[4]).trim().toLowerCase());
-      if (r[5]) phones.add(digits(r[5]));
-    }
+    const rowByEmail = new Map<string, number>(); const rowByPhone = new Map<string, number>();
+    (existing.values ?? []).forEach((r: string[], i: number) => {
+      const row = i + 2;
+      if (r[4]) { const e = String(r[4]).trim().toLowerCase(); emails.add(e); rowByEmail.set(e, row); }
+      if (r[5]) { const p = digits(r[5]); phones.add(p); rowByPhone.set(p, row); }
+    });
+
+    // Answer pickers: the investment-range question must never match the
+    // accreditation question (both contain "invest").
+    const answer = (f: Record<string, string>, include: RegExp, exclude?: RegExp) => {
+      for (const [k, v] of Object.entries(f)) if (include.test(k) && !(exclude && exclude.test(k))) return v;
+      return '';
+    };
+    const answers = (f: Record<string, string>) => [
+      pretty(answer(f, /accredit/)),
+      pretty(answer(f, /ideal|range|amount|how_much|invest/, /accredit|deploy|soon|timeline/)),
+      pretty(answer(f, /deploy|soon|timeline/)),
+    ];
 
     const toAdd: string[][] = [];
     const masked: string[] = [];
+    const fixes: { range: string; values: string[][] }[] = [];
+    const ghlCandidates: { name: string; email: string; phone: string; created: string }[] = [];
+    const fieldKeys = new Set<string>();
     const seen = new Set<string>();
     for (const l of inRange.sort((a, b) => a.created_time.localeCompare(b.created_time))) {
       const f: Record<string, string> = {};
-      for (const fd of l.field_data ?? []) f[String(fd.name).toLowerCase()] = (fd.values ?? []).join(', ');
+      for (const fd of l.field_data ?? []) { const k = String(fd.name).toLowerCase(); fieldKeys.add(k); f[k] = (fd.values ?? []).join(', '); }
       const email = pick(f, /^email$/, /email/).trim();
       const phone = pick(f, /^phone_number$/, /phone/);
       const key = email.toLowerCase() || digits(phone);
       if (!key || seen.has(key)) continue;
       seen.add(key);
-      if ((email && emails.has(email.toLowerCase())) || (phone && phones.has(digits(phone)))) continue;
       const name = pick(f, /^full_name$/, /name/) || [f.first_name, f.last_name].filter(Boolean).join(' ');
+      ghlCandidates.push({ name, email, phone, created: l.created_time });
+      const existingRow = (email && rowByEmail.get(email.toLowerCase())) || (phone && rowByPhone.get(digits(phone))) || 0;
+      if (existingRow) {
+        if (body.fix_answers) fixes.push({ range: `${TAB}!G${existingRow}:I${existingRow}`, values: [answers(f)] });
+        continue;
+      }
       toAdd.push([
         sheetDate(laDate(l.created_time)), 'Paid Ads', l.is_organic ? 'Facebook (Organic)' : 'Facebook',
-        name, email, fmtPhone(phone),
-        pretty(pick(f, /accredit/)), pretty(pick(f, /investment|range|invest/)), pretty(pick(f, /deploy|soon|timeline/)),
+        name, email, fmtPhone(phone), ...answers(f),
         l.campaign_name ?? '', l.adset_name ?? '', l.ad_name ?? '',
         pretty(pick(f, /income/)), pretty(pick(f, /net_?worth/)),
       ]);
@@ -138,10 +159,57 @@ Deno.serve(async (req) => {
         method: 'POST', body: JSON.stringify({ values: toAdd }),
       });
     }
+    if (!dry_run && fixes.length) {
+      await gw(`/spreadsheets/${sheetId}/values:batchUpdate`, {
+        method: 'POST', body: JSON.stringify({ valueInputOption: 'USER_ENTERED', data: fixes }),
+      });
+    }
+
+    // Optional CRM push: only leads not already in the client's CRM records.
+    let ghl: Record<string, unknown> | null = null;
+    if (body.push_ghl) {
+      const { tag, assignee_name } = body.push_ghl;
+      const { data: gc } = await sb.from('clients').select('ghl_api_key, ghl_location_id').eq('id', client_id).maybeSingle();
+      if (!gc?.ghl_api_key || !gc?.ghl_location_id) throw new Error('client missing CRM credentials');
+      const H = { Authorization: `Bearer ${gc.ghl_api_key}`, Version: '2021-07-28', 'Content-Type': 'application/json', Accept: 'application/json' };
+      let assignedTo: string | undefined;
+      if (assignee_name) {
+        const ur = await fetch(`https://services.leadconnectorhq.com/users/?locationId=${gc.ghl_location_id}`, { headers: H });
+        const uj: any = await ur.json().catch(() => ({}));
+        const users: any[] = uj.users ?? [];
+        const want = String(assignee_name).toLowerCase();
+        const u = users.find((x) => `${x.firstName ?? ''} ${x.lastName ?? ''} ${x.name ?? ''}`.toLowerCase().includes(want));
+        if (!u) throw new Error(`CRM user "${assignee_name}" not found (${ur.status})`);
+        assignedTo = u.id;
+      }
+      const { data: crm } = await sb.from('leads').select('email, phone').eq('client_id', client_id);
+      const crmEmails = new Set((crm ?? []).map((r: any) => String(r.email || '').toLowerCase()).filter(Boolean));
+      const crmPhones = new Set((crm ?? []).map((r: any) => digits(r.phone || '')).filter(Boolean));
+      let pushed = 0, skipped = 0; const failures: string[] = [];
+      for (const c of ghlCandidates) {
+        if ((c.email && crmEmails.has(c.email.toLowerCase())) || (c.phone && crmPhones.has(digits(c.phone)))) { skipped++; continue; }
+        if (dry_run) { pushed++; continue; }
+        const [firstName, ...rest] = c.name.split(' ');
+        const d = digits(c.phone);
+        const r = await fetch('https://services.leadconnectorhq.com/contacts/upsert', {
+          method: 'POST', headers: H,
+          body: JSON.stringify({
+            locationId: gc.ghl_location_id, firstName, lastName: rest.join(' '), name: c.name,
+            email: c.email || undefined, phone: d.length === 10 ? `+1${d}` : c.phone || undefined,
+            tags: tag ? [tag] : undefined, assignedTo, source: 'Facebook Lead Form',
+          }),
+        });
+        if (r.ok) pushed++; else failures.push(`${r.status}: ${(await r.text()).slice(0, 120)}`);
+      }
+      ghl = { assignee_found: !!assignedTo, pushed, skipped_already_in_crm: skipped, failures };
+    }
+
     return json({
       ok: true, dry_run, pages: pages.length, forms: formCount,
       facebook_leads_in_range: inRange.length, already_in_sheet: inRange.length - toAdd.length,
       added: dry_run ? 0 : toAdd.length, would_add: toAdd.length, leads: masked,
+      answer_rows_fixed: dry_run ? 0 : fixes.length, answer_rows_to_fix: fixes.length,
+      form_field_keys: [...fieldKeys], ghl,
     });
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
