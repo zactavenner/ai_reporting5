@@ -47,7 +47,7 @@ const laDate = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ 
 const sheetDate = (ymd: string) => { const [y, m, d] = ymd.split('-').map(Number); return `${m}/${d}/${y}`; };
 const digits = (p: string) => { const d = String(p || '').replace(/\D/g, ''); return d.length === 11 && d[0] === '1' ? d.slice(1) : d; };
 const fmtPhone = (p: string) => { const d = digits(p); return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : p; };
-const pretty = (v: string) => String(v || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+const pretty = (v: string) => String(v || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).replace(/(\d)m\b/gi, '$1M');
 
 function pick(fields: Record<string, string>, ...pats: RegExp[]) {
   for (const p of pats) for (const [k, v] of Object.entries(fields)) if (p.test(k)) return v;
