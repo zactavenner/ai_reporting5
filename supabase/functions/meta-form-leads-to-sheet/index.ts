@@ -5,6 +5,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { authorizeOperator } from '../_shared/operatorAuth.ts';
+import { authorizeDailyReportRun } from '../_shared/dailyReportSecret.ts';
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
 const GATEWAY = 'https://connector-gateway.lovable.dev/google_sheets/v4';
@@ -57,8 +58,12 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const body = await req.json().catch(() => ({}));
-  const auth = await authorizeOperator(req, sb, createClient, body);
-  if (!auth.ok) return json({ error: auth.error, code: auth.code }, auth.status);
+  // Internal jobs present the daily-run secret; otherwise require an agency operator.
+  const internal = await authorizeDailyReportRun(sb, req.headers.get('x-internal-secret'));
+  if (!internal) {
+    const auth = await authorizeOperator(req, sb, createClient, body);
+    if (!auth.ok) return json({ error: auth.error, code: auth.code }, auth.status);
+  }
 
   const { client_id, start_date, end_date, dry_run = true } = body;
   if (!client_id || !/^\d{4}-\d{2}-\d{2}$/.test(start_date ?? '') || !/^\d{4}-\d{2}-\d{2}$/.test(end_date ?? '')) {
