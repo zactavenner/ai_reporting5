@@ -145,6 +145,19 @@ Deno.serve(async (req) => {
       await new Promise(r => setTimeout(r, 5000));
     }
 
+    // ── Step 2b: Attribution per active client (was UI-only → attributed_leads stayed 0) ──
+    try {
+      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+      const sb = createClient(supabaseUrl, supabaseKey);
+      const { data: cl } = await sb.from("clients").select("id, name").in("status", ["active", "onboarding"]);
+      for (const c of cl || []) {
+        const r = await callFunction(supabaseUrl, supabaseKey, "run-attribution", { clientId: c.id });
+        console.log(`[daily-master-sync] attribution ${c.name}: ${r.success ? "ok" : r.error}`);
+      }
+      const r2 = await callFunction(supabaseUrl, supabaseKey, "ad-scoreboard", {});
+      console.log(`[daily-master-sync] ad-scoreboard: ${r2.success ? "ok" : r2.error}`);
+    } catch (e) { console.error("[daily-master-sync] attribution step failed", e); }
+
     // ── Step 4: Recalculate Daily Metrics ──
     if (!skipSteps.includes("recalculate")) {
       const start = Date.now();
