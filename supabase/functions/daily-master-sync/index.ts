@@ -37,6 +37,27 @@ async function callFunction(
   }
 }
 
+async function listClientsByStatus(
+  supabase: any,
+  statuses: string[],
+): Promise<{ id: string; name: string }[]> {
+  const pageSize = 1000;
+  const all: { id: string; name: string }[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("clients")
+      .select("id, name")
+      .in("status", statuses)
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(error.message);
+    const batch = data || [];
+    all.push(...batch);
+    if (batch.length < pageSize) break;
+  }
+  return all;
+}
+
 async function createAlertTask(
   supabase: any,
   title: string,
@@ -123,6 +144,53 @@ Deno.serve(async (req) => {
       await new Promise(r => setTimeout(r, 10000));
     }
 
+    // ── Step 2b: Attribution for every active/onboarding client, then ad scoreboard ──
+    // run-attribution was UI-only, so attributed_leads stayed 0. Status filter, not a client list.
+    if (!skipSteps.includes("attribution")) {
+      const start = Date.now();
+      console.log(`[daily-master-sync] Step 2b: run-attribution + ad-scoreboard`);
+      try {
+        const clients = await listClientsByStatus(supabase, ["active", "onboarding"]);
+        const failures: string[] = [];
+        for (const c of clients) {
+          const r = await callFunction(supabaseUrl, supabaseKey, "run-attribution", { clientId: c.id });
+          console.log(`[daily-master-sync] attribution ${c.name}: ${r.success ? "ok" : r.error}`);
+          if (!r.success) failures.push(`${c.name}: ${r.error || "failed"}`);
+        }
+        const scoreboard = await callFunction(supabaseUrl, supabaseKey, "ad-scoreboard", {});
+        console.log(`[daily-master-sync] ad-scoreboard: ${scoreboard.success ? "ok" : scoreboard.error}`);
+        if (!scoreboard.success) failures.push(`ad-scoreboard: ${scoreboard.error || "failed"}`);
+        results.push({
+          step: "run-attribution+ad-scoreboard",
+          success: failures.length === 0,
+          duration_ms: Date.now() - start,
+          details: `${clients.length} clients${scoreboard.data?.rows != null ? `, ${scoreboard.data.rows} scoreboard rows` : ""}`,
+          error: failures.length ? failures.join("; ") : undefined,
+        });
+        if (failures.length) {
+          await createAlertTask(
+            supabase,
+            "⚠️ Attribution / ad scoreboard failed",
+            `Nightly attribution or the ad scoreboard failed: ${failures.join("; ")}`,
+          );
+        }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Unknown";
+        console.error("[daily-master-sync] attribution step failed", e);
+        results.push({
+          step: "run-attribution+ad-scoreboard",
+          success: false,
+          duration_ms: Date.now() - start,
+          error: message,
+        });
+        await createAlertTask(
+          supabase,
+          "⚠️ Attribution / ad scoreboard failed",
+          `Nightly attribution step failed: ${message}`,
+        );
+      }
+    }
+
     // ── Step 3: HubSpot All Clients ──
     if (!skipSteps.includes("hubspot")) {
       const start = Date.now();
@@ -144,19 +212,6 @@ Deno.serve(async (req) => {
       }
       await new Promise(r => setTimeout(r, 5000));
     }
-
-    // ── Step 2b: Attribution per active client (was UI-only → attributed_leads stayed 0) ──
-    try {
-      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-      const sb = createClient(supabaseUrl, supabaseKey);
-      const { data: cl } = await sb.from("clients").select("id, name").in("status", ["active", "onboarding"]);
-      for (const c of cl || []) {
-        const r = await callFunction(supabaseUrl, supabaseKey, "run-attribution", { clientId: c.id });
-        console.log(`[daily-master-sync] attribution ${c.name}: ${r.success ? "ok" : r.error}`);
-      }
-      const r2 = await callFunction(supabaseUrl, supabaseKey, "ad-scoreboard", {});
-      console.log(`[daily-master-sync] ad-scoreboard: ${r2.success ? "ok" : r2.error}`);
-    } catch (e) { console.error("[daily-master-sync] attribution step failed", e); }
 
     // ── Step 4: Recalculate Daily Metrics ──
     if (!skipSteps.includes("recalculate")) {
