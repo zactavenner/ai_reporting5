@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { dayBounds, localDate } from "../_shared/day-bounds.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,16 +52,12 @@ Deno.serve(async (req) => {
       startDate = start.toISOString().split("T")[0];
       endDate = end.toISOString().split("T")[0];
     } else {
-      // Default: yesterday only
-      const d = new Date();
-      d.setUTCDate(d.getUTCDate() - 1);
-      startDate = d.toISOString().split("T")[0];
+      // Default: yesterday only (reporting timezone)
+      startDate = localDate(1);
       endDate = startDate;
     }
   } catch {
-    const d = new Date();
-    d.setUTCDate(d.getUTCDate() - 1);
-    startDate = d.toISOString().split("T")[0];
+    startDate = localDate(1);
     endDate = startDate;
   }
 
@@ -88,8 +85,7 @@ Deno.serve(async (req) => {
 
   while (current <= end) {
     const checkDate = current.toISOString().split("T")[0];
-    const dayStart = `${checkDate}T00:00:00.000Z`;
-    const dayEnd = `${checkDate}T23:59:59.999Z`;
+    const { start: dayStart, next: dayNext } = dayBounds(checkDate);
 
     for (const client of clients) {
       // Get current daily_metrics row
@@ -107,7 +103,7 @@ Deno.serve(async (req) => {
         .eq("client_id", client.id)
         .eq("is_spam", false)
         .gte("created_at", dayStart)
-        .lte("created_at", dayEnd);
+        .lt("created_at", dayNext);
 
       const { count: nullSpamCount } = await supabase
         .from("leads")
@@ -115,7 +111,7 @@ Deno.serve(async (req) => {
         .eq("client_id", client.id)
         .is("is_spam", null)
         .gte("created_at", dayStart)
-        .lte("created_at", dayEnd);
+        .lt("created_at", dayNext);
 
       const expectedLeads = (leadsCount || 0) + (nullSpamCount || 0);
 
@@ -125,7 +121,7 @@ Deno.serve(async (req) => {
         .eq("client_id", client.id)
         .neq("is_reconnect", true)
         .gte("booked_at", dayStart)
-        .lte("booked_at", dayEnd);
+        .lt("booked_at", dayNext);
 
       const { count: expectedShowed } = await supabase
         .from("calls")
@@ -134,14 +130,14 @@ Deno.serve(async (req) => {
         .eq("showed", true)
         .neq("is_reconnect", true)
         .gte("scheduled_at", dayStart)
-        .lte("scheduled_at", dayEnd);
+        .lt("scheduled_at", dayNext);
 
       const { count: expectedFunded } = await supabase
         .from("funded_investors")
         .select("*", { count: "exact", head: true })
         .eq("client_id", client.id)
         .gte("funded_at", dayStart)
-        .lte("funded_at", dayEnd);
+        .lt("funded_at", dayNext);
 
       const actualLeads = metricsRow?.leads ?? 0;
       const actualCalls = metricsRow?.calls ?? 0;
@@ -176,7 +172,7 @@ Deno.serve(async (req) => {
             expected_count: check.expected,
             actual_count: check.actual,
             discrepancy: check.expected - check.actual,
-            auto_fixed: true,
+            auto_fixed: false, // set true only after the recalc call succeeds
           });
         }
       }
@@ -189,7 +185,7 @@ Deno.serve(async (req) => {
   for (const cid of clientsNeedingFix) {
     try {
       console.log(`[daily-accuracy-check] Triggering recalc for client ${cid} (${startDate} to ${endDate})`);
-      await fetch(`${supabaseUrl}/functions/v1/recalculate-daily-metrics`, {
+      const resp = await fetch(`${supabaseUrl}/functions/v1/recalculate-daily-metrics`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -197,6 +193,9 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({ clientId: cid, startDate, endDate }),
       });
+      if (!resp.ok) throw new Error(`recalc HTTP ${resp.status}`);
+      await supabase.from("sync_accuracy_log").update({ auto_fixed: true })
+        .eq("client_id", cid).gte("check_date", startDate).lte("check_date", endDate).eq("auto_fixed", false);
       autoFixedClients++;
     } catch (err) {
       console.error(`[daily-accuracy-check] Failed to auto-fix client ${cid}:`, err);

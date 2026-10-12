@@ -177,8 +177,8 @@ Deno.serve(async (req) => {
       });
       if (discrepancies > 0) {
         await createAlertTask(supabase,
-          `📊 ${discrepancies} data discrepancies auto-fixed`,
-          `The daily accuracy check found ${discrepancies} discrepancies across ${res.data?.clientsWithIssues || 0} clients and auto-fixed ${res.data?.autoFixedClients || 0}. Review sync_accuracy_log for details.`,
+          `📊 ${discrepancies} data discrepancies (${res.data?.autoFixedClients || 0}/${res.data?.clientsWithIssues || 0} clients recalculated)`,
+          `The daily accuracy check found ${discrepancies} discrepancies across ${res.data?.clientsWithIssues || 0} clients and re-ran the recalculation for ${res.data?.autoFixedClients || 0} of those clients (a re-run is not a verified fix). Review sync_accuracy_log for details.`,
           "medium"
         );
       }

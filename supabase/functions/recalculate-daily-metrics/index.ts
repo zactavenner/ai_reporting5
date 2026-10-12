@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { dayBounds, localDate } from "../_shared/day-bounds.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,18 +39,12 @@ Deno.serve(async (req) => {
       startDate = body.startDate;
       endDate = body.endDate;
     } else {
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-      startDate = yesterday.toISOString().split("T")[0];
-      endDate = today.toISOString().split("T")[0];
+      startDate = localDate(1);
+      endDate = localDate(0);
     }
   } catch {
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-    startDate = yesterday.toISOString().split("T")[0];
-    endDate = today.toISOString().split("T")[0];
+    startDate = localDate(1);
+    endDate = localDate(0);
   }
 
   console.log(`[recalculate-daily-metrics] Range: ${startDate} to ${endDate}, client: ${clientId || "all"}`);
@@ -85,10 +80,7 @@ Deno.serve(async (req) => {
 
       while (current <= end) {
         const dateStr = current.toISOString().split("T")[0];
-        const dayStart = `${dateStr}T00:00:00.000Z`;
-        const next = new Date(current);
-        next.setUTCDate(next.getUTCDate() + 1);
-        const dayNext = `${next.toISOString().split("T")[0]}T00:00:00.000Z`;
+        const { start: dayStart, next: dayNext } = dayBounds(dateStr);
 
         try {
           // ── Leads: by created_at ──
