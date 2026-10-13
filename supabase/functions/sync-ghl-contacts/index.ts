@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { resolveShowed } from '../_shared/appointmentShowed.ts';
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 // Declare EdgeRuntime for background task support
@@ -2044,6 +2045,9 @@ async function syncAppointmentsAsCalls(
       outcome = 'booked';
       showed = false;
     }
+    // Only showed/completed counts, and never for a future start time.
+    showed = resolveShowed(status, appt.startTime);
+    if (!showed && outcome === 'showed') outcome = 'booked';
     
     // Use GHL dateAdded as the creation date for proper chronological ordering
     const ghlCreatedAt = appt.dateAdded || appt.createdAt || new Date().toISOString();
@@ -2894,6 +2898,9 @@ async function syncAppointmentToCall(
     outcome = 'booked';
     showed = false;
   }
+  // Only showed/completed counts, and never for a future start time.
+  showed = resolveShowed(status, appt.startTime);
+  if (!showed && outcome === 'showed') outcome = 'booked';
   
   // Find lead by contact ID
   const leadId = contactId ? leadsByContactId.get(contactId) || null : null;

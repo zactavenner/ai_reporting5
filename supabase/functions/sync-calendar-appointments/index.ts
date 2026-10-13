@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { resolveShowed } from '../_shared/appointmentShowed.ts';
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -139,7 +140,8 @@ async function syncAppointmentToCall(
     outcome = isReconnect && mapped.showed ? 'reconnect_showed' : 
               isReconnect && !mapped.showed && mapped.outcome === 'booked' ? 'reconnect_booked' :
               mapped.outcome;
-    showed = mapped.showed;
+    showed = resolveShowed(status, appt.startTime);
+    if (mapped.showed && !showed) outcome = isReconnect ? 'reconnect_booked' : 'booked';
   } else {
     // Unknown status — log warning and default to booked
     console.warn(`[sync-calendar] Unknown GHL status: "${rawStatus}" for appointment ${appointmentId}`);
