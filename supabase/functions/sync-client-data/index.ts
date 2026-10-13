@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { resolveShowed } from '../_shared/appointmentShowed.ts';
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -370,7 +371,7 @@ async function syncGHLData(supabase: any, client: any): Promise<{ leads: number;
         // no_show/noshow = no show
         // rescheduled = rescheduled
         const status = (apt.status || apt.appointmentStatus || '').toLowerCase();
-        const showed = status === 'showed';
+        const showed = resolveShowed(status, apt.startTime);
         
         // Determine outcome based on status - don't mark as no_show unless GHL explicitly says so
         let outcome = status;

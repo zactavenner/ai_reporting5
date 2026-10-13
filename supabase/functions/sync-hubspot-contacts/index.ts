@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { resolveShowed } from '../_shared/appointmentShowed.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -468,8 +469,8 @@ async function syncMeetings(
         ? Math.round((endTime.getTime() - startTime.getTime()) / 1000)
         : null;
 
-      const showed = props.hs_meeting_outcome === 'COMPLETED' || 
-                     props.hs_meeting_outcome === 'SCHEDULED';
+      // SCHEDULED is not attendance; only COMPLETED, and never in the future.
+      const showed = resolveShowed(props.hs_meeting_outcome, props.hs_meeting_start_time || props.hs_timestamp);
 
       const call = {
         client_id: clientId,
