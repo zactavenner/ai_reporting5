@@ -58,9 +58,11 @@ Deno.serve(async (req) => {
     const isPasswordValid = hardcodedMatch || hashMatch;
 
     if (!isPasswordValid) {
+      // Expected auth failures return 200 so the client's functions.invoke
+      // doesn't throw a non-2xx error that can crash the page.
       return new Response(
         JSON.stringify({ success: false, error: "Incorrect password" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -81,7 +83,7 @@ Deno.serve(async (req) => {
     if (!members || members.length === 0) {
       return new Response(
         JSON.stringify({ success: false, error: "Team member not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
