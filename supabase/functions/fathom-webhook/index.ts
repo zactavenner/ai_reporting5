@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { resolveShowed } from '../_shared/appointmentShowed.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -280,7 +281,7 @@ Deno.serve(async (req) => {
           contact_email: email || lead.email,
           contact_phone: lead.phone || null,
           scheduled_at: meetingDate,
-          showed: true,
+          showed: resolveShowed("completed", meetingDate),
           showed_at: meetingDate,
           outcome: 'completed',
           transcript,
