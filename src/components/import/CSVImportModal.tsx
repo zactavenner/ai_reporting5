@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { resolveShowed } from '../../../supabase/functions/_shared/appointmentShowed';
 import {
   Dialog,
   DialogContent,
@@ -217,7 +218,7 @@ export function CSVImportModal({ clientId, importType, open, onOpenChange }: CSV
                 client_id: clientId,
                 external_id: `csv-import-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 scheduled_at: row.scheduled_at || row.date || null,
-                showed: row.showed === 'true' || row.showed === '1' || row.showed === 'yes',
+                showed: resolveShowed(['true','1','yes','showed','completed'].includes(String(row.showed ?? '').trim().toLowerCase()) ? 'showed' : '', row.scheduled_at || row.date || null),
                 outcome: row.outcome || null,
                 summary: row.summary || null,
                 transcript: row.transcript || null,

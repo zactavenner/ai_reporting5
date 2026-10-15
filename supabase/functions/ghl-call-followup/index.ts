@@ -345,7 +345,6 @@ serve(async (req) => {
             quality_score: analysis?.quality_score ?? null,
             call_duration_seconds: message.durationSeconds ?? undefined,
             call_connected: analysis ? analysis.connected : undefined,
-            showed: analysis?.connected ?? undefined,
             direction: message.direction || undefined,
             ghl_synced_at: new Date().toISOString(),
           })

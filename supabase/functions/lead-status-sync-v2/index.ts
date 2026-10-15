@@ -11,6 +11,7 @@
 // Writes to: leads, calls, pipeline_opportunities, funded_investors
 // Then closes the loop with Meta attribution + daily-metrics recalc.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { resolveShowed } from "../_shared/appointmentShowed.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -165,7 +166,7 @@ async function syncOneContact(
     const started = a.startTime || a.startedAt || a.selectedTimezone && a.time;
     if (!started) continue;
     const status = String(a.appointmentStatus || a.status || "").toLowerCase();
-    const showed = ["showed", "attended", "confirmed"].includes(status);
+    const showed = resolveShowed(status, started);
     callRows.push({
       client_id: client.id,
       lead_id: upsertedLead?.id || null,
