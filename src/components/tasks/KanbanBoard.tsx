@@ -1,3 +1,4 @@
+import { ALL_STAGES, PRIMARY_STAGES, boardStageFor, isAgencyOnlyStage } from '@/lib/taskStages';
 import { useState, useMemo, useEffect } from 'react';
 import { 
   DndContext, 
@@ -69,16 +70,7 @@ interface KanbanBoardProps {
   isPublicView?: boolean;
 }
 
-const STAGES = [
-  { id: 'client_tasks', label: 'Client Tasks', color: 'bg-cyan-500/20' },
-  { id: 'todo', label: 'To-Do', color: 'bg-blue-500/20' },
-  { id: 'in_progress', label: 'In Progress', color: 'bg-orange-500/20' },
-  { id: 'stuck', label: 'Stuck', color: 'bg-destructive/20' },
-  { id: 'agency_review', label: 'Agency Review', color: 'bg-indigo-500/20', agencyOnly: true },
-  { id: 'review', label: 'Client Review', color: 'bg-purple-500/20' },
-  { id: 'revisions', label: 'Revisions', color: 'bg-amber-500/20' },
-  { id: 'done', label: 'Completed', color: 'bg-green-500/20' },
-];
+const STAGES = ALL_STAGES;
 
 const MY_TASKS_KEY = 'kanban_my_tasks_filter';
 
@@ -275,7 +267,7 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
 
     // Hide agency-only stage tasks from public/client view
     if (isPublicView) {
-      filtered = filtered.filter(t => t.stage !== 'agency_review');
+      filtered = filtered.filter(t => !isAgencyOnlyStage(t.stage));
     }
     
     // Filter by client - use prop clientId if provided, otherwise use filter dropdown
@@ -369,7 +361,7 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
   const tasksByStage = useMemo(() => {
     const grouped: Record<string, Task[]> = {};
     STAGES.forEach(stage => {
-      grouped[stage.id] = filteredTasks.filter(t => t.stage === stage.id);
+      grouped[stage.id] = filteredTasks.filter(t => boardStageFor(t.stage) === stage.id);
     });
     return grouped;
   }, [filteredTasks]);
@@ -394,15 +386,15 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
     if (!targetStage) {
       const overTask = filteredTasks.find(t => t.id === overId);
       if (overTask) {
-        targetStage = STAGES.find(s => s.id === overTask.stage);
+        targetStage = STAGES.find(s => s.id === boardStageFor(overTask.stage));
       }
     }
 
     if (targetStage) {
       const task = filteredTasks.find(t => t.id === taskId);
-      if (task && task.stage !== targetStage.id) {
+      if (task && boardStageFor(task.stage) !== targetStage.id) {
         const isCompleting = targetStage.id === 'done';
-        const oldStageName = STAGES.find(s => s.id === task.stage)?.label || task.stage;
+        const oldStageName = STAGES.find(s => s.id === boardStageFor(task.stage))?.label || task.stage;
         
         // Add history entry
         await addHistory.mutateAsync({
@@ -422,7 +414,7 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
 
         // When moved into Agency Review: add the client's Account Manager
         // as an assignee (keep existing assignees) and set due date to next business day.
-        if (targetStage.id === 'agency_review') {
+        if (targetStage.id === 'needs_qa' || targetStage.id === 'agency_review') {
           try {
             const client: any = (clients || []).find((c: any) => c.id === task.client_id);
             const amName: string | null = client?.account_manager || null;
@@ -753,7 +745,10 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-4 overflow-x-auto pb-4">
-            {STAGES.filter(stage => !(isPublicView && (stage as any).agencyOnly)).map(stage => (
+            {STAGES.filter(stage => !(isPublicView && stage.agencyOnly))
+              // Legacy columns only render when an existing task still uses them.
+              .filter(stage => !stage.legacy || (tasksByStage[stage.id] || []).length > 0)
+              .map(stage => (
               <KanbanColumn
                 key={stage.id}
                 stage={stage}
