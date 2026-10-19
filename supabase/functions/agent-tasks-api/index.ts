@@ -356,7 +356,9 @@ async function mcpCall(key: AgentKey, name: string, args: Record<string, unknown
   }
 }
 
-async function handleMcp(req: Request, key: AgentKey, msg: any, audit: AuditCtx): Promise<Response> {
+type JsonRpcMessage = { jsonrpc?: string; id?: string | number | null; method?: string; params?: { protocolVersion?: string; name?: string; arguments?: Record<string, unknown> } };
+
+async function handleMcp(_req: Request, key: AgentKey, msg: JsonRpcMessage | null, audit: AuditCtx): Promise<Response> {
   const id = msg?.id ?? null;
   const reply = (result: unknown) => json({ jsonrpc: "2.0", id, result });
   const fail = (code: number, message: string) => json({ jsonrpc: "2.0", id, error: { code, message } });
@@ -429,7 +431,7 @@ Deno.serve(async (req) => {
     return json({ error: "method_not_allowed", message: "Deletes are not available on this API." }, 405);
   }
 
-  let body: any = undefined;
+  let body: unknown = undefined;
   if (req.method === "POST" || req.method === "PATCH") {
     const text = await req.text();
     if (text.length > 100_000) return json({ error: "payload_too_large" }, 413);
@@ -441,30 +443,32 @@ Deno.serve(async (req) => {
 
     if (parts[0] === "mcp" && req.method === "POST") {
       if (Array.isArray(body)) return json({ jsonrpc: "2.0", id: null, error: { code: -32600, message: "Batching not supported" } });
-      const res = await handleMcp(req, key, body, audit);
+      const res = await handleMcp(req, key, (body ?? null) as JsonRpcMessage | null, audit);
       return res;
     }
 
+    if (body !== undefined && (body === null || typeof body !== "object" || Array.isArray(body))) throw new ApiError(400, "invalid_body", "Body must be a JSON object");
+    const input: Record<string, unknown> = (body as Record<string, unknown> | undefined) ?? {};
     const q = Object.fromEntries(url.searchParams.entries());
     let result: unknown;
     if (parts[0] === "stages" && req.method === "GET") { audit.action = "stages.list"; result = stagesInfo(); }
     else if (parts[0] === "tasks" && parts.length === 1 && req.method === "GET") { audit.action = "tasks.list"; result = await listTasks(key, q); }
     else if (parts[0] === "tasks" && parts.length === 1 && req.method === "POST") {
       audit.action = "tasks.create";
-      const r = await createTask(key, body || {}); audit.task_id = r.task.id; audit.details = { fields: r.changed }; result = r; audit.status = 201;
+      const r = await createTask(key, input); audit.task_id = r.task.id; audit.details = { fields: r.changed }; result = r; audit.status = 201;
     }
     else if (parts[0] === "tasks" && parts.length === 2 && req.method === "GET") { audit.action = "tasks.get"; audit.task_id = parts[1]; result = await getTask(key, parts[1]); }
     else if (parts[0] === "tasks" && parts.length === 2 && req.method === "PATCH") {
       audit.action = "tasks.update"; audit.task_id = parts[1];
-      const r = await updateTask(key, parts[1], body || {}); audit.details = { fields: r.changed }; result = r;
+      const r = await updateTask(key, parts[1], input); audit.details = { fields: r.changed }; result = r;
     }
     else if (parts[0] === "tasks" && parts[2] === "comments" && parts.length === 3 && req.method === "GET") { audit.action = "comments.list"; audit.task_id = parts[1]; result = await listComments(key, parts[1]); }
     else if (parts[0] === "tasks" && parts[2] === "comments" && parts.length === 3 && req.method === "POST") {
       audit.action = "comments.create"; audit.task_id = parts[1];
-      const r = await addComment(key, parts[1], body || {}); audit.comment_id = r.comment.id; result = r; audit.status = 201;
+      const r = await addComment(key, parts[1], input); audit.comment_id = r.comment.id; result = r; audit.status = 201;
     }
     else if (parts[0] === "comments" && parts.length === 2 && req.method === "PATCH") {
-      audit.action = "comments.update"; audit.comment_id = parts[1]; result = await updateComment(key, parts[1], body || {});
+      audit.action = "comments.update"; audit.comment_id = parts[1]; result = await updateComment(key, parts[1], input);
     }
     else throw new ApiError(404, "route_not_found");
 
