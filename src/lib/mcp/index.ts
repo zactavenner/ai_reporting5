@@ -16,6 +16,11 @@ import listAiStudioJobs from "./tools/list-ai-studio-jobs";
 import listPendingApprovals from "./tools/list-pending-approvals";
 import listWeeklyCalls from "./tools/list-weekly-calls";
 import getWeeklyCall from "./tools/get-weekly-call";
+import listMyAssignments from "./tools/list-my-assignments";
+import claimAssignment from "./tools/claim-assignment";
+import postTaskUpdate from "./tools/post-task-update";
+import listTeamMessages from "./tools/list-team-messages";
+import postTeamMessage from "./tools/post-team-message";
 
 // The OAuth issuer must be the direct Supabase host (not the Cloud proxy).
 const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID ?? "project-ref-unset";
@@ -48,5 +53,10 @@ export default defineMcp({
     listPendingApprovals,
     listWeeklyCalls,
     getWeeklyCall,
+    listMyAssignments,
+    claimAssignment,
+    postTaskUpdate,
+    listTeamMessages,
+    postTeamMessage,
   ],
 });

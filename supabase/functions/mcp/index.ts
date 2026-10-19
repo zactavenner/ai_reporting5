@@ -476,6 +476,104 @@ var get_weekly_call_default = defineTool17({
   }
 });
 
+// src/lib/mcp/tools/list-my-assignments.ts
+import { defineTool as defineTool18 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z17 } from "npm:zod@^4.4.3";
+var list_my_assignments_default = defineTool18({
+  name: "list_my_assignments",
+  title: "List my assignments",
+  description: "For a linked external agent: list tasks and chat mentions waiting for you or in progress. Empty access for anyone else.",
+  inputSchema: { limit: z17.number().int().min(1).max(100).default(25).optional() },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ limit }, ctx) => {
+    if (!ctx.isAuthenticated()) return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    const { data, error } = await sb5(ctx).rpc("mcp_agent_list_assignments", { p_limit: limit ?? 25 });
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    return { content: [{ type: "text", text: JSON.stringify(data ?? [], null, 2) }], structuredContent: { assignments: data ?? [] } };
+  }
+});
+
+// src/lib/mcp/tools/claim-assignment.ts
+import { defineTool as defineTool19 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z18 } from "npm:zod@^4.4.3";
+var claim_assignment_default = defineTool19({
+  name: "claim_assignment",
+  title: "Claim assignment",
+  description: "For a linked external agent: atomically claim one waiting assignment so no other worker starts it.",
+  inputSchema: { delivery_id: z18.string().uuid().regex(UUID) },
+  annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async ({ delivery_id }, ctx) => {
+    if (!ctx.isAuthenticated()) return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    const { data, error } = await sb5(ctx).rpc("mcp_agent_claim_assignment", { p_delivery_id: delivery_id });
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const row = Array.isArray(data) ? data[0] : null;
+    if (!row) return { content: [{ type: "text", text: "Not found" }], isError: true };
+    return { content: [{ type: "text", text: row.claimed ? "Claimed" : `Not claimed (status: ${row.status})` }], structuredContent: { delivery_id: row.delivery_id, status: row.status, claimed: row.claimed } };
+  }
+});
+
+// src/lib/mcp/tools/post-task-update.ts
+import { defineTool as defineTool20 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z19 } from "npm:zod@^4.4.3";
+var post_task_update_default = defineTool20({
+  name: "post_task_update",
+  title: "Post task update",
+  description: "For a linked external agent: report progress, completion or failure on a claimed assignment, optionally with an https result link.",
+  inputSchema: {
+    delivery_id: z19.string().uuid().regex(UUID),
+    event: z19.enum(["progress", "completed", "failed"]),
+    summary: z19.string().min(1).max(4e3),
+    result_url: z19.string().url().startsWith("https://").max(1e3).optional()
+  },
+  annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async ({ delivery_id, event, summary, result_url }, ctx) => {
+    if (!ctx.isAuthenticated()) return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    const { data, error } = await sb5(ctx).rpc("mcp_agent_post_task_update", { p_delivery_id: delivery_id, p_event: event, p_summary: summary, p_result_url: result_url ?? null });
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const row = Array.isArray(data) ? data[0] : null;
+    return { content: [{ type: "text", text: `Recorded (${row?.status ?? event})` }], structuredContent: { delivery_id, status: row?.status ?? event } };
+  }
+});
+
+// src/lib/mcp/tools/list-team-messages.ts
+import { defineTool as defineTool21 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z20 } from "npm:zod@^4.4.3";
+var list_team_messages_default = defineTool21({
+  name: "list_team_messages",
+  title: "List Agents Team messages",
+  description: "For a linked external agent: read recent messages in the shared Agents Team chat.",
+  inputSchema: { limit: z20.number().int().min(1).max(200).default(50).optional() },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ limit }, ctx) => {
+    if (!ctx.isAuthenticated()) return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    const { data, error } = await sb5(ctx).rpc("mcp_agent_list_team_messages", { p_limit: limit ?? 50 });
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const messages = (data ?? []).map((m) => ({ id: String(m.id), sender_name: String(m.sender_name ?? ""), kind: String(m.kind), body: String(m.body ?? ""), task_id: m.task_id ? String(m.task_id) : null, created_at: String(m.created_at) }));
+    return { content: [{ type: "text", text: JSON.stringify(messages, null, 2) }], structuredContent: { messages } };
+  }
+});
+
+// src/lib/mcp/tools/post-team-message.ts
+import { defineTool as defineTool22 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z21 } from "npm:zod@^4.4.3";
+var post_team_message_default = defineTool22({
+  name: "post_team_message",
+  title: "Post to Agents Team",
+  description: "For a linked external agent: post to the shared Agents Team chat. @slug mentions wake that agent, within hop and rate limits.",
+  inputSchema: {
+    body: z21.string().min(1).max(4e3),
+    task_id: z21.string().uuid().regex(UUID).optional(),
+    reply_to: z21.string().uuid().regex(UUID).optional()
+  },
+  annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async ({ body, task_id, reply_to }, ctx) => {
+    if (!ctx.isAuthenticated()) return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    const { data, error } = await sb5(ctx).rpc("mcp_agent_post_team_message", { p_body: body, p_task_id: task_id ?? null, p_reply_to: reply_to ?? null });
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    return { content: [{ type: "text", text: "Posted" }], structuredContent: { message_id: String(data) } };
+  }
+});
+
 // src/lib/mcp/index.ts
 var projectRef = "jgwwmtuvjlmzapwqiabu";
 var mcp_default = defineMcp({
@@ -504,7 +602,12 @@ var mcp_default = defineMcp({
     list_ai_studio_jobs_default,
     list_pending_approvals_default,
     list_weekly_calls_default,
-    get_weekly_call_default
+    get_weekly_call_default,
+    list_my_assignments_default,
+    claim_assignment_default,
+    post_task_update_default,
+    list_team_messages_default,
+    post_team_message_default
   ]
 });
 
