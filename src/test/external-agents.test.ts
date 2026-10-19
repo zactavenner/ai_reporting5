@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  canEnable, connectionState, decide, hmacHex, mentionKey, parseMentions, routeMentions, signingString, verifyCallback, MAX_HOP,
+  canEnable, connectionState, decide, isPushTransport, sessionScope, hmacHex, mentionKey, parseMentions, routeMentions, signingString, verifyCallback, MAX_HOP,
 } from '../../supabase/functions/_shared/externalAgents/core';
 
 const agent = (o: Partial<any> = {}) => ({ id: 'a1', slug: 'claude', enabled: true, member_id: 'm1', transport: 'push_webhook' as const, mention_hourly_limit: 20, ...o });
@@ -82,5 +82,27 @@ describe('mention routing', () => {
   });
   it('mention keys are stable per message and agent (duplicate routing collapses)', () => {
     expect(mentionKey('m1', 'a2')).toBe(mentionKey('m1', 'a2'));
+  });
+});
+
+describe('local Mac worker and remote MCP', () => {
+  const base = { member_id: 'm', endpoint_url: null, oauth_user_id: null };
+  it('Mac worker stays disconnected until the end-to-end test passes', () => {
+    expect(connectionState({ ...base, transport: 'local_worker', last_test_ok: null }, false)).toBe('missing_connection');
+    expect(connectionState({ ...base, transport: 'local_worker', last_test_ok: null }, true)).toBe('not_tested');
+    expect(connectionState({ ...base, transport: 'local_worker', last_test_ok: false }, true)).toBe('test_failed');
+    expect(connectionState({ ...base, transport: 'local_worker', last_test_ok: true }, true)).toBe('ready');
+  });
+  it('remote MCP needs endpoint and tool name', () => {
+    expect(connectionState({ ...base, transport: 'remote_mcp', endpoint_url: 'https://x.io', last_test_ok: true }, false)).toBe('missing_connection');
+    expect(connectionState({ ...base, transport: 'remote_mcp', endpoint_url: 'https://x.io', mcp_tool_name: 'start_task', last_test_ok: true }, false)).toBe('ready');
+  });
+  it('only webhook/MCP are pushed; Mac worker waits for its own poll', () => {
+    expect(isPushTransport('remote_mcp')).toBe(true);
+    expect(isPushTransport('local_worker')).toBe(false);
+  });
+  it('one continuity session per task, one for team chat', () => {
+    expect(sessionScope({ kind: 'assignment', task_id: 't1' })).toBe('task:t1');
+    expect(sessionScope({ kind: 'mention', task_id: null })).toBe('team');
   });
 });

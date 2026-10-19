@@ -1,4 +1,5 @@
-import { decide, hmacHex, mentionKey, routeMentions, signingString, type SendOutcome } from './core.ts';
+import { McpClient } from '../mcpClient.ts';
+import { decide, hmacHex, isPushTransport, mentionKey, routeMentions, signingString, type SendOutcome } from './core.ts';
 
 const APP_URL = 'https://reporting.highperformanceads.com';
 export const callbackUrl = () => `${Deno.env.get('SUPABASE_URL')}/functions/v1/external-agent-callback`;
@@ -28,7 +29,7 @@ export async function routePendingMentions(sb: any) {
       const a = agents!.find((x: any) => x.id === agentId)!;
       const { error } = await sb.from('agent_assignment_outbox').insert({
         agent_id: agentId, task_id: m.task_id, kind: 'mention', idempotency_key: mentionKey(m.id, agentId),
-        status: a.transport === 'pull_mcp' ? 'waiting_pull' : 'pending', source_message_id: m.id, hop: m.hop ?? 0,
+        status: isPushTransport(a.transport) ? 'pending' : 'waiting_pull', source_message_id: m.id, hop: m.hop ?? 0,
       });
       if (!error) woken++;
     }
@@ -37,7 +38,7 @@ export async function routePendingMentions(sb: any) {
   return woken;
 }
 
-async function buildPayload(sb: any, row: any) {
+export async function buildPayload(sb: any, row: any) {
   let task: any = null;
   if (row.task_id) {
     const { data } = await sb.from('tasks').select('id,title,description,status,priority,due_date,client_id').eq('id', row.task_id).maybeSingle();
@@ -101,14 +102,17 @@ export async function dispatchPush(sb: any, owner: string, limit = 10) {
         continue;
       }
     }
-    if (!a.enabled || !a.endpoint_url || !cred?.signing_secret) {
+    if (!a.enabled || !a.endpoint_url || (a.transport === 'push_webhook' && !cred?.signing_secret) || (a.transport === 'remote_mcp' && !a.mcp_tool_name)) {
       await sb.from('agent_assignment_outbox').update({ status: 'pending', lease_owner: null, last_error: 'Agent not connected' }).eq('id', row.id).eq('lease_owner', owner);
       continue;
     }
     const { data: marked } = await sb.from('agent_assignment_outbox').update({ status: 'sending', attempts: attempt, updated_at: new Date().toISOString() })
       .eq('id', row.id).eq('lease_owner', owner).eq('status', 'claimed').select('id');
     if (!marked?.length) continue; // lost the lease or cancelled meanwhile
-    const outcome = await signedPost(a.endpoint_url, cred.signing_secret, cred.outbound_token, row.idempotency_key, await buildPayload(sb, row));
+    const payload = await buildPayload(sb, row);
+    const outcome = a.transport === 'remote_mcp'
+      ? await mcpCall(a.endpoint_url, cred?.outbound_token ?? null, a.mcp_tool_name, payload)
+      : await signedPost(a.endpoint_url, cred!.signing_secret, cred!.outbound_token, row.idempotency_key, payload);
     const d = decide(outcome, attempt, a.supports_idempotency, row.max_attempts);
     const patch: Record<string, unknown> = { lease_owner: null, updated_at: new Date().toISOString() };
     if (d.status === 'accepted') { Object.assign(patch, { status: 'accepted', external_run_id: d.runId, accepted_at: new Date().toISOString(), last_error: null }); out.accepted++; }
@@ -118,4 +122,22 @@ export async function dispatchPush(sb: any, owner: string, limit = 10) {
     await sb.from('agent_assignment_outbox').update(patch).eq('id', row.id).eq('lease_owner', owner).eq('status', 'sending');
   }
   return out;
+}
+
+/** Remote MCP adapter: call the agent's configured tool; its JSON result must contain {accepted:true, run_id}. */
+export async function mcpCall(url: string, token: string | null, tool: string, args: Record<string, unknown>): Promise<SendOutcome> {
+  const timeout = new Promise<SendOutcome>((r) => setTimeout(() => r({ kind: 'timeout' }), SEND_TIMEOUT_MS));
+  const call = (async (): Promise<SendOutcome> => {
+    try {
+      const text = await new McpClient(url, token).callTool(tool, args);
+      if (text.startsWith('TOOL ERROR:')) return { kind: 'response', status: 502, body: null };
+      let body: any = null;
+      try { body = JSON.parse(text); } catch { /* not JSON */ }
+      return { kind: 'response', status: 200, body };
+    } catch (e) {
+      const m = /\[(\d{3})\]/.exec((e as Error).message);
+      return m ? { kind: 'response', status: Number(m[1]), body: null } : { kind: 'network', message: (e as Error).message.slice(0, 200) };
+    }
+  })();
+  return Promise.race([call, timeout]);
 }

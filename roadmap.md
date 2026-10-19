@@ -78,5 +78,6 @@ Plan: `.lovable/plan/week-4-ai-marketing-inside-reporting-5-0-2026-09-21.md`
 - [x] Assignment outbox (trigger-fed, revive on resave, cancel on unassign), atomic lease claim, bounded retry, ambiguous → review.
 - [x] Signed per-agent callbacks with replay guard + task scope; shared #agents-team with bounded @mention routing.
 - [x] OAuth MCP pull tools (list_my_assignments, claim_assignment, post_task_update, list/post team messages).
+- [x] Mac outbound worker transport (Alfred=Codex CLI, Claude=Claude Code) + per-task session continuity + remote MCP adapter for Grok PPM/Muse.
 - [ ] Link each agent to its task member + connect endpoint/secret — needs Zac (per-agent endpoint details).
 - [ ] Republish so the MCP pull tools go live.

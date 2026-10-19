@@ -1,6 +1,6 @@
 // Pure logic for external-agent delivery. No I/O, so it is unit-testable.
 
-export type Transport = 'none' | 'push_webhook' | 'pull_mcp';
+export type Transport = 'none' | 'push_webhook' | 'pull_mcp' | 'local_worker' | 'remote_mcp';
 export type AgentRow = {
   id: string; slug: string; display_name: string; member_id: string | null; transport: Transport;
   endpoint_url: string | null; oauth_user_id: string | null; enabled: boolean; last_test_ok: boolean | null;
@@ -13,17 +13,29 @@ export const MAX_HOP = 3;
 export const MAX_ATTEMPTS = 5;
 
 /** Honest connection status. Pull access alone is never "Ready" — nothing can wake it. */
-export function connectionState(a: Pick<AgentRow, 'member_id' | 'transport' | 'endpoint_url' | 'oauth_user_id' | 'last_test_ok'>, hasSigningSecret: boolean): ConnectionState {
+export function connectionState(
+  a: Pick<AgentRow, 'member_id' | 'transport' | 'endpoint_url' | 'oauth_user_id' | 'last_test_ok'> & { mcp_tool_name?: string | null },
+  hasSigningSecret: boolean,
+): ConnectionState {
   if (!a.member_id) return 'missing_connection';
-  if (a.transport === 'pull_mcp') return a.oauth_user_id ? 'pull_only' : 'missing_connection';
-  if (a.transport === 'push_webhook') {
-    if (!a.endpoint_url || !hasSigningSecret) return 'missing_connection';
-    if (a.last_test_ok === true) return 'ready';
-    if (a.last_test_ok === false) return 'test_failed';
-    return 'not_tested';
+  const tested = (): ConnectionState => (a.last_test_ok === true ? 'ready' : a.last_test_ok === false ? 'test_failed' : 'not_tested');
+  switch (a.transport) {
+    case 'pull_mcp': return a.oauth_user_id ? 'pull_only' : 'missing_connection';
+    case 'push_webhook': return a.endpoint_url && hasSigningSecret ? tested() : 'missing_connection';
+    // Mac worker dials out; "ready" only after the worker answered an end-to-end test.
+    case 'local_worker': return hasSigningSecret ? tested() : 'missing_connection';
+    case 'remote_mcp': return a.endpoint_url && a.mcp_tool_name ? tested() : 'missing_connection';
+    default: return 'missing_connection';
   }
-  return 'missing_connection';
 }
+
+/** Pushed transports are woken by Reporting; the others wait for their own worker. */
+export const isPushTransport = (t: Transport) => t === 'push_webhook' || t === 'remote_mcp';
+export const LOCAL_LEASE_SECONDS = 300;
+
+/** Continuity key: one external CLI session per task, one shared for team chat. */
+export const sessionScope = (row: { kind: string; task_id: string | null }) =>
+  row.task_id ? `task:${row.task_id}` : 'team';
 
 export function canEnable(state: ConnectionState) {
   return state === 'ready' || state === 'pull_only';

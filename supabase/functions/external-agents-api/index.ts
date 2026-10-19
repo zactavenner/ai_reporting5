@@ -1,8 +1,8 @@
 // Operator-only management for external agents (Grok PPM, Alfred, Muse, Claude) and the
 // shared Agents Team chat. Secrets are write-only: never returned, only "set"/"not set".
 import { admin, corsHeaders, json, requireOperator } from '../_shared/aiSetter/http.ts';
-import { canEnable, connectionState, decide, validateEndpoint } from '../_shared/externalAgents/core.ts';
-import { callbackUrl, signedPost, teamChannelId } from '../_shared/externalAgents/dispatch.ts';
+import { canEnable, connectionState, decide, isPushTransport, validateEndpoint } from '../_shared/externalAgents/core.ts';
+import { callbackUrl, mcpCall, signedPost, teamChannelId } from '../_shared/externalAgents/dispatch.ts';
 
 const UUID = /^[0-9a-f-]{36}$/i;
 const maskUrl = (u: string | null) => { try { const x = new URL(u!); return `${x.origin}${x.pathname}`; } catch { return null; } };
@@ -44,7 +44,8 @@ Deno.serve(async (req) => {
             id: a.id, slug: a.slug, display_name: a.display_name, provider_label: a.provider_label, member_id: a.member_id,
             transport: a.transport, endpoint: maskUrl(a.endpoint_url), supports_idempotency: a.supports_idempotency,
             oauth_linked: !!a.oauth_user_id, enabled: a.enabled, last_test_at: a.last_test_at, last_test_ok: a.last_test_ok,
-            last_test_detail: a.last_test_detail, signing_secret_set: s.signing, outbound_token_set: s.token,
+            last_test_detail: a.last_test_detail, runtime: a.runtime, mcp_tool_name: a.mcp_tool_name,
+            worker_last_seen_at: a.worker_last_seen_at, worker_info: a.worker_info, test_pending: !!a.test_nonce, signing_secret_set: s.signing, outbound_token_set: s.token,
             state: connectionState(a, s.signing), recent: recent ?? [],
           });
         }
@@ -70,9 +71,15 @@ Deno.serve(async (req) => {
         const a = await loadAgent(sb, body.agent_id);
         if (!a) return json({ error: 'agent_not_found' }, 404);
         const transport = body.transport;
-        if (!['none', 'push_webhook', 'pull_mcp'].includes(transport)) return json({ error: 'invalid_transport' }, 400);
+        if (!['none', 'push_webhook', 'pull_mcp', 'local_worker', 'remote_mcp'].includes(transport)) return json({ error: 'invalid_transport' }, 400);
         const patch: Record<string, unknown> = { transport, supports_idempotency: !!body.supports_idempotency, enabled: false, last_test_ok: null, updated_at: new Date().toISOString() };
-        if (transport === 'push_webhook') {
+        if (body.runtime === null || ['codex_cli', 'claude_code', 'service'].includes(body.runtime)) patch.runtime = body.runtime ?? null;
+        if (transport === 'remote_mcp') {
+          const tool = typeof body.mcp_tool_name === 'string' ? body.mcp_tool_name.trim() : '';
+          if (tool && !/^[A-Za-z0-9_.-]{1,64}$/.test(tool)) return json({ error: 'Invalid tool name' }, 400);
+          if (tool) patch.mcp_tool_name = tool;
+        }
+        if (transport === 'push_webhook' || transport === 'remote_mcp') {
           if (typeof body.endpoint_url === 'string' && body.endpoint_url.trim()) {
             const err = validateEndpoint(body.endpoint_url.trim());
             if (err) return json({ error: err }, 400);
@@ -122,6 +129,23 @@ Deno.serve(async (req) => {
             if (outcome.kind === 'response' && outcome.status >= 200 && outcome.status < 300 && outcome.body?.ok === true) { ok = true; detail = 'Endpoint acknowledged signed ping'; }
             else if (outcome.kind === 'response') detail = `Endpoint replied HTTP ${outcome.status}${outcome.body?.ok === true ? '' : ' without {"ok":true}'}`;
             else detail = decide(outcome, 1, false).status === 'needs_review' ? (outcome.kind === 'timeout' ? 'Timed out' : 'Could not reach endpoint') : 'Failed';
+          }
+        } else if (a.transport === 'local_worker') {
+          const s = await hasSecret(sb, a.id);
+          if (!s.signing) detail = 'Worker secret is required';
+          else {
+            // End-to-end: the Mac worker must pick this up on its next poll and answer it.
+            const nonce = crypto.randomUUID().replace(/-/g, '');
+            await sb.from('external_agents').update({ test_nonce: nonce, test_requested_at: new Date().toISOString(), last_test_ok: null, last_test_detail: 'Waiting for the Mac worker to answer' }).eq('id', a.id);
+            return json({ ok: false, pending: true, detail: 'Test sent — waiting for the Mac worker to answer on its next check-in' });
+          }
+        } else if (a.transport === 'remote_mcp') {
+          const { data: cred } = await sb.from('external_agent_credentials').select('outbound_token').eq('agent_id', a.id).maybeSingle();
+          if (!a.endpoint_url || !a.mcp_tool_name) detail = 'MCP endpoint and tool name are required';
+          else {
+            const outcome = await mcpCall(a.endpoint_url, cred?.outbound_token ?? null, a.mcp_tool_name, { type: 'ping', callback_url: callbackUrl() });
+            if (outcome.kind === 'response' && outcome.status === 200 && outcome.body?.ok === true) { ok = true; detail = 'MCP tool acknowledged ping'; }
+            else detail = outcome.kind === 'response' ? `MCP tool replied ${outcome.status === 200 ? 'without {"ok":true}' : `error ${outcome.status}`}` : outcome.kind === 'timeout' ? 'Timed out' : 'Could not reach MCP endpoint';
           }
         } else detail = 'No connection method chosen';
         await sb.from('external_agents').update({ last_test_at: new Date().toISOString(), last_test_ok: ok, last_test_detail: detail.slice(0, 300), ...(ok ? {} : { enabled: false }) }).eq('id', a.id);
