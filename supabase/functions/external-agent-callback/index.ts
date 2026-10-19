@@ -2,8 +2,8 @@
 // 5-minute window, single-use nonce, and the delivery must belong to the agent and its
 // task must still be assigned to the agent's linked member.
 import { admin, corsHeaders, json } from '../_shared/aiSetter/http.ts';
-import { verifyCallback } from '../_shared/externalAgents/core.ts';
-import { teamChannelId } from '../_shared/externalAgents/dispatch.ts';
+import { LOCAL_LEASE_SECONDS, sessionScope, verifyCallback } from '../_shared/externalAgents/core.ts';
+import { buildPayload, teamChannelId } from '../_shared/externalAgents/dispatch.ts';
 
 const EVENTS: Record<string, string> = { accepted: 'accepted', progress: 'in_progress', completed: 'completed', failed: 'failed', message: '' };
 const ACTIVE = ['pending', 'claimed', 'sending', 'accepted', 'in_progress', 'waiting_pull', 'failed_retryable', 'needs_review'];
@@ -100,6 +100,8 @@ Deno.serve(async (req) => {
   }
   if (!ACTIVE.includes(row.status)) return json({ ok: true, status: row.status, note: 'already_final' });
 
+  // A local worker may only confirm start on a delivery it currently holds.
+  if (agent.transport === 'local_worker' && event === 'accepted' && row.status !== 'claimed') return json({ error: 'not_claimed' }, 409);
   const next = EVENTS[event];
   const now = new Date().toISOString();
   await sb.from('agent_assignment_outbox').update({
