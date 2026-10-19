@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
   if (!/^[a-z0-9_]{2,32}$/.test(slug)) return json({ error: 'unauthorized' }, 401);
   const { data: agent } = await sb.from('external_agents').select('*').eq('slug', slug).maybeSingle();
   const { data: cred } = agent ? await sb.from('external_agent_credentials').select('signing_secret').eq('agent_id', agent.id).maybeSingle() : { data: null };
-  if (!agent || !agent.enabled || !cred?.signing_secret) return json({ error: 'unauthorized' }, 401);
+  if (!agent || !cred?.signing_secret) return json({ error: 'unauthorized' }, 401);
 
   const v = await verifyCallback(cred.signing_secret, {
     ts: req.headers.get('x-agent-timestamp'), nonce: req.headers.get('x-agent-nonce'), sig: req.headers.get('x-agent-signature'),
@@ -30,6 +30,50 @@ Deno.serve(async (req) => {
   let body: any;
   try { body = JSON.parse(raw); } catch { return json({ error: 'invalid_json' }, 400); }
   const event = String(body.event || '');
+
+  // ---- Local Mac worker: outbound polling, end-to-end test, session linkage ----
+  if (event === 'poll' || event === 'ping_ack' || event === 'session') {
+    if (agent.transport !== 'local_worker') return json({ error: 'wrong_transport' }, 409);
+    const info = body.worker && typeof body.worker === 'object'
+      ? { host: String(body.worker.host ?? '').slice(0, 60), runtime: String(body.worker.runtime ?? '').slice(0, 40), version: String(body.worker.version ?? '').slice(0, 40), cli_authenticated: body.worker.cli_authenticated === true }
+      : agent.worker_info;
+    await sb.from('external_agents').update({ worker_last_seen_at: new Date().toISOString(), worker_info: info }).eq('id', agent.id);
+
+    if (event === 'ping_ack') {
+      const ok = !!agent.test_nonce && body.test_nonce === agent.test_nonce && info?.cli_authenticated === true;
+      await sb.from('external_agents').update({
+        last_test_at: new Date().toISOString(), last_test_ok: ok, test_nonce: null, test_requested_at: null,
+        last_test_detail: ok ? `Mac worker answered end-to-end test (${info?.runtime} ${info?.version})` : (info?.cli_authenticated === true ? 'Test code did not match' : 'Worker reachable but CLI not signed in'),
+        ...(ok ? {} : { enabled: false }),
+      }).eq('id', agent.id);
+      return json({ ok });
+    }
+    if (event === 'session') {
+      const scope = String(body.scope_key || '');
+      const sid = typeof body.external_session_id === 'string' ? body.external_session_id.trim() : '';
+      if (!/^(task:[0-9a-f-]{36}|team)$/.test(scope) || !sid || sid.length > 200) return json({ error: 'invalid_session' }, 400);
+      if (scope.startsWith('task:')) {
+        const { data: own } = await sb.from('agent_assignment_outbox').select('id').eq('agent_id', agent.id).eq('task_id', scope.slice(5)).limit(1);
+        if (!own?.length) return json({ error: 'task_not_assigned_to_agent' }, 403);
+      }
+      await sb.from('external_agent_sessions').upsert({ agent_id: agent.id, scope_key: scope, runtime: agent.runtime, external_session_id: sid, updated_at: new Date().toISOString() }, { onConflict: 'agent_id,scope_key' });
+      return json({ ok: true });
+    }
+    // poll
+    const test = agent.test_nonce ? { test_nonce: agent.test_nonce } : null;
+    if (!agent.enabled) return json({ ok: true, test, work: [] });
+    const { data: rows, error } = await sb.rpc('claim_local_agent_work', { p_agent_id: agent.id, p_owner: `mac:${agent.slug}`, p_limit: Number(body.max) || 1, p_lease_seconds: LOCAL_LEASE_SECONDS });
+    if (error) return json({ error: 'claim_failed' }, 500);
+    const work = [];
+    for (const row of rows ?? []) {
+      const scope = sessionScope(row);
+      const { data: s } = await sb.from('external_agent_sessions').select('external_session_id').eq('agent_id', agent.id).eq('scope_key', scope).maybeSingle();
+      work.push({ ...(await buildPayload(sb, row)), scope_key: scope, resume_session_id: s?.external_session_id ?? null, lease_seconds: LOCAL_LEASE_SECONDS });
+    }
+    return json({ ok: true, test, work });
+  }
+
+  if (!agent.enabled) return json({ error: 'unauthorized' }, 401);
   if (!(event in EVENTS)) return json({ error: 'invalid_event' }, 400);
   const summary = typeof body.summary === 'string' ? body.summary.slice(0, 4000) : '';
   const resultUrl = typeof body.result_url === 'string' && /^https:\/\//.test(body.result_url) ? body.result_url.slice(0, 1000) : null;
