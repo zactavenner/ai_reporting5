@@ -72,3 +72,11 @@ Plan: `.lovable/plan/week-4-ai-marketing-inside-reporting-5-0-2026-09-21.md`
 - [x] Add scoped client login for Emily across Clear Summit Investments and 5 Winds, limited to viewing and adding tasks in those client projects.
 - [x] Keep each task column readable with fixed-width columns and horizontal board scrolling.
 - [x] Add ad account 1948413122522274 to Lansing Capital
+
+# External agents + Agents Team (2026-10-19)
+- [x] Registry for Grok PPM / Alfred / Muse / Claude (all Off, unlinked), write-only credentials.
+- [x] Assignment outbox (trigger-fed, revive on resave, cancel on unassign), atomic lease claim, bounded retry, ambiguous → review.
+- [x] Signed per-agent callbacks with replay guard + task scope; shared #agents-team with bounded @mention routing.
+- [x] OAuth MCP pull tools (list_my_assignments, claim_assignment, post_task_update, list/post team messages).
+- [ ] Link each agent to its task member + connect endpoint/secret — needs Zac (per-agent endpoint details).
+- [ ] Republish so the MCP pull tools go live.

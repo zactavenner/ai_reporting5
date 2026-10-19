@@ -1798,6 +1798,99 @@ export type Database = {
           },
         ]
       }
+      agent_assignment_outbox: {
+        Row: {
+          accepted_at: string | null
+          agent_id: string
+          attempts: number
+          cancelled_txid: number | null
+          client_id: string | null
+          completed_at: string | null
+          created_at: string
+          external_run_id: string | null
+          hop: number
+          id: string
+          idempotency_key: string
+          kind: string
+          last_error: string | null
+          lease_expires_at: string | null
+          lease_owner: string | null
+          max_attempts: number
+          next_attempt_at: string
+          prev_status: string | null
+          revision: number
+          source_message_id: string | null
+          status: string
+          task_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          agent_id: string
+          attempts?: number
+          cancelled_txid?: number | null
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          external_run_id?: string | null
+          hop?: number
+          id?: string
+          idempotency_key: string
+          kind: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          prev_status?: string | null
+          revision?: number
+          source_message_id?: string | null
+          status: string
+          task_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          agent_id?: string
+          attempts?: number
+          cancelled_txid?: number | null
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          external_run_id?: string | null
+          hop?: number
+          id?: string
+          idempotency_key?: string
+          kind?: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          prev_status?: string | null
+          revision?: number
+          source_message_id?: string | null
+          status?: string
+          task_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_assignment_outbox_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "external_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_assignment_outbox_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_channels: {
         Row: {
           agent_id: string | null
@@ -2107,11 +2200,16 @@ export type Database = {
           channel_id: string
           created_at: string
           from_agent_id: string | null
+          from_external_agent_id: string | null
+          hop: number
           id: string
           kind: string
           payload: Json
+          reply_to: string | null
           role: string
+          routed_at: string | null
           run_id: string | null
+          sender_name: string | null
           task_id: string | null
           to_agent_id: string | null
           user_id: string | null
@@ -2121,11 +2219,16 @@ export type Database = {
           channel_id: string
           created_at?: string
           from_agent_id?: string | null
+          from_external_agent_id?: string | null
+          hop?: number
           id?: string
           kind?: string
           payload?: Json
+          reply_to?: string | null
           role: string
+          routed_at?: string | null
           run_id?: string | null
+          sender_name?: string | null
           task_id?: string | null
           to_agent_id?: string | null
           user_id?: string | null
@@ -2135,11 +2238,16 @@ export type Database = {
           channel_id?: string
           created_at?: string
           from_agent_id?: string | null
+          from_external_agent_id?: string | null
+          hop?: number
           id?: string
           kind?: string
           payload?: Json
+          reply_to?: string | null
           role?: string
+          routed_at?: string | null
           run_id?: string | null
+          sender_name?: string | null
           task_id?: string | null
           to_agent_id?: string | null
           user_id?: string | null
@@ -2157,6 +2265,13 @@ export type Database = {
             columns: ["from_agent_id"]
             isOneToOne: false
             referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_messages_from_external_agent_id_fkey"
+            columns: ["from_external_agent_id"]
+            isOneToOne: false
+            referencedRelation: "external_agents"
             referencedColumns: ["id"]
           },
           {
@@ -12638,6 +12753,126 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      external_agent_callback_nonces: {
+        Row: {
+          agent_id: string
+          created_at: string
+          nonce: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          nonce: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          nonce?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_agent_callback_nonces_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "external_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_agent_credentials: {
+        Row: {
+          agent_id: string
+          outbound_token: string | null
+          signing_secret: string | null
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          outbound_token?: string | null
+          signing_secret?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          outbound_token?: string | null
+          signing_secret?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_agent_credentials_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: true
+            referencedRelation: "external_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_agents: {
+        Row: {
+          created_at: string
+          display_name: string
+          enabled: boolean
+          endpoint_url: string | null
+          id: string
+          last_test_at: string | null
+          last_test_detail: string | null
+          last_test_ok: boolean | null
+          member_id: string | null
+          mention_hourly_limit: number
+          oauth_user_id: string | null
+          provider_label: string
+          slug: string
+          supports_idempotency: boolean
+          transport: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          enabled?: boolean
+          endpoint_url?: string | null
+          id?: string
+          last_test_at?: string | null
+          last_test_detail?: string | null
+          last_test_ok?: boolean | null
+          member_id?: string | null
+          mention_hourly_limit?: number
+          oauth_user_id?: string | null
+          provider_label: string
+          slug: string
+          supports_idempotency?: boolean
+          transport?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          enabled?: boolean
+          endpoint_url?: string | null
+          id?: string
+          last_test_at?: string | null
+          last_test_detail?: string | null
+          last_test_ok?: boolean | null
+          member_id?: string | null
+          mention_hourly_limit?: number
+          oauth_user_id?: string | null
+          provider_label?: string
+          slug?: string
+          supports_idempotency?: boolean
+          transport?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_agents_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: true
+            referencedRelation: "agency_members"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -26334,6 +26569,40 @@ export type Database = {
         Returns: boolean
       }
       call_is_showed: { Args: { p_status: string }; Returns: boolean }
+      claim_agent_outbox: {
+        Args: { p_lease_seconds: number; p_limit: number; p_owner: string }
+        Returns: {
+          accepted_at: string | null
+          agent_id: string
+          attempts: number
+          cancelled_txid: number | null
+          client_id: string | null
+          completed_at: string | null
+          created_at: string
+          external_run_id: string | null
+          hop: number
+          id: string
+          idempotency_key: string
+          kind: string
+          last_error: string | null
+          lease_expires_at: string | null
+          lease_owner: string | null
+          max_attempts: number
+          next_attempt_at: string
+          prev_status: string | null
+          revision: number
+          source_message_id: string | null
+          status: string
+          task_id: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "agent_assignment_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       claim_hyperframes_render: {
         Args: never
         Returns: {
@@ -26620,6 +26889,84 @@ export type Database = {
           p_status_code?: number
         }
         Returns: string
+      }
+      mcp_agent_claim_assignment: {
+        Args: { p_delivery_id: string }
+        Returns: {
+          claimed: boolean
+          delivery_id: string
+          status: string
+        }[]
+      }
+      mcp_agent_list_assignments: {
+        Args: { p_limit?: number }
+        Returns: {
+          client_id: string
+          created_at: string
+          delivery_id: string
+          due_date: string
+          kind: string
+          source_message_id: string
+          status: string
+          task_description: string
+          task_id: string
+          task_status: string
+          task_title: string
+        }[]
+      }
+      mcp_agent_list_team_messages: {
+        Args: { p_limit?: number }
+        Returns: {
+          body: string
+          created_at: string
+          id: string
+          kind: string
+          sender_name: string
+          task_id: string
+        }[]
+      }
+      mcp_agent_post_task_update: {
+        Args: {
+          p_delivery_id: string
+          p_event: string
+          p_result_url?: string
+          p_summary: string
+        }
+        Returns: {
+          delivery_id: string
+          status: string
+        }[]
+      }
+      mcp_agent_post_team_message: {
+        Args: { p_body: string; p_reply_to?: string; p_task_id?: string }
+        Returns: string
+      }
+      mcp_agent_self: {
+        Args: never
+        Returns: {
+          created_at: string
+          display_name: string
+          enabled: boolean
+          endpoint_url: string | null
+          id: string
+          last_test_at: string | null
+          last_test_detail: string | null
+          last_test_ok: boolean | null
+          member_id: string | null
+          mention_hourly_limit: number
+          oauth_user_id: string | null
+          provider_label: string
+          slug: string
+          supports_idempotency: boolean
+          transport: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "external_agents"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       normalize_appointment_status: {
         Args: { p_status: string }
