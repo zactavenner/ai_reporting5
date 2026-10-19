@@ -449,11 +449,8 @@ export function KanbanBoard({ tasks, clients, clientId, isPublicView = false }: 
                 if (!insErr) {
                   queryClient.invalidateQueries({ queryKey: ['task-assignees', taskId] });
                   queryClient.invalidateQueries({ queryKey: ['all-task-assignees-full'] });
-                  supabase.functions
-                    .invoke('notify-task-assignee', {
-                      body: { task_id: taskId, member_id: amMember.id, kind: 'assigned' },
-                    })
-                    .catch((e) => console.warn('notify-task-assignee failed', e));
+                  // Assignee ping is sent server-side by trg_task_assignees_notify
+                  // (migration 20261019160000), so every writer (UI, APIs, agents) notifies once.
                 }
               }
             }
