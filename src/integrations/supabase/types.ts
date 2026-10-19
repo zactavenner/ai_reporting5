@@ -12811,6 +12811,44 @@ export type Database = {
           },
         ]
       }
+      external_agent_sessions: {
+        Row: {
+          agent_id: string
+          created_at: string
+          external_session_id: string
+          id: string
+          runtime: string | null
+          scope_key: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          external_session_id: string
+          id?: string
+          runtime?: string | null
+          scope_key: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          external_session_id?: string
+          id?: string
+          runtime?: string | null
+          scope_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_agent_sessions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "external_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       external_agents: {
         Row: {
           created_at: string
@@ -12821,14 +12859,20 @@ export type Database = {
           last_test_at: string | null
           last_test_detail: string | null
           last_test_ok: boolean | null
+          mcp_tool_name: string | null
           member_id: string | null
           mention_hourly_limit: number
           oauth_user_id: string | null
           provider_label: string
+          runtime: string | null
           slug: string
           supports_idempotency: boolean
+          test_nonce: string | null
+          test_requested_at: string | null
           transport: string
           updated_at: string
+          worker_info: Json | null
+          worker_last_seen_at: string | null
         }
         Insert: {
           created_at?: string
@@ -12839,14 +12883,20 @@ export type Database = {
           last_test_at?: string | null
           last_test_detail?: string | null
           last_test_ok?: boolean | null
+          mcp_tool_name?: string | null
           member_id?: string | null
           mention_hourly_limit?: number
           oauth_user_id?: string | null
           provider_label: string
+          runtime?: string | null
           slug: string
           supports_idempotency?: boolean
+          test_nonce?: string | null
+          test_requested_at?: string | null
           transport?: string
           updated_at?: string
+          worker_info?: Json | null
+          worker_last_seen_at?: string | null
         }
         Update: {
           created_at?: string
@@ -12857,14 +12907,20 @@ export type Database = {
           last_test_at?: string | null
           last_test_detail?: string | null
           last_test_ok?: boolean | null
+          mcp_tool_name?: string | null
           member_id?: string | null
           mention_hourly_limit?: number
           oauth_user_id?: string | null
           provider_label?: string
+          runtime?: string | null
           slug?: string
           supports_idempotency?: boolean
+          test_nonce?: string | null
+          test_requested_at?: string | null
           transport?: string
           updated_at?: string
+          worker_info?: Json | null
+          worker_last_seen_at?: string | null
         }
         Relationships: [
           {
@@ -26670,6 +26726,45 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      claim_local_agent_work: {
+        Args: {
+          p_agent_id: string
+          p_lease_seconds: number
+          p_limit: number
+          p_owner: string
+        }
+        Returns: {
+          accepted_at: string | null
+          agent_id: string
+          attempts: number
+          cancelled_txid: number | null
+          client_id: string | null
+          completed_at: string | null
+          created_at: string
+          external_run_id: string | null
+          hop: number
+          id: string
+          idempotency_key: string
+          kind: string
+          last_error: string | null
+          lease_expires_at: string | null
+          lease_owner: string | null
+          max_attempts: number
+          next_attempt_at: string
+          prev_status: string | null
+          revision: number
+          source_message_id: string | null
+          status: string
+          task_id: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "agent_assignment_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       complete_hyperframes_render: {
         Args: { job_id: string; lease_token: string; media_url: string }
         Returns: string
@@ -26952,14 +27047,20 @@ export type Database = {
           last_test_at: string | null
           last_test_detail: string | null
           last_test_ok: boolean | null
+          mcp_tool_name: string | null
           member_id: string | null
           mention_hourly_limit: number
           oauth_user_id: string | null
           provider_label: string
+          runtime: string | null
           slug: string
           supports_idempotency: boolean
+          test_nonce: string | null
+          test_requested_at: string | null
           transport: string
           updated_at: string
+          worker_info: Json | null
+          worker_last_seen_at: string | null
         }
         SetofOptions: {
           from: "*"
