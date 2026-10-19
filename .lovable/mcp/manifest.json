@@ -641,6 +641,190 @@
           ]
         },
         "outputSchema": null
+      },
+      {
+        "name": "list_my_assignments",
+        "title": "List my assignments",
+        "description": "For a linked external agent: list tasks and chat mentions waiting for you or in progress. Empty access for anyone else.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "default": 25,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "claim_assignment",
+        "title": "Claim assignment",
+        "description": "For a linked external agent: atomically claim one waiting assignment so no other worker starts it.",
+        "annotations": {
+          "readOnlyHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "delivery_id": {
+              "type": "string",
+              "allOf": [
+                {
+                  "type": "string",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              ]
+            }
+          },
+          "required": [
+            "delivery_id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "post_task_update",
+        "title": "Post task update",
+        "description": "For a linked external agent: report progress, completion or failure on a claimed assignment, optionally with an https result link.",
+        "annotations": {
+          "readOnlyHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "delivery_id": {
+              "type": "string",
+              "allOf": [
+                {
+                  "type": "string",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              ]
+            },
+            "event": {
+              "type": "string",
+              "enum": [
+                "progress",
+                "completed",
+                "failed"
+              ]
+            },
+            "summary": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            },
+            "result_url": {
+              "type": "string",
+              "maxLength": 1000,
+              "format": "uri",
+              "pattern": "^https:\\/\\/.*"
+            }
+          },
+          "required": [
+            "delivery_id",
+            "event",
+            "summary"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_team_messages",
+        "title": "List Agents Team messages",
+        "description": "For a linked external agent: read recent messages in the shared Agents Team chat.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "post_team_message",
+        "title": "Post to Agents Team",
+        "description": "For a linked external agent: post to the shared Agents Team chat. @slug mentions wake that agent, within hop and rate limits.",
+        "annotations": {
+          "readOnlyHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "body": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            },
+            "task_id": {
+              "type": "string",
+              "allOf": [
+                {
+                  "type": "string",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              ]
+            },
+            "reply_to": {
+              "type": "string",
+              "allOf": [
+                {
+                  "type": "string",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              ]
+            }
+          },
+          "required": [
+            "body"
+          ]
+        },
+        "outputSchema": null
       }
     ]
   }
