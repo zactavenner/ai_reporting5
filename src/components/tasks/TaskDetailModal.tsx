@@ -1,3 +1,4 @@
+import { SELECTABLE_STAGES } from '@/lib/taskStages';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Dialog,
@@ -85,16 +86,7 @@ type TimelineEntry =
   | { type: 'history'; data: TaskHistory; timestamp: Date };
 
 // All workflow stages matching KanbanBoard
-const STAGES = [
-  { id: 'client_tasks', label: 'Client Tasks' },
-  { id: 'todo', label: 'To Do' },
-  { id: 'in_progress', label: 'In Progress' },
-  { id: 'stuck', label: 'Stuck' },
-  { id: 'agency_review', label: 'Agency Review' },
-  { id: 'review', label: 'Client Review' },
-  { id: 'revisions', label: 'Revisions' },
-  { id: 'done', label: 'Completed' },
-];
+const STAGES = SELECTABLE_STAGES;
 
 export function TaskDetailModal({ task, open, onOpenChange, clientName, clientId, isPublicView = false }: TaskDetailModalProps) {
   const updateTask = useUpdateTask();
