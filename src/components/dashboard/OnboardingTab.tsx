@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PilotReadinessPanel } from './PilotReadinessPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { useClients } from '@/hooks/useClients';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -257,6 +258,10 @@ function exportToGoogleDoc(client: ClientOnboardingData, offer: ClientOffer | un
 // ─── Component ───
 
 export function OnboardingTab() {
+  return <div className="space-y-6"><PilotReadinessPanel /><OnboardingPipeline /></div>;
+}
+
+function OnboardingPipeline() {
   const navigate = useNavigate();
   const { data: allClients = [] } = useClients();
   const [clientData, setClientData] = useState<ClientOnboardingData[]>([]);
