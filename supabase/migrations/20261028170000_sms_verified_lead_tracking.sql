@@ -245,13 +245,36 @@ CREATE OR REPLACE VIEW public.v_non_sms_forms_latest AS
 SELECT ran_at, result FROM public.meta_non_sms_form_checks ORDER BY ran_at DESC LIMIT 1;
 GRANT SELECT ON public.v_non_sms_forms_latest TO authenticated, service_role;
 
+-- Re-evaluate SMS status for leads created in the last 7 days (DB-only, zero Meta calls). Catches ad->form
+-- changes and form flag changes after ingest, incl. form_uncertain. Only rows whose status changes are updated.
+CREATE OR REPLACE FUNCTION public.reevaluate_recent_lead_sms()
+RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE n integer;
+BEGIN
+  WITH calc AS (
+    SELECT l.id, public.lead_sms_status(l.meta_form_id, l.meta_ad_id, l.created_at) AS st
+    FROM public.leads l
+    WHERE l.created_at >= now() - interval '7 days'
+  )
+  UPDATE public.leads l
+     SET verification_status = c.st,
+         is_sms_verified = CASE c.st WHEN 'verified' THEN true WHEN 'unverified' THEN false ELSE NULL END
+    FROM calc c
+   WHERE l.id = c.id
+     AND (l.verification_status IS DISTINCT FROM c.st
+          OR l.is_sms_verified IS DISTINCT FROM (CASE c.st WHEN 'verified' THEN true WHEN 'unverified' THEN false ELSE NULL END));
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END $$;
+
 -- Daily at 13:45 UTC = 6:45 AM PDT. pg_cron runs in UTC with no DST: after DST ends (Nov 1, 2026) this
 -- fires at 5:45 AM PST; change to '45 14 * * *' for winter if 6:45 local must hold. Pure SQL, zero Meta
--- calls, one statement (sequential), no HTTP/secret needed.
+-- calls, no HTTP/secret needed. Steps run sequentially in one job: (1) re-evaluate last-7-day leads,
+-- (2) snapshot non-SMS forms.
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'meta-non-sms-form-check-daily') THEN
     PERFORM cron.unschedule('meta-non-sms-form-check-daily');
   END IF;
 END $$;
-SELECT cron.schedule('meta-non-sms-form-check-daily', '45 13 * * *', $$ SELECT public.run_non_sms_form_check(); $$);
+SELECT cron.schedule('meta-non-sms-form-check-daily', '45 13 * * *', $$ SELECT public.reevaluate_recent_lead_sms(); SELECT public.run_non_sms_form_check(); $$);
