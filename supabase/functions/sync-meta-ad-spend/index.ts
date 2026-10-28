@@ -36,6 +36,35 @@ const isoNDaysAgo = (n: number) => {
   return d.toISOString().slice(0, 10);
 };
 
+
+// A day is only final once it has ENDED in the ad account's own timezone
+// (Meta buckets spend by account tz). Pulling earlier stores a partial or $0
+// day. Timezone comes from the meta_ad_accounts cache (filled by
+// sync-meta-ads), so this adds no Meta API calls; unknown tz falls back to
+// Pacific/Honolulu (latest US zone) to stay safe.
+const tzCacheByAccount = new Map<string, string>();
+async function accountTimezone(sb: any, adAccountId: string): Promise<string> {
+  const hit = tzCacheByAccount.get(adAccountId);
+  if (hit) return hit;
+  let tz = 'Pacific/Honolulu';
+  try {
+    const { data } = await sb.from('meta_ad_accounts').select('timezone_name')
+      .eq('ad_account_id', adAccountId).maybeSingle();
+    if (data?.timezone_name) {
+      try { new Intl.DateTimeFormat('en-CA', { timeZone: data.timezone_name }); tz = data.timezone_name; } catch { /* keep fallback */ }
+    }
+  } catch { /* keep fallback */ }
+  tzCacheByAccount.set(adAccountId, tz);
+  return tz;
+}
+function todayInTz(tz: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+/** true when `date` (YYYY-MM-DD) is strictly before today in `tz`. */
+function dayEndedInTz(date: string, tz: string): boolean {
+  return date < todayInTz(tz);
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Minimum gap between Google Sheets gateway calls (read quota is per-minute
@@ -475,10 +504,17 @@ Deno.serve(async (req) => {
     const summary = {
       total_accounts: accounts.length, dates: dates.length,
       ok: 0, failed: 0, total_rows: 0, sheet_ok: 0, sheet_failed: 0, sheet_skipped: 0,
-    };
+    } as Record<string, number>;
 
     for (const date of dates) {
       for (const acct of accounts) {
+        const acctTz = await accountTimezone(sb, acct.ad_account_id);
+        if (!dayEndedInTz(date, acctTz)) {
+          // Not final yet in this account's timezone: skip (no Meta call, no
+          // $0 row). The next scheduled run picks it up.
+          summary.not_ended = (summary.not_ended ?? 0) + 1;
+          continue;
+        }
         const { data: runIns } = await sb.from('ad_spend_sync_runs').insert({
           client_id: acct.client_id, client_name: acct.client_name,
           ad_account_id: acct.ad_account_id, sync_date: date,
@@ -571,6 +607,7 @@ Deno.serve(async (req) => {
         const clientAccts = accounts.filter((a) => a.client_id === cid);
         let recovered = 0;
         for (const acct of clientAccts) {
+          if (!dayEndedInTz(yday, await accountTimezone(sb, acct.ad_account_id))) continue;
           try {
             const rows = await fetchMetaInsights(acct, yday);
             recovered += await upsertDaily(sb, acct, yday, rows);
