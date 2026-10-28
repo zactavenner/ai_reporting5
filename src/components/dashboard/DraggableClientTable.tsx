@@ -200,6 +200,26 @@ export function DraggableClientTable({
   const { dateRange } = useDateFilter();
   const numberOfDays = useMemo(() => differenceInDays(dateRange.to, dateRange.from) + 1, [dateRange]);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  // SMS-verified CPL per client (spend_verified_forms / meta_leads_verified). Null => "n/a".
+  const { data: verifiedCplByClient = {} } = useQuery({
+    queryKey: ['verified-cpl-by-client', format(dateRange.from, 'yyyy-MM-dd'), format(dateRange.to, 'yyyy-MM-dd')],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from('daily_metrics')
+        .select('client_id, meta_leads_verified, spend_verified_forms')
+        .gte('date', format(dateRange.from, 'yyyy-MM-dd'))
+        .lte('date', format(dateRange.to, 'yyyy-MM-dd'));
+      if (error) return {}; // migration not applied yet
+      const agg: Record<string, { spend: number; leads: number; seen: boolean }> = {};
+      for (const r of data || []) {
+        if (r.meta_leads_verified === null && r.spend_verified_forms === null) continue;
+        const a = (agg[r.client_id] ||= { spend: 0, leads: 0, seen: false });
+        a.spend += Number(r.spend_verified_forms || 0); a.leads += Number(r.meta_leads_verified || 0); a.seen = true;
+      }
+      const out: Record<string, number | null> = {};
+      for (const [id, a] of Object.entries(agg)) out[id] = a.seen && a.leads > 0 ? a.spend / a.leads : null;
+      return out;
+    },
+  });
   const [sortConfig, setSortConfig] = useState<SortConfig>({ column: '', direction: null });
   const [mutedClientIds, setMutedClientIds] = useState<Set<string>>(() => {
     try {
@@ -422,6 +442,7 @@ export function DraggableClientTable({
         case 'rollupSpend': aVal = a.metrics.totalAdSpend || 0; bVal = b.metrics.totalAdSpend || 0; break;
         case 'rollupLeads': aVal = a.metrics.totalLeads || 0; bVal = b.metrics.totalLeads || 0; break;
         case 'rollupCPL': aVal = a.metrics.costPerLead || 0; bVal = b.metrics.costPerLead || 0; break;
+        case 'rollupVerifiedCPL': aVal = (verifiedCplByClient as any)[a.client.id] ?? -1; bVal = (verifiedCplByClient as any)[b.client.id] ?? -1; break;
         case 'rollupCalls': aVal = a.metrics.totalCalls || 0; bVal = b.metrics.totalCalls || 0; break;
         case 'rollupShowed': aVal = a.metrics.showedCalls || 0; bVal = b.metrics.showedCalls || 0; break;
         case 'rollupCPBC': aVal = a.metrics.costPerCall || 0; bVal = b.metrics.costPerCall || 0; break;
@@ -448,7 +469,7 @@ export function DraggableClientTable({
 
       return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
     });
-  }, [clientsWithComputedValues, sortConfig, assignments]);
+  }, [clientsWithComputedValues, sortConfig, assignments, verifiedCplByClient]);
 
   const handleSort = (column: string) => {
     setSortConfig(prev => {
@@ -566,6 +587,7 @@ export function DraggableClientTable({
               <SortableHeader column="rollupSpend" label="Spend" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="rollupLeads" label={labels.shortLeads} tooltip={labels.leadsHint} sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="rollupCPL" label={labels.shortCostPerLead} tooltip={labels.costPerLead} sortConfig={sortConfig} onSort={handleSort} />
+              <SortableHeader column="rollupVerifiedCPL" label="Verified CPL" tooltip="Spend on SMS-verified forms / leads from SMS-verified forms (n/a when no data)" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="rollupCalls" label="Calls" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="rollupShowed" label="Showed" sortConfig={sortConfig} onSort={handleSort} />
               <SortableHeader column="rollupCPBC" label="CPBC" sortConfig={sortConfig} onSort={handleSort} />
@@ -761,6 +783,11 @@ export function DraggableClientTable({
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
                       {/* Denominator-aware: leads known and > 0 => show the cost (0 spend => $0). */}
                       {renderRatio(m.costPerLead, m.totalAdSpend, m.totalLeads, (v) => formatCurrency(v))}
+                    </TableCell>
+                    <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
+                      {typeof (verifiedCplByClient as any)[client.id] === 'number'
+                        ? formatCurrency((verifiedCplByClient as any)[client.id])
+                        : <span className="text-muted-foreground">n/a</span>}
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-[11px] py-0 px-1">
                       {typeof m.totalCalls === 'number' ? m.totalCalls.toLocaleString() : <span className="text-muted-foreground">-</span>}
