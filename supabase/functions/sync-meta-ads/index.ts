@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { leadFormIdFromCreative } from "../_shared/metaThrottle.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -925,7 +926,7 @@ Deno.serve(async (req) => {
       const adSetIdMap = new Map((dbAdSets || []).map((a: any) => [a.meta_adset_id, a.id]));
 
       // ── 4. Fetch Ads ──
-      const adFields = "id,name,status,effective_status,adset_id,campaign_id,creative{id,thumbnail_url,image_url,object_story_spec}";
+      const adFields = "id,name,status,effective_status,adset_id,campaign_id,creative{id,thumbnail_url,image_url,object_story_spec,asset_feed_spec}";
       const ads = await fetchAllPages(
         `${META_GRAPH_API_URL}/${adAccountId}/ads?fields=${adFields}`,
         accessToken, 50, "ads"
@@ -979,6 +980,15 @@ Deno.serve(async (req) => {
       for (const rec of adRecords) {
         await supabase.from("meta_ads").upsert(rec, { onConflict: "client_id,meta_ad_id" });
         totalRowsWritten++;
+      }
+
+      // ── Ad -> lead form map (SMS-verified tracking). No extra Meta calls: reuses the ads pull above. ──
+      const formMapRows = ads
+        .map((a: any) => ({ ad_id: a.id, form_id: leadFormIdFromCreative(a.creative), client_id: clientId, last_seen: new Date().toISOString() }))
+        .filter((r: any) => r.form_id);
+      for (let i = 0; i < formMapRows.length; i += 500) {
+        const { error: mapErr } = await supabase.from("meta_ad_form_map").upsert(formMapRows.slice(i, i + 500), { onConflict: "ad_id" });
+        if (mapErr) console.warn(`meta_ad_form_map upsert: ${mapErr.message}`);
       }
 
       // ── Fetch HD video source URLs ──

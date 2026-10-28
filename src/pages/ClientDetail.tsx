@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AISheetSummaryButton } from '@/components/ai/AISheetSummaryButton';
 import { DateRangeFilter } from '@/components/dashboard/DateRangeFilter';
 import { KPIGrid } from '@/components/dashboard/KPIGrid';
+import { SmsVerifiedCplCard } from '@/components/dashboard/SmsVerifiedCplCard';
 import { SectionErrorBoundary } from '@/components/ui/SectionErrorBoundary';
 import { MetricChartsGrid } from '@/components/dashboard/MetricChartsGrid';
 import { PeriodicStatsTable } from '@/components/dashboard/PeriodicStatsTable';
@@ -537,6 +538,9 @@ export default function ClientDetail() {
 
           {/* ─── AI STUDIO TAB ─── */}
           <TabsContent value="ads-manager" className="space-y-6">
+            <SectionErrorBoundary sectionName="SMS-verified CPL">
+              <SmsVerifiedCplCard clientId={client.id} startDate={startDate} endDate={endDate} />
+            </SectionErrorBoundary>
             <SectionErrorBoundary sectionName="Ads Manager">
               <AdsManagerTab clientId={client.id} clientName={client.name} />
             </SectionErrorBoundary>

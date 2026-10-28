@@ -83,6 +83,16 @@ Deno.serve(async (req) => {
       const byDate = new Map<string, any>();
       for (const r of rows || []) byDate.set(r.date, r);
 
+      // SMS-verified rollup (form-level). Missing view (migration not applied) => leave columns untouched.
+      const { data: smsRows, error: smsErr } = await supabase
+        .from("v_daily_sms_verified")
+        .select("date, meta_leads_verified, spend_verified_forms, spend_unverified_forms")
+        .eq("client_id", client.id)
+        .gte("date", startDate)
+        .lte("date", endDate);
+      const smsByDate = new Map<string, any>();
+      for (const r of smsRows || []) smsByDate.set(r.date, r);
+
       for (let d = startDate; d <= endDate; d = addDays(d, 1)) {
         const r = byDate.get(d) || {};
         const leadsTotal = Number(r.leads_total || 0);
@@ -125,6 +135,11 @@ Deno.serve(async (req) => {
             funded_investors: fundedCount,
             funded_on_day: fundedCount,
             funded_dollars: fundedDollars,
+            ...(smsErr ? {} : {
+              meta_leads_verified: Number(smsByDate.get(d)?.meta_leads_verified || 0),
+              spend_verified_forms: Number(smsByDate.get(d)?.spend_verified_forms || 0),
+              spend_unverified_forms: Number(smsByDate.get(d)?.spend_unverified_forms || 0),
+            }),
             updated_at: new Date().toISOString(),
           }, { onConflict: "client_id,date", ignoreDuplicates: false });
 

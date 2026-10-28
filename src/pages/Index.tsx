@@ -60,6 +60,7 @@ import { useClientSourceMetrics, buildClientMetricsFromRPC, rpcCoveredClientIds 
 import { useAllClientSettings, useAllClientFullSettings } from '@/hooks/useAllClientSettings';
 import { useSheetClientMetrics } from '@/hooks/useSheetClientMetrics';
 import { ReportingHeadline } from '@/components/dashboard/ReportingHeadline';
+import { NonSmsFormsPanel } from '@/components/dashboard/NonSmsFormsPanel';
 import { resolveReportingScope, scopeIsCompleteForAI, scopeBlockReason, sourceLabel, type ReportingSource, type ClientMetricStatus } from '@/lib/reportingScope';
 
 import { useAllClientMRR } from '@/hooks/useClientMRR';
@@ -550,6 +551,10 @@ const Index = () => {
                   unambiguous.
                 */}
 
+
+                <SectionErrorBoundary sectionName="Non-SMS forms">
+                  <NonSmsFormsPanel />
+                </SectionErrorBoundary>
 
                 <SectionErrorBoundary sectionName="Reporting Headline">
                   <ReportingHeadline

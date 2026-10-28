@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
         const pageToken = await getPageToken(page.id, token);
         if (!pageToken) continue;
         const forms = await fetchAll(
-          `${GRAPH}/${page.id}/leadgen_forms?fields=id,name,status,locale,questions,question_page_custom_headline,thank_you_page,privacy_policy_url,leads_count`,
+          `${GRAPH}/${page.id}/leadgen_forms?fields=id,name,status,locale,questions,question_page_custom_headline,thank_you_page,privacy_policy_url,leads_count,is_optimized_for_quality`,
           pageToken,
         );
         for (const f of forms) {
@@ -94,6 +94,9 @@ Deno.serve(async (req) => {
               thank_you_page: f.thank_you_page || {},
               privacy_policy_url: f.privacy_policy_url || null,
               leads_count: f.leads_count || 0,
+              is_optimized_for_quality: f.is_optimized_for_quality ?? null,
+              // sms_verified / verification_source are NOT written here: a DB trigger applies the
+              // whole-word 'sms' name rule and never overwrites a manual override.
               last_synced_at: new Date().toISOString(),
               raw: f,
             },
