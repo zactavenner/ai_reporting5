@@ -57,7 +57,7 @@ export function ErrorToastHandler() {
 
     const errHandler = (e: ErrorEvent) => {
       const msg = e.error?.message || e.message || '';
-      if (/returned 403|not_operator|not an agency admin/i.test(msg)) e.preventDefault();
+      if (/returned 40[13]|not_operator|not an agency admin|not authenticated|invalid_token|session expired/i.test(msg)) e.preventDefault();
     };
     window.addEventListener('unhandledrejection', handler);
     window.addEventListener('error', errHandler);
