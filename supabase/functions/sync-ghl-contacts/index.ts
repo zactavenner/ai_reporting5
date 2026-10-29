@@ -156,7 +156,18 @@ interface GHLContact {
     utm_term?: string;
     medium?: string;
     sessionSource?: string;
+    // camelCase keys GHL actually returns for Facebook lead-form contacts
+    campaign?: string;
+    campaignId?: string;
+    adSetId?: string;
+    adId?: string;
+    utmCampaign?: string;
+    utmMedium?: string;
+    utmContent?: string;
+    formId?: string;
+    formName?: string;
   };
+  lastAttributionSource?: GHLContact['attributionSource'];
 }
 
 interface GHLCall {
@@ -901,7 +912,23 @@ function extractCampaignAttribution(contact: GHLContact, customFields: Record<st
     console.log(`Using attributionSource.utm_content as ad_id: ${ad_id}`);
   }
   
+  // GHL's own default label ('Paid Ads') is not a campaign name.
+  if (campaign_name && isDefaultCampaignName(campaign_name)) campaign_name = null;
+
+  // GHL Facebook lead-form attribution (camelCase). The latest attribution wins
+  // so a re-submitter is credited to the ad that produced the new submission.
+  for (const attr of [contact.lastAttributionSource, contact.attributionSource]) {
+    if (!attr) continue;
+    if (attr.adId && /^\d+$/.test(String(attr.adId)) && !/^\d+$/.test(String(ad_id || ''))) ad_id = String(attr.adId);
+    if (!campaign_name && (attr.campaign || attr.utmCampaign)) campaign_name = String(attr.campaign || attr.utmCampaign);
+    if (!ad_set_name && attr.utmMedium) ad_set_name = String(attr.utmMedium);
+  }
+
   return { campaign_name, ad_set_name, ad_id };
+}
+
+function isDefaultCampaignName(v: unknown): boolean {
+  return String(v ?? '').trim().toLowerCase() === 'paid ads';
 }
 
 // Extract pipeline value from contact custom fields or opportunities
@@ -1182,6 +1209,14 @@ async function syncContactToDatabase(
 
   // For new leads, set created_at from GHL dateAdded
   // For existing leads, we don't want to overwrite created_at
+  // Never wipe attribution an earlier sync or backfill-meta-lead-attribution
+  // already filled: for existing leads, drop empty/default values from the upsert.
+  if (existingLead) {
+    for (const k of ['ad_id', 'campaign_name', 'ad_set_name']) {
+      if (upsertData[k] == null || upsertData[k] === '' || (k === 'campaign_name' && isDefaultCampaignName(upsertData[k]))) delete upsertData[k];
+    }
+  }
+
   if (!existingLead) {
     upsertData.created_at = ghlCreatedAt;
     upsertData.status = 'new';
