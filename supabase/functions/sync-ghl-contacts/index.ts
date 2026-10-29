@@ -927,6 +927,90 @@ function extractPipelineValue(contact: GHLContact, opportunity?: GHLOpportunity)
   return 0;
 }
 
+// ---------------------------------------------------------------------------
+// Form re-submissions
+// ---------------------------------------------------------------------------
+// The recent-lead pass walks /contacts/search by dateAdded and stops at the
+// cutoff, so a contact that already existed in GHL (for example a May CSV
+// import) and submits a NEW Meta/GHL form today is never seen: its dateAdded is
+// old. GHL keeps every submission in /forms/submissions with contactId and
+// createdAt, so we pull submissions since the cutoff, sync any contact the
+// dateAdded pass missed, and record each submission once in
+// public.lead_form_submissions (unique on client_id + external_submission_id).
+// v_daily_funnel_day counts a lead on the day of a fresh submission.
+interface GHLFormSubmission {
+  id: string;
+  contactId?: string;
+  formId?: string;
+  createdAt?: string;
+  others?: Record<string, any>;
+}
+
+async function fetchGHLFormSubmissionsSince(
+  apiKey: string,
+  locationId: string,
+  since: Date,
+  maxPages = 20,
+): Promise<{ ok: boolean; submissions: GHLFormSubmission[]; status?: number }> {
+  const headers = { 'Authorization': `Bearer ${apiKey}`, 'Version': '2021-07-28', 'Accept': 'application/json' };
+  const startAt = since.toISOString().slice(0, 10);
+  const endAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const submissions: GHLFormSubmission[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    const url = `${GHL_BASE_URL}/forms/submissions?locationId=${locationId}&startAt=${startAt}&endAt=${endAt}&limit=100&page=${page}`;
+    const response = await fetchGHL(url, { method: 'GET', headers }, `forms/submissions page ${page}`);
+    if (!response.ok) {
+      // Missing forms.readonly scope etc. must not break the contact sync.
+      return { ok: false, submissions, status: response.status };
+    }
+    const data = await response.json();
+    const batch: GHLFormSubmission[] = data.submissions || [];
+    for (const sub of batch) {
+      const at = sub.createdAt ? Date.parse(sub.createdAt) : NaN;
+      if (Number.isFinite(at) && at >= since.getTime()) submissions.push(sub);
+    }
+    if (!data.meta?.nextPage || batch.length === 0) break;
+  }
+  return { ok: true, submissions };
+}
+
+async function fetchGHLContactById(apiKey: string, contactId: string): Promise<GHLContact | null> {
+  const headers = { 'Authorization': `Bearer ${apiKey}`, 'Version': '2021-07-28', 'Accept': 'application/json' };
+  const response = await fetchGHL(`${GHL_BASE_URL}/contacts/${contactId}`, { method: 'GET', headers }, `contacts/${contactId}`);
+  if (!response.ok) return null;
+  const data = await response.json();
+  return data.contact || null;
+}
+
+async function recordFormSubmissions(
+  supabase: any,
+  clientId: string,
+  leadId: string,
+  subs: GHLFormSubmission[],
+): Promise<number> {
+  const rows = subs
+    .filter((s) => s.id && s.createdAt && !Number.isNaN(Date.parse(s.createdAt)))
+    .map((s) => ({
+      client_id: clientId,
+      lead_id: leadId,
+      external_submission_id: s.id,
+      external_contact_id: s.contactId || null,
+      form_id: s.formId || null,
+      form_name: s.others?.facebookFormName || null,
+      submitted_at: new Date(s.createdAt as string).toISOString(),
+    }));
+  if (rows.length === 0) return 0;
+  // ignoreDuplicates: the same GHL submission is only ever stored (and counted) once.
+  const { error } = await supabase
+    .from('lead_form_submissions')
+    .upsert(rows, { onConflict: 'client_id,external_submission_id', ignoreDuplicates: true });
+  if (error) {
+    console.error(`Failed to record form submissions for lead ${leadId}:`, error);
+    return 0;
+  }
+  return rows.length;
+}
+
 async function syncContactToDatabase(
   supabase: any,
   clientId: string,
@@ -943,6 +1027,8 @@ async function syncContactToDatabase(
   // Contacts bulk-imported into GHL from a CSV (attributionSource.medium = 'csv_import')
   // are not new ad leads. Flag them so v_daily_funnel_day leaves them out of lead
   // counts (same legacy_import flag as the HubSpot legacy rows), without deleting them.
+  // NOTE: the flag only removes the import itself (created_at) from counts. A fresh
+  // form submission by the same contact is counted from lead_form_submissions.
   if (String(contact.attributionSource?.medium || '').toLowerCase() === 'csv_import') {
     customFields.legacy_import = true;
     customFields.legacy_import_source = 'ghl_csv_import';
@@ -1612,6 +1698,44 @@ async function syncClientContacts(
     }
     if (hasMore && totalProcessed >= MAX_CONTACTS) {
       throw new Error(`recent contact pull exceeded the verified ${MAX_CONTACTS}-contact safety bound`);
+    }
+
+    // Re-submissions: contacts whose dateAdded is older than the cutoff but who
+    // submitted a form since then (see fetchGHLFormSubmissionsSince).
+    if (cutoffDate) {
+      const subResult = await fetchGHLFormSubmissionsSince(client.ghl_api_key, client.ghl_location_id, cutoffDate);
+      if (!subResult.ok) {
+        console.warn(`[form-submissions] ${client.name}: submissions API returned ${subResult.status}; re-submitters not checked this run`);
+      } else {
+        const byContact = new Map<string, GHLFormSubmission[]>();
+        for (const sub of subResult.submissions) {
+          if (!sub.contactId) continue;
+          const list = byContact.get(sub.contactId) || [];
+          list.push(sub);
+          byContact.set(sub.contactId, list);
+        }
+        let resubmitContacts = 0;
+        for (const [contactId, subs] of byContact) {
+          try {
+            let { data: lead } = await supabase
+              .from('leads').select('id').eq('client_id', client.id).eq('external_id', contactId).maybeSingle();
+            if (!lead) {
+              // Existing GHL contact the dateAdded pass never reached (old dateAdded).
+              const contact = await fetchGHLContactById(client.ghl_api_key, contactId);
+              if (!contact) continue;
+              const syncResult = await syncContactToDatabase(supabase, client.id, contact, opportunityByContactId.get(contactId), fieldNameMap);
+              if (syncResult.action === 'created') result.created++;
+              else if (syncResult.action === 'updated') result.updated++;
+              lead = syncResult.leadId ? { id: syncResult.leadId } : null;
+              resubmitContacts++;
+            }
+            if (lead?.id) await recordFormSubmissions(supabase, client.id, lead.id, subs);
+          } catch (err) {
+            result.errors.push(`Form submissions for ${contactId}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+          }
+        }
+        console.log(`[form-submissions] ${client.name}: ${subResult.submissions.length} submission(s) since ${cutoffDate.toISOString()}, ${byContact.size} contact(s), ${resubmitContacts} pulled in outside the dateAdded window`);
+      }
     }
     
     result.totalApiContacts = totalProcessed;
