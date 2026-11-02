@@ -6,6 +6,7 @@ import { Lock, Loader2 } from 'lucide-react';
 import { TeamMemberProvider, useTeamMember } from '@/contexts/TeamMemberContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getValidDashboardToken } from '@/lib/dashboardSession';
 
 const SESSION_KEY = 'dashboard_auth';
 
@@ -24,15 +25,22 @@ function PasswordGateContent({ children }: PasswordGateProps) {
   const { login } = useTeamMember();
 
   useEffect(() => {
-    // Check if already authenticated in this session
-    const storedAuth = localStorage.getItem(SESSION_KEY);
-    const dashboardToken = localStorage.getItem('dashboard_session_token');
-    if (storedAuth === 'true' && dashboardToken) {
-      setIsAuthenticated(true);
-    } else if (storedAuth === 'true' && !dashboardToken) {
-      localStorage.removeItem(SESSION_KEY);
-    }
+    // Only trust a stored session whose token hasn't expired; an expired token
+    // makes every background request fail with "Not authenticated".
+    const check = () => {
+      const storedAuth = localStorage.getItem(SESSION_KEY);
+      const dashboardToken = getValidDashboardToken();
+      if (storedAuth === 'true' && dashboardToken) return true;
+      if (storedAuth === 'true') localStorage.removeItem(SESSION_KEY);
+      return false;
+    };
+    setIsAuthenticated(check());
     setIsLoading(false);
+    // Re-check every minute so a session that expires mid-use returns to sign-in.
+    const id = window.setInterval(() => {
+      if (!check()) setIsAuthenticated(false);
+    }, 60_000);
+    return () => window.clearInterval(id);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
