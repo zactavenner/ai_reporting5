@@ -2,7 +2,7 @@ import { useEffect, useState, Suspense, lazy } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, ChevronDown, ChevronUp, FileText, Image as ImageIcon, GitBranch, ClipboardList, Megaphone, Facebook, Globe, Users, Briefcase, Link2 } from 'lucide-react';
+import { ExternalLink, ChevronDown, ChevronUp, FileText, Image as ImageIcon, GitBranch, Megaphone, Facebook, Globe, Users, Briefcase, Link2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { embedSheetUrl } from '@/lib/huddle/sheet';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
