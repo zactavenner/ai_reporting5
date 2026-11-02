@@ -1,3 +1,4 @@
+import { normalizeCreativeComments } from '@/lib/normalizeCreativeComments';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -66,7 +67,7 @@ export function useCreatives(clientId?: string) {
         type: item.type as 'image' | 'video' | 'copy',
         platform: (item.platform as 'meta' | 'tiktok' | 'youtube' | 'google') || 'meta',
         status: item.status as 'draft' | 'pending' | 'approved' | 'revisions' | 'rejected' | 'launched',
-        comments: (item.comments as unknown as CreativeComment[]) || [],
+        comments: normalizeCreativeComments(item.comments, item.created_at),
         aspect_ratio: (item as any).aspect_ratio || null,
         source: (item as any).source || 'manual',
         trigger_campaign_id: (item as any).trigger_campaign_id || null,
@@ -340,7 +341,7 @@ export function useAddCreativeComment() {
       
       if (fetchError) throw fetchError;
       
-      const existingComments = (current?.comments as unknown as CreativeComment[]) || [];
+      const existingComments = normalizeCreativeComments(current?.comments);
       const updatedComments = [...existingComments, comment];
       
       const { data, error } = await supabase
