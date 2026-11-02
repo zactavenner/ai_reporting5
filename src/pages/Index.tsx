@@ -81,6 +81,7 @@ import SpamBlacklist from './SpamBlacklist';
 import { AdminOffersTab } from '@/components/offers/AdminOffersTab';
 import { QuizBuilderTab } from '@/components/quiz/QuizBuilderTab';
 import { AgentsTab } from '@/components/agents/AgentsTab';
+import { CommunicationTab } from '@/components/agents/CommunicationTab';
 import { AgentsOverview } from '@/components/agents/AgentsOverview';
 import { TeamReport } from '@/components/agents/TeamReport';
 import { AvatarAdProvider } from '@/context/AvatarAdContext';
@@ -887,6 +888,12 @@ const Index = () => {
             {activeTab === 'data-audit' && currentMember?.role === 'admin' && (
               <SectionErrorBoundary sectionName="DataAccuracyAudit">
                 <DataAccuracyAuditPanel />
+              </SectionErrorBoundary>
+            )}
+
+            {activeTab === 'communication' && (
+              <SectionErrorBoundary sectionName="Communication">
+                <CommunicationTab />
               </SectionErrorBoundary>
             )}
 
