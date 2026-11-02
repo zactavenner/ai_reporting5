@@ -4,12 +4,16 @@
  * Rendered inside each Daily Huddle client card (collapsed by default, summary
  * chips in the header) and reused expanded in the client dashboard Settings tab.
  * Both surfaces share the SAME panels and the SAME records.
+ *
+ * In the Huddle, the full offer editor (offer details + offer files) and the
+ * client file uploads are consolidated here so operators manage everything in
+ * one place.
  */
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, Link2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Link2, Upload } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   ConnectionAuditPanel,
@@ -22,6 +26,23 @@ import {
 import { useConnectionsSummary, type SettingsSource } from '@/hooks/useClientConnections';
 import { AgentApiPanel } from './AgentApiPanel';
 
+const ClientOffersSection = lazy(() =>
+  import('@/components/offers/ClientOffersSection').then((m) => ({ default: m.ClientOffersSection })),
+);
+const ClientUploadPortal = lazy(() =>
+  import('@/components/uploads/ClientUploadPortal').then((m) => ({ default: m.ClientUploadPortal })),
+);
+
+export interface ConnectionsClientInfo {
+  name: string;
+  description?: string | null;
+  offer_description?: string | null;
+  website_url?: string | null;
+  industry?: string | null;
+  client_type?: string | null;
+  brand_colors?: string[] | null;
+  brand_fonts?: string[] | null;
+}
 
 function SummaryChips({ clientId }: { clientId: string }) {
   const { offersActive, rollup, accounts } = useConnectionsSummary(clientId);
@@ -44,25 +65,81 @@ function SummaryChips({ clientId }: { clientId: string }) {
   );
 }
 
+function OfferAndFilesPanel({ clientId, client }: { clientId: string; client: ConnectionsClientInfo }) {
+  const [showUploads, setShowUploads] = useState(false);
+  return (
+    <div className="space-y-3">
+      <Card className="p-4">
+        <Suspense fallback={<div className="text-sm text-muted-foreground">Loading offers…</div>}>
+          <ClientOffersSection
+            clientId={clientId}
+            clientName={client.name}
+            isPublicView={false}
+            brandColors={client.brand_colors ?? null}
+            brandFonts={client.brand_fonts ?? null}
+            clientDescription={client.description ?? null}
+            offerDescription={client.offer_description ?? null}
+            websiteUrl={client.website_url ?? null}
+            industry={client.industry ?? null}
+            clientType={client.client_type ?? null}
+          />
+        </Suspense>
+      </Card>
+
+      <Card className="p-0 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowUploads((o) => !o)}
+          aria-expanded={showUploads}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
+        >
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <Upload className="h-4 w-4" />
+            Files &amp; uploads
+          </div>
+          {showUploads ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
+        {showUploads && (
+          <div className="border-t p-4">
+            <Suspense fallback={<div className="text-sm text-muted-foreground">Loading files…</div>}>
+              <ClientUploadPortal clientId={clientId} clientName={client.name} isPublicView={false} />
+            </Suspense>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 export function ClientConnectionsPanelGroup({
   clientId,
   source,
   showAudit = true,
   showApiCopy = false,
+  client,
 }: {
   clientId: string;
   source: SettingsSource;
   showAudit?: boolean;
   showApiCopy?: boolean;
+  /** When provided, the full offer editor + files/uploads replace the compact offers list. */
+  client?: ConnectionsClientInfo;
 }) {
   const { rollup } = useConnectionsSummary(clientId);
   return (
     <div className="space-y-3">
       <RollupSummaryCard rollup={rollup} />
-      <div className="grid gap-3 lg:grid-cols-2">
-        <OffersPanel clientId={clientId} source={source} />
-        <GhlPanel clientId={clientId} source={source} />
-      </div>
+      {client ? (
+        <>
+          <OfferAndFilesPanel clientId={clientId} client={client} />
+          <GhlPanel clientId={clientId} source={source} />
+        </>
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-2">
+          <OffersPanel clientId={clientId} source={source} />
+          <GhlPanel clientId={clientId} source={source} />
+        </div>
+      )}
       <MetaPanel clientId={clientId} source={source} />
       {showAudit && <ConnectionAuditPanel clientId={clientId} />}
       {showApiCopy && <AgentApiPanel />}
@@ -75,10 +152,12 @@ export function ClientConnectionsSection({
   clientId,
   source = 'huddle',
   defaultOpen = false,
+  client,
 }: {
   clientId: string;
   source?: SettingsSource;
   defaultOpen?: boolean;
+  client?: ConnectionsClientInfo;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -92,7 +171,7 @@ export function ClientConnectionsSection({
         <div className="min-w-0 space-y-1.5">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <Link2 className="h-4 w-4" />
-            Connections &amp; Settings
+            Connections, Offer &amp; Files
           </div>
           <SummaryChips clientId={clientId} />
         </div>
@@ -102,7 +181,7 @@ export function ClientConnectionsSection({
       </button>
       {open && (
         <div className="border-t p-4">
-          <ClientConnectionsPanelGroup clientId={clientId} source={source} />
+          <ClientConnectionsPanelGroup clientId={clientId} source={source} client={client} />
         </div>
       )}
     </Card>
