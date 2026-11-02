@@ -49,7 +49,7 @@ export function DeleteClientDialog({ client, open, onOpenChange }: DeleteClientD
       onOpenChange(false);
     } catch (error) {
       console.error('Error deleting client:', error);
-      toast.error('Failed to delete client');
+      toast.error(`Failed to delete client: ${error instanceof Error ? error.message : 'unknown error'}`);
     } finally {
       setDeleting(false);
     }
