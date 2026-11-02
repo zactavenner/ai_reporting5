@@ -33,18 +33,12 @@ export function DeleteClientDialog({ client, open, onOpenChange }: DeleteClientD
     
     setDeleting(true);
     try {
-      // Delete related records first
-      await supabase.from('alert_configs').delete().eq('client_id', client.id);
-      await supabase.from('funded_investors').delete().eq('client_id', client.id);
-      await supabase.from('calls').delete().eq('client_id', client.id);
-      await supabase.from('leads').delete().eq('client_id', client.id);
-      await supabase.from('daily_metrics').delete().eq('client_id', client.id);
-      await supabase.from('sync_logs').delete().eq('client_id', client.id);
-      
-      // Delete the client
-      const { error } = await supabase.from('clients').delete().eq('id', client.id);
-      
+      // Linked records (leads, calls, metrics, logs, etc.) are removed by the database together with the client.
+      const { data, error } = await supabase.from('clients').delete().eq('id', client.id).select('id');
+
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Client was not deleted (no permission or already removed)');
+
       
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       queryClient.invalidateQueries({ queryKey: ['all-daily-metrics'] });
@@ -55,7 +49,7 @@ export function DeleteClientDialog({ client, open, onOpenChange }: DeleteClientD
       onOpenChange(false);
     } catch (error) {
       console.error('Error deleting client:', error);
-      toast.error('Failed to delete client');
+      toast.error(`Failed to delete client: ${error instanceof Error ? error.message : 'unknown error'}`);
     } finally {
       setDeleting(false);
     }
