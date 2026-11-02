@@ -83,6 +83,11 @@ const navStructure = [
     icon: ClipboardCheck,
   },
   {
+    title: 'Communication',
+    value: 'communication',
+    icon: MessageSquare,
+  },
+  {
     title: 'AI Review',
     value: 'ai',
     icon: Bot,
