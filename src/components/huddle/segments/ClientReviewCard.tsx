@@ -2,7 +2,7 @@ import { useEffect, useState, Suspense, lazy } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, ChevronDown, ChevronUp, FileText, Image as ImageIcon, GitBranch, ClipboardList, Megaphone, Facebook, Globe, Users, Briefcase, Link2 } from 'lucide-react';
+import { ExternalLink, ChevronDown, ChevronUp, FileText, Image as ImageIcon, GitBranch, Megaphone, Facebook, Globe, Users, Briefcase, Link2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { embedSheetUrl } from '@/lib/huddle/sheet';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
@@ -18,9 +18,6 @@ const FunnelPreviewTab = lazy(() =>
 );
 const OnboardingIntake = lazy(() =>
   import('@/components/onboarding/OnboardingIntake').then((m) => ({ default: m.OnboardingIntake })),
-);
-const ClientOffersSection = lazy(() =>
-  import('@/components/offers/ClientOffersSection').then((m) => ({ default: m.ClientOffersSection })),
 );
 const AdsManagerTab = lazy(() =>
   import('@/components/ads-manager/AdsManagerTab').then((m) => ({ default: m.AdsManagerTab })),
@@ -72,7 +69,7 @@ export function ClientReviewCard({ client }: { client: Client }) {
       return next;
     });
   };
-  const { sheet: showSheet, tasks: showTasks, ads: showAds, creatives: showCreatives, funnel: showFunnel, onboarding: showOnboarding } = sections;
+  const { sheet: showSheet, tasks: showTasks, ads: showAds, creatives: showCreatives, funnel: showFunnel } = sections;
 
   // Quick links derived from client integration ids — only render buttons for
   // fields that are actually configured, so operators aren't clicking dead links.
@@ -172,7 +169,20 @@ export function ClientReviewCard({ client }: { client: Client }) {
       )}
 
       {/* Connections & Settings — same records/components as the client Settings tab */}
-      <ClientConnectionsSection clientId={client.id} source="huddle" />
+      <ClientConnectionsSection
+        clientId={client.id}
+        source="huddle"
+        client={{
+          name: client.name,
+          description: c.description ?? null,
+          offer_description: c.offer_description ?? null,
+          website_url: c.website_url ?? c.website ?? null,
+          industry: c.industry ?? null,
+          client_type: c.client_type ?? null,
+          brand_colors: c.brand_colors ?? null,
+          brand_fonts: c.brand_fonts ?? null,
+        }}
+      />
 
       {/* Scorecard iframe — zoomed out so more of the sheet is visible at once */}
 
@@ -327,34 +337,6 @@ export function ClientReviewCard({ client }: { client: Client }) {
         )}
       </Card>
 
-      {/* Offer / onboarding intake */}
-      <Card className="p-0 overflow-hidden">
-        <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/40">
-          <div className="text-sm font-medium flex items-center gap-2">
-            <ClipboardList className="w-4 h-4 text-muted-foreground" /> Offers
-          </div>
-          <Button size="sm" variant="ghost" onClick={() => toggle('onboarding')}>
-            {showOnboarding ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </Button>
-        </div>
-        {showOnboarding && (
-          <div className="p-3 overflow-hidden">
-            <div style={{ transform: 'scale(0.85)', transformOrigin: 'top left', width: '117.65%' }}>
-              <Suspense fallback={<div className="text-sm text-muted-foreground p-3">Loading offers…</div>}>
-                <ClientOffersSection
-                  clientId={client.id}
-                  clientName={client.name}
-                  isPublicView={false}
-                  clientDescription={(client as any).description ?? null}
-                  websiteUrl={(client as any).website_url ?? null}
-                  industry={(client as any).industry ?? null}
-                  clientType={(client as any).client_type ?? null}
-                />
-              </Suspense>
-            </div>
-          </div>
-        )}
-      </Card>
     </div>
   );
 }

@@ -58,6 +58,7 @@ export function useCreateOffer() {
     },
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['client-offers', vars.client_id] });
+      queryClient.invalidateQueries({ queryKey: ['connection-offers', vars.client_id] });
       toast.success('Offer/file added');
     },
     onError: (err: Error) => {
@@ -87,6 +88,7 @@ export function useUpdateOffer() {
     },
     onSuccess: (clientId) => {
       queryClient.invalidateQueries({ queryKey: ['client-offers', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['connection-offers', clientId] });
       toast.success('Updated successfully');
     },
     onError: (err: Error) => {
@@ -108,6 +110,7 @@ export function useDeleteOffer() {
     },
     onSuccess: (clientId) => {
       queryClient.invalidateQueries({ queryKey: ['client-offers', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['connection-offers', clientId] });
       toast.success('Removed');
     },
     onError: (err: Error) => {

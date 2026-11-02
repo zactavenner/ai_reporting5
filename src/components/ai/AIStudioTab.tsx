@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { getValidDashboardToken } from "@/lib/dashboardSession";
 import { ScriptRenderCard } from "@/components/ai/ScriptRenderCard";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -1921,7 +1922,7 @@ export function AIStudioTab({ clientId, clientName }: Props) {
   const getStudioAuth = useCallback(async (requireIdentity = false) => {
     const { data: sess } = await supabase.auth.getSession();
     const token = sess.session?.access_token || null;
-    const dashboardToken = localStorage.getItem("dashboard_session_token") || null;
+    const dashboardToken = getValidDashboardToken();
     if (!token && !dashboardToken && requireIdentity) {
       throw new Error("Your dashboard session expired. Please sign in again.");
     }
