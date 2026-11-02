@@ -1,3 +1,4 @@
+import { normalizeCreativeComments } from '@/lib/normalizeCreativeComments';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Creative, CreativeComment } from './useCreatives';
@@ -18,7 +19,7 @@ export function useAllCreatives() {
         type: item.type as 'image' | 'video' | 'copy',
         platform: (item.platform as 'meta' | 'tiktok' | 'youtube' | 'google') || 'meta',
         status: item.status as 'draft' | 'pending' | 'approved' | 'revisions' | 'rejected' | 'launched',
-        comments: (item.comments as unknown as CreativeComment[]) || [],
+        comments: normalizeCreativeComments(item.comments, item.created_at),
         aspect_ratio: (item as any).aspect_ratio || null,
         source: (item as any).source || 'manual',
         trigger_campaign_id: (item as any).trigger_campaign_id || null,

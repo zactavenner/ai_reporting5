@@ -1,3 +1,4 @@
+import { normalizeCreativeComments } from '@/lib/normalizeCreativeComments';
 import { useState, useRef } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { useParams } from 'react-router-dom';
@@ -1488,7 +1489,7 @@ function UploadNewVersionButton({ creative, clientId }: { creative: Creative; cl
         .eq('id', creative.id)
         .single();
       
-      const existingComments = (current?.comments as unknown as CreativeComment[]) || [];
+      const existingComments = normalizeCreativeComments(current?.comments);
       await supabase
         .from('creatives')
         .update({ comments: [...existingComments, comment] as unknown as Json })
