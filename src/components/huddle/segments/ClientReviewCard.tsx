@@ -9,6 +9,7 @@ import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import type { Client } from '@/hooks/useClients';
 import { ClientConnectionsSection } from '@/components/connections/ClientConnectionsSection';
 import { HuddleScorecardStrip } from './HuddleScorecardStrip';
+import { HuddleDocsSection } from './HuddleDocsSection';
 
 
 const CreativesSection = lazy(() =>
@@ -153,6 +154,9 @@ export function ClientReviewCard({ client }: { client: Client }) {
 
       {/* Top scorecard: Daily / Monthly numbers + size of raise & deadline */}
       <HuddleScorecardStrip clientId={client.id} />
+
+      {/* Google Sheet & Docs — turns red when a required link is missing */}
+      <HuddleDocsSection clientId={client.id} onSheetChange={(url) => url && setSheetUrl(url)} />
 
       {/* Quick links — one-click hops to the external tools we reference during huddle */}
       {quickLinks.length > 0 && (

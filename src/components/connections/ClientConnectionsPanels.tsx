@@ -76,6 +76,7 @@ import {
   type RollupSummary,
   type SettingsSource,
 } from '@/hooks/useClientConnections';
+import { parseMetaAdAccountInput } from '@/lib/metaAdAccountLink';
 
 /** Editing is server-enforced; the UI hides controls when no operator session exists. */
 export function useCanEditConnections(): boolean {
@@ -555,11 +556,17 @@ function AddAdAccountDialog({
     }
   }, [open]);
 
+  const parsed = useMemo(() => parseMetaAdAccountInput(accountId), [accountId]);
+
   const submit = async () => {
     setError(null);
+    if (!parsed.accountId) {
+      setError(parsed.error || 'Enter an ad account ID or paste the Ads Manager link');
+      return;
+    }
     try {
       const res: any = await add.mutateAsync({
-        provider_account_id: accountId,
+        provider_account_id: parsed.accountId,
         account_name: label || undefined,
         is_primary: primary,
         rollup_enabled: rollup,
@@ -584,8 +591,26 @@ function AddAdAccountDialog({
         {!result ? (
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="acct">Ad account ID</Label>
-              <Input id="acct" value={accountId} onChange={(e) => setAccountId(e.target.value)} placeholder="act_1234567890 or 1234567890" className="font-mono" />
+              <Label htmlFor="acct">Ads Manager link or ad account ID</Label>
+              <Input
+                id="acct"
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+                placeholder="Paste the Ads Manager link, or act_1234567890"
+                className="font-mono"
+              />
+              {accountId.trim() && (
+                parsed.accountId ? (
+                  <div className="text-[11px] text-emerald-600 flex items-center gap-1.5 flex-wrap">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Found ad account <span className="font-mono">act_{parsed.accountId}</span>
+                    {parsed.businessId && <> · business <span className="font-mono">{parsed.businessId}</span></>}
+                    <span className="text-muted-foreground">— name, currency and time zone are pulled from Meta when you link it.</span>
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-rose-600">{parsed.error}</div>
+                )
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="acct-label">Label (optional)</Label>
@@ -620,7 +645,7 @@ function AddAdAccountDialog({
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>{result ? 'Close' : 'Cancel'}</Button>
           {!result && (
-            <Button onClick={submit} disabled={add.isPending || !accountId.trim()}>
+            <Button onClick={submit} disabled={add.isPending || !parsed.accountId}>
               {add.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
               Link account
             </Button>

@@ -21,7 +21,7 @@
  *  - No Meta campaign/ad writes and no GHL contact/workflow writes happen here.
  */
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0';
-import { corsHeaders } from 'npm:@supabase/supabase-js@2.115.0/cors';
+import { corsHeaders as sdkCors } from 'npm:@supabase/supabase-js@2.115.0/cors';
 import { authorizeOperator } from '../_shared/operatorAuth.ts';
 import { META_GRAPH_BASE, metaFetch, resolveMetaToken } from '../_shared/meta.ts';
 import {
@@ -36,6 +36,13 @@ import {
   validateOfferInput,
   withActPrefix,
 } from '../_shared/clientConnections.ts';
+
+// The dashboard sends its signed session in `x-dashboard-token`; the SDK's
+// default allow-list omits it, which made every browser call fail preflight.
+const corsHeaders = {
+  ...sdkCors,
+  'Access-Control-Allow-Headers': `${sdkCors['Access-Control-Allow-Headers']}, x-dashboard-token`,
+};
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
