@@ -21,7 +21,7 @@
  *  - No Meta campaign/ad writes and no GHL contact/workflow writes happen here.
  */
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0';
-import { corsHeaders } from 'npm:@supabase/supabase-js@2.115.0/cors';
+import { corsHeaders as sdkCors } from 'npm:@supabase/supabase-js@2.115.0/cors';
 import { authorizeOperator } from '../_shared/operatorAuth.ts';
 import { META_GRAPH_BASE, metaFetch, resolveMetaToken } from '../_shared/meta.ts';
 import {
