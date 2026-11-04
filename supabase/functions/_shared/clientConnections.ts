@@ -25,7 +25,16 @@ export type Normalized<T> = { ok: true; value: T } | { ok: false; error: string 
  * optional prefix is accepted on input and stripped on save.
  */
 export function normalizeAdAccountId(raw: unknown): Normalized<string> {
-  const trimmed = String(raw ?? '').trim().replace(/^act_/i, '').replace(/\s+/g, '');
+  let input = String(raw ?? '').trim();
+  // Accept a full Ads Manager / Business Manager link and pull the account out.
+  const fromLink =
+    input.match(/[?&#](?:act|ad_account_id|asset_id|selected_ad_account_id)=(?:act_)?(\d{6,20})/i) ||
+    input.match(/act_(\d{6,20})/i);
+  if (/^https?:\/\//i.test(input) || input.includes('facebook.com')) {
+    if (!fromLink) return { ok: false, error: 'No ad account ID found in that link' };
+    input = fromLink[1];
+  }
+  const trimmed = input.replace(/^act_/i, '').replace(/\s+/g, '');
   if (!trimmed) return { ok: false, error: 'Ad account ID is required' };
   if (!/^\d{6,20}$/.test(trimmed)) {
     return { ok: false, error: 'Ad account ID must be 6–20 digits, with or without the act_ prefix' };

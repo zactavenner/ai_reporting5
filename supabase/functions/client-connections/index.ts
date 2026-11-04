@@ -37,6 +37,13 @@ import {
   withActPrefix,
 } from '../_shared/clientConnections.ts';
 
+// The dashboard sends its signed session in `x-dashboard-token`; the SDK's
+// default allow-list omits it, which made every browser call fail preflight.
+const corsHeaders = {
+  ...sdkCors,
+  'Access-Control-Allow-Headers': `${sdkCors['Access-Control-Allow-Headers']}, x-dashboard-token`,
+};
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
