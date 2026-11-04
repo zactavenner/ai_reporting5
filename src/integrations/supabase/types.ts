@@ -9326,6 +9326,7 @@ export type Database = {
           pixel_verification_enabled: boolean | null
           pixel_verification_frequency: string | null
           public_link_password: string | null
+          raise_deadline: string | null
           reconnect_calendar_ids: string[] | null
           retargetiq_auto_enrich: boolean | null
           retargetiq_website_slug: string | null
@@ -9430,6 +9431,7 @@ export type Database = {
           pixel_verification_enabled?: boolean | null
           pixel_verification_frequency?: string | null
           public_link_password?: string | null
+          raise_deadline?: string | null
           reconnect_calendar_ids?: string[] | null
           retargetiq_auto_enrich?: boolean | null
           retargetiq_website_slug?: string | null
@@ -9534,6 +9536,7 @@ export type Database = {
           pixel_verification_enabled?: boolean | null
           pixel_verification_frequency?: string | null
           public_link_password?: string | null
+          raise_deadline?: string | null
           reconnect_calendar_ids?: string[] | null
           retargetiq_auto_enrich?: boolean | null
           retargetiq_website_slug?: string | null
