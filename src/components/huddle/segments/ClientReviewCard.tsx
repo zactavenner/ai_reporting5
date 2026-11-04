@@ -8,6 +8,7 @@ import { embedSheetUrl } from '@/lib/huddle/sheet';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import type { Client } from '@/hooks/useClients';
 import { ClientConnectionsSection } from '@/components/connections/ClientConnectionsSection';
+import { HuddleScorecardStrip } from './HuddleScorecardStrip';
 
 
 const CreativesSection = lazy(() =>
@@ -149,6 +150,9 @@ export function ClientReviewCard({ client }: { client: Client }) {
           )}
         </div>
       </div>
+
+      {/* Top scorecard: Daily / Monthly numbers + size of raise & deadline */}
+      <HuddleScorecardStrip clientId={client.id} />
 
       {/* Quick links — one-click hops to the external tools we reference during huddle */}
       {quickLinks.length > 0 && (

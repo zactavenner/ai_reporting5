@@ -43,6 +43,13 @@
       "when": 1793658129996,
       "tag": "0005_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793810598557,
+      "tag": "0006_client_settings_raise_deadline",
+      "breakpoints": true
     }
   ]
 }
