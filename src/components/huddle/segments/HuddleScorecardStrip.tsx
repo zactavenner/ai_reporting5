@@ -7,7 +7,14 @@ import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Progress } from '@/components/ui/progress';
-import { CalendarClock, Pencil, Target, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { CalendarClock, Pencil, Target, ArrowUpRight, ArrowDownRight, Wallet } from 'lucide-react';
+import {
+  adSpendTargetPatch,
+  dailyToMonthly,
+  effectiveAdSpendTargets,
+  monthlyToDaily,
+  type AdSpendMode,
+} from '@/lib/huddle/adSpendTargets';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
@@ -96,7 +103,7 @@ export function HuddleScorecardStrip({ clientId }: { clientId: string }) {
     queryKey: ['huddle-raise', clientId],
     queryFn: async () => {
       const [{ data: cs }, { data: offers }, { data: monthly }] = await Promise.all([
-        (supabase as any).from('client_settings').select('total_raise_amount, raise_deadline').eq('client_id', clientId).maybeSingle(),
+        (supabase as any).from('client_settings').select('total_raise_amount, raise_deadline, daily_ad_spend_target, monthly_ad_spend_target').eq('client_id', clientId).maybeSingle(),
         (supabase as any)
           .from('client_offers')
           .select('raise_amount, timeline, is_primary, updated_at')
@@ -114,6 +121,10 @@ export function HuddleScorecardStrip({ clientId }: { clientId: string }) {
         deadline: (cs?.raise_deadline as string | null) ?? null,
         offerTimeline: offerTimeline as string | null,
         fundedToDate,
+        spendTargets: {
+          daily_ad_spend_target: (cs?.daily_ad_spend_target as number | null) ?? null,
+          monthly_ad_spend_target: (cs?.monthly_ad_spend_target as number | null) ?? null,
+        },
       };
     },
     staleTime: 5 * 60 * 1000,
@@ -127,12 +138,37 @@ export function HuddleScorecardStrip({ clientId }: { clientId: string }) {
   const [amountDraft, setAmountDraft] = useState('');
   const [deadlineDraft, setDeadlineDraft] = useState('');
   const [saving, setSaving] = useState(false);
+  const spend = useMemo(() => effectiveAdSpendTargets(raise?.spendTargets, today), [raise?.spendTargets, today]);
+  const [dailyDraft, setDailyDraft] = useState('');
+  const [monthlyDraft, setMonthlyDraft] = useState('');
+  const [spendEdited, setSpendEdited] = useState<AdSpendMode | null>(null);
   useEffect(() => {
     if (editOpen) {
       setAmountDraft(raise?.amount ? String(raise.amount) : '');
       setDeadlineDraft(raise?.deadline ?? '');
+      setDailyDraft(spend.daily ? String(spend.daily) : '');
+      setMonthlyDraft(spend.monthly ? String(spend.monthly) : '');
+      setSpendEdited(null);
     }
-  }, [editOpen, raise]);
+  }, [editOpen, raise, spend]);
+
+  const parseMoney = (s: string) => {
+    const n = parseFloat(s.replace(/[$,\s]/g, ''));
+    return isFinite(n) && n >= 0 ? n : null;
+  };
+  // Typing in one field instantly recalculates the other for this month.
+  const onDailyChange = (s: string) => {
+    setDailyDraft(s);
+    setSpendEdited('daily');
+    const n = parseMoney(s);
+    setMonthlyDraft(s.trim() === '' ? '' : n == null ? monthlyDraft : String(dailyToMonthly(n, today)));
+  };
+  const onMonthlyChange = (s: string) => {
+    setMonthlyDraft(s);
+    setSpendEdited('monthly');
+    const n = parseMoney(s);
+    setDailyDraft(s.trim() === '' ? '' : n == null ? dailyDraft : String(monthlyToDaily(n, today)));
+  };
 
   const save = async () => {
     const parsed = amountDraft.trim() ? parseRaiseAmount(amountDraft) : 0;
@@ -140,22 +176,39 @@ export function HuddleScorecardStrip({ clientId }: { clientId: string }) {
       toast.error('Enter the raise as a number, e.g. 3000000 or 3M');
       return;
     }
+    let spendPatch = {};
+    if (spendEdited) {
+      const raw = spendEdited === 'daily' ? dailyDraft : monthlyDraft;
+      const n = raw.trim() === '' ? 0 : parseMoney(raw);
+      if (n == null) {
+        toast.error('Enter ad spend as a number, e.g. 1000');
+        return;
+      }
+      spendPatch = adSpendTargetPatch(spendEdited, n);
+    }
     setSaving(true);
     const { error } = await (supabase as any)
       .from('client_settings')
       .upsert(
-        { client_id: clientId, total_raise_amount: parsed ?? 0, raise_deadline: deadlineDraft || null },
+        { client_id: clientId, total_raise_amount: parsed ?? 0, raise_deadline: deadlineDraft || null, ...spendPatch },
         { onConflict: 'client_id' },
       );
     setSaving(false);
     if (error) {
-      toast.error('Could not save raise details');
+      toast.error('Could not save');
       return;
     }
-    toast.success('Raise details saved');
+    toast.success('Saved');
     setEditOpen(false);
     qc.invalidateQueries({ queryKey: ['huddle-raise', clientId] });
+    qc.invalidateQueries({ queryKey: ['client-settings', clientId] });
+    qc.invalidateQueries({ queryKey: ['all-client-settings'] });
+    qc.invalidateQueries({ queryKey: ['all-client-mrr'] });
   };
+
+  // Month-to-date spend vs monthly target (pace)
+  const mtdSpend = useMemo(() => summarize(rows, scorecardWindows('monthly', today).current).ad_spend, [rows, today]);
+  const expectedByToday = spend.daily ? spend.daily * today.getDate() : 0;
 
   const daysLeft = useMemo(() => {
     if (!raise?.deadline) return null;
@@ -205,6 +258,40 @@ export function HuddleScorecardStrip({ clientId }: { clientId: string }) {
           </div>
         </div>
 
+        <button
+          type="button"
+          onClick={() => setEditOpen(true)}
+          className="flex items-center gap-3 min-w-[260px] text-left rounded-lg -m-1 p-1 hover:bg-muted/50 transition-colors"
+        >
+          <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
+            <Wallet className="w-4 h-4 text-muted-foreground" />
+          </div>
+          <div className="flex gap-6">
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Daily Ad Spend</div>
+              <div className={`text-lg font-semibold tabular-nums ${spend.daily ? '' : 'text-muted-foreground'}`}>
+                {spend.daily ? money(spend.daily) : 'Not set'}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Monthly Ad Spend</div>
+              <div className={`text-lg font-semibold tabular-nums ${spend.monthly ? '' : 'text-muted-foreground'}`}>
+                {spend.monthly ? money(spend.monthly) : 'Not set'}
+              </div>
+              {spend.monthly > 0 && mtdSpend != null && (
+                <div className="text-[11px] text-muted-foreground tabular-nums">
+                  {money(mtdSpend)} spent MTD
+                  {expectedByToday > 0 && (
+                    <span className={mtdSpend < expectedByToday * 0.9 ? 'text-destructive' : mtdSpend > expectedByToday * 1.1 ? 'text-warning' : 'text-success'}>
+                      {' '}· {((mtdSpend / expectedByToday) * 100).toFixed(0)}% of pace
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </button>
+
         {progress != null && (
           <div className="flex-1 min-w-[220px] max-w-[360px] space-y-1.5">
             <div className="flex justify-between text-[11px] text-muted-foreground">
@@ -218,10 +305,26 @@ export function HuddleScorecardStrip({ clientId }: { clientId: string }) {
         <Popover open={editOpen} onOpenChange={setEditOpen}>
           <PopoverTrigger asChild>
             <Button size="sm" variant="ghost" className="ml-auto">
-              <Pencil className="w-3.5 h-3.5 mr-1" /> Edit raise
+              <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
             </Button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-72 space-y-3">
+          <PopoverContent align="end" className="w-80 space-y-3">
+            <div className="space-y-1.5">
+              <Label>Ad spend</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <span className="text-[11px] text-muted-foreground">Daily</span>
+                  <Input inputMode="decimal" placeholder="e.g. 1000" value={dailyDraft} onChange={(e) => onDailyChange(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[11px] text-muted-foreground">Monthly</span>
+                  <Input inputMode="decimal" placeholder="e.g. 30000" value={monthlyDraft} onChange={(e) => onMonthlyChange(e.target.value)} />
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Edit either one — the other updates automatically ({new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()} days this month).
+              </p>
+            </div>
             <div className="space-y-1.5">
               <Label htmlFor="raise-amount">Size of raise</Label>
               <Input id="raise-amount" placeholder="e.g. 3000000 or 3M" value={amountDraft} onChange={(e) => setAmountDraft(e.target.value)} />
