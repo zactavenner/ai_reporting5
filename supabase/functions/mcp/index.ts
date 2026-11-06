@@ -574,6 +574,67 @@ var post_team_message_default = defineTool22({
   }
 });
 
+// src/lib/mcp/tools/get-client-report.ts
+import { defineTool as defineTool23 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z22 } from "npm:zod@^4.4.3";
+var YMD = /^\d{4}-\d{2}-\d{2}$/;
+var get_client_report_default = defineTool23({
+  name: "get_client_report",
+  title: "Get client report facts",
+  description: "For a linked external agent: verified, PII-free report facts for one active client and date range (spend, verified leads, CPL, booked, shows, commitments, funded, daily rows, creatives, system flags) plus existing review notes. null means unavailable, never zero. Read this before posting a review.",
+  inputSchema: {
+    client_id: z22.string().uuid().regex(UUID),
+    from: z22.string().regex(YMD).describe("Start date yyyy-mm-dd (client timezone)"),
+    to: z22.string().regex(YMD).describe("End date yyyy-mm-dd, inclusive")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ client_id, from, to }, ctx) => {
+    if (!ctx.isAuthenticated()) return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    const resp = await fetch(`${process.env.SUPABASE_URL}/functions/v1/client-report-review`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${ctx.getToken()}`, apikey: process.env.SUPABASE_PUBLISHABLE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "facts", client_id, from, to })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) return { content: [{ type: "text", text: data?.error || `Failed (${resp.status})` }], isError: true };
+    return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }], structuredContent: data };
+  }
+});
+
+// src/lib/mcp/tools/post-report-review.ts
+import { defineTool as defineTool24 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z23 } from "npm:zod@^4.4.3";
+var YMD2 = /^\d{4}-\d{2}-\d{2}$/;
+var post_report_review_default = defineTool24({
+  name: "post_report_review",
+  title: "Post report review",
+  description: "For a linked external agent: post a review of a client's report for a date range, shown under 'What needs attention'. Base every item on numbers from get_client_report. This adds notes only \u2014 it never changes source data.",
+  inputSchema: {
+    client_id: z23.string().uuid().regex(UUID),
+    from: z23.string().regex(YMD2),
+    to: z23.string().regex(YMD2),
+    summary: z23.string().max(4e3).optional(),
+    items: z23.array(z23.object({
+      tone: z23.enum(["alert", "watch", "good"]),
+      title: z23.string().min(1).max(200),
+      detail: z23.string().max(1e3).default("")
+    })).min(1).max(12)
+  },
+  annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async ({ client_id, from, to, summary, items }, ctx) => {
+    if (!ctx.isAuthenticated()) return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    const { data, error } = await sb5(ctx).rpc("mcp_agent_post_report_review", {
+      p_client_id: client_id,
+      p_from: from,
+      p_to: to,
+      p_summary: summary ?? null,
+      p_items: items
+    });
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    return { content: [{ type: "text", text: `Review posted (${data})` }], structuredContent: { review_id: data } };
+  }
+});
+
 // src/lib/mcp/index.ts
 var projectRef = "jgwwmtuvjlmzapwqiabu";
 var mcp_default = defineMcp({
@@ -607,7 +668,9 @@ var mcp_default = defineMcp({
     claim_assignment_default,
     post_task_update_default,
     list_team_messages_default,
-    post_team_message_default
+    post_team_message_default,
+    get_client_report_default,
+    post_report_review_default
   ]
 });
 
