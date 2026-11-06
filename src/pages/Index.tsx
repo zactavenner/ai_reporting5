@@ -171,25 +171,30 @@ const Index = () => {
     data: dailyMetricsData,
     isLoading: metricsLoading,
     isError: metricsError,
-    isRefetching: metricsRefetching,
+    refetch: refetchDailyMetrics,
   } = useAllDailyMetrics(startDate, endDate);
   const {
     data: rpcMetricsData,
     isLoading: sourceMetricsLoading,
     isError: sourceMetricsError,
-    isRefetching: sourceMetricsRefetching,
+    refetch: refetchSourceMetrics,
   } = useClientSourceMetrics(startDate, endDate);
   const dailyMetrics = dailyMetricsData ?? [];
   const rpcMetrics = rpcMetricsData ?? [];
   // A failed refetch leaves stale cached rows behind — treat that as an error too.
   const databaseReadFailed = metricsError || sourceMetricsError;
+  // Pending only while a date range has no answer yet. A background refresh of
+  // the same range keeps showing the last good numbers instead of blanking
+  // every client row to dashes on each window focus / refresh.
   const databaseReadPending =
     metricsLoading ||
     sourceMetricsLoading ||
-    metricsRefetching ||
-    sourceMetricsRefetching ||
     (!metricsError && dailyMetricsData === undefined) ||
     (!sourceMetricsError && rpcMetricsData === undefined);
+  const retryDatabaseRead = useCallback(() => {
+    void refetchDailyMetrics();
+    void refetchSourceMetrics();
+  }, [refetchDailyMetrics, refetchSourceMetrics]);
   
   const clientIds = useMemo(() => clients.map(c => c.id), [clients]);
   const { data: clientThresholds = {} } = useAllClientSettings(clientIds);
@@ -581,6 +586,7 @@ const Index = () => {
                     sheetAvailable={sheetConfiguredCount > 0}
                     databaseAvailable
                     clientNameById={clientNameById}
+                    onRetry={reportingSource === 'database' ? retryDatabaseRead : undefined}
                   />
                 </SectionErrorBoundary>
 
