@@ -10,6 +10,9 @@ import { SetterRollupBar } from '@/components/setter/SetterRollupBar';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatDistanceToNowStrict } from 'date-fns';
+import { ScriptEditor } from '@/components/setter/ScriptEditor';
+import { UnifiedInbox } from '@/components/setter/UnifiedInbox';
+import { useTeamMember } from '@/contexts/TeamMemberContext';
 
 const LS_KEY = 'setter.enabledClientIds.v1';
 
@@ -24,6 +27,9 @@ function readStored(): string[] {
 
 export default function SetterPage() {
   const { data: allClients = [] } = useClients();
+  const { currentMember } = useTeamMember();
+  const [view, setView] = useState<'queue' | 'inbox' | 'scripts'>('queue');
+  const clientNames = useMemo(() => Object.fromEntries((allClients as any[]).map((c) => [c.id, c.name])), [allClients]);
   const activeClients = useMemo(
     () => allClients.filter((c: any) => c.status === 'active').map((c: any) => ({ id: c.id, name: c.name })),
     [allClients]
@@ -179,6 +185,11 @@ export default function SetterPage() {
         <div className="flex items-center gap-2">
           <Zap className="w-5 h-5 text-primary" />
           <h1 className="text-lg font-semibold tracking-tight">Setter</h1>
+          <div className="ml-3 flex rounded-md border p-0.5 text-xs">
+            {([['queue', 'Queue'], ['inbox', 'Inbox'], ['scripts', 'Scripts']] as const).map(([k, l]) => (
+              <button key={k} onClick={() => setView(k)} className={`px-2.5 py-1 rounded ${view === k ? 'bg-muted font-medium' : 'text-muted-foreground'}`}>{l}</button>
+            ))}
+          </div>
           <span className="text-xs text-muted-foreground ml-2">Speed-to-lead · last {win === '1d' ? '24h' : win === '7d' ? '7 days' : '30 days'}</span>
         </div>
         <div className="flex items-center gap-5 ml-auto text-sm">
@@ -241,7 +252,14 @@ export default function SetterPage() {
         <div className="p-3 text-sm text-destructive border-b bg-destructive/5">Error: {error}</div>
       )}
 
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-[360px_1fr] min-h-0">
+      {view === 'scripts' && <div className="flex-1 min-h-0"><ScriptEditor clients={activeClients} /></div>}
+      {view === 'inbox' && (
+        <div className="flex-1 min-h-0">
+          <UnifiedInbox clientIds={rollupClientIds} clientNames={clientNames} memberKey={currentMember?.id || 'anon'}
+            onOpenLead={(id) => { setSelectedId(id); setView('queue'); if (!leads.some((l) => l.id === id)) toast.info('Lead is outside the current queue window/filter'); }} />
+        </div>
+      )}
+      {view === 'queue' && <div className="flex-1 grid grid-cols-1 md:grid-cols-[360px_1fr] min-h-0">
         <aside className="border-r min-h-0">
           {loading ? (
             <div className="p-8 text-center text-sm text-muted-foreground">Loading leads…</div>
@@ -252,7 +270,7 @@ export default function SetterPage() {
         <section className="min-h-0">
           <SetterDetailPanel lead={selected} onChanged={refresh} onAdvance={advanceToNext} />
         </section>
-      </div>
+      </div>}
     </div>
   );
 }
