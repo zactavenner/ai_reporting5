@@ -69,7 +69,7 @@ serve(async (req) => {
           Authorization: `Bearer ${OPENROUTER_API_KEY}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://reporting.highperformanceads.com',
-          'X-Title': 'Jeremy â€” exact model video',
+          'X-Title': 'Jeremy â€- exact model video',
         },
         body: JSON.stringify(providerBody),
       });
@@ -166,7 +166,7 @@ serve(async (req) => {
           Authorization: `Bearer ${OPENROUTER_API_KEY}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://reporting.highperformanceads.com',
-          'X-Title': 'Batch Video â€” Seedance',
+          'X-Title': 'Batch Video â€- Seedance',
         },
         body: JSON.stringify(seedanceBody),
       });
