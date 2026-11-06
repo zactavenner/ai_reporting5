@@ -45,7 +45,7 @@ interface Props {
   kind: "video" | "image";
   clientId: string;
   selectedIds: string[];
-  onSelectionChange: (ids: string[]) => void;
+  onSelectionChange: (ids: string[], rows?: TemplateRow[]) => void;
   /** Cap on simultaneous selection (the pipeline renders one column per pick). */
   maxSelected?: number;
 }
@@ -95,16 +95,19 @@ export function TemplateLibrary({ kind, clientId, selectedIds, onSelectionChange
   const references = rows.filter((r) => r.library === "reference");
   const templates = rows.filter((r) => r.library !== "reference");
 
+  const emit = (ids: string[]) =>
+    onSelectionChange(ids, rows.filter((r) => ids.includes(r.id)));
+
   const toggle = (id: string) => {
     if (selectedIds.includes(id)) {
-      onSelectionChange(selectedIds.filter((x) => x !== id));
+      emit(selectedIds.filter((x) => x !== id));
       return;
     }
     if (selectedIds.length >= maxSelected) {
       toast.info(`Pick up to ${maxSelected} at a time — one column each`);
       return;
     }
-    onSelectionChange([...selectedIds, id]);
+    emit([...selectedIds, id]);
   };
 
   const upload = async (files: FileList | null) => {
@@ -181,7 +184,7 @@ export function TemplateLibrary({ kind, clientId, selectedIds, onSelectionChange
       if (t.storage_path) {
         try { await supabase.storage.from("creatives").remove([t.storage_path]); } catch {}
       }
-      onSelectionChange(selectedIds.filter((x) => x !== t.id));
+      emit(selectedIds.filter((x) => x !== t.id));
       qc.invalidateQueries({ queryKey });
       toast.success("Deleted");
     } catch (e: any) {
