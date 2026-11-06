@@ -29,6 +29,7 @@ function buildConfig(c: any, s: any): ClientReportConfig {
     trackedCalendarIds: s?.tracked_calendar_ids || [],
     raiseGoal: s?.total_raise_amount ? Number(s.total_raise_amount) : null,
     raiseDeadline: s?.raise_deadline || null,
+    crmConnected: !!(c.last_ghl_sync_at || c.last_hubspot_sync_at),
   };
 }
 
@@ -37,9 +38,9 @@ export function useWeeklyReportRoster() {
   return useQuery<RosterEntry[]>({
     queryKey: ['weekly-report-roster'],
     queryFn: async () => {
-      // Presence-only columns: no credential values are read into the browser.
+      // IDs and sync-health columns only — no key/token columns are ever selected here.
       const { data: clients, error } = await sb.from('clients')
-        .select('id,name,status,industry,meta_ad_account_id,meta_ad_account_ids,meta_token_type,ghl_location_id,ghl_sync_status,last_ghl_sync_at,hubspot_portal_id,last_hubspot_sync_at')
+        .select('id,name,status,industry,meta_ad_account_id,meta_ad_account_ids,consecutive_meta_failures,consecutive_ghl_failures,ghl_location_id,last_ghl_sync_at,hubspot_portal_id,last_hubspot_sync_at')
         .eq('status', 'active').order('name');
       if (error) throw error;
       const ids = (clients || []).map((c: any) => c.id);
@@ -59,9 +60,9 @@ export function useWeeklyReportRoster() {
         const approved = (recips || []).filter((r: any) => r.client_id === c.id && (r.cadences || []).includes('weekly') && (r.channels || []).includes('email')).length;
         const checks = readiness({
           hasMetaAccount: !!(c.meta_ad_account_id || c.meta_ad_account_ids?.length),
-          hasMetaToken: !!c.meta_token_type,
+          spendSyncOk: (c.consecutive_meta_failures || 0) > 0 ? false : lastSpend.has(c.id) ? true : null,
           hasGhlLocation: !!c.ghl_location_id || !!c.hubspot_portal_id,
-          hasCrmCredential: !!c.ghl_sync_status || !!c.hubspot_portal_id,
+          crmSyncOk: (c.consecutive_ghl_failures || 0) > 0 ? false : (c.last_ghl_sync_at || c.last_hubspot_sync_at) ? true : null,
           timezoneConfigured: config.timezoneConfigured,
           trackedCalendars: config.trackedCalendarIds.length,
           isCapital: config.isCapital,
@@ -81,7 +82,7 @@ export function useWeeklyReportRoster() {
 export interface WeeklyClientReport {
   clientName: string; config: ClientReportConfig;
   weeks: WeekMetrics[]; // newest first: [current, prior, ...]
-  creatives: ReturnType<typeof topCreatives>; creativesSyncedAt: string | null;
+  creatives: ReturnType<typeof topCreatives>; creativeDays: number;
   raise: { goal: number | null; fundedToDate: number | null; committedToDate: number | null; deadline: string | null };
   quality: { total: number; spam: number; missingContact: number; duplicates: number; verified: number };
   exceptions: string[]; // internal only — never printed in client copy
@@ -98,14 +99,18 @@ export function useWeeklyClientReport(entry: RosterEntry | null) {
       const fromTs = new Date(Date.parse(from) - 2 * 86400000).toISOString();
       const toTs = new Date(Date.parse(to) + 2 * 86400000).toISOString();
       const [leads, calls, spend, form, funded, ads] = await Promise.all([
-        sb.from('leads').select('id,client_id,created_at,email,phone,is_spam,status,current_disposition,opportunity_value,pipeline_value').eq('client_id', id).gte('created_at', fromTs).lte('created_at', toTs).limit(5000),
+        sb.from('leads').select('id,client_id,name,created_at,email,phone,is_spam,status,current_disposition,opportunity_value,pipeline_value').eq('client_id', id).gte('created_at', fromTs).lte('created_at', toTs).limit(5000),
         sb.from('calls').select('id,client_id,lead_id,scheduled_at,booked_at,showed,appointment_status,ghl_appointment_id,ghl_calendar_id,is_reconnect').eq('client_id', id).or(`booked_at.gte.${fromTs},scheduled_at.gte.${fromTs}`).limit(5000),
         sb.from('daily_metrics').select('client_id,date,ad_spend').eq('client_id', id).gte('date', from).lte('date', to),
         sb.from('ad_spend_daily').select('client_id,date,leads').eq('client_id', id).gte('date', from).lte('date', to),
-        sb.from('funded_investors').select('client_id,commitment_amount,funded_amount,funded_at,is_verified_funded').eq('client_id', id).limit(5000),
-        sb.from('meta_ads').select('client_id,meta_ad_id,name,thumbnail_url,image_url,spend,attributed_leads,attributed_calls,attributed_funded,synced_at').eq('client_id', id).gt('spend', 0).order('spend', { ascending: false }).limit(20),
+        sb.from('funded_investors').select('client_id,commitment_amount,committed_at,funded_amount,funded_at,is_verified_funded').eq('client_id', id).limit(5000),
+        sb.from('meta_ad_daily_insights').select('client_id,date,meta_ad_id,spend,leads').eq('client_id', id).gte('date', weeks[0].from).lte('date', weeks[0].to).limit(10000),
       ]);
       for (const r of [leads, calls, spend, form, funded, ads]) if (r.error) throw r.error;
+      const adIds = [...new Set((ads.data || []).map((a: any) => a.meta_ad_id))].slice(0, 500);
+      const meta = adIds.length ? await sb.from('meta_ads').select('client_id,meta_ad_id,name,thumbnail_url,image_url').eq('client_id', id).in('meta_ad_id', adIds) : { data: [] };
+      if ((meta as any).error) throw (meta as any).error;
+      const adDays = new Set((ads.data || []).map((a: any) => a.date)).size;
       const data = { leads: leads.data || [], calls: calls.data || [], spend: spend.data || [], formLeads: form.data || [], funded: funded.data || [] };
       const metrics = weeks.map((w) => computeWeek(cfg, w, data));
       const exceptions: string[] = [];
@@ -113,6 +118,8 @@ export function useWeeklyClientReport(entry: RosterEntry | null) {
       if (cur.spendDaysCovered < 7) exceptions.push(`Spend covers ${cur.spendDaysCovered}/7 days`);
       if (cur.metaFormLeads.value != null && cur.verifiedLeads.value != null && Math.abs(cur.metaFormLeads.value - cur.verifiedLeads.value) > Math.max(3, cur.metaFormLeads.value * 0.2))
         exceptions.push(`Meta form leads (${cur.metaFormLeads.value}) differ from verified CRM leads (${cur.verifiedLeads.value})`);
+      if (!cfg.crmConnected) exceptions.push('CRM never synced — CRM metrics unavailable');
+      if (adDays < 7) exceptions.push(`Per-ad insights cover ${adDays}/7 days`);
       if (cur.shows.value == null) exceptions.push('Shows unavailable — configure tracked calendars');
       for (const c of entry!.checks) if (c.level !== 'ok') exceptions.push(`${c.label}: ${c.detail}`);
 
@@ -124,8 +131,8 @@ export function useWeeklyClientReport(entry: RosterEntry | null) {
       const wk = curLeads.filter(inWeek);
       return {
         clientName: entry!.name, config: cfg, weeks: metrics,
-        creatives: topCreatives(ads.data || [], id, 6),
-        creativesSyncedAt: ads.data?.[0]?.synced_at || null,
+        creatives: topCreatives(ads.data || [], (meta as any).data || [], id, weeks[0], 6),
+        creativeDays: adDays,
         raise: { goal: cfg.raiseGoal, fundedToDate, committedToDate, deadline: cfg.raiseDeadline },
         quality: {
           total: wk.length,
