@@ -68,19 +68,69 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
   const clientId = selected?.id || "";
 
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
+  const [selectedRows, setSelectedRows] = useState<TemplateRow[]>([]);
   const [view, setView] = useState<"create" | "top" | "templates">("create");
+
+  const handleSelectionChange = (ids: string[], rows?: TemplateRow[]) => {
+    setSelectedTemplates(ids);
+    if (rows) setSelectedRows(rows);
+  };
 
   const handleClientChange = (id: string) => {
     setSelectedClientId(id);
     localStorage.setItem(storageKey, id);
   };
 
-  // Latest offer = the offer summary shown under the client name.
+  // Latest offer = the offer summary shown under the client name. Editable
+  // inline; saving writes back to the client's offer record.
   const { data: offers = [] } = useClientOffers(clientId);
   const primaryOffer = offers[0] || null;
   const offerSummary = primaryOffer
     ? [primaryOffer.title, primaryOffer.description].filter(Boolean).join(" — ")
     : "";
+
+  const createOffer = useCreateOffer();
+  const updateOffer = useUpdateOffer();
+  const [editingOffer, setEditingOffer] = useState(false);
+  const [offerTitle, setOfferTitle] = useState("");
+  const [offerDesc, setOfferDesc] = useState("");
+  const [savingOffer, setSavingOffer] = useState(false);
+
+  const startOfferEdit = () => {
+    setOfferTitle(primaryOffer?.title || "");
+    setOfferDesc(primaryOffer?.description || "");
+    setEditingOffer(true);
+  };
+
+  const saveOffer = async () => {
+    if (!offerTitle.trim()) {
+      toast.error("The offer needs a title");
+      return;
+    }
+    setSavingOffer(true);
+    try {
+      if (primaryOffer) {
+        await updateOffer.mutateAsync({
+          id: primaryOffer.id,
+          clientId,
+          updates: { title: offerTitle.trim(), description: offerDesc.trim() },
+        });
+      } else {
+        await createOffer.mutateAsync({
+          client_id: clientId,
+          title: offerTitle.trim(),
+          description: offerDesc.trim(),
+          offer_type: "lead_gen",
+        } as any);
+      }
+      setEditingOffer(false);
+      toast.success("Offer saved to the client");
+    } catch {
+      // the hooks toast the specific error
+    } finally {
+      setSavingOffer(false);
+    }
+  };
 
   // Top performing creatives under $100 CPL, last 7 days, matching media type.
   const sevenDaysAgo = subDays(new Date(), 7).toISOString();
