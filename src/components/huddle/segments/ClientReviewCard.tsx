@@ -7,9 +7,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { embedSheetUrl } from '@/lib/huddle/sheet';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import type { Client } from '@/hooks/useClients';
-import { ClientConnectionsSection } from '@/components/connections/ClientConnectionsSection';
 import { HuddleScorecardStrip } from './HuddleScorecardStrip';
-import { HuddleDocsSection } from './HuddleDocsSection';
+import { HuddleConnectionsChecklist } from './HuddleConnectionsChecklist';
 
 
 const CreativesSection = lazy(() =>
@@ -155,9 +154,6 @@ export function ClientReviewCard({ client }: { client: Client }) {
       {/* Top scorecard: Daily / Monthly numbers + size of raise & deadline */}
       <HuddleScorecardStrip clientId={client.id} />
 
-      {/* Google Sheet & Docs — turns red when a required link is missing */}
-      <HuddleDocsSection clientId={client.id} onSheetChange={(url) => url && setSheetUrl(url)} />
-
       {/* Quick links — one-click hops to the external tools we reference during huddle */}
       {quickLinks.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
@@ -176,11 +172,11 @@ export function ClientReviewCard({ client }: { client: Client }) {
         </div>
       )}
 
-      {/* Connections & Settings — same records/components as the client Settings tab */}
-      <ClientConnectionsSection
-        clientId={client.id}
-        source="huddle"
-        client={{
+      {/* Connections, Offer & Files — one checklist: sheet, doc, offer, Meta, CRM, pipeline, files */}
+      <HuddleConnectionsChecklist
+        client={client}
+        onSheetChange={(url) => url && setSheetUrl(url)}
+        info={{
           name: client.name,
           description: c.description ?? null,
           offer_description: c.offer_description ?? null,
