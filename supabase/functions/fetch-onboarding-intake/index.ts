@@ -195,7 +195,18 @@ Deno.serve(async (req) => {
     });
     if (!resp.ok) {
       const txt = await resp.text();
-      throw new Error(`Sheets API ${resp.status}: ${txt}`);
+      // Rate limits and upstream outages are expected states, not crashes:
+      // answer 200 with a reason so the panel shows a retry hint instead of failing.
+      if (resp.status === 429 || resp.status >= 500) {
+        console.warn('Sheets fallback unavailable', resp.status, txt.slice(0, 200));
+        return new Response(JSON.stringify({
+          matched: false,
+          reason: resp.status === 429 ? 'rate_limited' : 'sheet_unavailable',
+          retry_after_seconds: resp.status === 429 ? 60 : 30,
+          client_name: nameToMatch,
+        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      throw new Error(`Sheets API ${resp.status}: ${txt.slice(0, 300)}`);
     }
     const data = await resp.json();
     const values: string[][] = data.values || [];

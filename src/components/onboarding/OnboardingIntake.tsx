@@ -19,6 +19,7 @@ interface IntakeResponse {
   source?: string;
   fetched_at?: string;
   reason?: string;
+  retry_after_seconds?: number;
 }
 
 const GROUP_ORDER = ['Company', 'Offer & Strategy', 'Operations & Access', 'Budget', 'Other'];
@@ -58,6 +59,7 @@ export function OnboardingIntake({ clientId, isPublicView }: Props) {
       return data as IntakeResponse;
     },
     staleTime: 5 * 60 * 1000,
+    retry: 1,
     enabled: !!clientId,
   });
 
@@ -104,6 +106,24 @@ export function OnboardingIntake({ clientId, isPublicView }: Props) {
       <Card className="p-6 rounded-2xl border-destructive/40 bg-destructive/5">
         <p className="text-sm text-destructive font-medium">Could not load onboarding intake</p>
         <p className="text-xs text-muted-foreground mt-1">{(error as any)?.message}</p>
+      </Card>
+    );
+  }
+
+  if (data && (data.reason === 'rate_limited' || data.reason === 'sheet_unavailable')) {
+    return (
+      <Card className="p-6 rounded-2xl border-dashed">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium">Onboarding sheet is busy</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Google Sheets asked us to slow down. Try again in about {data.retry_after_seconds ?? 60} seconds.
+            </p>
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`h-3 w-3 ${isFetching ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </Card>
     );
   }
