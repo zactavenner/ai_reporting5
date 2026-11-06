@@ -6,8 +6,8 @@
  */
 import {
   completedWeeks, computeWeek, readiness, topCreatives, liveDeliveryGate, localDate, verifiedLeads, assertIsolated,
-  WEEKLY_REPORT_DISPATCH_ARMED,
-  type ClientReportConfig, type ReadinessCheck, type WeekMetrics,
+  WEEKLY_REPORT_DISPATCH_ARMED, rangeDays, priorRange, dailyRows, capitalEvents, inRange,
+  type ClientReportConfig, type ReadinessCheck, type WeekMetrics, type WeekRange, type DayRow, type CapitalEvent, type Metric,
 } from './core.ts';
 
 export const DEFAULT_TZ = 'America/Los_Angeles';
@@ -143,9 +143,110 @@ export function buildReportModel(entry: RosterEntry, rows: ReportRows, now = new
 
 /** Reads all rows for one client, every query scoped by client_id. */
 export async function loadReportRows(sb: any, entry: RosterEntry, now = new Date()): Promise<ReportRows> {
-  const id = entry.id;
   const weeks = completedWeeks(now, entry.config.timezone, 4);
-  const from = weeks[3].from, to = weeks[0].to;
+  return loadRowsBetween(sb, entry, weeks[3].from, weeks[0].to, weeks[0]);
+}
+
+/** Rows for any custom range plus its prior equal-length period. */
+export async function loadRangeRows(sb: any, entry: RosterEntry, range: WeekRange): Promise<ReportRows> {
+  return loadRowsBetween(sb, entry, priorRange(range).from, range.to, range);
+}
+
+// ---------------------------------------------------------------------------
+// Custom-range client report (Analytics → Reporting)
+
+export type AttentionTone = 'alert' | 'watch' | 'good';
+export interface AttentionItem { tone: AttentionTone; title: string; detail: string; source: 'system' | 'ai' | 'agent' | 'human'; author?: string }
+
+export interface RangeReport {
+  clientId: string; clientName: string; config: ClientReportConfig;
+  range: WeekRange; prior: WeekRange; days: number;
+  cur: WeekMetrics; prev: WeekMetrics; daily: DayRow[];
+  raise: { goal: number | null; fundedToDate: number | null; fundedInvestors: number | null; remaining: number | null; deadline: string | null; verbalAmount: number | null; verbalCount: number | null };
+  activity: CapitalEvent[];
+  creatives: ReturnType<typeof topCreatives>; creativeDays: number;
+  attention: AttentionItem[];
+  sources: string[];
+}
+
+const pct = (v: number) => `${Math.abs(Math.round(v * 100))}%`;
+
+/** Rule-based attention items computed from the same verified numbers the report shows. */
+export function systemAttention(entry: RosterEntry, r: Omit<RangeReport, 'attention'>): AttentionItem[] {
+  const out: AttentionItem[] = [];
+  const add = (tone: AttentionTone, title: string, detail: string) => out.push({ tone, title, detail, source: 'system' });
+  const check = (k: string) => entry.checks.find((c) => c.key === k);
+  const { cur, prev, days } = r;
+  if (check('meta')?.level === 'block') add('alert', 'No ad account linked', 'Spend, CPL and creative results can’t be reported until an ad account is linked.');
+  else if (check('metaToken')?.level === 'block') add('alert', 'Ad account access failing', 'The last spend sync failed. Spend, CPL and creative performance are unverified for this period.');
+  if (cur.spend.value == null) add('alert', 'No spend data for this period', 'Spend is shown as N/A rather than $0.');
+  else if (cur.spend.partial) add('watch', `Spend covers ${cur.spendDaysCovered}/${days} days`, 'Totals and cost metrics are partial for the selected period.');
+  if (!r.config.crmConnected) add('alert', 'CRM not syncing', 'Leads, booked calls, shows and funding are unavailable until the CRM syncs.');
+  else if (check('crm')?.level === 'block') add('alert', 'CRM sync reporting errors', 'CRM-based figures may be incomplete.');
+  if (cur.shows.value == null && r.config.crmConnected) add('watch', 'Show tracking off', 'Pick the tracked calendars in client settings to report shows and cost per show.');
+  if (cur.metaFormLeads.value != null && cur.verifiedLeads.value != null && Math.abs(cur.metaFormLeads.value - cur.verifiedLeads.value) > Math.max(3, cur.metaFormLeads.value * 0.2))
+    add('watch', 'Meta leads don’t match CRM', `Meta reported ${cur.metaFormLeads.value} form leads; ${cur.verifiedLeads.value} verified leads reached the CRM.`);
+  if ((cur.spend.value || 0) > 0 && cur.verifiedLeads.value === 0) add('alert', 'Spend with zero verified leads', 'Check the form → CRM connection and lead routing.');
+  const full = (m: Metric) => m.value != null && !m.partial;
+  if (full(cur.cpl) && full(prev.cpl) && prev.cpl.value! > 0) {
+    const ch = (cur.cpl.value! - prev.cpl.value!) / prev.cpl.value!;
+    if (ch <= -0.15) add('good', `Cost per lead down ${pct(ch)}`, `$${cur.cpl.value!.toFixed(2)} vs $${prev.cpl.value!.toFixed(2)} the prior period.`);
+    else if (ch >= 0.25) add('watch', `Cost per lead up ${pct(ch)}`, `$${cur.cpl.value!.toFixed(2)} vs $${prev.cpl.value!.toFixed(2)} the prior period.`);
+  }
+  if ((cur.verifiedLeads.value || 0) >= 10 && cur.bookedCalls.value != null && cur.bookedCalls.value / cur.verifiedLeads.value! < 0.1)
+    add('watch', 'Low booking rate', `${cur.bookedCalls.value} booked from ${cur.verifiedLeads.value} verified leads.`);
+  if (r.creativeDays > 0 && r.creativeDays < days) add('watch', `Per-ad data covers ${r.creativeDays}/${days} days`, 'Creative results are partial.');
+  if (!out.some((o) => o.tone !== 'good')) add('good', 'All sources reporting', 'Spend and CRM data are complete for the selected period.');
+  return out;
+}
+
+export function buildRangeReport(entry: RosterEntry, rows: ReportRows, range: WeekRange, now = new Date()): RangeReport {
+  const cfg = entry.config; const id = entry.id;
+  assertIsolated(id, rows.leads, rows.calls, rows.spend, rows.formLeads, rows.funded, rows.adDaily, rows.adMeta);
+  const prior = priorRange(range);
+  const data = { leads: rows.leads, calls: rows.calls, spend: rows.spend, formLeads: rows.formLeads, funded: rows.funded };
+  const cur = computeWeek(cfg, range, data, now), prev = computeWeek(cfg, prior, data, now);
+  const daily = dailyRows(cfg, range, data, now);
+  const creativeDays = new Set(rows.adDaily.filter((a) => inRange(a.date, range)).map((a) => a.date)).size;
+  const verified = rows.funded.filter((f) => f.is_verified_funded && Number(f.funded_amount || 0) > 0);
+  const verbal = rows.funded.filter((f) => Number(f.commitment_amount || 0) > 0 && !(f.is_verified_funded && Number(f.funded_amount || 0) > 0));
+  const capOk = cfg.isCapital && cfg.crmConnected;
+  const fundedToDate = capOk ? verified.reduce((a, f) => a + Number(f.funded_amount), 0) : null;
+  const base: Omit<RangeReport, 'attention'> = {
+    clientId: id, clientName: entry.name, config: cfg, range, prior, days: rangeDays(range), cur, prev, daily,
+    raise: {
+      goal: cfg.raiseGoal, fundedToDate, fundedInvestors: capOk ? verified.length : null,
+      remaining: cfg.raiseGoal != null && fundedToDate != null ? Math.max(0, cfg.raiseGoal - fundedToDate) : null,
+      deadline: cfg.raiseDeadline,
+      verbalAmount: capOk ? verbal.reduce((a, f) => a + Number(f.commitment_amount), 0) : null,
+      verbalCount: capOk ? verbal.length : null,
+    },
+    activity: capitalEvents(cfg, rows.funded, range),
+    creatives: topCreatives(rows.adDaily, rows.adMeta, id, range, 6),
+    creativeDays,
+    sources: [entry.checks.find((c) => c.key === 'meta')?.level === 'ok' ? 'Meta Ads' : null, cfg.crmConnected ? 'CRM pipeline' : null].filter(Boolean) as string[],
+  };
+  return { ...base, attention: systemAttention(entry, base) };
+}
+
+/** Compact, PII-free facts for AI and external-agent review (no names, emails or phones). */
+export function reportFacts(r: RangeReport) {
+  const m = (x: Metric) => (x.value == null ? { value: null, note: x.note } : { value: Math.round(x.value * 100) / 100, partial: !!x.partial });
+  const pick = (w: WeekMetrics) => ({ spend: m(w.spend), verified_leads: m(w.verifiedLeads), meta_form_leads: m(w.metaFormLeads), cpl: m(w.cpl), booked: m(w.bookedCalls), cpbc: m(w.cpbc), shows: m(w.shows), cost_per_show: m(w.costPerShow), committed: m(w.committed), funded: m(w.funded) });
+  return {
+    client: r.clientName, is_capital: r.config.isCapital, timezone: r.config.timezone,
+    period: r.range, prior_period: r.prior, current: pick(r.cur), prior: pick(r.prev),
+    daily: r.daily, raise: r.raise,
+    capital_activity: r.activity.map((a) => ({ kind: a.kind, date: a.date, amount: a.amount })),
+    creatives: r.creatives.map((c) => ({ name: c.name, spend: c.spend, leads: c.leads, cpl: c.cpl })),
+    creative_days_covered: r.creativeDays,
+    system_flags: r.attention.map(({ tone, title, detail }) => ({ tone, title, detail })),
+  };
+}
+
+async function loadRowsBetween(sb: any, entry: RosterEntry, from: string, to: string, adRange: WeekRange): Promise<ReportRows> {
+  const id = entry.id;
+  const weeks = [adRange];
   const fromTs = new Date(Date.parse(from) - 2 * 86400000).toISOString();
   const toTs = new Date(Date.parse(to) + 2 * 86400000).toISOString();
   const [leads, calls, spend, form, funded, ads] = await Promise.all([
@@ -153,7 +254,7 @@ export async function loadReportRows(sb: any, entry: RosterEntry, now = new Date
     sb.from('calls').select('id,client_id,lead_id,scheduled_at,booked_at,showed,appointment_status,ghl_appointment_id,ghl_calendar_id,is_reconnect').eq('client_id', id).or(`booked_at.gte.${fromTs},scheduled_at.gte.${fromTs}`).limit(5000),
     sb.from('daily_metrics').select('client_id,date,ad_spend').eq('client_id', id).gte('date', from).lte('date', to),
     sb.from('ad_spend_daily').select('client_id,date,leads').eq('client_id', id).gte('date', from).lte('date', to),
-    sb.from('funded_investors').select('client_id,commitment_amount,committed_at,funded_amount,funded_at,is_verified_funded').eq('client_id', id).limit(5000),
+    sb.from('funded_investors').select('client_id,name,commitment_amount,committed_at,funded_amount,funded_at,is_verified_funded').eq('client_id', id).limit(5000),
     sb.from('meta_ad_daily_insights').select('client_id,date,meta_ad_id,spend,leads').eq('client_id', id).gte('date', weeks[0].from).lte('date', weeks[0].to).limit(10000),
   ]);
   for (const r of [leads, calls, spend, form, funded, ads]) if (r.error) throw r.error;
