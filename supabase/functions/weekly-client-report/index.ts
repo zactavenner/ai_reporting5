@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   const sb = admin();
   const op = await requireOperator(req, sb, body);
-  if ('error' in op) return op.error;
+  if (!('auth' in op) || !op.auth) return (op as { error: Response }).error;
   const action = body?.action;
   const clientId = body?.client_id;
   if (clientId !== undefined && clientId !== null && (typeof clientId !== 'string' || !UUID.test(clientId))) return json({ error: 'invalid client_id' }, 400);

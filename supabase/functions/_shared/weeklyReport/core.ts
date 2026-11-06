@@ -237,7 +237,7 @@ export function liveDeliveryGate(checks: ReadinessCheck[], armed: boolean): { al
  * WEEKLY_REPORT_DELIVERY_ARMED=true, the staged ledger (supabase/staged/) applied and the
  * private PDF bucket created — see supabase/staged/README.md. Keep false until reviewed.
  */
-export const WEEKLY_REPORT_DISPATCH_ARMED = false;
+export const WEEKLY_REPORT_DISPATCH_ARMED: boolean = false;
 
 /** Idempotency key for a future send — one per client/week/recipient/channel. */
 export const sendKey = (clientId: string, weekFrom: string, recipientId: string, channel: string) => `weekly-pdf:${clientId}:${weekFrom}:${recipientId}:${channel}`;
