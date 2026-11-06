@@ -71,6 +71,13 @@
       "when": 1793982418512,
       "tag": "0009_setter_memory_inbox_calls",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793982429557,
+      "tag": "0010_setter_calls_hide_token",
+      "breakpoints": true
     }
   ]
 }
