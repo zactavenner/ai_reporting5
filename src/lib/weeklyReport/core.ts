@@ -232,6 +232,12 @@ export function liveDeliveryGate(checks: ReadinessCheck[], armed: boolean): { al
   return { allowed: reasons.length === 0, reasons };
 }
 
+/**
+ * DELIVERY GAP (left disabled): the existing `dispatch-client-reports` pipeline sends server-rendered
+ * HTML from `generate-client-report`; it has no PDF renderer and does not use these metrics. Arming
+ * weekly PDF delivery needs a server-side renderer reusing this core, a send ledger keyed by `sendKey`,
+ * and a reviewed schedule. Until then this stays false and the UI is preview/print only.
+ */
 export const WEEKLY_REPORT_DISPATCH_ARMED = false;
 
 /** Idempotency key for a future send — one per client/week/recipient/channel. */
