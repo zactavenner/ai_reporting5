@@ -206,7 +206,31 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
                     <Badge variant="outline" className="text-[10px] capitalize">{(selected as any).industry}</Badge>
                   )}
                 </div>
-                {primaryOffer ? (
+                {editingOffer ? (
+                  <div className="mt-2 space-y-1.5 max-w-lg">
+                    <Input
+                      value={offerTitle}
+                      onChange={(e) => setOfferTitle(e.target.value)}
+                      placeholder="Offer title"
+                      className="h-8 text-xs rounded-lg"
+                    />
+                    <Textarea
+                      value={offerDesc}
+                      onChange={(e) => setOfferDesc(e.target.value)}
+                      placeholder="Offer description — audience, terms, proof…"
+                      className="min-h-[56px] text-xs rounded-lg"
+                    />
+                    <div className="flex gap-1.5">
+                      <Button size="sm" className="h-7 text-[11px]" onClick={saveOffer} disabled={savingOffer}>
+                        {savingOffer ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+                        Save to client
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => setEditingOffer(false)}>
+                        <X className="h-3 w-3 mr-1" /> Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : primaryOffer ? (
                   <div className="mt-2 flex items-start gap-2">
                     <FileText className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
                     <div className="min-w-0">
@@ -216,11 +240,19 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
                       )}
                       <Badge variant="outline" className="text-[9px] mt-1 capitalize">{primaryOffer.offer_type}</Badge>
                     </div>
+                    <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={startOfferEdit} title="Edit offer">
+                      <Pencil className="h-3 w-3" />
+                    </Button>
                   </div>
                 ) : (
-                  <p className="text-[11px] text-muted-foreground mt-2">
-                    No offer saved for this client yet — add one in the Huddle connections panel.
-                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <p className="text-[11px] text-muted-foreground">
+                      No offer saved for this client yet.
+                    </p>
+                    <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={startOfferEdit}>
+                      <Pencil className="h-3 w-3 mr-1" /> Add offer
+                    </Button>
+                  </div>
                 )}
               </div>
 
@@ -239,6 +271,27 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
 
           {view === "create" && (
             <div className="flex flex-col gap-4">
+              {mediaType === "video" && (
+                <VideoPipeline
+                  key={`pipeline-${clientId}`}
+                  clientId={clientId}
+                  clientName={selected.name}
+                  offerTitle={primaryOffer?.title || ""}
+                  offerDescription={primaryOffer?.description || ""}
+                  templates={selectedRows
+                    .filter((r) => selectedTemplates.includes(r.id))
+                    .map((r) => ({
+                      id: r.id,
+                      name: r.name,
+                      url: r.url,
+                      poster_url: r.poster_url,
+                      library: r.library,
+                      view_count: r.view_count,
+                      instructions: r.instructions,
+                    }))}
+                  onRemoveTemplate={(id) => handleSelectionChange(selectedTemplates.filter((x) => x !== id))}
+                />
+              )}
               {mediaType === "static" && (
                 <Card className="p-3 sm:p-4">
                   <StaticGenerator clientId={clientId} clientName={selected.name} offerSummary={offerSummary} />
