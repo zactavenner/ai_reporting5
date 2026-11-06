@@ -18,6 +18,7 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   "openai/gpt-5-mini": { id: "openai/gpt-5-mini", label: "GPT-5 Mini", provider: "OpenAI", contextTokens: 200_000, capability: "chat" },
   "google/gemini-2.5-pro": { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "Google", contextTokens: 2_000_000, capability: "chat" },
   "anthropic/claude-3.7-sonnet": { id: "anthropic/claude-3.7-sonnet", label: "Claude 3.7 Sonnet", provider: "Anthropic", contextTokens: 200_000, capability: "chat" },
+  "openai/gpt-image-2.6": { id: "openai/gpt-image-2.6", label: "GPT Image 2.6", provider: "OpenAI", contextTokens: 0, capability: "image" },
   "openai/gpt-image-2": { id: "openai/gpt-image-2", label: "GPT Image 2", provider: "OpenAI", contextTokens: 0, capability: "image" },
   "google/gemini-3.1-flash-image": { id: "google/gemini-3.1-flash-image", label: "Nano Banana Pro", provider: "Google", contextTokens: 0, capability: "image" },
   // Approved video models: MiniMax H3 (720p/2K), Seedance 2.0 (720p only)

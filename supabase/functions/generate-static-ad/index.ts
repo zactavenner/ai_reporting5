@@ -339,16 +339,20 @@ serve(async (req) => {
       : (() => {
         const requested = (body.imageModel || '').trim();
         const MODEL_ALIASES: Record<string, string> = {
+          'gpt-image-2.6': 'openai/gpt-image-2.6',
+          'openai/gpt-image-2.6': 'openai/gpt-image-2.6',
           'gpt-image-2': 'openai/gpt-image-2',
           'openai/gpt-image-2': 'openai/gpt-image-2',
           'nano-banana-pro-2': 'google/gemini-3.1-flash-image-preview',
           'google/nano-banana-pro-2': 'google/gemini-3.1-flash-image-preview',
           'google/gemini-3.1-flash-image-preview': 'google/gemini-3.1-flash-image-preview',
         };
-        const chosen = MODEL_ALIASES[requested] || 'openai/gpt-image-2';
-        const fallbacks = chosen === 'openai/gpt-image-2'
-          ? ['google/gemini-3.1-flash-image-preview']
-          : ['openai/gpt-image-2'];
+        const chosen = MODEL_ALIASES[requested] || 'openai/gpt-image-2.6';
+        const fallbacks = chosen === 'openai/gpt-image-2.6'
+          ? ['openai/gpt-image-2', 'google/gemini-3.1-flash-image-preview']
+          : chosen === 'openai/gpt-image-2'
+            ? ['google/gemini-3.1-flash-image-preview']
+            : ['openai/gpt-image-2.6', 'openai/gpt-image-2'];
         console.log('[generate-static-ad] image model →', chosen, 'requested:', requested);
         return {
           model: chosen,

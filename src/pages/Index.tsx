@@ -25,6 +25,7 @@ import { DeleteClientDialog } from '@/components/settings/DeleteClientDialog';
 import { AgencyAIChat } from '@/components/ai/AgencyAIChat';
 import { AIHubTab } from '@/components/ai/AIHubTab';
 import { AgencyAIStudioTab } from '@/components/ai/AgencyAIStudioTab';
+import { ContentAdsTab } from '@/components/content-ads/ContentAdsTab';
 import { QualityFeedbackOverview } from '@/components/quality-feedback/QualityFeedbackOverview';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel';
