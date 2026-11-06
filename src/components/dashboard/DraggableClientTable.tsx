@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, Fragment } from 'react';
+import { groupByClientStatus, type ClientStatusGroupKey } from '@/lib/clientStatusGroups';
 import { useQueryClient } from '@tanstack/react-query';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -40,7 +41,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, AlertCircle, CheckCircle, Clock, XCircle, AlertTriangle, Pencil, RefreshCw, Sparkles, BarChart, FileSpreadsheet, FileText, Palette, Layers, Activity as ActivityIcon, Bell, BellOff, Plug, Target } from 'lucide-react';
+import { Settings, ExternalLink, Copy, Trash2, GripVertical, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, AlertCircle, CheckCircle, Clock, XCircle, AlertTriangle, Pencil, RefreshCw, Sparkles, BarChart, FileSpreadsheet, FileText, Palette, Layers, Activity as ActivityIcon, Bell, BellOff, Plug, Target, ChevronDown, ChevronRight } from 'lucide-react';
 import { useMetaAccountAssets } from '@/components/ads-manager/shared/useMetaAccountAssets';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -450,6 +451,18 @@ export function DraggableClientTable({
     });
   }, [clientsWithComputedValues, sortConfig, assignments]);
 
+  const statusGroups = useMemo(
+    () => groupByClientStatus(sortedClients, (r) => r.client.status),
+    [sortedClients],
+  );
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<ClientStatusGroupKey>>(new Set());
+  const toggleGroup = (key: ClientStatusGroupKey) =>
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+
   const handleSort = (column: string) => {
     setSortConfig(prev => {
       if (prev.column === column) {
@@ -583,7 +596,23 @@ export function DraggableClientTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedClients.map(({ client, metrics: m, computed }) => {
+            {statusGroups.map((group) => {
+              const collapsed = collapsedGroups.has(group.key);
+              return (
+              <Fragment key={group.key}>
+                <TableRow
+                  className="h-7 bg-muted/40 hover:bg-muted/60 border-b cursor-pointer"
+                  onClick={() => toggleGroup(group.key)}
+                >
+                  <TableCell colSpan={40} className="py-0 px-1">
+                    <div className="sticky left-1 inline-flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+                      {collapsed ? <ChevronRight className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                      {group.label}
+                      <span className="font-normal text-muted-foreground tabular-nums">{group.rows.length}</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+            {!collapsed && group.rows.map(({ client, metrics: m, computed }) => {
               const t = thresholds[client.id] || {};
               const syncInfo = getClientSyncStatus(client);
               const syncBorderStyle = getSyncBorderStyle(syncInfo.status);
@@ -914,6 +943,9 @@ export function DraggableClientTable({
                     </TableCell>
                   </TableRow>
                 </TooltipProvider>
+              );
+            })}
+              </Fragment>
               );
             })}
           </TableBody>
