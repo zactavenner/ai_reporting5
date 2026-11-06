@@ -12,11 +12,12 @@ import { useWeeklyReportRoster, useWeeklyClientReport, type RosterEntry } from '
 import { pctChange, type Metric, type ReadinessCheck } from '@/lib/weeklyReport/core';
 import { cn } from '@/lib/utils';
 
+const partialTag = (m: unknown) => (m && typeof m === 'object' && (m as Metric).partial ? ' (partial)' : '');
 const money = (m: Metric | number | null, d = 0) => {
   const v = typeof m === 'number' || m == null ? m : m.value;
-  return v == null ? 'Unavailable' : `$${v.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d })}`;
+  return v == null ? 'Unavailable' : `$${v.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d })}${partialTag(m)}`;
 };
-const num = (m: Metric) => (m.value == null ? 'Unavailable' : m.value.toLocaleString());
+const num = (m: Metric) => (m.value == null ? 'Unavailable' : m.value.toLocaleString() + partialTag(m));
 
 function Level({ level }: { level: ReadinessCheck['level'] }) {
   if (level === 'ok') return <CheckCircle2 className="h-3.5 w-3.5 text-primary" />;
@@ -166,7 +167,8 @@ function ReportPreview({ entry, onClose }: { entry: RosterEntry; onClose: () => 
                 ))}</tbody>
               </table>
             </div>
-            <p className="text-[10px] text-muted-foreground">Verified leads are unique CRM contacts with email and phone, excluding spam and duplicates. Booked calls count calendar bookings made during the week. "Unavailable" means the data was missing or not tracked — not zero.</p>
+            {cur.spend.partial && <p className="text-xs text-destructive">{cur.spend.note} — figures marked (partial) do not represent the full week.</p>}
+            <p className="text-[10px] text-muted-foreground">Verified leads are unique CRM contacts with a name and a valid email or phone, excluding spam, tests and duplicates. Booked calls count calendar bookings made during the week. "Unavailable" means the data was missing or not tracked — not zero.</p>
           </section>
 
           <section className="weekly-page rounded-xl border bg-card p-8 space-y-5">
@@ -197,7 +199,7 @@ function ReportPreview({ entry, onClose }: { entry: RosterEntry; onClose: () => 
 
           <section className="weekly-page rounded-xl border bg-card p-8 space-y-4">
             <h3 className="text-lg font-semibold">Creative performance</h3>
-            {data.creatives.length === 0 ? <p className="text-sm text-muted-foreground">No creative spend data available.</p> : (
+            {data.creatives.length === 0 ? <p className="text-sm text-muted-foreground">Per-ad data unavailable for this week.</p> : (
               <div className="grid grid-cols-3 gap-3">
                 {data.creatives.map((c) => (
                   <div key={c.id} className="overflow-hidden rounded-lg border">
@@ -205,13 +207,13 @@ function ReportPreview({ entry, onClose }: { entry: RosterEntry; onClose: () => 
                     <div className="space-y-0.5 p-2 text-[11px]">
                       <p className="truncate font-medium">{c.name}</p>
                       <p>Spend {money(c.spend)} · Leads {c.leads ?? 'Unavailable'}</p>
-                      <p>CPL {money(c.cpl, 2)}{c.booked ? ` · Booked ${c.booked}` : ''}</p>
+                      <p>CPL {money(c.cpl, 2)}</p>
                     </div>
                   </div>
                 ))}
               </div>
             )}
-            <p className="text-[10px] text-muted-foreground">Creative totals are cumulative as of the last ad sync{data.creativesSyncedAt ? ` (${data.creativesSyncedAt.slice(0, 10)})` : ''}, not limited to this week. Booked results shown only where attribution exists.</p>
+            <p className="text-[10px] text-muted-foreground">Spend and Meta-reported leads per ad for {cur.range.from} → {cur.range.to}{data.creativeDays < 7 ? ` (partial: ${data.creativeDays}/7 days of data)` : ''}. Booked or committed results are not shown per ad because they can't be attributed reliably for the week.</p>
           </section>
         </div>
       )}
