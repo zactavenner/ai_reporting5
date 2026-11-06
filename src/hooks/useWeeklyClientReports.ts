@@ -132,7 +132,7 @@ export function useWeeklyClientReport(entry: RosterEntry | null) {
           spam: wk.filter((l: any) => l.is_spam).length,
           missingContact: wk.filter((l: any) => !l.is_spam && (!l.email || !l.phone)).length,
           verified: cur.verifiedLeads.value ?? 0,
-          duplicates: 0,
+          duplicates: Math.max(0, wk.length - wk.filter((l: any) => l.is_spam).length - wk.filter((l: any) => !l.is_spam && (!l.email || !l.phone)).length - (cur.verifiedLeads.value ?? 0)),
         },
         exceptions,
       };
