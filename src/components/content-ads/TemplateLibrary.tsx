@@ -26,7 +26,7 @@ import { toast } from "sonner";
 
 export type LibraryKind = "reference" | "template";
 
-interface TemplateRow {
+export interface TemplateRow {
   id: string;
   name: string;
   tags: string[] | null;
