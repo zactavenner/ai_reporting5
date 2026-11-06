@@ -368,6 +368,36 @@ export function SetterDetailPanel({ lead, onChanged, onAdvance }: { lead: Setter
     onChanged?.();
   };
 
+  const [hot, setHot] = useState(false);
+  useEffect(() => { setHot(!!lead?.is_hot); }, [lead?.id, lead?.is_hot]);
+  const toggleHot = async () => {
+    if (!lead) return;
+    const next = !hot;
+    setHot(next);
+    const { error } = await supabase.from('leads').update({
+      is_hot: next,
+      hot_marked_by: next ? (currentMember?.name || 'setter') : null,
+      hot_marked_at: next ? new Date().toISOString() : null,
+    }).eq('id', lead.id);
+    if (error) { setHot(!next); toast.error(`Failed: ${error.message}`); return; }
+    toast.success(next ? 'Marked hot' : 'Hot flag removed');
+    onChanged?.();
+  };
+  // Hotkeys: 1–7 dispositions, H toggles hot (ignored while typing)
+  const hotkeyRef = useRef<{ setDispo: (v: string) => void; toggleHot: () => void } | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const d = DISPOSITION_HOTKEYS[e.key];
+      if (d) { e.preventDefault(); hotkeyRef.current?.setDispo(d); }
+      else if (e.key === 'h') { e.preventDefault(); hotkeyRef.current?.toggleHot(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const DISPOSITIONS: { value: string; label: string }[] = [
     { value: 'new', label: 'New' },
     { value: 'contacted', label: 'Contacted' },
