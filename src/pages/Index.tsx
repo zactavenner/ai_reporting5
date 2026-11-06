@@ -27,6 +27,7 @@ import { AIHubTab } from '@/components/ai/AIHubTab';
 import { AgencyAIStudioTab } from '@/components/ai/AgencyAIStudioTab';
 import { ContentAdsTab } from '@/components/content-ads/ContentAdsTab';
 import { QualityFeedbackOverview } from '@/components/quality-feedback/QualityFeedbackOverview';
+import { AdsManagementPage } from '@/components/ads-manager/AdsManagementPage';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel';
 import { EmailManagementTab } from '@/components/email/EmailManagementTab';
@@ -508,6 +509,12 @@ const Index = () => {
             {activeTab === 'am-workspace' && (
               <SectionErrorBoundary sectionName="AM Workspace">
                 <AccountManagerPage />
+              </SectionErrorBoundary>
+            )}
+
+            {activeTab === 'ads-management' && (
+              <SectionErrorBoundary sectionName="Ads Management">
+                <AdsManagementPage />
               </SectionErrorBoundary>
             )}
 

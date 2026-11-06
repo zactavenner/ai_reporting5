@@ -90,6 +90,7 @@ const navStructure = [
   {
     title: 'Ads', value: 'ads-group', icon: Megaphone,
     children: [
+      { title: 'Management', value: 'ads-management', icon: Megaphone },
       { title: 'Ads Generator', value: 'ads-generator-ext', icon: ExternalLink, externalUrl: 'https://id-preview--b57a79c0-3e59-4a78-be94-340c58fe824e.lovable.app' },
       { title: 'Quality Feedback', value: 'quality-feedback', icon: ShieldCheck },
     ],
