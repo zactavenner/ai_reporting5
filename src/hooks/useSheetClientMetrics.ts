@@ -91,7 +91,9 @@ export function useSheetClientMetrics(
   queries.forEach((q, i) => {
     const id = targets[i]?.id;
     if (!id) return;
-    if (q.isLoading || q.isFetching) statuses[id] = 'loading';
+    // Only "loading" while there is no answer yet; a background refresh keeps
+    // the last good sheet numbers on screen.
+    if (q.isPending) statuses[id] = 'loading';
     else if (q.isError) statuses[id] = 'error';
     else if (q.data?.aggregated) statuses[id] = 'ok';
     else statuses[id] = 'error';

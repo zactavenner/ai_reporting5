@@ -133,7 +133,10 @@ export function useAllDailyMetrics(startDate?: string, endDate?: string) {
         return query;
       }), 'Daily metrics');
     },
-    retry: 0,
+    // Two quick retries absorb a brief network/database hiccup instead of
+    // leaving every client row blank until the next manual reload.
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
     staleTime: 60 * 1000,
   });
 }
