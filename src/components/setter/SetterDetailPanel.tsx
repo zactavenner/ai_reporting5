@@ -378,7 +378,7 @@ export function SetterDetailPanel({ lead, onChanged, onAdvance }: { lead: Setter
       is_hot: next,
       hot_marked_by: next ? (currentMember?.name || 'setter') : null,
       hot_marked_at: next ? new Date().toISOString() : null,
-    }).eq('id', lead.id);
+    } as any).eq('id', lead.id);
     if (error) { setHot(!next); toast.error(`Failed: ${error.message}`); return; }
     toast.success(next ? 'Marked hot' : 'Hot flag removed');
     onChanged?.();
