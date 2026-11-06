@@ -205,8 +205,11 @@ export function createEmptyDraft(): MasterVideoDraft {
     disclosure: "",
     scriptVersions: [],
     model: DEFAULT_MASTER_VIDEO_MODEL,
-    // Defaults: vertical, the highest resolution this model genuinely serves, ~30s.
-    resolution: spec.resolutions[spec.resolutions.length - 1],
+    // Defaults: vertical, 720p (the price/speed sweet spot — 1080p is an
+    // explicit upgrade), ~30s. clampRenderSettings keeps these honest.
+    resolution: spec.resolutions.includes("720p")
+      ? "720p"
+      : spec.resolutions[spec.resolutions.length - 1],
     aspectRatio: "9:16",
     durationSeconds: 30,
     audio: true,
@@ -559,6 +562,24 @@ export function estimatedReadSeconds(script: string, wordsPerMinute = 150): numb
 }
 
 /** Spoken words only — direction lines never count towards the read length. */
+/**
+ * Picks the render duration from the script's spoken length: the smallest
+ * duration the model serves that fits the read time, capped at 30s. Ads are
+ * 30 seconds or less, so a script that reads longer is trimmed to the 30s
+ * ceiling rather than silently producing a longer, more expensive clip.
+ */
+export function suggestDurationForScript(
+  script: string,
+  model: string | null | undefined,
+): number {
+  const spec = modelSpec(model);
+  const read = estimatedReadSeconds(script);
+  if (read <= 0) return spec.durations[0];
+  const fit = spec.durations.filter((d) => d >= read && d <= 30);
+  if (fit.length) return fit[0];
+  return Math.min(30, spec.durations[spec.durations.length - 1]);
+}
+
 export function scriptWordCount(script: string): number {
   return norm(extractSpokenScript(script))
     .split(/\s+/)
