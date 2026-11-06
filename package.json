@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "test:annuity": "vitest run --config vitest.annuity.config.ts",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -73,6 +74,7 @@
     "framer-motion": "^12.35.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.3.14",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
     "@testing-library/jest-dom": "^6.6.0",

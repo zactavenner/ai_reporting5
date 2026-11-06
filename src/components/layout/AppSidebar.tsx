@@ -19,6 +19,7 @@ import {
   Calendar,
   BookOpen,
   DollarSign,
+  Landmark,
   Users,
   CheckCircle2,
   Zap,
@@ -104,6 +105,11 @@ const navStructure = [
     title: 'Offers',
     value: 'offers',
     icon: FileText,
+  },
+  {
+    title: 'Annuities',
+    value: 'annuities',
+    icon: Landmark,
   },
   {
     title: 'Funnel Builder',

@@ -71,6 +71,7 @@ import { AvatarAdWizard } from '@/components/avatar-ad/AvatarAdWizard';
 const StaticCreativesInline = lazy(() => import('@/pages/StaticCreativesPage'));
 const AvatarAdGenInline = lazy(() => Promise.resolve({ default: () => <AvatarAdProvider><AvatarAdWizard /></AvatarAdProvider> }));
 import { TopPerformersSection } from '@/components/creative/TopPerformersSection';
+const AnnuitySandboxInline = lazy(() => import('@/pages/AnnuitySandboxPage'));
 
 const Index = () => {
   const navigate = useNavigate();
@@ -282,6 +283,14 @@ const Index = () => {
 
             {/* Ads Manager */}
             {activeTab === 'ads-manager' && <AdminAdsManagerTab platform="all" />}
+
+            {activeTab === 'annuities' && (
+              <SectionErrorBoundary sectionName="Annuities">
+                <Suspense fallback={<div className="text-sm text-muted-foreground">Loading annuities…</div>}>
+                  <AnnuitySandboxInline embedded />
+                </Suspense>
+              </SectionErrorBoundary>
+            )}
 
             {/* Offers */}
             {activeTab === 'offers' && (

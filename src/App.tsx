@@ -70,6 +70,7 @@ const DailyReportPage = lazyRetry(() => import("./pages/DailyReportPage"));
 const DailyReportThankYouPage = lazyRetry(() => import("./pages/DailyReportThankYouPage"));
 const ClientOnboardingPage = lazyRetry(() => import("./pages/ClientOnboardingPage"));
 const FulfillmentReviewPage = lazyRetry(() => import("./pages/FulfillmentReviewPage"));
+const AnnuitySandboxPage = lazyRetry(() => import("./pages/AnnuitySandboxPage"));
 
 function PageLoader() {
   return (
@@ -150,6 +151,7 @@ const App = () => (
             <Route path="/public/:token/creatives" element={<PublicCreatives />} />
             <Route path="/upload/:token" element={<PublicUpload />} />
             <Route path="/quiz/:slug" element={<QuizPage />} />
+            <Route path="/annuity/sandbox" element={<AnnuitySandboxPage />} />
             <Route path="/meta-overlay" element={<MetaAdsOverlay />} />
 
             <Route path="*" element={<NotFound />} />
