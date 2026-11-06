@@ -86,11 +86,16 @@ export async function executePlan(plan: DeliveryPlan, store: DeliveryStore, send
     let out: SendOutcome;
     try { out = await sender.send(d, plan.clientId); }
     catch (e) { out = { ok: false, ambiguous: false, error: String((e as Error)?.message || e) }; }
-    if (out.ok) { await store.mark(d.key, 'sent', { provider_message_id: out.messageId, pdf_path: out.pdfPath }); results.push({ key: d.key, result: 'sent' }); }
-    else if (out.ambiguous) { await store.mark(d.key, 'unknown', { last_error: out.error }); results.push({ key: d.key, result: 'unknown' }); }
+    if (out.ok === true) {
+      const ok = out as Extract<SendOutcome, { ok: true }>;
+      await store.mark(d.key, 'sent', { provider_message_id: ok.messageId, pdf_path: ok.pdfPath }); results.push({ key: d.key, result: 'sent' });
+      continue;
+    }
+    const bad = out as Extract<SendOutcome, { ok: false }>;
+    if (bad.ambiguous) { await store.mark(d.key, 'unknown', { last_error: bad.error }); results.push({ key: d.key, result: 'unknown' }); }
     else {
       const final = d.attempts + 1 >= MAX_ATTEMPTS;
-      await store.mark(d.key, final ? 'failed_permanent' : 'failed_retryable', { last_error: out.error });
+      await store.mark(d.key, final ? 'failed_permanent' : 'failed_retryable', { last_error: bad.error });
       results.push({ key: d.key, result: final ? 'failed_permanent' : 'failed_retryable' });
     }
   }
