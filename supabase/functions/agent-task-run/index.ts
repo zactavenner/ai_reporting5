@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
           Authorization: `Bearer ${OPENROUTER_API_KEY}`,
           "Content-Type": "application/json",
           "HTTP-Referer": "https://reporting.highperformanceads.com",
-          "X-Title": `HPA Agent · ${agent.name}`,
+          "X-Title": `HPA Agent - ${agent.name}`,
         },
         body: JSON.stringify({
           model: models[0],

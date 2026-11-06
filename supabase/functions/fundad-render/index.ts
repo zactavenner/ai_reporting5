@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
         Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://reporting.highperformanceads.com',
-        'X-Title': `FundAd AI Studio — ${useHappyHorse ? 'HappyHorse' : 'Seedance'}`,
+        'X-Title': `FundAd AI Studio - ${useHappyHorse ? 'HappyHorse' : 'Seedance'}`,
       },
       body: JSON.stringify({
         model: orModel,

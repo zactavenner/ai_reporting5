@@ -171,10 +171,26 @@ export function StaticGenerator({ clientId, clientName, offerSummary }: Props) {
                 </div>
               )}
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="h-7 text-xs flex-1" asChild>
-                  <a href={imageUrl} download target="_blank" rel="noreferrer">
-                    <Download className="h-3 w-3 mr-1" /> Image
-                  </a>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs flex-1"
+                  onClick={async () => {
+                    try {
+                      const blob = await (await fetch(imageUrl)).blob();
+                      const ext = blob.type.includes("jpeg") ? "jpg" : blob.type.includes("webp") ? "webp" : "png";
+                      const href = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = href;
+                      a.download = `ad.${ext}`;
+                      a.click();
+                      setTimeout(() => URL.revokeObjectURL(href), 1000);
+                    } catch {
+                      window.open(imageUrl, "_blank", "noopener");
+                    }
+                  }}
+                >
+                  <Download className="h-3 w-3 mr-1" /> Image
                 </Button>
                 {gifUrl && (
                   <Button size="sm" variant="outline" className="h-7 text-xs flex-1" asChild>

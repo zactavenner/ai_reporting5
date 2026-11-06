@@ -12,6 +12,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-dashboard-token, x-internal-secret',
 };
 
+
+// Provider content links need our server key, so copy finished videos into public storage.
+async function persistVideo(url: string | null, key: string): Promise<string | null> {
+  if (!url) return null;
+  if (!url.startsWith('https://openrouter.ai/')) return url;
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${key}` } });
+  if (!r.ok) throw new Error(`Could not download finished video (${r.status})`);
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  const path = `generated-videos/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.mp4`;
+  const { error } = await db.storage.from('assets').upload(path, bytes, { contentType: 'video/mp4', upsert: false });
+  if (error) throw new Error(`Could not store finished video: ${error.message}`);
+  return db.storage.from('assets').getPublicUrl(path).data.publicUrl;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -30,6 +45,27 @@ serve(async (req) => {
     }
 
     const { imageUrl, prompt, aspectRatio, duration, apiKey: clientApiKey, model, lastFrameUrl, ingredientUrl, exactModel: requestedExactModel, resolution } = requestBody;
+
+    // ── Poll a pending exact-model job (keeps every request under the 150s gateway limit)
+    const pollJobUrl = String(requestBody.pollJobUrl ?? '').trim();
+    if (pollJobUrl) {
+      if (!pollJobUrl.startsWith('https://openrouter.ai/')) {
+        return new Response(JSON.stringify({ error: 'Invalid job reference' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const p = await fetch(pollJobUrl, { headers: { Authorization: `Bearer ${OPENROUTER_API_KEY}` } });
+      if (!p.ok) {
+        return new Response(JSON.stringify({ status: 'pending', jobUrl: pollJobUrl }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const pj = await p.json();
+      if (pj.status === 'completed') {
+        const urls: string[] = pj.unsigned_urls || pj.urls || (pj.video?.url ? [pj.video.url] : []);
+        return new Response(JSON.stringify({ status: 'completed', videoUrl: await persistVideo(urls[0] || null, OPENROUTER_API_KEY!) }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      if (pj.status === 'failed') {
+        return new Response(JSON.stringify({ error: `Video generation failed: ${pj.error || 'unknown'}` }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ status: 'pending', jobUrl: pollJobUrl }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     // ── Exact-model path (Jeremy / approved automated callers) ───────────────
     // The approved model id is validated against the active configured allowlist
@@ -69,7 +105,7 @@ serve(async (req) => {
           Authorization: `Bearer ${OPENROUTER_API_KEY}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://reporting.highperformanceads.com',
-          'X-Title': 'Jeremy — exact model video',
+          'X-Title': 'Jeremy - exact model video',
         },
         body: JSON.stringify(providerBody),
       });
@@ -96,7 +132,7 @@ serve(async (req) => {
         );
       }
       let exactVideoUrl: string | null = null;
-      for (let i = 0; i < 60; i++) {
+      for (let i = 0; i < 22; i++) {
         await new Promise((r) => setTimeout(r, 5000));
         const p = await fetch(pollingUrl, { headers: { Authorization: `Bearer ${OPENROUTER_API_KEY}` } });
         if (!p.ok) continue;
@@ -114,13 +150,14 @@ serve(async (req) => {
         }
       }
       if (!exactVideoUrl) {
+        // Still rendering: hand back the job so the caller keeps polling.
         return new Response(
-          JSON.stringify({ error: 'Video generation timed out after 5 minutes', model: exact }),
-          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          JSON.stringify({ status: 'pending', jobUrl: pollingUrl, model: exact }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
       return new Response(
-        JSON.stringify({ status: 'completed', videoUrl: exactVideoUrl, model: exact }),
+        JSON.stringify({ status: 'completed', videoUrl: await persistVideo(exactVideoUrl, OPENROUTER_API_KEY!), model: exact }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -166,7 +203,7 @@ serve(async (req) => {
           Authorization: `Bearer ${OPENROUTER_API_KEY}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://reporting.highperformanceads.com',
-          'X-Title': 'Batch Video — Seedance',
+          'X-Title': 'Batch Video - Seedance',
         },
         body: JSON.stringify(seedanceBody),
       });
