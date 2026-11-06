@@ -61,15 +61,18 @@ export interface PipelineMapping {
   committedStages: number;
   fundedPipeline: boolean;
   fundedStages: number;
+  /** HubSpot books through meetings, not tracked calendars. Defaults to true (GoHighLevel). */
+  calendarsRequired?: boolean;
 }
 
-/** The three mappings reporting needs: booked-call calendars, committed stages, funded pipeline + stages. */
+/** The mappings reporting needs: booked-call calendars (GHL), committed stages, funded pipeline + stages. */
 export function pipelineChecks(m: PipelineMapping) {
-  return [
+  const checks = [
     { key: 'calendars', label: 'Booked-call calendars', ok: m.calendars > 0, count: m.calendars },
     { key: 'committed', label: 'Committed stages', ok: m.committedStages > 0, count: m.committedStages },
     { key: 'funded', label: 'Funded pipeline & stages', ok: m.fundedPipeline && m.fundedStages > 0, count: m.fundedStages },
   ];
+  return m.calendarsRequired === false ? checks.filter((c) => c.key !== 'calendars') : checks;
 }
 
 export function pipelineState(m: PipelineMapping): RowState {
