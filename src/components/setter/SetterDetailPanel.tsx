@@ -18,6 +18,9 @@ import { formatDistanceToNowStrict, format } from 'date-fns';
 import { fmtDuration, timeSinceISO, type SetterLead } from '@/hooks/useSetterLeads';
 import { markViewed } from '@/lib/setterViewState';
 import { getPhoneTimezone, isBusinessHours } from '@/lib/areaCodeTimezone';
+import { CallCoach } from './CallCoach';
+import { DISPOSITION_HOTKEYS } from '@/lib/setterCoach';
+import { Flame } from 'lucide-react';
 
 interface TimelineEvent {
   id: string;
@@ -684,6 +687,9 @@ export function SetterDetailPanel({ lead, onChanged, onAdvance }: { lead: Setter
             <a href={`mailto:${lead.email}`}><Mail className="w-3.5 h-3.5 mr-1" />Mail</a>
           </Button>
         )}
+        <Button size="sm" variant={hot ? 'default' : 'outline'} onClick={toggleHot} className="gap-1" title="Mark hot (H)">
+          <Flame className="w-3.5 h-3.5" />{hot ? 'Hot' : 'Mark hot'}
+        </Button>
         <select
           value={assignee}
           onChange={(e) => assign(e.target.value)}
@@ -844,6 +850,8 @@ export function SetterDetailPanel({ lead, onChanged, onAdvance }: { lead: Setter
           </div>
         </div>
       )}
+
+      <CallCoach clientId={lead.client_id} clientName={lead.client_name} firstName={(lead.name || '').split(' ')[0]} agentName={currentMember?.name?.split(' ')[0]} />
 
       {lead.ghl_notes && (
         <div className="border-b p-3 bg-amber-500/5">
