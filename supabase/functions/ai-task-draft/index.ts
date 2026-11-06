@@ -9,7 +9,7 @@
 //   - Loads task, client, latest comments, and active client offers
 //   - Builds a Dan-Kennedy / direct-response prompt covering ad angles,
 //     hooks, scripts, copy, briefs, outlines, summaries, etc.
-//   - Skips silently if the task already has an AI draft and force !== true
+//   - Manual only: returns { drafted:false, reason:"manual_only" } unless force === true
 //   - Returns { drafted: boolean, comment_id?, preview? }
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { callOpenRouter } from "../_shared/openrouter.ts";
@@ -58,6 +58,9 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
   const taskId = body.task_id;
   if (!taskId || typeof taskId !== "string") return json({ error: "task_id required" }, 400);
+  // Drafts are manual only (the task's "AI draft" button sends force:true).
+  // Automatic calls on task creation are ignored so no comment is posted.
+  if (body.force !== true) return json({ drafted: false, reason: "manual_only" });
 
   // Load task
   const { data: task, error: tErr } = await supa
