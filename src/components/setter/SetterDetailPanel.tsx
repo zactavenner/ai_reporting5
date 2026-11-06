@@ -18,6 +18,9 @@ import { formatDistanceToNowStrict, format } from 'date-fns';
 import { fmtDuration, timeSinceISO, type SetterLead } from '@/hooks/useSetterLeads';
 import { markViewed } from '@/lib/setterViewState';
 import { getPhoneTimezone, isBusinessHours } from '@/lib/areaCodeTimezone';
+import { CallCoach } from './CallCoach';
+import { DISPOSITION_HOTKEYS } from '@/lib/setterCoach';
+import { Flame } from 'lucide-react';
 
 interface TimelineEvent {
   id: string;
@@ -365,6 +368,36 @@ export function SetterDetailPanel({ lead, onChanged, onAdvance }: { lead: Setter
     onChanged?.();
   };
 
+  const [hot, setHot] = useState(false);
+  useEffect(() => { setHot(!!lead?.is_hot); }, [lead?.id, lead?.is_hot]);
+  const toggleHot = async () => {
+    if (!lead) return;
+    const next = !hot;
+    setHot(next);
+    const { error } = await supabase.from('leads').update({
+      is_hot: next,
+      hot_marked_by: next ? (currentMember?.name || 'setter') : null,
+      hot_marked_at: next ? new Date().toISOString() : null,
+    } as any).eq('id', lead.id);
+    if (error) { setHot(!next); toast.error(`Failed: ${error.message}`); return; }
+    toast.success(next ? 'Marked hot' : 'Hot flag removed');
+    onChanged?.();
+  };
+  // Hotkeys: 1–7 dispositions, H toggles hot (ignored while typing)
+  const hotkeyRef = useRef<{ setDispo: (v: string) => void; toggleHot: () => void } | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const d = DISPOSITION_HOTKEYS[e.key];
+      if (d) { e.preventDefault(); hotkeyRef.current?.setDispo(d); }
+      else if (e.key === 'h') { e.preventDefault(); hotkeyRef.current?.toggleHot(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const DISPOSITIONS: { value: string; label: string }[] = [
     { value: 'new', label: 'New' },
     { value: 'contacted', label: 'Contacted' },
@@ -429,6 +462,7 @@ export function SetterDetailPanel({ lead, onChanged, onAdvance }: { lead: Setter
       toast.error(`Failed: ${e?.message || e}`);
     } finally { setSavingDispo(false); }
   };
+  hotkeyRef.current = { setDispo, toggleHot };
 
   const scheduleCallback = async (isoDue: string, note: string) => {
     if (!lead || !isoDue) return;
@@ -684,6 +718,9 @@ export function SetterDetailPanel({ lead, onChanged, onAdvance }: { lead: Setter
             <a href={`mailto:${lead.email}`}><Mail className="w-3.5 h-3.5 mr-1" />Mail</a>
           </Button>
         )}
+        <Button size="sm" variant={hot ? 'default' : 'outline'} onClick={toggleHot} className="gap-1" title="Mark hot (H)">
+          <Flame className="w-3.5 h-3.5" />{hot ? 'Hot' : 'Mark hot'}
+        </Button>
         <select
           value={assignee}
           onChange={(e) => assign(e.target.value)}
@@ -844,6 +881,8 @@ export function SetterDetailPanel({ lead, onChanged, onAdvance }: { lead: Setter
           </div>
         </div>
       )}
+
+      <CallCoach clientId={lead.client_id} clientName={lead.client_name} firstName={(lead.name || '').split(' ')[0]} agentName={currentMember?.name?.split(' ')[0]} />
 
       {lead.ghl_notes && (
         <div className="border-b p-3 bg-amber-500/5">

@@ -16,6 +16,8 @@ export interface SetterLead {
   status: string | null;
   assigned_user: string | null;
   is_spam: boolean | null;
+  is_hot?: boolean | null;
+  hot_reason?: string | null;
   questions: any;
   ghl_contact_id?: string | null;
   external_id?: string | null;
@@ -90,7 +92,7 @@ export function useSetterLeads(enabledClientIds?: string[] | null, windowDays: n
       const LIMIT = 2000;
       const { data: rawLeads, error: lErr, count } = await supabase
         .from('leads')
-        .select('id, client_id, name, email, phone, source, campaign_name, utm_source, utm_medium, utm_campaign, utm_content, ad_id, ad_set_name, custom_fields, ghl_notes, opportunity_status, opportunity_stage, opportunity_value, current_disposition, quality_score, pipeline_value, created_at, updated_at, status, assigned_user, is_spam, questions, external_id', { count: 'exact' })
+        .select('id, client_id, name, email, phone, source, campaign_name, utm_source, utm_medium, utm_campaign, utm_content, ad_id, ad_set_name, custom_fields, ghl_notes, opportunity_status, opportunity_stage, opportunity_value, current_disposition, quality_score, pipeline_value, created_at, updated_at, status, assigned_user, is_spam, is_hot, hot_reason, questions, external_id', { count: 'exact' })
         .gte('created_at', sinceISO)
         .order('created_at', { ascending: false })
         .limit(LIMIT);
@@ -190,6 +192,8 @@ export function useSetterLeads(enabledClientIds?: string[] | null, windowDays: n
           status: l.status,
           assigned_user: l.assigned_user,
           is_spam: l.is_spam,
+          is_hot: l.is_hot,
+          hot_reason: l.hot_reason,
           questions: l.questions,
           // GHL contact id is the lead external_id. Do not wait for a timeline
           // row to exist before allowing Setter to pull/live-sync conversations.

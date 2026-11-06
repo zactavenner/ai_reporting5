@@ -17656,7 +17656,11 @@ export type Database = {
           external_id: string
           ghl_notes: Json | null
           ghl_synced_at: string | null
+          hot_marked_at: string | null
+          hot_marked_by: string | null
+          hot_reason: string | null
           id: string
+          is_hot: boolean
           is_spam: boolean | null
           name: string | null
           opportunity_stage: string | null
@@ -17690,7 +17694,11 @@ export type Database = {
           external_id: string
           ghl_notes?: Json | null
           ghl_synced_at?: string | null
+          hot_marked_at?: string | null
+          hot_marked_by?: string | null
+          hot_reason?: string | null
           id?: string
+          is_hot?: boolean
           is_spam?: boolean | null
           name?: string | null
           opportunity_stage?: string | null
@@ -17724,7 +17732,11 @@ export type Database = {
           external_id?: string
           ghl_notes?: Json | null
           ghl_synced_at?: string | null
+          hot_marked_at?: string | null
+          hot_marked_by?: string | null
+          hot_reason?: string | null
           id?: string
+          is_hot?: boolean
           is_spam?: boolean | null
           name?: string | null
           opportunity_stage?: string | null
@@ -23368,6 +23380,77 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sendblue_lines"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      setter_scripts: {
+        Row: {
+          booking: string
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_default: boolean
+          name: string
+          objections: Json
+          opening: string
+          questions: string[]
+          updated_at: string
+        }
+        Insert: {
+          booking?: string
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          objections?: Json
+          opening?: string
+          questions?: string[]
+          updated_at?: string
+        }
+        Update: {
+          booking?: string
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          objections?: Json
+          opening?: string
+          questions?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "setter_scripts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "setter_scripts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setter_scripts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "setter_scripts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
