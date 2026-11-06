@@ -19,6 +19,8 @@ import { fmtDuration, timeSinceISO, type SetterLead } from '@/hooks/useSetterLea
 import { markViewed } from '@/lib/setterViewState';
 import { getPhoneTimezone, isBusinessHours } from '@/lib/areaCodeTimezone';
 import { CallCoach } from './CallCoach';
+import { LiveCall } from './LiveCall';
+import { LeadMemory } from './LeadMemory';
 import { DISPOSITION_HOTKEYS } from '@/lib/setterCoach';
 import { Flame } from 'lucide-react';
 
@@ -370,6 +372,8 @@ export function SetterDetailPanel({ lead, onChanged, onAdvance }: { lead: Setter
 
   const [hot, setHot] = useState(false);
   useEffect(() => { setHot(!!lead?.is_hot); }, [lead?.id, lead?.is_hot]);
+  const [liveLine, setLiveLine] = useState<string | null>(null);
+  useEffect(() => { setLiveLine(null); }, [lead?.id]);
   const toggleHot = async () => {
     if (!lead) return;
     const next = !hot;
@@ -882,7 +886,9 @@ export function SetterDetailPanel({ lead, onChanged, onAdvance }: { lead: Setter
         </div>
       )}
 
-      <CallCoach clientId={lead.client_id} clientName={lead.client_name} firstName={(lead.name || '').split(' ')[0]} agentName={currentMember?.name?.split(' ')[0]} />
+      <LiveCall lead={lead} setterName={currentMember?.name} setterPhone={myPhone} onLeadLine={setLiveLine} />
+      <CallCoach clientId={lead.client_id} clientName={lead.client_name} firstName={(lead.name || '').split(' ')[0]} agentName={currentMember?.name?.split(' ')[0]} liveLine={liveLine} />
+      <LeadMemory leadId={lead.id} clientId={lead.client_id} author={currentMember?.name} />
 
       {lead.ghl_notes && (
         <div className="border-b p-3 bg-amber-500/5">

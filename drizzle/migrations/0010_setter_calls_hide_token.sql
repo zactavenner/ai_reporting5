@@ -1,0 +1,2 @@
+REVOKE SELECT ON public.setter_calls FROM authenticated;
+GRANT SELECT (id, client_id, lead_id, setter_name, setter_phone, to_phone, from_phone, twilio_call_sid, status, error, created_at, ended_at) ON public.setter_calls TO authenticated;

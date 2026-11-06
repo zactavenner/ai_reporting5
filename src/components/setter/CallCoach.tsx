@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
@@ -7,11 +7,12 @@ import { Lightbulb, ScrollText, ChevronDown, ChevronRight } from 'lucide-react';
 import { fillScript, matchObjection, pickScript, type SetterScript } from '@/lib/setterCoach';
 
 /** Script + objection coach for the lead currently open in Setter. */
-export function CallCoach({ clientId, clientName, firstName, agentName }: {
-  clientId: string; clientName?: string | null; firstName?: string | null; agentName?: string | null;
+export function CallCoach({ clientId, clientName, firstName, agentName, liveLine }: {
+  clientId: string; clientName?: string | null; firstName?: string | null; agentName?: string | null; liveLine?: string | null;
 }) {
   const [open, setOpen] = useState(true);
   const [said, setSaid] = useState('');
+  useEffect(() => { if (liveLine) setSaid(liveLine); }, [liveLine]);
   const { data: scripts = [] } = useQuery({
     queryKey: ['setter_scripts'],
     staleTime: 5 * 60_000,
