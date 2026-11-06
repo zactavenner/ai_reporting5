@@ -65,7 +65,9 @@ async function drawBlock(doc: PDFDocument, p: PDFPage, b: Block, y: number, reg:
   switch (b.kind) {
     case 'header': {
       p.drawText(winAnsi(b.eyebrow), { x: M, y: y - 9, size: 8, font: bold, color: MUTED });
-      p.drawText(fit(b.title, bold, 22, inner * 0.6), { x: M, y: y - 34, size: 22, font: bold, color: ACCENT });
+      const rightW = Math.max(0, ...b.right.map((t) => reg.widthOfTextAtSize(winAnsi(t), 8)));
+      const tSize = bold.widthOfTextAtSize(winAnsi(b.title), 22) > inner - rightW - 16 ? 16 : 22;
+      p.drawText(fit(b.title, bold, tSize, inner - rightW - 16), { x: M, y: y - 34, size: tSize, font: bold, color: ACCENT });
       b.right.forEach((t, i) => { const s = winAnsi(t); p.drawText(s, { x: W - M - reg.widthOfTextAtSize(s, 8), y: y - 18 - i * 11, size: 8, font: reg, color: MUTED }); });
       p.drawLine({ start: { x: M, y: y - 46 }, end: { x: W - M, y: y - 46 }, thickness: 1, color: LINE });
       return y - 66;
