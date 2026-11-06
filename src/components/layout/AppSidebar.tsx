@@ -94,16 +94,7 @@ const navStructure = [
   {
     title: 'Sales', value: 'sales-group', icon: Handshake,
     children: [
-      { title: 'Deals', value: 'deals', icon: Handshake },
       { title: 'Setter', value: 'setter', icon: Zap, href: '/setter' },
-      { title: 'Outreach', value: 'outreach', icon: MessageSquare },
-      { title: 'Sendblue', value: 'sendblue', icon: MessageCircle },
-      { title: 'WhatsApp', value: 'whatsapp', icon: MessageCircle, href: '/whatsapp' },
-      { title: 'Enrichment', value: 'enrichment', icon: Sparkles },
-      { title: 'Spam List', value: 'spam', icon: Shield },
-      { title: 'Communication', value: 'communication', icon: MessageSquare },
-      { title: 'Agents', value: 'agents', icon: Cpu },
-      { title: 'Agent Infrastructure', value: 'agent-infrastructure', icon: Cpu, href: '/agent-infrastructure' },
     ],
   },
   {
