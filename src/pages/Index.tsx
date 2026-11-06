@@ -90,6 +90,7 @@ import { AvatarAdWizard } from '@/components/avatar-ad/AvatarAdWizard';
 
 const StaticCreativesInline = lazy(() => import('@/pages/StaticCreativesPage'));
 const AvatarAdGenInline = lazy(() => Promise.resolve({ default: () => <AvatarAdProvider><AvatarAdWizard /></AvatarAdProvider> }));
+import { WeeklyClientReportsTab } from '@/components/reports/WeeklyClientReportsTab';
 import { TopPerformersSection } from '@/components/creative/TopPerformersSection';
 import { CreativeLibraryTab } from '@/components/creative/CreativeLibraryTab';
 const SendblueTab = lazy(() => import('@/components/sendblue/SendblueTab').then(m => ({ default: m.SendblueTab })));
@@ -901,6 +902,12 @@ const Index = () => {
             {activeTab === 'data-audit' && currentMember?.role === 'admin' && (
               <SectionErrorBoundary sectionName="DataAccuracyAudit">
                 <DataAccuracyAuditPanel />
+              </SectionErrorBoundary>
+            )}
+
+            {activeTab === 'weekly-client-reports' && (
+              <SectionErrorBoundary sectionName="Weekly Client Reports">
+                <WeeklyClientReportsTab />
               </SectionErrorBoundary>
             )}
 
