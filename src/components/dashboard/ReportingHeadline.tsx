@@ -41,6 +41,8 @@ interface ReportingHeadlineProps {
   sheetAvailable: boolean;
   databaseAvailable: boolean;
   clientNameById: Record<string, string>;
+  /** Re-runs the failed reads for the selected source. */
+  onRetry?: () => void;
 }
 
 function money(v: number | null): string {
@@ -61,6 +63,7 @@ export function ReportingHeadline({
   sheetAvailable,
   databaseAvailable,
   clientNameById,
+  onRetry,
 }: ReportingHeadlineProps) {
   const [detailOpen, setDetailOpen] = useState(false);
   const totals = aggregateScopeTotals(scope);
@@ -158,6 +161,15 @@ export function ReportingHeadline({
         {scope.hasError && (
           <span className="flex items-center gap-1 text-destructive">
             <AlertCircle className="h-3 w-3" /> Some clients failed to load and are left out (not counted as zero)
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="ml-1 rounded border border-destructive/40 px-1.5 py-0.5 font-medium hover:bg-destructive/10"
+              >
+                Retry
+              </button>
+            )}
           </span>
         )}
       </div>
