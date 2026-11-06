@@ -244,6 +244,12 @@ export function reportFacts(r: RangeReport) {
   };
 }
 
+/** Short stable hash of the facts, so a review can be flagged once the data changes. */
+export async function factsHash(facts: unknown) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(facts)));
+  return [...new Uint8Array(buf)].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 async function loadRowsBetween(sb: any, entry: RosterEntry, from: string, to: string, adRange: WeekRange): Promise<ReportRows> {
   const id = entry.id;
   const weeks = [adRange];

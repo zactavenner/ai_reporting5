@@ -6,7 +6,7 @@
 // Reviews never change source data; they are notes on top of verified numbers.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { admin, corsHeaders, json, requireOperator } from '../_shared/aiSetter/http.ts';
-import { buildRangeReport, loadRangeRows, loadRoster, reportFacts } from '../_shared/weeklyReport/model.ts';
+import { buildRangeReport, factsHash, loadRangeRows, loadRoster, reportFacts } from '../_shared/weeklyReport/model.ts';
 
 const UUID = /^[0-9a-f-]{36}$/i;
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
@@ -17,11 +17,6 @@ function parseRange(body: any) {
   if (typeof from !== 'string' || typeof to !== 'string' || !YMD.test(from) || !YMD.test(to) || to < from) return null;
   if ((Date.parse(to) - Date.parse(from)) / 86400000 > 366) return null;
   return { from, to };
-}
-
-export async function factsHash(facts: unknown) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(facts)));
-  return [...new Uint8Array(buf)].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 function cleanItems(raw: unknown) {
