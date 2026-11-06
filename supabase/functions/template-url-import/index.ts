@@ -66,6 +66,13 @@ Deno.serve(async (req) => {
     const kind = body?.kind === "video" ? "video" : body?.kind === "image" ? "image" : null;
     const name = String(body?.name || "").trim().slice(0, 80) || null;
     const clientId = body?.client_id ? String(body.client_id) : null;
+    // 'reference' = new find to test (carries view count + prompt instructions);
+    // 'template' = proven converter. Anything else defaults to template.
+    const library = body?.library === "reference" ? "reference" : "template";
+    const viewCount = Number.isFinite(Number(body?.view_count)) && body?.view_count !== null && body?.view_count !== undefined
+      ? Math.max(0, Math.floor(Number(body.view_count)))
+      : null;
+    const instructions = String(body?.instructions || "").trim().slice(0, 2000) || null;
 
     if (!kind) return json(400, { error: "kind must be 'video' or 'image'" });
     if (!url) return json(400, { error: "url is required" });
@@ -142,6 +149,9 @@ Deno.serve(async (req) => {
       created_by: userId,
       client_id: clientId,
       source: "url_import",
+      library,
+      view_count: viewCount,
+      instructions,
     };
     if (kind === "video") row.video_url = publicUrl;
     else row.image_url = publicUrl;
