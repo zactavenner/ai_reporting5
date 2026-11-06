@@ -12,6 +12,8 @@ import { useClientOffers } from "@/hooks/useClientOffers";
 import { TemplateLibrary } from "./TemplateLibrary";
 import { StaticGenerator } from "./StaticGenerator";
 import { subDays } from "date-fns";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AIStudioTab } from "@/components/ai/AIStudioTab";
 
 /**
  * Content → Video Ads / Static Ads tabs.
@@ -62,6 +64,7 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
   const clientId = selected?.id || "";
 
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
+  const [view, setView] = useState<"create" | "top" | "templates">("create");
 
   const handleClientChange = (id: string) => {
     setSelectedClientId(id);
@@ -166,14 +169,40 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
                   </p>
                 )}
               </div>
-              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onOpenStudio}>
-                <Sparkles className="h-3.5 w-3.5 mr-1" />
-                Open in AI Studio
-              </Button>
+
             </div>
           </Card>
 
+          <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+            <TabsList className="h-9 rounded-xl">
+              <TabsTrigger value="create" className="rounded-lg text-xs">Create</TabsTrigger>
+              <TabsTrigger value="top" className="rounded-lg text-xs">Top performers</TabsTrigger>
+              <TabsTrigger value="templates" className="rounded-lg text-xs">
+                Templates{selectedTemplates.length > 0 ? ` · ${selectedTemplates.length}` : ""}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {view === "create" && (
+            <div className="flex flex-col gap-4">
+              {mediaType === "static" && (
+                <Card className="p-3 sm:p-4">
+                  <StaticGenerator clientId={clientId} clientName={selected.name} offerSummary={offerSummary} />
+                </Card>
+              )}
+              <div className="h-[calc(100dvh-14rem)] min-h-[640px]">
+                <AIStudioTab
+                  key={`${clientId}-${mediaType}`}
+                  clientId={clientId}
+                  clientName={selected.name}
+                  lockedAgent={mediaType === "video" ? "slug:video_ads" : "slug:static_ads"}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Top creatives under $100 CPL */}
+          {view === "top" && (
           <Card className="p-3 sm:p-4">
             <div className="flex items-center gap-2 mb-3">
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -235,14 +264,10 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
             )}
           </Card>
 
-          {/* Static generator (static tab only) */}
-          {mediaType === "static" && (
-            <Card className="p-3 sm:p-4">
-              <StaticGenerator clientId={clientId} clientName={selected.name} offerSummary={offerSummary} />
-            </Card>
           )}
 
           {/* Template library */}
+          {view === "templates" && (
           <Card className="p-3 sm:p-4">
             <TemplateLibrary
               kind={mediaType === "video" ? "video" : "image"}
@@ -257,9 +282,9 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
                   <Badge variant="secondary" className="text-[10px]">
                     {selectedTemplates.length} template{selectedTemplates.length > 1 ? "s" : ""} selected
                   </Badge>
-                  <Button size="sm" className="h-8 text-xs" onClick={onOpenStudio}>
+                  <Button size="sm" className="h-8 text-xs" onClick={() => setView("create")}>
                     <Sparkles className="h-3.5 w-3.5 mr-1" />
-                    Recreate in AI Studio
+                    Recreate selected
                   </Button>
                   <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSelectedTemplates([])}>
                     Clear selection
@@ -268,6 +293,7 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
               </>
             )}
           </Card>
+          )}
         </>
       )}
     </div>

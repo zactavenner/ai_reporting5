@@ -81,7 +81,6 @@ const navStructure = [
     children: [
       { title: 'Video Ads', value: 'content-video-ads', icon: Play },
       { title: 'Static Ads', value: 'content-static-ads', icon: ImageIcon },
-      { title: 'AI Studio', value: 'ai-studio', icon: Palette },
       { title: 'Creative Library', value: 'creative-library', icon: Megaphone },
       { title: 'Top Creatives', value: 'top-performers', icon: TrendingUp },
       { title: 'AI Review', value: 'ai', icon: Bot },
