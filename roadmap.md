@@ -1,83 +1,10 @@
-# Roadmap — MeetGeek containment (urgent)
+# Roadmap — Setter rebuild (molded from PPS - Setting)
 
-## Containment (done)
-- [x] Stop all historical replay + sheet delivery processing (poll cron disabled, bulk actions behind `MEETGEEK_ALLOW_BULK`).
-- [x] Keep every `client_meetgeek_settings` disabled (enabled = 0). Restore list held by user.
-- [x] Quarantine misattributed `meeting_records`, `meeting_call_activity`, pending `meeting_sheet_deliveries`.
-- [x] Audit + redact ONLY the erroneous Legacy Capital note; internal audit entry recorded; nobody contacted.
+## Done
+- Phase 1: Script & coach panel (client/agency scripts, objection replies), hot-lead flag + Hot queue tab, hotkeys 1–7 / H.
 
-## Resolution correctness (done)
-- [x] Removed every time-only and attendee-only tenant authority.
-- [x] Require stable invite UID or identical join URL + unambiguous external attendee.
-- [x] Ledger fallback no longer synthesizes appointment authority from time.
-- [x] Internal-only HPA meetings classified internal; never written to client leads.
-- [x] Attribution validated and persisted BEFORE any GHL note write.
-- [x] Fixed `bot_guest_email` column query (fail-closed on error).
-- [x] Reject partial/missing transcripts (`transcript_incomplete`, min 200 chars).
-
-## Regression tests (done — 132 passing)
-- [x] The exact internal meeting fae18b69… → internal, no client note.
-- [x] Two different clients meeting simultaneously.
-- [x] Mismatched join URLs.
-- [x] Host email present as a lead under many clients.
-- [x] Verified exact-appointment pilot writes exactly one note.
-
-## Remaining (blocked / next)
-- [ ] Pilot re-enable of ONE client per the checklist in `docs/meetgeek-end-to-end-verification.md` — needs operator go-ahead.
-- [ ] Earlier calendar mirror / phone-coverage tasks.
-
-# Master AI Video (AI Studio)
-- [x] Six-step workflow, approval gates, guarded render route, contract tests.
-- [x] QA blocker: portal (password/name) sessions have no Supabase auth user →
-      identity now resolves auth uid → verified dashboard member; draft load/save
-      goes through the guarded edge route; errors are visible, never a spinner.
-- [ ] Verify through a real dashboard sign-in in the preview (needs the dashboard password).
-
-# Week 4 AI marketing (plan approved 2026-09-21)
-Plan: `.lovable/plan/week-4-ai-marketing-inside-reporting-5-0-2026-09-21.md`
-
-## Phase 1 — foundation (in progress)
-- [x] Refresh evidence counts (21 active clients; 23 KPI rows, 0 target_cpql / 0 qualification_lag_days; 719 phone rows all `awaiting_recording`; 3 meeting records all quarantined; 294 creative intel findings; 44 offers / 9 offer files; knowledge_base_documents, client_brain, content_queue empty).
-- [x] Diagnose the call-recording gap: every `phone_call_records` row (provider `webhook`) carries a GHL **workflow form** payload (appointment outcome, call-notes custom fields) with **no recording URL of any kind**. `call-transcription` therefore parks them as `awaiting_recording` — correct behaviour, not a transcription bug. Fixing capture means sending a call/recording webhook (or pulling recordings from the CRM/dialer), not changing the transcriber.
-- [ ] Map each agency role to its actual runner → ledger → artifact (agent_task_runs: 264 completed / 10,876 failed; agent_runs last activity Sep 14) and record which roles have a real completed artifact.
-- [ ] Per-workflow completion contract (received → validated → processed → reviewed → approved → dispatched → readback → outcome reconciled).
-- [ ] Approved-pack schema/permission review before any build.
-
-## Blocked on owner/client decisions
-- [ ] Pilot fund + agency ICP selection; recording rights/retention and CRM recording access.
-- [ ] Approved claims/disclosures, qualification criteria, CPQL and lag values per pilot client.
-- [ ] Channel/consent/handoff rules and recipient roles for reports and nurture.
-- [ ] Per-client cost and media caps; labor/vendor costs for margin.
-- [x] Runner→artifact map: account_manager 0 completed / 7,879 failed, copywriter / video_ads / static_ads 0 completed — all pointed at an AI model name the provider rejects (400 invalid model id, 1,292 failures in 7 days). Corrected to the working model in the agent records and in the app/backends; `ai-studio` and `test-agent` redeployed. media_buyer / reporting / sales_agent / jeremy_ai do produce completed runs.
-- [ ] Remaining 963 provider "user not found" (401) failures in the last 7 days — needs the AI provider account/key checked by the owner; no key was touched.
-
-## Call recording capture (built, off by default)
-- [x] `_shared/ghlCallRecordings.ts` pure rules + 14 tests (call detection, reason codes, duration floor, bounded retries, cursors, run budget).
-- [x] `ghl-call-recordings` function: read-only `audit`, bounded `capture` (per-client lease, cursor, budget), single-call `webhook`, per-client `state` (enable + consent).
-- [x] Migration: `call_recording_capture_state` (backend-only), `phone_call_records.recording_status/checked_at/attempts`, `v_client_call_recording_coverage`.
-- [x] `call-transcription` pending queue now only takes rows with a confirmed-fetchable recording.
-- [x] Read-only audit proves recordings exist: AMT 2/8, Atlas Parker 4/8, Clear Summit 2/7, Clever Capital 2/3 available; most gaps are calls under 30s.
-- [ ] Owner decisions before capture is enabled for any client: pilot client, recording consent confirmation, retention, backfill window (default 30 days).
-
-## Sendblue (texting) — built Sep 21
-- Tab live on the main menu and inside every client account (Messages / Numbers / Connection).
-- Numbers registry: add an existing Sendblue number or request a new one (preview then confirm).
-- Sending: replies always allowed after an inbound message; starting a new conversation requires an outbound-capable number; opt-outs block every send.
-- Every message is mirrored into the client's CRM contact as an internal note only (exact phone match; ambiguous or unmatched are skipped, never guessed).
-- Open: agency Sendblue API key + secret, the webhook signing secret, and a first pilot client for end-to-end proof.
-
-- [ ] Send Atlas Parker ad spend Sep 16 - Sep 21 to its reporting sheet (requested Sep 22)
-
-# Client project access (requested Sep 23)
-- [x] Add scoped client login for Emily across Clear Summit Investments and 5 Winds, limited to viewing and adding tasks in those client projects.
-- [x] Keep each task column readable with fixed-width columns and horizontal board scrolling.
-- [x] Add ad account 1948413122522274 to Lansing Capital
-
-# External agents + Agents Team (2026-10-19)
-- [x] Registry for Grok PPM / Alfred / Muse / Claude (all Off, unlinked), write-only credentials.
-- [x] Assignment outbox (trigger-fed, revive on resave, cancel on unassign), atomic lease claim, bounded retry, ambiguous → review.
-- [x] Signed per-agent callbacks with replay guard + task scope; shared #agents-team with bounded @mention routing.
-- [x] OAuth MCP pull tools (list_my_assignments, claim_assignment, post_task_update, list/post team messages).
-- [x] Mac outbound worker transport (Alfred=Codex CLI, Claude=Claude Code) + per-task session continuity + remote MCP adapter for Grok PPM/Muse.
-- [ ] Link each agent to its task member + connect endpoint/secret — needs Zac (per-agent endpoint details).
-- [ ] Republish so the MCP pull tools go live.
+## Open
+- Phase 2: Script editor UI (create/edit client scripts).
+- Phase 3: Lead memory (facts/summary shared by human setters + AI caller).
+- Phase 4: Browser dialer with live transcript feeding the coach automatically (needs Twilio voice connection).
+- Phase 5: Unified Messages inbox view (SMS/email/calls across clients, unread).

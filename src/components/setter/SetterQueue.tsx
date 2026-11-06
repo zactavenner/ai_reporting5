@@ -14,7 +14,7 @@ interface Props {
   onSelect: (l: SetterLead) => void;
 }
 
-type Tab = 'uncontacted' | 'all' | 'contacted' | 'callbacks' | 'unread';
+type Tab = 'uncontacted' | 'all' | 'contacted' | 'callbacks' | 'unread' | 'hot';
 
 const ROW_HEIGHT = 82;
 
@@ -54,6 +54,7 @@ export function SetterQueue({ leads, selectedId, onSelect }: Props) {
     if (tab === 'uncontacted') rows = rows.filter(l => l.touch_count === 0);
     else if (tab === 'contacted') rows = rows.filter(l => l.touch_count > 0);
     else if (tab === 'callbacks') rows = rows.filter(l => !!l.next_callback_at);
+    else if (tab === 'hot') rows = rows.filter(l => !!l.is_hot);
     else if (tab === 'unread') rows = rows.filter(l => hasUnread(l, viewedMap[l.id] || 0));
     if (q.trim()) {
       const s = q.toLowerCase();
@@ -80,6 +81,7 @@ export function SetterQueue({ leads, selectedId, onSelect }: Props) {
     uncontacted: leads.filter(l => !l.is_spam && l.touch_count === 0).length,
     contacted: leads.filter(l => l.touch_count > 0).length,
     callbacks: leads.filter(l => !!l.next_callback_at).length,
+    hot: leads.filter(l => !l.is_spam && !!l.is_hot).length,
     unread: leads.filter(l => !l.is_spam && hasUnread(l, viewedMap[l.id] || 0)).length,
   };
 
@@ -100,6 +102,7 @@ export function SetterQueue({ leads, selectedId, onSelect }: Props) {
         <div className="flex gap-1 text-xs flex-wrap" role="tablist">
           {([
             { k: 'uncontacted', label: 'Uncontacted' },
+            { k: 'hot', label: 'Hot' },
             { k: 'unread', label: 'Unread' },
             { k: 'callbacks', label: 'Callbacks' },
             { k: 'all', label: 'All' },
@@ -139,6 +142,7 @@ export function SetterQueue({ leads, selectedId, onSelect }: Props) {
 function emptyLabel(tab: Tab): string {
   switch (tab) {
     case 'unread': return 'No unread replies.';
+    case 'hot': return 'No hot leads — press H on a lead to flag it.';
     case 'callbacks': return 'No callbacks scheduled.';
     case 'uncontacted': return 'No uncontacted leads — you\'re caught up.';
     default: return 'No leads.';
