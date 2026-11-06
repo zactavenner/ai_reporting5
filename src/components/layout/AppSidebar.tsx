@@ -68,88 +68,59 @@ interface AppSidebarProps {
   onTabChange: (tab: string) => void;
 }
 
-// Five everyday choices sit at the top level. Every other capability keeps its
-// exact destination (same tab value / href / external URL) but lives under
-// "More tools", so deep links and permissions are unchanged.
+// Menu follows the four product pillars (Content, Ads, Sales, Analytics).
+// Every item keeps its exact destination (tab value / href / external URL),
+// so deep links and permissions are unchanged.
 const navStructure = [
+  { title: 'Dashboard', value: 'dashboard', icon: LayoutDashboard },
+  { title: 'Tasks', value: 'tasks', icon: ClipboardCheck },
   {
-    title: 'Clients',
-    value: 'dashboard',
-    icon: Users,
-  },
-  {
-    title: 'Tasks',
-    value: 'tasks',
-    icon: ClipboardCheck,
-  },
-  {
-    title: 'Communication',
-    value: 'communication',
-    icon: MessageSquare,
-  },
-  {
-    title: 'AI Review',
-    value: 'ai',
-    icon: Bot,
-  },
-  {
-    title: 'AI Studio',
-    value: 'ai-studio',
-    icon: Palette,
-  },
-  {
-    title: 'Creative Library',
-    value: 'creative-library',
-    icon: Megaphone,
-  },
-  {
-    title: 'Top Creatives',
-    value: 'top-performers',
-    icon: TrendingUp,
-  },
-  {
-    title: 'Connections',
-    value: 'integrations',
-    icon: Plug,
-  },
-  {
-    title: 'Sendblue',
-    value: 'sendblue',
-    icon: MessageCircle,
-  },
-  {
-    title: 'AI Meetings',
-    value: 'ai-meetings',
-    icon: Sparkles,
-  },
-  {
-    title: 'More tools',
-    value: 'more-tools',
-    icon: Wrench,
+    title: 'Content', value: 'content-group', icon: Palette,
     children: [
-      { title: 'Daily Huddle', value: 'huddle', icon: Timer, href: '/huddle' },
-      { title: 'Meetings', value: 'meetings', icon: Video },
-      { title: 'Call Transcripts', value: 'call-transcripts', icon: Phone },
-      { title: 'Deals', value: 'deals', icon: Handshake },
-      { title: 'Outreach', value: 'outreach', icon: MessageSquare },
+      { title: 'AI Studio', value: 'ai-studio', icon: Palette },
+      { title: 'Creative Library', value: 'creative-library', icon: Megaphone },
+      { title: 'Top Creatives', value: 'top-performers', icon: TrendingUp },
+      { title: 'AI Review', value: 'ai', icon: Bot },
       { title: 'Offers', value: 'offers', icon: FileText },
+    ],
+  },
+  {
+    title: 'Ads', value: 'ads-group', icon: Megaphone,
+    children: [
       { title: 'Ads Generator', value: 'ads-generator-ext', icon: ExternalLink, externalUrl: 'https://id-preview--b57a79c0-3e59-4a78-be94-340c58fe824e.lovable.app' },
-      { title: 'Setter', value: 'setter', icon: Zap, href: '/setter' },
-      { title: 'WhatsApp', value: 'whatsapp', icon: MessageCircle, href: '/whatsapp' },
-      { title: 'Agents', value: 'agents', icon: Cpu },
-      { title: 'Agent Infrastructure', value: 'agent-infrastructure', icon: Cpu, href: '/agent-infrastructure' },
-      { title: 'Enrichment', value: 'enrichment', icon: Sparkles },
       { title: 'Quality Feedback', value: 'quality-feedback', icon: ShieldCheck },
     ],
   },
   {
-    title: 'Settings',
-    value: 'settings-group',
-    icon: Settings,
+    title: 'Sales', value: 'sales-group', icon: Handshake,
+    children: [
+      { title: 'Deals', value: 'deals', icon: Handshake },
+      { title: 'Setter', value: 'setter', icon: Zap, href: '/setter' },
+      { title: 'Outreach', value: 'outreach', icon: MessageSquare },
+      { title: 'Sendblue', value: 'sendblue', icon: MessageCircle },
+      { title: 'WhatsApp', value: 'whatsapp', icon: MessageCircle, href: '/whatsapp' },
+      { title: 'Enrichment', value: 'enrichment', icon: Sparkles },
+      { title: 'Spam List', value: 'spam', icon: Shield },
+      { title: 'Communication', value: 'communication', icon: MessageSquare },
+      { title: 'Agents', value: 'agents', icon: Cpu },
+      { title: 'Agent Infrastructure', value: 'agent-infrastructure', icon: Cpu, href: '/agent-infrastructure' },
+    ],
+  },
+  {
+    title: 'Analytics', value: 'analytics-group', icon: BarChart3,
+    children: [
+      { title: 'AI Meetings', value: 'ai-meetings', icon: Sparkles },
+      { title: 'Meetings', value: 'meetings', icon: Video },
+      { title: 'Call Transcripts', value: 'call-transcripts', icon: Phone },
+      { title: 'Data · Google Sheets', value: 'huddle', icon: FileText, href: '/huddle' },
+      { title: 'Email Reports & Dashboards', value: 'email', icon: Globe },
+    ],
+  },
+  {
+    title: 'Settings', value: 'settings-group', icon: Settings,
     children: [
       { title: 'Database', value: 'database', icon: Database },
-      { title: 'Spam List', value: 'spam', icon: Shield },
-      { title: 'Integrations', value: 'integrations', icon: Plug },
+      { title: 'Connections', value: 'integrations', icon: Plug },
     ],
   },
 ];
