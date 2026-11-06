@@ -15587,6 +15587,32 @@ export type Database = {
         }
         Relationships: []
       }
+      inbox_reads: {
+        Row: {
+          lead_id: string
+          member_key: string
+          read_at: string
+        }
+        Insert: {
+          lead_id: string
+          member_key: string
+          read_at?: string
+        }
+        Update: {
+          lead_id?: string
+          member_key?: string
+          read_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_reads_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instagram_creatives: {
         Row: {
           caption: string | null
@@ -17637,6 +17663,75 @@ export type Database = {
             columns: ["meeting_record_id"]
             isOneToOne: false
             referencedRelation: "meeting_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_memory: {
+        Row: {
+          author: string | null
+          body: string
+          client_id: string
+          created_at: string
+          id: string
+          kind: string
+          lead_id: string
+          source: string
+        }
+        Insert: {
+          author?: string | null
+          body: string
+          client_id: string
+          created_at?: string
+          id?: string
+          kind?: string
+          lead_id: string
+          source?: string
+        }
+        Update: {
+          author?: string | null
+          body?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          lead_id?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_memory_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_memory_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_memory_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_memory_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_memory_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
         ]
@@ -23379,6 +23474,122 @@ export type Database = {
             columns: ["line_id"]
             isOneToOne: false
             referencedRelation: "sendblue_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      setter_call_lines: {
+        Row: {
+          body: string
+          call_id: string
+          created_at: string
+          id: string
+          speaker: string
+        }
+        Insert: {
+          body: string
+          call_id: string
+          created_at?: string
+          id?: string
+          speaker: string
+        }
+        Update: {
+          body?: string
+          call_id?: string
+          created_at?: string
+          id?: string
+          speaker?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "setter_call_lines_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "setter_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      setter_calls: {
+        Row: {
+          client_id: string
+          created_at: string
+          ended_at: string | null
+          error: string | null
+          from_phone: string | null
+          id: string
+          lead_id: string | null
+          setter_name: string | null
+          setter_phone: string
+          status: string
+          to_phone: string
+          twilio_call_sid: string | null
+          webhook_token: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          ended_at?: string | null
+          error?: string | null
+          from_phone?: string | null
+          id?: string
+          lead_id?: string | null
+          setter_name?: string | null
+          setter_phone: string
+          status?: string
+          to_phone: string
+          twilio_call_sid?: string | null
+          webhook_token: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          ended_at?: string | null
+          error?: string | null
+          from_phone?: string | null
+          id?: string
+          lead_id?: string | null
+          setter_name?: string | null
+          setter_phone?: string
+          status?: string
+          to_phone?: string
+          twilio_call_sid?: string | null
+          webhook_token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "setter_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "setter_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setter_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "setter_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "setter_calls_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
         ]

@@ -64,6 +64,13 @@
       "when": 1793981844548,
       "tag": "0008_setter_scripts_and_hot_leads",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793982418512,
+      "tag": "0009_setter_memory_inbox_calls",
+      "breakpoints": true
     }
   ]
 }
