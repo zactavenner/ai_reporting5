@@ -237,8 +237,20 @@ export function VideoPipeline({ clientId, clientName, offerTitle, offerDescripti
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      const videoUrl: string | undefined = data?.videoUrl;
-      if (!videoUrl) throw new Error("No video came back");
+      let result = data;
+      // Long renders come back as a pending job — keep polling (up to ~10 min).
+      for (let i = 0; result?.status === "pending" && result?.jobUrl && i < 120; i++) {
+        await new Promise((r) => setTimeout(r, 5000));
+        const { data: pd, error: pe } = await supabase.functions.invoke("generate-video-from-image", {
+          headers: dashboardTokenHeaders(),
+          body: { pollJobUrl: result.jobUrl },
+        });
+        if (pe) throw pe;
+        if (pd?.error) throw new Error(pd.error);
+        result = pd;
+      }
+      const videoUrl: string | undefined = result?.videoUrl;
+      if (!videoUrl) throw new Error(result?.status === "pending" ? "Video is still rendering — try again shortly" : "No video came back");
       patch(t.id, { videoUrl, busy: null });
       toast.success("Video rendered");
     } catch (e: any) {
