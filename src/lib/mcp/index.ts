@@ -21,6 +21,8 @@ import claimAssignment from "./tools/claim-assignment";
 import postTaskUpdate from "./tools/post-task-update";
 import listTeamMessages from "./tools/list-team-messages";
 import postTeamMessage from "./tools/post-team-message";
+import getClientReport from "./tools/get-client-report";
+import postReportReview from "./tools/post-report-review";
 
 // The OAuth issuer must be the direct Supabase host (not the Cloud proxy).
 const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID ?? "project-ref-unset";
@@ -58,5 +60,7 @@ export default defineMcp({
     postTaskUpdate,
     listTeamMessages,
     postTeamMessage,
+    getClientReport,
+    postReportReview,
   ],
 });

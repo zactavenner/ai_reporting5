@@ -9179,6 +9179,77 @@ export type Database = {
           },
         ]
       }
+      client_report_reviews: {
+        Row: {
+          author_kind: string
+          author_name: string | null
+          client_id: string
+          created_at: string
+          external_agent_id: string | null
+          facts_hash: string | null
+          id: string
+          items: Json
+          range_from: string
+          range_to: string
+          summary: string | null
+        }
+        Insert: {
+          author_kind: string
+          author_name?: string | null
+          client_id: string
+          created_at?: string
+          external_agent_id?: string | null
+          facts_hash?: string | null
+          id?: string
+          items?: Json
+          range_from: string
+          range_to: string
+          summary?: string | null
+        }
+        Update: {
+          author_kind?: string
+          author_name?: string | null
+          client_id?: string
+          created_at?: string
+          external_agent_id?: string | null
+          facts_hash?: string | null
+          id?: string
+          items?: Json
+          range_from?: string
+          range_to?: string
+          summary?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_report_reviews_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_report_reviews_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_report_reviews_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_report_reviews_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       client_report_sends: {
         Row: {
           cadence: string
@@ -27334,6 +27405,16 @@ export type Database = {
           sender_name: string
           task_id: string
         }[]
+      }
+      mcp_agent_post_report_review: {
+        Args: {
+          p_client_id: string
+          p_from: string
+          p_items: Json
+          p_summary: string
+          p_to: string
+        }
+        Returns: string
       }
       mcp_agent_post_task_update: {
         Args: {

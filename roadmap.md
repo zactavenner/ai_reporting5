@@ -11,3 +11,12 @@
 ## Open
 - Verify a real live call end-to-end (needs a setter to place one).
 - AI caller writing into lead memory.
+
+# Roadmap — Client Reporting (Analytics → Reporting)
+## Done
+- Artifact-style report for every active client with date picker, sheet-style daily table, raise bar, commitments/funded, creatives, attention.
+- AI review + agent tools (get_client_report / post_report_review) + team notes.
+- Menu renamed to "Reporting"; setup & weekly delivery moved to a secondary view.
+## Open
+- Agent tools go live only after publishing (MCP).
+- Booked/funded counts differ from the GHL pipeline for some clients (e.g. InjuryPro) — needs sync review.

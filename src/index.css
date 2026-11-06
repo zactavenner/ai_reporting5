@@ -232,4 +232,9 @@ html {
   body.printing-weekly .weekly-page { break-after: page; border: none !important; box-shadow: none !important; min-height: 10in; }
   body.printing-weekly .weekly-page:last-child { break-after: auto; }
   @page { size: letter; margin: 0.4in; }
+  body.printing-report * { visibility: hidden; }
+  body.printing-report #client-report-print, body.printing-report #client-report-print * { visibility: visible; }
+  body.printing-report #client-report-print { position: absolute; left: 0; top: 0; width: 100%; max-width: none; }
+  body.printing-report .no-print { display: none !important; }
+  body.printing-report .report-section { break-inside: avoid; }
 }

@@ -114,9 +114,10 @@ export function computeWeek(cfg: ClientReportConfig, r: WeekRange, d: { leads: L
   const tz = cfg.timezone;
   const spendRows = d.spend.filter((s) => inRange(s.date, r) && s.ad_spend != null);
   const days = new Set(spendRows.map((s) => s.date)).size;
+  const expected = rangeDays(r);
   const spendTotal = spendRows.reduce((a, s) => a + Number(s.ad_spend || 0), 0);
-  const spend: Metric = days === 0 ? NA('No synced spend for this week')
-    : days < 7 ? { value: spendTotal, partial: true, note: `Partial: ${days}/7 days synced` } : M(spendTotal);
+  const spend: Metric = days === 0 ? NA('No synced spend for this period')
+    : days < expected ? { value: spendTotal, partial: true, note: `Partial: ${days}/${expected} days synced` } : M(spendTotal);
 
   const vl = verifiedLeads(d.leads, r, tz);
   const crmNA = NA('CRM not connected or never synced');
@@ -124,30 +125,14 @@ export function computeWeek(cfg: ClientReportConfig, r: WeekRange, d: { leads: L
   const fl = d.formLeads.filter((f) => inRange(f.date, r) && f.leads != null);
   const metaFormLeads = fl.length ? M(fl.reduce((a, f) => a + Number(f.leads || 0), 0)) : NA('No Meta form counts');
 
-  const tracked = new Set(cfg.trackedCalendarIds);
-  const calls = d.calls.filter((c) => !c.is_reconnect && (tracked.size === 0 || (c.ghl_calendar_id && tracked.has(c.ghl_calendar_id))));
-  const seenAppt = new Set<string>();
-  let booked = 0;
-  for (const c of calls) {
-    const at = c.booked_at; if (!at || !inRange(localDate(at, tz), r)) continue;
-    const k = c.ghl_appointment_id || c.id; if (seenAppt.has(k)) continue; seenAppt.add(k); booked++;
-  }
+  const booked = bookedDates(cfg, d.calls, r).length;
   const vlIds = new Set(vl.map((l) => l.id));
   const cohort = new Set(d.calls.filter((c) => c.lead_id && vlIds.has(c.lead_id)).map((c) => c.lead_id)).size;
 
   let shows: Metric;
   if (!cfg.crmConnected) shows = crmNA;
-  else if (tracked.size === 0) shows = NA('Show tracking off — no tracked calendars configured');
-  else {
-    const seen = new Set<string>(); let n = 0;
-    for (const c of calls) {
-      if (!c.scheduled_at || new Date(c.scheduled_at) > now || !inRange(localDate(c.scheduled_at, tz), r)) continue;
-      const st = (c.appointment_status || '').toLowerCase();
-      if (c.showed !== true || !(st === 'showed' || st === 'completed')) continue;
-      const k = c.ghl_appointment_id || c.id; if (seen.has(k)) continue; seen.add(k); n++;
-    }
-    shows = M(n);
-  }
+  else if (cfg.trackedCalendarIds.length === 0) shows = NA('Show tracking off — no tracked calendars configured');
+  else shows = M(showDates(cfg, d.calls, r, now).length);
 
   const fundedInWeek = d.funded.filter((f) => f.is_verified_funded && f.funded_at && inRange(localDate(f.funded_at, tz), r));
   const funded = !cfg.isCapital ? NA('Not a capital account') : !cfg.crmConnected ? crmNA : M(fundedInWeek.reduce((a, f) => a + Number(f.funded_amount || 0), 0));
@@ -166,6 +151,87 @@ export function computeWeek(cfg: ClientReportConfig, r: WeekRange, d: { leads: L
     shows, costPerShow: div(spend, shows),
     committed, funded, pipelineInterest,
   };
+}
+
+/** Inclusive number of days in a range. */
+export function rangeDays(r: WeekRange): number { return Math.round((Date.parse(r.to) - Date.parse(r.from)) / 86400000) + 1; }
+/** Same-length period immediately before `r`. */
+export function priorRange(r: WeekRange): WeekRange { const n = rangeDays(r); return { from: addDays(r.from, -n), to: addDays(r.from, -1) }; }
+export function eachDay(r: WeekRange): string[] { const out: string[] = []; for (let d = r.from; d <= r.to; d = addDays(d, 1)) out.push(d); return out; }
+
+function trackedCalls(cfg: ClientReportConfig, calls: CallRow[]) {
+  const tracked = new Set(cfg.trackedCalendarIds);
+  return calls.filter((c) => !c.is_reconnect && (tracked.size === 0 || (c.ghl_calendar_id && tracked.has(c.ghl_calendar_id))));
+}
+/** Local dates of calendar booking events in range (deduped by appointment). */
+export function bookedDates(cfg: ClientReportConfig, calls: CallRow[], r: WeekRange): string[] {
+  const seen = new Set<string>(); const out: string[] = [];
+  for (const c of trackedCalls(cfg, calls)) {
+    if (!c.booked_at) continue; const d = localDate(c.booked_at, cfg.timezone); if (!inRange(d, r)) continue;
+    const k = c.ghl_appointment_id || c.id; if (seen.has(k)) continue; seen.add(k); out.push(d);
+  }
+  return out;
+}
+/** Local dates of shows in range: tracked calendar, past start, showed=true AND status showed/completed. */
+export function showDates(cfg: ClientReportConfig, calls: CallRow[], r: WeekRange, now = new Date()): string[] {
+  const seen = new Set<string>(); const out: string[] = [];
+  for (const c of trackedCalls(cfg, calls)) {
+    if (!c.scheduled_at || new Date(c.scheduled_at) > now) continue;
+    const d = localDate(c.scheduled_at, cfg.timezone); if (!inRange(d, r)) continue;
+    const st = (c.appointment_status || '').toLowerCase();
+    if (c.showed !== true || !(st === 'showed' || st === 'completed')) continue;
+    const k = c.ghl_appointment_id || c.id; if (seen.has(k)) continue; seen.add(k); out.push(d);
+  }
+  return out;
+}
+
+export interface CapitalEvent { kind: 'commit' | 'funded'; date: string; amount: number; name: string | null }
+/** Commitments dated by committed_at; funded only when verified and dated by funded_at. */
+export function capitalEvents(cfg: ClientReportConfig, funded: (FundedRow & { name?: string | null })[], r: WeekRange): CapitalEvent[] {
+  if (!cfg.isCapital) return [];
+  const out: CapitalEvent[] = [];
+  for (const f of funded) {
+    if (f.committed_at && Number(f.commitment_amount || 0) > 0) {
+      const d = localDate(f.committed_at, cfg.timezone);
+      if (inRange(d, r)) out.push({ kind: 'commit', date: d, amount: Number(f.commitment_amount), name: f.name ?? null });
+    }
+    if (f.is_verified_funded && f.funded_at && Number(f.funded_amount || 0) > 0) {
+      const d = localDate(f.funded_at, cfg.timezone);
+      if (inRange(d, r)) out.push({ kind: 'funded', date: d, amount: Number(f.funded_amount), name: f.name ?? null });
+    }
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export type Tally = { n: number; amount: number };
+export interface DayRow {
+  date: string; spend: number | null; leads: number | null; booked: number | null; showed: number | null;
+  commits: Tally | null; funded: Tally | null;
+}
+
+/** Sheet-style daily rows. null = not tracked/unavailable (never a fake 0). Totals equal computeWeek. */
+export function dailyRows(cfg: ClientReportConfig, r: WeekRange, d: { leads: LeadRow[]; calls: CallRow[]; spend: SpendRow[]; funded: FundedRow[] }, now = new Date()): DayRow[] {
+  assertIsolated(cfg.clientId, d.leads, d.calls, d.spend, d.funded);
+  const tz = cfg.timezone; const today = localDate(now, tz);
+  const spend = new Map<string, number>();
+  for (const s of d.spend) if (inRange(s.date, r) && s.ad_spend != null) spend.set(s.date, (spend.get(s.date) || 0) + Number(s.ad_spend));
+  const count = (dates: string[]) => { const m = new Map<string, number>(); for (const x of dates) m.set(x, (m.get(x) || 0) + 1); return m; };
+  const leads = count(verifiedLeads(d.leads, r, tz).map((l) => localDate(l.created_at, tz)));
+  const booked = count(bookedDates(cfg, d.calls, r));
+  const shows = count(showDates(cfg, d.calls, r, now));
+  const ev = capitalEvents(cfg, d.funded, r);
+  const hasCommitSource = d.funded.some((f) => f.committed_at && Number(f.commitment_amount || 0) > 0);
+  const tally = (kind: CapitalEvent['kind'], day: string): Tally => ev.filter((e) => e.kind === kind && e.date === day).reduce((a, e) => ({ n: a.n + 1, amount: a.amount + e.amount }), { n: 0, amount: 0 });
+  const showsOn = cfg.crmConnected && cfg.trackedCalendarIds.length > 0;
+  return eachDay(r).map((day) => ({
+    date: day,
+    spend: spend.has(day) ? spend.get(day)! : null,
+    leads: cfg.crmConnected ? leads.get(day) || 0 : null,
+    booked: cfg.crmConnected ? booked.get(day) || 0 : null,
+    showed: showsOn && day <= today ? shows.get(day) || 0 : null,
+    commits: cfg.isCapital && hasCommitSource ? tally('commit', day) : null,
+    funded: cfg.isCapital && cfg.crmConnected ? tally('funded', day) : null,
+  }));
 }
 
 export function pctChange(cur: Metric, prev: Metric): number | null {
