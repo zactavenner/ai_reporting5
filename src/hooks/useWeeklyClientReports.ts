@@ -49,7 +49,7 @@ export function useWeeklyReportRoster() {
         sb.from('client_report_recipients').select('id,client_id,channels,cadences,active,unsubscribed_at').in('client_id', ids).eq('active', true).is('unsubscribed_at', null),
         sb.from('daily_metrics').select('client_id,date').in('client_id', ids).not('ad_spend', 'is', null).gte('date', new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)).order('date', { ascending: false }).limit(5000),
       ]);
-      const sBy = new Map((settings || []).map((s: any) => [s.client_id, s]));
+      const sBy = new Map<string, any>((settings || []).map((s: any) => [s.client_id, s]));
       const lastSpend = new Map<string, string>();
       for (const r of spend || []) if (!lastSpend.has(r.client_id)) lastSpend.set(r.client_id, r.date);
       return (clients || []).map((c: any) => {
