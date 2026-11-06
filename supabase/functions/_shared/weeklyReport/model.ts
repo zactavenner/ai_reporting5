@@ -196,6 +196,7 @@ export function systemAttention(entry: RosterEntry, r: Omit<RangeReport, 'attent
   if ((cur.verifiedLeads.value || 0) >= 10 && cur.bookedCalls.value != null && cur.bookedCalls.value / cur.verifiedLeads.value! < 0.1)
     add('watch', 'Low booking rate', `${cur.bookedCalls.value} booked from ${cur.verifiedLeads.value} verified leads.`);
   if (r.creativeDays > 0 && r.creativeDays < days) add('watch', `Per-ad data covers ${r.creativeDays}/${days} days`, 'Creative results are partial.');
+  else if (r.creativeDays === 0 && (cur.spend.value || 0) > 0) add('watch', 'No per-ad data for this period', 'Spend synced but creative-level results did not — creative performance is unavailable.');
   if (!out.some((o) => o.tone !== 'good')) add('good', 'All sources reporting', 'Spend and CRM data are complete for the selected period.');
   return out;
 }
