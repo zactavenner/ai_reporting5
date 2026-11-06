@@ -29,8 +29,9 @@ describe("suggestDurationForScript", () => {
     expect(suggestDurationForScript(words(40), "alibaba/wan-3.0")).toBe(20);
   });
 
-  it("uses the shortest duration for an empty script", () => {
-    expect(suggestDurationForScript("", "alibaba/wan-3.0")).toBe(5);
+  it("aims at the 30s ad ceiling when no script exists yet", () => {
+    expect(suggestDurationForScript("", "alibaba/wan-3.0")).toBe(30);
+    expect(suggestDurationForScript("", "minimax/hailuo-3")).toBe(15);
   });
 
   it("caps at 30 seconds even when the script reads longer", () => {

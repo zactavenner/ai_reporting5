@@ -574,7 +574,9 @@ export function suggestDurationForScript(
 ): number {
   const spec = modelSpec(model);
   const read = estimatedReadSeconds(script);
-  if (read <= 0) return spec.durations[0];
+  // No script yet: aim at the 30s ad ceiling (or the model's max) so the
+  // first draft is written for a full-length ad, not a 5s teaser.
+  if (read <= 0) return Math.min(30, spec.durations[spec.durations.length - 1]);
   const fit = spec.durations.filter((d) => d >= read && d <= 30);
   if (fit.length) return fit[0];
   return Math.min(30, spec.durations[spec.durations.length - 1]);
