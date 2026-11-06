@@ -517,12 +517,12 @@ const Index = () => {
             )}
 
             {/* Content → Video Ads / Static Ads */}
-            {activeTab === 'video-ads' && (
+            {activeTab === 'content-video-ads' && (
               <SectionErrorBoundary sectionName="Video Ads">
                 <ContentAdsTab mediaType="video" onOpenStudio={() => handleTabChange('ai-studio')} />
               </SectionErrorBoundary>
             )}
-            {activeTab === 'static-ads' && (
+            {activeTab === 'content-static-ads' && (
               <SectionErrorBoundary sectionName="Static Ads">
                 <ContentAdsTab mediaType="static" onOpenStudio={() => handleTabChange('ai-studio')} />
               </SectionErrorBoundary>
