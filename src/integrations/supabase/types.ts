@@ -4014,11 +4014,14 @@ export type Database = {
           created_by: string | null
           id: string
           image_url: string
+          instructions: string | null
+          library: string
           name: string
           source: string
           source_creative_id: string | null
           storage_path: string | null
           tags: string[] | null
+          view_count: number | null
         }
         Insert: {
           client_id?: string | null
@@ -4026,11 +4029,14 @@ export type Database = {
           created_by?: string | null
           id?: string
           image_url: string
+          instructions?: string | null
+          library?: string
           name: string
           source?: string
           source_creative_id?: string | null
           storage_path?: string | null
           tags?: string[] | null
+          view_count?: number | null
         }
         Update: {
           client_id?: string | null
@@ -4038,11 +4044,14 @@ export type Database = {
           created_by?: string | null
           id?: string
           image_url?: string
+          instructions?: string | null
+          library?: string
           name?: string
           source?: string
           source_creative_id?: string | null
           storage_path?: string | null
           tags?: string[] | null
+          view_count?: number | null
         }
         Relationships: [
           {
@@ -4083,6 +4092,8 @@ export type Database = {
           created_by: string | null
           duration_seconds: number | null
           id: string
+          instructions: string | null
+          library: string
           name: string
           notes: string | null
           poster_url: string | null
@@ -4091,6 +4102,7 @@ export type Database = {
           storage_path: string | null
           tags: string[] | null
           video_url: string
+          view_count: number | null
         }
         Insert: {
           aspect_ratio?: string | null
@@ -4099,6 +4111,8 @@ export type Database = {
           created_by?: string | null
           duration_seconds?: number | null
           id?: string
+          instructions?: string | null
+          library?: string
           name: string
           notes?: string | null
           poster_url?: string | null
@@ -4107,6 +4121,7 @@ export type Database = {
           storage_path?: string | null
           tags?: string[] | null
           video_url: string
+          view_count?: number | null
         }
         Update: {
           aspect_ratio?: string | null
@@ -4115,6 +4130,8 @@ export type Database = {
           created_by?: string | null
           duration_seconds?: number | null
           id?: string
+          instructions?: string | null
+          library?: string
           name?: string
           notes?: string | null
           poster_url?: string | null
@@ -4123,6 +4140,7 @@ export type Database = {
           storage_path?: string | null
           tags?: string[] | null
           video_url?: string
+          view_count?: number | null
         }
         Relationships: [
           {

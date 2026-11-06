@@ -6,11 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Users, FileText, TrendingUp, DollarSign, Play, Sparkles, ImageIcon } from "lucide-react";
+import { Users, FileText, TrendingUp, DollarSign, Play, Sparkles, ImageIcon, Pencil, Check, X, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 import { useClients } from "@/hooks/useClients";
-import { useClientOffers } from "@/hooks/useClientOffers";
-import { TemplateLibrary } from "./TemplateLibrary";
+import { useClientOffers, useCreateOffer, useUpdateOffer } from "@/hooks/useClientOffers";
+import { TemplateLibrary, type TemplateRow } from "./TemplateLibrary";
 import { StaticGenerator } from "./StaticGenerator";
+import { VideoPipeline } from "./VideoPipeline";
 import { subDays } from "date-fns";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AIStudioTab } from "@/components/ai/AIStudioTab";
@@ -64,19 +68,69 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
   const clientId = selected?.id || "";
 
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
+  const [selectedRows, setSelectedRows] = useState<TemplateRow[]>([]);
   const [view, setView] = useState<"create" | "top" | "templates">("create");
+
+  const handleSelectionChange = (ids: string[], rows?: TemplateRow[]) => {
+    setSelectedTemplates(ids);
+    if (rows) setSelectedRows(rows);
+  };
 
   const handleClientChange = (id: string) => {
     setSelectedClientId(id);
     localStorage.setItem(storageKey, id);
   };
 
-  // Latest offer = the offer summary shown under the client name.
+  // Latest offer = the offer summary shown under the client name. Editable
+  // inline; saving writes back to the client's offer record.
   const { data: offers = [] } = useClientOffers(clientId);
   const primaryOffer = offers[0] || null;
   const offerSummary = primaryOffer
     ? [primaryOffer.title, primaryOffer.description].filter(Boolean).join(" — ")
     : "";
+
+  const createOffer = useCreateOffer();
+  const updateOffer = useUpdateOffer();
+  const [editingOffer, setEditingOffer] = useState(false);
+  const [offerTitle, setOfferTitle] = useState("");
+  const [offerDesc, setOfferDesc] = useState("");
+  const [savingOffer, setSavingOffer] = useState(false);
+
+  const startOfferEdit = () => {
+    setOfferTitle(primaryOffer?.title || "");
+    setOfferDesc(primaryOffer?.description || "");
+    setEditingOffer(true);
+  };
+
+  const saveOffer = async () => {
+    if (!offerTitle.trim()) {
+      toast.error("The offer needs a title");
+      return;
+    }
+    setSavingOffer(true);
+    try {
+      if (primaryOffer) {
+        await updateOffer.mutateAsync({
+          id: primaryOffer.id,
+          clientId,
+          updates: { title: offerTitle.trim(), description: offerDesc.trim() },
+        });
+      } else {
+        await createOffer.mutateAsync({
+          client_id: clientId,
+          title: offerTitle.trim(),
+          description: offerDesc.trim(),
+          offer_type: "lead_gen",
+        } as any);
+      }
+      setEditingOffer(false);
+      toast.success("Offer saved to the client");
+    } catch {
+      // the hooks toast the specific error
+    } finally {
+      setSavingOffer(false);
+    }
+  };
 
   // Top performing creatives under $100 CPL, last 7 days, matching media type.
   const sevenDaysAgo = subDays(new Date(), 7).toISOString();
@@ -152,7 +206,31 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
                     <Badge variant="outline" className="text-[10px] capitalize">{(selected as any).industry}</Badge>
                   )}
                 </div>
-                {primaryOffer ? (
+                {editingOffer ? (
+                  <div className="mt-2 space-y-1.5 max-w-lg">
+                    <Input
+                      value={offerTitle}
+                      onChange={(e) => setOfferTitle(e.target.value)}
+                      placeholder="Offer title"
+                      className="h-8 text-xs rounded-lg"
+                    />
+                    <Textarea
+                      value={offerDesc}
+                      onChange={(e) => setOfferDesc(e.target.value)}
+                      placeholder="Offer description — audience, terms, proof…"
+                      className="min-h-[56px] text-xs rounded-lg"
+                    />
+                    <div className="flex gap-1.5">
+                      <Button size="sm" className="h-7 text-[11px]" onClick={saveOffer} disabled={savingOffer}>
+                        {savingOffer ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+                        Save to client
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => setEditingOffer(false)}>
+                        <X className="h-3 w-3 mr-1" /> Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : primaryOffer ? (
                   <div className="mt-2 flex items-start gap-2">
                     <FileText className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
                     <div className="min-w-0">
@@ -162,11 +240,19 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
                       )}
                       <Badge variant="outline" className="text-[9px] mt-1 capitalize">{primaryOffer.offer_type}</Badge>
                     </div>
+                    <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={startOfferEdit} title="Edit offer">
+                      <Pencil className="h-3 w-3" />
+                    </Button>
                   </div>
                 ) : (
-                  <p className="text-[11px] text-muted-foreground mt-2">
-                    No offer saved for this client yet — add one in the Huddle connections panel.
-                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <p className="text-[11px] text-muted-foreground">
+                      No offer saved for this client yet.
+                    </p>
+                    <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={startOfferEdit}>
+                      <Pencil className="h-3 w-3 mr-1" /> Add offer
+                    </Button>
+                  </div>
                 )}
               </div>
 
@@ -185,6 +271,27 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
 
           {view === "create" && (
             <div className="flex flex-col gap-4">
+              {mediaType === "video" && (
+                <VideoPipeline
+                  key={`pipeline-${clientId}`}
+                  clientId={clientId}
+                  clientName={selected.name}
+                  offerTitle={primaryOffer?.title || ""}
+                  offerDescription={primaryOffer?.description || ""}
+                  templates={selectedRows
+                    .filter((r) => selectedTemplates.includes(r.id))
+                    .map((r) => ({
+                      id: r.id,
+                      name: r.name,
+                      url: r.url,
+                      poster_url: r.poster_url,
+                      library: r.library,
+                      view_count: r.view_count,
+                      instructions: r.instructions,
+                    }))}
+                  onRemoveTemplate={(id) => handleSelectionChange(selectedTemplates.filter((x) => x !== id))}
+                />
+              )}
               {mediaType === "static" && (
                 <Card className="p-3 sm:p-4">
                   <StaticGenerator clientId={clientId} clientName={selected.name} offerSummary={offerSummary} />
@@ -273,7 +380,8 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
               kind={mediaType === "video" ? "video" : "image"}
               clientId={clientId}
               selectedIds={selectedTemplates}
-              onSelectionChange={setSelectedTemplates}
+              onSelectionChange={handleSelectionChange}
+              maxSelected={3}
             />
             {selectedTemplates.length > 0 && (
               <>
@@ -286,7 +394,7 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
                     <Sparkles className="h-3.5 w-3.5 mr-1" />
                     Recreate selected
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSelectedTemplates([])}>
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => handleSelectionChange([])}>
                     Clear selection
                   </Button>
                 </div>
