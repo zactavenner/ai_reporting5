@@ -25,6 +25,7 @@ import { DeleteClientDialog } from '@/components/settings/DeleteClientDialog';
 import { AgencyAIChat } from '@/components/ai/AgencyAIChat';
 import { AIHubTab } from '@/components/ai/AIHubTab';
 import { AgencyAIStudioTab } from '@/components/ai/AgencyAIStudioTab';
+import { ContentAdsTab } from '@/components/content-ads/ContentAdsTab';
 import { QualityFeedbackOverview } from '@/components/quality-feedback/QualityFeedbackOverview';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel';
@@ -512,6 +513,18 @@ const Index = () => {
             {activeTab === 'quality-feedback' && (
               <SectionErrorBoundary sectionName="Quality Feedback">
                 <QualityFeedbackOverview />
+              </SectionErrorBoundary>
+            )}
+
+            {/* Content → Video Ads / Static Ads */}
+            {activeTab === 'content-video-ads' && (
+              <SectionErrorBoundary sectionName="Video Ads">
+                <ContentAdsTab mediaType="video" onOpenStudio={() => handleTabChange('ai-studio')} />
+              </SectionErrorBoundary>
+            )}
+            {activeTab === 'content-static-ads' && (
+              <SectionErrorBoundary sectionName="Static Ads">
+                <ContentAdsTab mediaType="static" onOpenStudio={() => handleTabChange('ai-studio')} />
               </SectionErrorBoundary>
             )}
 
