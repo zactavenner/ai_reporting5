@@ -516,6 +516,18 @@ const Index = () => {
               </SectionErrorBoundary>
             )}
 
+            {/* Content → Video Ads / Static Ads */}
+            {activeTab === 'video-ads' && (
+              <SectionErrorBoundary sectionName="Video Ads">
+                <ContentAdsTab mediaType="video" onOpenStudio={() => handleTabChange('ai-studio')} />
+              </SectionErrorBoundary>
+            )}
+            {activeTab === 'static-ads' && (
+              <SectionErrorBoundary sectionName="Static Ads">
+                <ContentAdsTab mediaType="static" onOpenStudio={() => handleTabChange('ai-studio')} />
+              </SectionErrorBoundary>
+            )}
+
             {/* AI Studio — agency level */}
             {activeTab === 'ai-studio' && (
               <SectionErrorBoundary sectionName="AI Studio">
