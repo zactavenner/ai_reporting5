@@ -29,7 +29,7 @@ export function WeeklyClientReportsTab() {
     <div className="space-y-4 p-4">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-xl font-semibold">Weekly Client Reports</h1>
+          <h2 className="text-lg font-semibold">Report setup & weekly delivery</h2>
           <p className="text-sm text-muted-foreground">Monday draft for the last completed Mon–Sun vs the week before, in each client's timezone.</p>
         </div>
         <div className="flex items-center gap-2">

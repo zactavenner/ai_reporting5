@@ -199,7 +199,7 @@ function ReportView({ entry, report: r, hash, range, showNames }: { entry: Roste
 
       {/* KPI cards */}
       <div className={cn('report-section grid grid-cols-2 gap-3', cap ? 'md:grid-cols-5' : 'md:grid-cols-4')}>
-        <Kpi label="Ad spend" value={mVal(r.cur.spend, 'money')} m={r.cur.spend} prev={r.prev.spend} note={r.cur.spend.value == null ? r.cur.spend.note : r.cur.spend.partial ? r.cur.spend.note : undefined} />
+        <Kpi neutral label="Ad spend" value={mVal(r.cur.spend, 'money')} m={r.cur.spend} prev={r.prev.spend} note={r.cur.spend.value == null ? r.cur.spend.note : r.cur.spend.partial ? r.cur.spend.note : undefined} />
         <Kpi label="Leads · CPL" value={`${mVal(r.cur.verifiedLeads, 'num')} · ${mVal(r.cur.cpl, 'money2')}`} m={r.cur.verifiedLeads} prev={r.prev.verifiedLeads}
           note={r.cur.verifiedLeads.value == null ? r.cur.verifiedLeads.note : r.cur.metaFormLeads.value != null ? `${r.cur.metaFormLeads.value} Meta form leads` : undefined} />
         <Kpi label="Booked · CPBC" value={`${mVal(r.cur.bookedCalls, 'num')} · ${mVal(r.cur.cpbc, 'money2')}`} m={r.cur.bookedCalls} prev={r.prev.bookedCalls} note={r.cur.bookedCalls.value == null ? r.cur.bookedCalls.note : undefined} />
@@ -351,9 +351,9 @@ function RaiseCard({ r }: { r: RangeReport }) {
   );
 }
 
-function Kpi({ label, value, m, prev, note, lowerIsBetter }: { label: string; value: string; m: Metric; prev: Metric; note?: string; lowerIsBetter?: boolean }) {
+function Kpi({ label, value, m, prev, note, neutral }: { label: string; value: string; m: Metric; prev: Metric; note?: string; neutral?: boolean }) {
   const d = m.partial || prev.partial ? null : pctChange(m, prev);
-  const good = d != null && (lowerIsBetter ? d < 0 : d > 0);
+  const good = d != null && d > 0;
   return (
     <Card className="relative overflow-hidden rounded-2xl border-border/60 bg-card/60 p-4">
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
@@ -361,7 +361,7 @@ function Kpi({ label, value, m, prev, note, lowerIsBetter }: { label: string; va
       {m.partial && <Badge variant="outline" className="mt-1 h-5 text-[10px]">Partial</Badge>}
       {note && <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{note}</p>}
       {d != null && Math.abs(d) >= 0.005 && (
-        <div className={cn('mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold', good ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive')}>
+        <div className={cn('mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold', neutral ? 'bg-muted text-foreground' : good ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive')}>
           {d > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}{Math.abs(d * 100).toFixed(0)}%
           <span className="font-normal text-muted-foreground">vs prior</span>
         </div>

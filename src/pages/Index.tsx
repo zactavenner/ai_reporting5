@@ -906,8 +906,8 @@ const Index = () => {
             )}
 
             {activeTab === 'weekly-client-reports' && (
-              <SectionErrorBoundary sectionName="Weekly Client Reports">
-                <WeeklyClientReportsTab />
+              <SectionErrorBoundary sectionName="Reporting">
+                <ClientReportingTab />
               </SectionErrorBoundary>
             )}
 

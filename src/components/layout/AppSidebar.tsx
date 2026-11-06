@@ -107,7 +107,7 @@ const navStructure = [
       { title: 'Meetings', value: 'meetings', icon: Video },
       { title: 'Call Transcripts', value: 'call-transcripts', icon: Phone },
       { title: 'Data · Google Sheets', value: 'huddle', icon: FileText, href: '/huddle' },
-      { title: 'Weekly Client Reports', value: 'weekly-client-reports', icon: FileText },
+      { title: 'Reporting', value: 'weekly-client-reports', icon: FileText },
       { title: 'Email Reports & Dashboards', value: 'email', icon: Globe },
     ],
   },
