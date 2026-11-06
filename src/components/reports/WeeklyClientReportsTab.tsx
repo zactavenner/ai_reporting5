@@ -63,7 +63,7 @@ export function WeeklyClientReportsTab() {
                     {c.level !== 'ok' && c.fix && (
                       c.fix === 'settings'
                         ? <button className="ml-auto text-primary underline-offset-2 hover:underline" onClick={() => setEditing(editing === r.id ? null : r.id)}>Fix</button>
-                        : <Link className="ml-auto text-primary underline-offset-2 hover:underline" to={`/client/${r.id}?tab=${c.fix === 'recipients' ? 'reports' : 'settings'}`}>Open</Link>
+                        : <Link className="ml-auto text-primary underline-offset-2 hover:underline" to={`/client/${r.id}?tab=client-settings`}>Open</Link>
                     )}
                   </li>
                 ))}
@@ -99,7 +99,7 @@ function ConfigEditor({ entry, onDone }: { entry: RosterEntry; onDone: () => voi
       {!c.timezoneConfigured && <Input placeholder="Timezone e.g. America/New_York" value={tz} onChange={(e) => setTz(e.target.value)} />}
       {c.isCapital && !c.raiseGoal && <Input placeholder="Raise goal ($)" value={goal} onChange={(e) => setGoal(e.target.value)} />}
       {c.isCapital && !c.raiseDeadline && <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />}
-      <p className="text-muted-foreground">Calendars and funded stages are set in the client's settings. <Link className="text-primary" to={`/client/${entry.id}?tab=settings`}>Open settings</Link></p>
+      <p className="text-muted-foreground">Calendars and funded stages are set in the client's settings. <Link className="text-primary" to={`/client/${entry.id}?tab=client-settings`}>Open settings</Link></p>
       <div className="flex gap-2"><Button size="sm" onClick={save}>Save</Button><Button size="sm" variant="ghost" onClick={onDone}>Cancel</Button></div>
     </div>
   );
