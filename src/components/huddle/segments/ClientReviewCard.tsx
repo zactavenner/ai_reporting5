@@ -20,9 +20,6 @@ const FunnelPreviewTab = lazy(() =>
 const OnboardingIntake = lazy(() =>
   import('@/components/onboarding/OnboardingIntake').then((m) => ({ default: m.OnboardingIntake })),
 );
-const AdsManagerTab = lazy(() =>
-  import('@/components/ads-manager/AdsManagerTab').then((m) => ({ default: m.AdsManagerTab })),
-);
 
 // Session-scoped map that remembers which collapsible sections are open per
 // client, so navigating back to a client during the same huddle keeps the
