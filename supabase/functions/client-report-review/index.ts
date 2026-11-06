@@ -6,6 +6,7 @@
 // Reviews never change source data; they are notes on top of verified numbers.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { admin, corsHeaders, json, requireOperator } from '../_shared/aiSetter/http.ts';
+import { callOpenRouterJSON } from '../_shared/openrouter.ts';
 import { buildRangeReport, factsHash, loadRangeRows, loadRoster, reportFacts } from '../_shared/weeklyReport/model.ts';
 
 const UUID = /^[0-9a-f-]{36}$/i;
@@ -64,27 +65,24 @@ Rules:
 - No personal data. Keep each item short and specific, with the number that matters.
 Return strict JSON only: {"summary": string (max 2 sentences), "items": [{"tone":"alert"|"watch"|"good","title": string (max 80 chars),"detail": string (max 220 chars)}]} with 3 to 6 items, most important first.`;
 
+// Same OpenRouter path and default model the rest of the app uses, with fallbacks.
+const REVIEW_MODELS = ['openrouter/owl-alpha', 'google/gemini-3.5-flash', 'openai/gpt-4o-mini'];
+
+class AiUnavailable extends Error {}
+
 async function runAi(facts: unknown) {
-  const key = Deno.env.get('LOVABLE_API_KEY');
-  if (!key) throw new Error('AI is not configured');
-  const resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'openrouter/owl-alpha', temperature: 0.2,
-      messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: JSON.stringify(facts) }],
-    }),
-  });
-  if (resp.status === 429) throw Object.assign(new Error('AI is busy — try again in a minute'), { status: 429 });
-  if (resp.status === 402) throw Object.assign(new Error('AI credits exhausted'), { status: 402 });
-  if (!resp.ok) throw new Error(`AI request failed (${resp.status})`);
-  const j = await resp.json();
-  const raw = String(j?.choices?.[0]?.message?.content || '');
-  const m = raw.match(/\{[\s\S]*\}/);
-  if (!m) throw new Error('AI returned no review');
-  const parsed = JSON.parse(m[0]);
+  let parsed: any;
+  try {
+    ({ data: parsed } = await callOpenRouterJSON([
+      { role: 'system', content: SYSTEM },
+      { role: 'user', content: JSON.stringify(facts) },
+    ], { models: REVIEW_MODELS, temperature: 0.2, max_tokens: 900 }));
+  } catch (e) {
+    console.warn('client-report-review ai failed', String((e as Error)?.message || e).slice(0, 300));
+    throw new AiUnavailable('AI review is unavailable right now — try again in a minute.');
+  }
   const items = cleanItems(parsed?.items);
-  if (!items.length) throw new Error('AI returned no review items');
+  if (!items.length) throw new AiUnavailable('AI returned an empty review — try again.');
   return { summary: String(parsed?.summary || '').slice(0, 600) || null, items };
 }
 
@@ -141,9 +139,9 @@ Deno.serve(async (req) => {
 
     return json({ error: 'unknown action' }, 400);
   } catch (e) {
-    const status = (e as any)?.status;
+    // AI outages are an expected, recoverable state: answer 200 with a readable message.
+    if (e instanceof AiUnavailable) return json({ error: e.message, ai_unavailable: true });
     console.error('client-report-review', (e as Error)?.message);
-    if (status === 429 || status === 402) return json({ error: (e as Error).message }, status);
     return json({ error: (e as Error)?.message?.slice(0, 200) || 'internal error' }, 500);
   }
 });
