@@ -11,3 +11,9 @@
 ## Open
 - Verify a real live call end-to-end (needs a setter to place one).
 - AI caller writing into lead memory.
+
+# Roadmap — Client Reporting (Analytics → Reporting)
+## Open
+- Artifact-style report for every active client with date picker (raise bar, KPI cards, daily sheet-style table, commitments/funded, creatives, attention).
+- AI review + external agents can read accurate report facts and post review notes (no raw-data edits).
+- Rename menu item to "Reporting"; keep setup/readiness and delivery dry-run as a secondary view.
