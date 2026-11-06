@@ -109,6 +109,8 @@ import { VIDEO_STYLE_PRESETS } from "@/lib/videoStylePresets";
 interface Props {
   clientId: string;
   clientName: string;
+  /** Pins the studio to one specialist (e.g. "slug:video_ads") — used by Content → Video/Static Ads. */
+  lockedAgent?: string;
 }
 
 type CompareResult = { model: string; label: string; output?: string; error?: string; ms?: number; usage?: any };
@@ -1329,7 +1331,7 @@ function stripImageMarkup(t: string) {
     .replace(/\n{3,}/g, "\n\n");
 }
 
-export function AIStudioTab({ clientId, clientName }: Props) {
+export function AIStudioTab({ clientId, clientName, lockedAgent }: Props) {
   const { data: agencySettings } = useAgencySettings();
   const { data: clientSettings } = useClientSettings(clientId);
   const { data: client } = useClient(clientId);
@@ -1726,6 +1728,7 @@ export function AIStudioTab({ clientId, clientName }: Props) {
   // specialist), or a specific client_agents.id. When a specific agent is picked we also
   // override chatModel with that agent's preferred model, if it has one.
   const [selectedAgentId, setSelectedAgentId] = useState<string>(() => {
+    if (lockedAgent) return lockedAgent;
     try {
       return localStorage.getItem(`ai-studio:agent-id:${clientId}`) || (agentMode ? "master" : "off");
     } catch {
@@ -1733,8 +1736,12 @@ export function AIStudioTab({ clientId, clientName }: Props) {
     }
   });
   useEffect(() => {
+    if (lockedAgent && selectedAgentId !== lockedAgent) {
+      setSelectedAgentId(lockedAgent);
+      return;
+    }
     try {
-      localStorage.setItem(`ai-studio:agent-id:${clientId}`, selectedAgentId);
+      if (!lockedAgent) localStorage.setItem(`ai-studio:agent-id:${clientId}`, selectedAgentId);
     } catch {}
     // Keep legacy agentMode flag in sync so backend keeps receiving it
     setAgentMode(selectedAgentId !== "off");
