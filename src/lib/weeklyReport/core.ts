@@ -12,7 +12,7 @@
  *  - Pipeline interest (prospect estimate) is separate from committed and funded.
  */
 
-export type Metric = { value: number | null; note?: string };
+export type Metric = { value: number | null; note?: string; partial?: boolean };
 export const NA = (note: string): Metric => ({ value: null, note });
 export const M = (value: number): Metric => ({ value });
 
@@ -53,11 +53,12 @@ export const inRange = (ymd: string, r: WeekRange) => ymd >= r.from && ymd <= r.
 export function normEmail(e?: string | null) { const v = (e || '').trim().toLowerCase(); return v.includes('@') ? v : ''; }
 export function normPhone(p?: string | null) { const d = (p || '').replace(/\D/g, ''); return d.length >= 10 ? d.slice(-10) : ''; }
 
-export interface LeadRow { id: string; client_id: string; created_at: string; email: string | null; phone: string | null; is_spam: boolean | null; status?: string | null; current_disposition?: string | null; opportunity_value?: number | null; pipeline_value?: number | null; }
+export interface LeadRow { name?: string | null; id: string; client_id: string; created_at: string; email: string | null; phone: string | null; is_spam: boolean | null; status?: string | null; current_disposition?: string | null; opportunity_value?: number | null; pipeline_value?: number | null; }
 export interface CallRow { id: string; client_id: string; lead_id: string | null; scheduled_at: string | null; booked_at: string | null; showed: boolean | null; appointment_status: string | null; ghl_appointment_id: string | null; ghl_calendar_id: string | null; is_reconnect: boolean | null; }
 export interface SpendRow { client_id: string; date: string; ad_spend: number | null }
 export interface FormLeadRow { client_id: string; date: string; leads: number | null }
-export interface FundedRow { client_id: string; commitment_amount: number | null; funded_amount: number | null; funded_at: string | null; is_verified_funded: boolean | null; created_at?: string | null }
+export interface FundedRow { client_id: string; committed_at?: string | null; commitment_amount: number | null; funded_amount: number | null; funded_at: string | null; is_verified_funded: boolean | null; created_at?: string | null }
+/** @deprecated cumulative totals — not used for weekly reports */
 export interface AdRow { client_id: string; meta_ad_id: string; name: string | null; thumbnail_url: string | null; image_url: string | null; spend: number | null; attributed_leads: number | null; attributed_calls: number | null; attributed_funded: number | null; synced_at: string | null }
 
 export interface ClientReportConfig {
@@ -68,6 +69,8 @@ export interface ClientReportConfig {
   trackedCalendarIds: string[];
   raiseGoal: number | null;
   raiseDeadline: string | null;
+  /** false = CRM never synced/unknown: CRM-derived counts are Unavailable, not zero. */
+  crmConnected: boolean;
 }
 
 const BAD_DISPO = /(spam|invalid|test|duplicate|disqualif|wrong number|dnc)/i;
@@ -83,10 +86,11 @@ export function verifiedLeads(leads: LeadRow[], r: WeekRange, tz: string): LeadR
   for (const l of [...leads].sort((a, b) => a.created_at.localeCompare(b.created_at))) {
     if (!inRange(localDate(l.created_at, tz), r)) continue;
     if (l.is_spam || BAD_DISPO.test(l.current_disposition || '') || BAD_DISPO.test(l.status || '')) continue;
+    if (!(l.name || '').trim() || /\btest\b/i.test(l.name || '')) continue;
     const e = normEmail(l.email), p = normPhone(l.phone);
-    if (!e || !p) continue;
-    if (seen.has('e' + e) || seen.has('p' + p)) continue;
-    seen.add('e' + e); seen.add('p' + p);
+    if (!e && !p) continue;
+    if ((e && seen.has('e' + e)) || (p && seen.has('p' + p))) continue;
+    if (e) seen.add('e' + e); if (p) seen.add('p' + p);
     out.push(l);
   }
   return out;
@@ -102,17 +106,21 @@ export interface WeekMetrics {
 }
 
 const div = (a: Metric, b: Metric): Metric =>
-  a.value == null ? NA(a.note || 'Unavailable') : b.value == null ? NA(b.note || 'Unavailable') : b.value === 0 ? NA('No denominator') : M(a.value / b.value);
+  a.value == null ? NA(a.note || 'Unavailable') : b.value == null ? NA(b.note || 'Unavailable') : b.value === 0 ? NA('No denominator')
+    : { value: a.value / b.value, partial: a.partial || b.partial, note: a.partial ? a.note : b.note };
 
 export function computeWeek(cfg: ClientReportConfig, r: WeekRange, d: { leads: LeadRow[]; calls: CallRow[]; spend: SpendRow[]; formLeads: FormLeadRow[]; funded: FundedRow[] }, now = new Date()): WeekMetrics {
   assertIsolated(cfg.clientId, d.leads, d.calls, d.spend, d.formLeads, d.funded);
   const tz = cfg.timezone;
   const spendRows = d.spend.filter((s) => inRange(s.date, r) && s.ad_spend != null);
   const days = new Set(spendRows.map((s) => s.date)).size;
-  const spend = days === 0 ? NA('No synced spend for this week') : M(spendRows.reduce((a, s) => a + Number(s.ad_spend || 0), 0));
+  const spendTotal = spendRows.reduce((a, s) => a + Number(s.ad_spend || 0), 0);
+  const spend: Metric = days === 0 ? NA('No synced spend for this week')
+    : days < 7 ? { value: spendTotal, partial: true, note: `Partial: ${days}/7 days synced` } : M(spendTotal);
 
   const vl = verifiedLeads(d.leads, r, tz);
-  const vLeads = M(vl.length);
+  const crmNA = NA('CRM not connected or never synced');
+  const vLeads = cfg.crmConnected ? M(vl.length) : crmNA;
   const fl = d.formLeads.filter((f) => inRange(f.date, r) && f.leads != null);
   const metaFormLeads = fl.length ? M(fl.reduce((a, f) => a + Number(f.leads || 0), 0)) : NA('No Meta form counts');
 
@@ -128,7 +136,8 @@ export function computeWeek(cfg: ClientReportConfig, r: WeekRange, d: { leads: L
   const cohort = new Set(d.calls.filter((c) => c.lead_id && vlIds.has(c.lead_id)).map((c) => c.lead_id)).size;
 
   let shows: Metric;
-  if (tracked.size === 0) shows = NA('Show tracking off — no tracked calendars configured');
+  if (!cfg.crmConnected) shows = crmNA;
+  else if (tracked.size === 0) shows = NA('Show tracking off — no tracked calendars configured');
   else {
     const seen = new Set<string>(); let n = 0;
     for (const c of calls) {
@@ -140,17 +149,20 @@ export function computeWeek(cfg: ClientReportConfig, r: WeekRange, d: { leads: L
     shows = M(n);
   }
 
-  const fundedInWeek = d.funded.filter((f) => f.funded_at && inRange(localDate(f.funded_at, tz), r));
-  const verified = fundedInWeek.filter((f) => f.is_verified_funded);
-  const funded = cfg.isCapital ? M(verified.reduce((a, f) => a + Number(f.funded_amount || 0), 0)) : NA('Not a capital account');
-  const committed = cfg.isCapital ? M(fundedInWeek.reduce((a, f) => a + Number(f.commitment_amount || 0), 0)) : NA('Not a capital account');
+  const fundedInWeek = d.funded.filter((f) => f.is_verified_funded && f.funded_at && inRange(localDate(f.funded_at, tz), r));
+  const funded = !cfg.isCapital ? NA('Not a capital account') : !cfg.crmConnected ? crmNA : M(fundedInWeek.reduce((a, f) => a + Number(f.funded_amount || 0), 0));
+  // A commitment is dated only by committed_at — never by funded_at or created_at.
+  const datedCommitments = d.funded.filter((f) => f.committed_at && Number(f.commitment_amount || 0) > 0);
+  const committed = !cfg.isCapital ? NA('Not a capital account')
+    : datedCommitments.length === 0 ? NA('No dated commitment records')
+    : M(datedCommitments.filter((f) => inRange(localDate(f.committed_at!, tz), r)).reduce((a, f) => a + Number(f.commitment_amount || 0), 0));
   const piVals = vl.map((l) => Number(l.opportunity_value ?? l.pipeline_value ?? 0)).filter((v) => v > 0);
   const pipelineInterest = piVals.length ? M(piVals.reduce((a, v) => a + v, 0)) : NA('No stated interest on verified leads');
 
   return {
     range: r, spend, spendDaysCovered: days,
     verifiedLeads: vLeads, metaFormLeads, cpl: div(spend, vLeads),
-    bookedCalls: M(booked), cpbc: div(spend, M(booked)), cohortBooked: M(cohort),
+    bookedCalls: cfg.crmConnected ? M(booked) : crmNA, cpbc: div(spend, cfg.crmConnected ? M(booked) : crmNA), cohortBooked: cfg.crmConnected ? M(cohort) : crmNA,
     shows, costPerShow: div(spend, shows),
     committed, funded, pipelineInterest,
   };
@@ -161,26 +173,31 @@ export function pctChange(cur: Metric, prev: Metric): number | null {
   return (cur.value - prev.value) / prev.value;
 }
 
-/** Top creatives. meta_ads totals are cumulative at last sync — labeled as such, never as weekly. */
-export function topCreatives(ads: AdRow[], clientId: string, limit = 6) {
-  assertIsolated(clientId, ads);
-  return ads
-    .filter((a) => Number(a.spend || 0) > 0)
-    .sort((a, b) => Number(b.spend) - Number(a.spend))
-    .slice(0, limit)
-    .map((a) => ({
-      id: a.meta_ad_id, name: a.name || 'Untitled ad', image: a.image_url || a.thumbnail_url,
-      spend: Number(a.spend || 0), leads: a.attributed_leads,
-      cpl: a.attributed_leads ? Number(a.spend) / a.attributed_leads : null,
-      booked: a.attributed_calls, funded: a.attributed_funded,
-    }));
+export interface AdDailyRow { client_id: string; date: string; meta_ad_id: string; spend: number | null; leads: number | null }
+export interface AdMetaRow { client_id: string; meta_ad_id: string; name: string | null; thumbnail_url: string | null; image_url: string | null }
+
+/** Top creatives for the report week, from per-ad daily insights. Names/images joined from scoped meta_ads. */
+export function topCreatives(daily: AdDailyRow[], meta: AdMetaRow[], clientId: string, r: WeekRange, limit = 6) {
+  assertIsolated(clientId, daily, meta);
+  const info = new Map(meta.map((m) => [m.meta_ad_id, m]));
+  const agg = new Map<string, { spend: number; leads: number; days: Set<string> }>();
+  for (const d of daily) {
+    if (!inRange(d.date, r)) continue;
+    const a = agg.get(d.meta_ad_id) || { spend: 0, leads: 0, days: new Set<string>() };
+    a.spend += Number(d.spend || 0); a.leads += Number(d.leads || 0); a.days.add(d.date);
+    agg.set(d.meta_ad_id, a);
+  }
+  return [...agg.entries()].filter(([, a]) => a.spend > 0).sort((x, y) => y[1].spend - x[1].spend).slice(0, limit).map(([id, a]) => {
+    const m = info.get(id);
+    return { id, name: m?.name || 'Untitled ad', image: m?.image_url || m?.thumbnail_url || null, spend: a.spend, leads: a.leads, cpl: a.leads ? a.spend / a.leads : null };
+  });
 }
 
 export type CheckLevel = 'ok' | 'warn' | 'block';
 export interface ReadinessCheck { key: string; label: string; level: CheckLevel; detail: string; fix?: 'connections' | 'settings' | 'recipients' }
 
 export interface ReadinessInput {
-  hasMetaAccount: boolean; hasMetaToken: boolean; hasGhlLocation: boolean; hasCrmCredential: boolean;
+  hasMetaAccount: boolean; spendSyncOk: boolean | null; hasGhlLocation: boolean; crmSyncOk: boolean | null;
   timezoneConfigured: boolean; trackedCalendars: number; isCapital: boolean;
   hasFundedMapping: boolean; raiseGoal: number | null; lastSpendDate: string | null; lastCrmSync: string | null;
   weekEnd: string; approvedRecipients: number;
@@ -189,8 +206,11 @@ export interface ReadinessInput {
 export function readiness(i: ReadinessInput, now = new Date()): ReadinessCheck[] {
   const c: ReadinessCheck[] = [];
   c.push(i.hasMetaAccount ? { key: 'meta', label: 'Ad account', level: 'ok', detail: 'Linked' } : { key: 'meta', label: 'Ad account', level: 'block', detail: 'No ad account ID', fix: 'connections' });
-  c.push(i.hasMetaToken ? { key: 'metaToken', label: 'Ads access', level: 'ok', detail: 'Credential on file' } : { key: 'metaToken', label: 'Ads access', level: 'warn', detail: 'Uses shared agency login', fix: 'connections' });
-  c.push(i.hasGhlLocation && i.hasCrmCredential ? { key: 'crm', label: 'CRM', level: 'ok', detail: 'Location + credential linked' } : { key: 'crm', label: 'CRM', level: 'block', detail: i.hasGhlLocation ? 'CRM credential missing' : 'CRM location ID missing', fix: 'connections' });
+  c.push(i.spendSyncOk === true ? { key: 'metaToken', label: 'Ads access', level: 'ok', detail: 'Last spend sync succeeded' } : i.spendSyncOk === false ? { key: 'metaToken', label: 'Ads access', level: 'block', detail: 'Last spend sync failed', fix: 'connections' } : { key: 'metaToken', label: 'Ads access', level: 'warn', detail: 'Unknown — no sync health recorded', fix: 'connections' });
+  c.push(!i.hasGhlLocation ? { key: 'crm', label: 'CRM', level: 'block', detail: 'CRM location ID missing', fix: 'connections' }
+    : i.crmSyncOk === true ? { key: 'crm', label: 'CRM', level: 'ok', detail: 'Linked, sync healthy' }
+    : i.crmSyncOk === false ? { key: 'crm', label: 'CRM', level: 'block', detail: 'Sync reporting errors', fix: 'connections' }
+    : { key: 'crm', label: 'CRM', level: 'warn', detail: 'Linked; access unknown', fix: 'connections' });
   c.push(i.timezoneConfigured ? { key: 'tz', label: 'Timezone', level: 'ok', detail: 'Configured' } : { key: 'tz', label: 'Timezone', level: 'warn', detail: 'Not set — using Pacific', fix: 'settings' });
   c.push(i.trackedCalendars > 0 ? { key: 'cal', label: 'Calendars', level: 'ok', detail: `${i.trackedCalendars} tracked` } : { key: 'cal', label: 'Calendars', level: 'warn', detail: 'None tracked — shows unavailable, bookings use all calendars', fix: 'settings' });
   if (i.isCapital) {
