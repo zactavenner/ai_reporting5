@@ -27,6 +27,8 @@ import {
   Zap,
   BarChart2,
   Megaphone,
+  Play,
+  ImageIcon,
   FileText,
   Plug,
   Cpu,
