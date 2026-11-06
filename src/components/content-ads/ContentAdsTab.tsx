@@ -380,7 +380,8 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
               kind={mediaType === "video" ? "video" : "image"}
               clientId={clientId}
               selectedIds={selectedTemplates}
-              onSelectionChange={setSelectedTemplates}
+              onSelectionChange={handleSelectionChange}
+              maxSelected={3}
             />
             {selectedTemplates.length > 0 && (
               <>
@@ -393,7 +394,7 @@ export function ContentAdsTab({ mediaType, onOpenStudio }: Props) {
                     <Sparkles className="h-3.5 w-3.5 mr-1" />
                     Recreate selected
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSelectedTemplates([])}>
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => handleSelectionChange([])}>
                     Clear selection
                   </Button>
                 </div>
