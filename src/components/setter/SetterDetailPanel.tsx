@@ -462,6 +462,7 @@ export function SetterDetailPanel({ lead, onChanged, onAdvance }: { lead: Setter
       toast.error(`Failed: ${e?.message || e}`);
     } finally { setSavingDispo(false); }
   };
+  hotkeyRef.current = { setDispo, toggleHot };
 
   const scheduleCallback = async (isoDue: string, note: string) => {
     if (!lead || !isoDue) return;
