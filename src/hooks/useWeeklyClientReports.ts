@@ -1,7 +1,8 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
   buildReportModel, loadReportRows, loadRoster, type RosterEntry, type WeeklyClientReport,
+  buildRangeReport, loadRangeRows, reportFacts, factsHash, type RangeReport, type AttentionTone,
 } from '../../supabase/functions/_shared/weeklyReport/model.ts';
 import { dashboardAuthHeaders, normalizeDashboardError } from '@/lib/dashboardAuthHeaders';
 
@@ -53,10 +54,6 @@ export async function fetchServerPdf(clientId: string): Promise<Blob> {
 // ---------------------------------------------------------------------------
 // Analytics → Reporting: any date range, plus review notes (AI, agents, team)
 
-import {
-  buildRangeReport, loadRangeRows, reportFacts, factsHash, type RangeReport, type AttentionTone,
-} from '../../supabase/functions/_shared/weeklyReport/model.ts';
-import { useQueryClient } from '@tanstack/react-query';
 export type { RangeReport };
 export type DateRange = { from: string; to: string };
 
