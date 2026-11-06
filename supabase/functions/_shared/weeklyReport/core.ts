@@ -114,9 +114,10 @@ export function computeWeek(cfg: ClientReportConfig, r: WeekRange, d: { leads: L
   const tz = cfg.timezone;
   const spendRows = d.spend.filter((s) => inRange(s.date, r) && s.ad_spend != null);
   const days = new Set(spendRows.map((s) => s.date)).size;
+  const expected = rangeDays(r);
   const spendTotal = spendRows.reduce((a, s) => a + Number(s.ad_spend || 0), 0);
-  const spend: Metric = days === 0 ? NA('No synced spend for this week')
-    : days < 7 ? { value: spendTotal, partial: true, note: `Partial: ${days}/7 days synced` } : M(spendTotal);
+  const spend: Metric = days === 0 ? NA('No synced spend for this period')
+    : days < expected ? { value: spendTotal, partial: true, note: `Partial: ${days}/${expected} days synced` } : M(spendTotal);
 
   const vl = verifiedLeads(d.leads, r, tz);
   const crmNA = NA('CRM not connected or never synced');
@@ -124,30 +125,14 @@ export function computeWeek(cfg: ClientReportConfig, r: WeekRange, d: { leads: L
   const fl = d.formLeads.filter((f) => inRange(f.date, r) && f.leads != null);
   const metaFormLeads = fl.length ? M(fl.reduce((a, f) => a + Number(f.leads || 0), 0)) : NA('No Meta form counts');
 
-  const tracked = new Set(cfg.trackedCalendarIds);
-  const calls = d.calls.filter((c) => !c.is_reconnect && (tracked.size === 0 || (c.ghl_calendar_id && tracked.has(c.ghl_calendar_id))));
-  const seenAppt = new Set<string>();
-  let booked = 0;
-  for (const c of calls) {
-    const at = c.booked_at; if (!at || !inRange(localDate(at, tz), r)) continue;
-    const k = c.ghl_appointment_id || c.id; if (seenAppt.has(k)) continue; seenAppt.add(k); booked++;
-  }
+  const booked = bookedDates(cfg, d.calls, r).length;
   const vlIds = new Set(vl.map((l) => l.id));
   const cohort = new Set(d.calls.filter((c) => c.lead_id && vlIds.has(c.lead_id)).map((c) => c.lead_id)).size;
 
   let shows: Metric;
   if (!cfg.crmConnected) shows = crmNA;
-  else if (tracked.size === 0) shows = NA('Show tracking off — no tracked calendars configured');
-  else {
-    const seen = new Set<string>(); let n = 0;
-    for (const c of calls) {
-      if (!c.scheduled_at || new Date(c.scheduled_at) > now || !inRange(localDate(c.scheduled_at, tz), r)) continue;
-      const st = (c.appointment_status || '').toLowerCase();
-      if (c.showed !== true || !(st === 'showed' || st === 'completed')) continue;
-      const k = c.ghl_appointment_id || c.id; if (seen.has(k)) continue; seen.add(k); n++;
-    }
-    shows = M(n);
-  }
+  else if (cfg.trackedCalendarIds.length === 0) shows = NA('Show tracking off — no tracked calendars configured');
+  else shows = M(showDates(cfg, d.calls, r, now).length);
 
   const fundedInWeek = d.funded.filter((f) => f.is_verified_funded && f.funded_at && inRange(localDate(f.funded_at, tz), r));
   const funded = !cfg.isCapital ? NA('Not a capital account') : !cfg.crmConnected ? crmNA : M(fundedInWeek.reduce((a, f) => a + Number(f.funded_amount || 0), 0));
