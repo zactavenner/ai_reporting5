@@ -31,6 +31,27 @@ serve(async (req) => {
 
     const { imageUrl, prompt, aspectRatio, duration, apiKey: clientApiKey, model, lastFrameUrl, ingredientUrl, exactModel: requestedExactModel, resolution } = requestBody;
 
+    // ── Poll a pending exact-model job (keeps every request under the 150s gateway limit)
+    const pollJobUrl = String(requestBody.pollJobUrl ?? '').trim();
+    if (pollJobUrl) {
+      if (!pollJobUrl.startsWith('https://openrouter.ai/')) {
+        return new Response(JSON.stringify({ error: 'Invalid job reference' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const p = await fetch(pollJobUrl, { headers: { Authorization: `Bearer ${OPENROUTER_API_KEY}` } });
+      if (!p.ok) {
+        return new Response(JSON.stringify({ status: 'pending', jobUrl: pollJobUrl }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const pj = await p.json();
+      if (pj.status === 'completed') {
+        const urls: string[] = pj.unsigned_urls || pj.urls || (pj.video?.url ? [pj.video.url] : []);
+        return new Response(JSON.stringify({ status: 'completed', videoUrl: urls[0] || null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      if (pj.status === 'failed') {
+        return new Response(JSON.stringify({ error: `Video generation failed: ${pj.error || 'unknown'}` }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ status: 'pending', jobUrl: pollJobUrl }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     // ── Exact-model path (Jeremy / approved automated callers) ───────────────
     // The approved model id is validated against the active configured allowlist
     // and sent to the provider verbatim: no aliasing, no fallback, and the
@@ -96,7 +117,7 @@ serve(async (req) => {
         );
       }
       let exactVideoUrl: string | null = null;
-      for (let i = 0; i < 60; i++) {
+      for (let i = 0; i < 22; i++) {
         await new Promise((r) => setTimeout(r, 5000));
         const p = await fetch(pollingUrl, { headers: { Authorization: `Bearer ${OPENROUTER_API_KEY}` } });
         if (!p.ok) continue;
@@ -114,9 +135,10 @@ serve(async (req) => {
         }
       }
       if (!exactVideoUrl) {
+        // Still rendering: hand back the job so the caller keeps polling.
         return new Response(
-          JSON.stringify({ error: 'Video generation timed out after 5 minutes', model: exact }),
-          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          JSON.stringify({ status: 'pending', jobUrl: pollingUrl, model: exact }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
       return new Response(
