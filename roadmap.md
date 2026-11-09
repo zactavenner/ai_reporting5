@@ -20,3 +20,10 @@
 ## Open
 - Agent tools go live only after publishing (MCP).
 - Booked/funded counts differ from the GHL pipeline for some clients (e.g. InjuryPro) — needs sync review.
+
+# Roadmap — AI Influencer Studio (Content → AI Influencers)
+## Done
+- Four-stage studio: reference clip cut + pacing, raw-iPhone character + 6-view turnaround roster, word-for-word script lock, motion-swap / character-only render → Creatives.
+## Open
+- Wan 3.0 and Seedance 2.5 need admin approval to be enabled for spending (only Seedance 2.0 is enabled).
+- First paid end-to-end render not yet run.

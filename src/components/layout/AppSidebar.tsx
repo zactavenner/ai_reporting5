@@ -1,4 +1,4 @@
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, UserRound } from 'lucide-react';
 import {
   LayoutDashboard,
   BarChart3,
