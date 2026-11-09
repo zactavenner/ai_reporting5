@@ -278,6 +278,16 @@ Deno.serve(async (req) => {
     if (!row) return json({ error: "Project not found" }, 404);
     if (isUuid(clientId) && row.client_id !== clientId) return json({ error: "Project not found" }, 404);
 
+    // A claim with no job after 3 minutes means the submit never finished.
+    if (row.status === "rendering" && !row.job_url) {
+      const started = Date.parse(String(row.render_started_at || "")) || 0;
+      if (Date.now() - started > 3 * 60_000) {
+        await db.from("influencer_projects").update({ status: "failed", error: "Render submit never completed" }).eq("id", id);
+        row.status = "failed";
+        row.error = "Render submit never completed";
+      }
+    }
+
     if (action === "update") {
       if (row.status === "rendering") return json({ error: "Wait for the render to finish before editing" }, 409);
       const patch = (typeof body.patch === "object" && body.patch) ? body.patch as Record<string, unknown> : {};
@@ -362,16 +372,27 @@ Deno.serve(async (req) => {
         .update({ status: "rendering", error: null, render_started_at: new Date().toISOString() })
         .eq("id", id).neq("status", "rendering").select("id");
       if (!claimed?.length) return json({ error: "A render is already in progress" }, 409);
-      const submit = await fetch("https://openrouter.ai/api/v1/videos", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${OPENROUTER}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://reporting.highperformanceads.com",
-          "X-Title": "AI Influencer Studio",
-        },
-        body: JSON.stringify(providerBody),
-      });
+      let submit: Response;
+      try {
+        submit = await fetch("https://openrouter.ai/api/v1/videos", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${OPENROUTER}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://reporting.highperformanceads.com",
+            "X-Title": "AI Influencer Studio",
+          },
+          body: JSON.stringify(providerBody),
+        });
+      } catch (e) {
+        // Outcome unknown: the provider may have started a job. Say so rather than
+        // pretending nothing happened, so nobody blindly pays for a second one.
+        await db.from("influencer_projects").update({
+          status: "failed",
+          error: `Connection dropped while submitting — the provider may still have started a render. ${String(e).slice(0, 200)}`,
+        }).eq("id", id);
+        return json({ error: "Connection dropped while submitting — check before re-rendering" }, 502);
+      }
       if (!submit.ok) {
         const t = await submit.text();
         await db.from("influencer_projects").update({ status: "failed", error: `Submit ${submit.status}: ${t.slice(0, 300)}` }).eq("id", id);
