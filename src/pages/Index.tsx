@@ -26,6 +26,7 @@ import { AgencyAIChat } from '@/components/ai/AgencyAIChat';
 import { AIHubTab } from '@/components/ai/AIHubTab';
 import { AgencyAIStudioTab } from '@/components/ai/AgencyAIStudioTab';
 import { ContentAdsTab } from '@/components/content-ads/ContentAdsTab';
+import { InfluencerStudio } from '@/components/influencer-studio/InfluencerStudio';
 import { QualityFeedbackOverview } from '@/components/quality-feedback/QualityFeedbackOverview';
 import { AdsManagementPage } from '@/components/ads-manager/AdsManagementPage';
 import { TaskBoardView } from '@/components/tasks/TaskBoardView';
@@ -538,6 +539,11 @@ const Index = () => {
             {activeTab === 'content-static-ads' && (
               <SectionErrorBoundary sectionName="Static Ads">
                 <ContentAdsTab mediaType="static" onOpenStudio={() => handleTabChange('ai-studio')} />
+              </SectionErrorBoundary>
+            )}
+            {activeTab === 'content-influencers' && (
+              <SectionErrorBoundary sectionName="AI Influencers">
+                <InfluencerStudio />
               </SectionErrorBoundary>
             )}
 
