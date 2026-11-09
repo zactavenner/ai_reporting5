@@ -188,10 +188,9 @@ Deno.serve(async (req) => {
       }
       // Keep the looks gallery in step (front portrait + turnaround sheet).
       await db.from("avatar_looks").delete().eq("avatar_id", id).in("angle", ["front", "turnaround"]);
-      const looks = [
-        portrait && { avatar_id: id, name: "Portrait", image_url: portrait, angle: "front", is_primary: true, is_default: true, prompt: metadata.portrait_prompt },
-        sheet && { avatar_id: id, name: "Turnaround sheet", image_url: sheet, angle: "turnaround", is_primary: false, is_default: false, prompt: metadata.sheet_prompt },
-      ].filter(Boolean);
+      const looks: Array<Record<string, unknown>> = [];
+      if (portrait) looks.push({ avatar_id: id, name: "Portrait", image_url: portrait, angle: "front", is_primary: true, is_default: true, prompt: metadata.portrait_prompt });
+      if (sheet) looks.push({ avatar_id: id, name: "Turnaround sheet", image_url: sheet, angle: "turnaround", is_primary: false, is_default: false, prompt: metadata.sheet_prompt });
       if (looks.length) await db.from("avatar_looks").insert(looks);
       return json({ id });
     }
