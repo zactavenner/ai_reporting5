@@ -15684,6 +15684,167 @@ export type Database = {
           },
         ]
       }
+      influencer_projects: {
+        Row: {
+          aspect_ratio: string
+          character_id: string | null
+          client_id: string
+          clip_end_s: number
+          clip_start_s: number
+          clip_url: string | null
+          created_at: string
+          created_by: string | null
+          creative_id: string | null
+          cta: string
+          duration_seconds: number | null
+          error: string | null
+          hook: string
+          id: string
+          job_url: string | null
+          mechanism: string
+          model: string | null
+          name: string
+          pacing: Json
+          reference_poster_url: string | null
+          reference_url: string | null
+          reference_video_id: string | null
+          render_mode: string
+          render_request: Json | null
+          render_started_at: string | null
+          resolution: string
+          script: string
+          script_lock_hash: string | null
+          script_locked: boolean
+          script_locked_at: string | null
+          script_locked_by: string | null
+          status: string
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          aspect_ratio?: string
+          character_id?: string | null
+          client_id: string
+          clip_end_s?: number
+          clip_start_s?: number
+          clip_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          creative_id?: string | null
+          cta?: string
+          duration_seconds?: number | null
+          error?: string | null
+          hook?: string
+          id?: string
+          job_url?: string | null
+          mechanism?: string
+          model?: string | null
+          name?: string
+          pacing?: Json
+          reference_poster_url?: string | null
+          reference_url?: string | null
+          reference_video_id?: string | null
+          render_mode?: string
+          render_request?: Json | null
+          render_started_at?: string | null
+          resolution?: string
+          script?: string
+          script_lock_hash?: string | null
+          script_locked?: boolean
+          script_locked_at?: string | null
+          script_locked_by?: string | null
+          status?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          aspect_ratio?: string
+          character_id?: string | null
+          client_id?: string
+          clip_end_s?: number
+          clip_start_s?: number
+          clip_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          creative_id?: string | null
+          cta?: string
+          duration_seconds?: number | null
+          error?: string | null
+          hook?: string
+          id?: string
+          job_url?: string | null
+          mechanism?: string
+          model?: string | null
+          name?: string
+          pacing?: Json
+          reference_poster_url?: string | null
+          reference_url?: string | null
+          reference_video_id?: string | null
+          render_mode?: string
+          render_request?: Json | null
+          render_started_at?: string | null
+          resolution?: string
+          script?: string
+          script_lock_hash?: string | null
+          script_locked?: boolean
+          script_locked_at?: string | null
+          script_locked_by?: string | null
+          status?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "influencer_projects_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "avatars"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "influencer_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "influencer_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "influencer_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "influencer_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "influencer_projects_creative_id_fkey"
+            columns: ["creative_id"]
+            isOneToOne: false
+            referencedRelation: "creatives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "influencer_projects_reference_video_id_fkey"
+            columns: ["reference_video_id"]
+            isOneToOne: false
+            referencedRelation: "ai_studio_reference_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instagram_creatives: {
         Row: {
           caption: string | null

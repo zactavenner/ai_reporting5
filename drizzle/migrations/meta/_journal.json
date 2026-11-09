@@ -85,6 +85,13 @@
       "when": 1793986979492,
       "tag": "0011_client_report_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794244182612,
+      "tag": "0012_influencer_studio_projects",
+      "breakpoints": true
     }
   ]
 }
