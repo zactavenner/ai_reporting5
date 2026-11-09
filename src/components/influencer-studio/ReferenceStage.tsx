@@ -240,7 +240,6 @@ export function ReferenceStage({ clientId, project, update, onNext }: Props) {
                   className="w-full h-full object-contain"
                   controls
                   playsInline
-                  crossOrigin="anonymous"
                   onLoadedMetadata={onLoaded}
                 />
                 <Button
