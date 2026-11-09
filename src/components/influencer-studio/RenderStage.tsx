@@ -11,9 +11,10 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  defaultModelForMode, modelSpec, modelsForMode, renderBlockers, renderDuration, studioCostEstimate,
+  defaultModelForMode, modelsForMode, renderBlockers, renderDuration, studioCostEstimate,
   swapModel, targetSeconds, type RenderMode, type StageKey,
 } from "@/lib/influencerStudio";
+import { modelSpec } from "@/lib/masterVideo";
 import { studio, toStudioCharacter, toStudioProject, StudioError, type CharacterRow, type ProjectRow } from "./api";
 
 interface Props {
