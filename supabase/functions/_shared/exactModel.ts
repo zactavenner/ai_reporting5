@@ -91,6 +91,14 @@ export interface VideoRequestInput {
   firstFrameUrl?: string | null;
   lastFrameUrl?: string | null;
   referenceImageUrls?: string[] | null;
+  /**
+   * Multimodal references sent as OpenRouter `input_references`. Video and
+   * audio references are only honoured by models that support them (Seedance
+   * 2.0 and newer); callers must check that before sending one.
+   */
+  inputReferences?: Array<{ kind: "image" | "video" | "audio"; url: string }> | null;
+  /** Ask the provider for a soundtrack (spoken script). Omitted when undefined. */
+  generateAudio?: boolean;
 }
 
 /**
@@ -110,10 +118,14 @@ export function buildExactVideoRequest(input: VideoRequestInput): Record<string,
     frames.push({ type: "image_url", image_url: { url: input.lastFrameUrl }, frame_type: "last_frame" });
   }
   const references = (input.referenceImageUrls ?? []).filter((u) => typeof u === "string" && u.length > 0);
-  if (frames.length && references.length) {
+  const inputRefs = (input.inputReferences ?? []).filter((r) => r && typeof r.url === "string" && r.url.length > 0);
+  if (frames.length && (references.length || inputRefs.length)) {
     throw new Error(
       "This model cannot accept pinned frame images and subject reference images in the same request; choose one.",
     );
+  }
+  if (references.length && inputRefs.length) {
+    throw new Error("Send reference images either as referenceImageUrls or inputReferences, not both.");
   }
 
   const body: Record<string, unknown> = {
@@ -125,6 +137,16 @@ export function buildExactVideoRequest(input: VideoRequestInput): Record<string,
   };
   if (frames.length) body.frame_images = frames;
   if (references.length) body.reference_images = references.map((url) => ({ type: "image_url", image_url: { url } }));
+  if (inputRefs.length) {
+    body.input_references = inputRefs.map((r) =>
+      r.kind === "video"
+        ? { type: "video_url", video_url: { url: r.url } }
+        : r.kind === "audio"
+          ? { type: "audio_url", audio_url: { url: r.url } }
+          : { type: "image_url", image_url: { url: r.url } }
+    );
+  }
+  if (typeof input.generateAudio === "boolean") body.generate_audio = input.generateAudio;
   return body;
 }
 
