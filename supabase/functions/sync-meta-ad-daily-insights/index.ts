@@ -2,6 +2,7 @@
 // and upserts into public.meta_ad_daily_insights.
 // Called by sync-meta-ads-daily (fire-and-forget) and available for backfill.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 import { META_GRAPH_BASE, metaFetch, resolveMetaToken } from "../_shared/meta.ts";
 
 const corsHeaders = {
@@ -77,10 +78,12 @@ async function fetchAllPages(url: string) {
 }
 
 async function syncClient(sb: any, client: any, days: number, startDate?: string, endDate?: string) {
-  const { token } = resolveMetaToken(client);
-  if (!token) return { rows: 0, skipped: "no_token" };
+  const tk = await resolveClientMetaToken(sb, client, "sync-meta-ad-daily-insights");
+  if (!tk.token) return { rows: 0, skipped: "no_token" };
   const acct = String(client.meta_ad_account_id);
   const acctPath = acct.startsWith("act_") ? acct : `act_${acct}`;
+  const token = await tk.preflight((t) => `${META_GRAPH_BASE}/${acctPath}?fields=id&access_token=${encodeURIComponent(t)}`);
+  if (!token) return { rows: 0, skipped: "no_token" };
 
   const end = endDate ? new Date(`${endDate}T00:00:00Z`) : new Date();
   const start = startDate ? new Date(`${startDate}T00:00:00Z`) : new Date(end.getTime() - (days - 1) * 86400_000);
