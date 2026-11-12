@@ -154,6 +154,8 @@ interface GHLContact {
     utm_campaign?: string;
     utm_content?: string;
     utm_term?: string;
+    medium?: string;
+    sessionSource?: string;
   };
 }
 
@@ -938,6 +940,13 @@ async function syncContactToDatabase(
   const phone = contact.phone || null;
   
   const customFields = parseCustomFields(contact.customFields);
+  // Contacts bulk-imported into GHL from a CSV (attributionSource.medium = 'csv_import')
+  // are not new ad leads. Flag them so v_daily_funnel_day leaves them out of lead
+  // counts (same legacy_import flag as the HubSpot legacy rows), without deleting them.
+  if (String(contact.attributionSource?.medium || '').toLowerCase() === 'csv_import') {
+    customFields.legacy_import = true;
+    customFields.legacy_import_source = 'ghl_csv_import';
+  }
   const cfCount = Object.keys(customFields).length;
   if (cfCount > 0) {
     console.log(`Contact ${externalId} has ${cfCount} custom fields (raw type: ${Array.isArray(contact.customFields) ? 'array' : typeof contact.customFields})`);
