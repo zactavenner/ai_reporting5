@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { legacyChain, resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -762,13 +763,20 @@ Deno.serve(async (req) => {
         );
       }
 
-      const accessToken = client.meta_access_token || Deno.env.get("META_SHARED_ACCESS_TOKEN");
-      if (!accessToken) {
+      const tk = await resolveClientMetaToken(supabase, clientId, "sync-meta-ads", {
+        legacy: legacyChain([["client", client.meta_access_token], ["master", Deno.env.get("META_SHARED_ACCESS_TOKEN")]]),
+      });
+      if (!tk.token) {
         throw new Error("No Meta access token available (client token and shared token both missing).");
       }
       const adAccountId = effectiveAccountId.startsWith("act_")
         ? effectiveAccountId
         : `act_${effectiveAccountId}`;
+      // System user token rejected for this account → whole sync uses the user token.
+      const accessToken = await tk.preflight((t) => `${META_GRAPH_API_URL}/${adAccountId}?fields=id&access_token=${t}`);
+      if (!accessToken) {
+        throw new Error("No Meta access token available (client token and shared token both missing).");
+      }
 
       console.log(`Syncing Meta Ads for ${client.name} (${adAccountId})`);
 
