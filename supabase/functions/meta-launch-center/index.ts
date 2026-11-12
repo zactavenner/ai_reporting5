@@ -5,6 +5,7 @@
 // Auth: the dashboard's server-verifiable signed session token only.
 // Meta access tokens never leave this function.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { legacyChain, resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 import { verifyDashboardToken, readDashboardToken } from "../_shared/dashboardToken.ts";
 import { buildTargeting, GRAPH, META_VERSION, OBJECTIVES, validateLaunch } from "../_shared/metaLaunchValidation.ts";
 
@@ -115,15 +116,21 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!client?.meta_ad_account_id) return json({ success: false, error: "Client has no Meta ad account configured" }, 400);
 
-    const token =
-      (client.meta_system_user_token || "").trim() ||
-      (client.meta_access_token || "").trim() ||
-      (Deno.env.get("META_SHARED_ACCESS_TOKEN") || "").trim();
-    if (!token) return json({ success: false, error: "No Meta access token available for this client" }, 400);
+    const tk = await resolveClientMetaToken(supabase, client.id, "meta-launch-center", {
+      legacy: legacyChain([
+        ["system_user_legacy_column", (client.meta_system_user_token || "").trim()],
+        ["client", (client.meta_access_token || "").trim()],
+        ["master", (Deno.env.get("META_SHARED_ACCESS_TOKEN") || "").trim()],
+      ]),
+    });
+    if (!tk.token) return json({ success: false, error: "No Meta access token available for this client" }, 400);
 
     const actId = String(client.meta_ad_account_id).startsWith("act_")
       ? String(client.meta_ad_account_id)
       : `act_${client.meta_ad_account_id}`;
+    // If the system user token can't reach this account, fall back to the user token for the whole launch.
+    const token = (await tk.preflight((t) => `${GRAPH}/${actId}?fields=id&access_token=${encodeURIComponent(t)}`)) || "";
+    if (!token) return json({ success: false, error: "No Meta access token available for this client" }, 400);
 
     const map = OBJECTIVES[launch.objective as keyof typeof OBJECTIVES];
     if (!alreadyPublished) {

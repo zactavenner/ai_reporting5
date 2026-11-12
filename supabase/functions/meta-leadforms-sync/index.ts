@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { legacyChain, resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,13 +59,19 @@ Deno.serve(async (req) => {
     const results: any[] = [];
 
     for (const client of clients || []) {
-      const token = (client as any).meta_system_user_token
-        || client.meta_access_token
-        || Deno.env.get("META_SHARED_ACCESS_TOKEN");
-      if (!token) continue;
+      const tk = await resolveClientMetaToken(supabase, client.id, "meta-leadforms-sync", {
+        legacy: legacyChain([
+          ["system_user_legacy_column", (client as any).meta_system_user_token],
+          ["client", client.meta_access_token],
+          ["master", Deno.env.get("META_SHARED_ACCESS_TOKEN")],
+        ]),
+      });
+      if (!tk.token) continue;
       const acctId = client.meta_ad_account_id!.startsWith("act_")
         ? client.meta_ad_account_id!
         : `act_${client.meta_ad_account_id}`;
+      const token = await tk.preflight((t) => `${GRAPH}/${acctId}?fields=id&access_token=${t}`);
+      if (!token) continue;
 
       // 1) Get pages on this ad account
       const pages = await fetchAll(

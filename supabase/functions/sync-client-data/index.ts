@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { legacyChain, resolveClientMetaToken } from '../_shared/metaSystemToken.ts';
 import { resolveShowed } from '../_shared/appointmentShowed.ts';
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -251,13 +252,16 @@ async function syncMetaAds(supabase: any, client: any): Promise<void> {
   };
 
   // Pinned to v21.0 via shared helper (see _shared/meta.ts)
-  const insightsUrl = `https://graph.facebook.com/v21.0/act_${client.meta_ad_account_id}/insights?` +
+  const tk = await resolveClientMetaToken(supabase, client.id, 'sync-client-data', {
+    legacy: legacyChain([['client', client.meta_access_token]]),
+  });
+  const insightsUrl = (t: string) => `https://graph.facebook.com/v21.0/act_${client.meta_ad_account_id}/insights?` +
     `fields=spend,impressions,clicks,ctr,actions&` +
     `time_range={"since":"${dateRange.since}","until":"${dateRange.until}"}&` +
     `time_increment=1&` +
-    `access_token=${client.meta_access_token}`;
+    `access_token=${t}`;
 
-  const response = await fetch(insightsUrl);
+  const response = await tk.fetch(insightsUrl);
   
   if (!response.ok) {
     const errorData = await response.json();

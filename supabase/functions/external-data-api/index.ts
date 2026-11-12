@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { runSystemTokenAction, type SystemTokenAction } from "../_shared/metaSystemToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -149,8 +150,48 @@ Deno.serve(async (req) => {
               statuses: "Optional. Array of client.status values to include (default ['active']). Use ['*'] for all clients.",
             },
           },
+          meta_system_token_status: {
+            description: "Metadata for a client's Meta system user token (never the token). Returns status not_set|active|invalid|needs_attention and using system_user|user_token.",
+            fields: { client_id: "Required. The client UUID" },
+          },
+          meta_system_token_set: {
+            description: "Save or replace a client's Meta system user token. Validated with Meta first; an invalid token is NOT stored (422, status 'invalid'). Encrypted at rest; never returned.",
+            fields: { client_id: "Required. The client UUID", token: "Required. The system user access token" },
+          },
+          meta_system_token_delete: {
+            description: "Remove the client's system user token from Reporting 5.0 (pulls go back to the user token). Nothing is revoked at Meta.",
+            fields: { client_id: "Required. The client UUID" },
+          },
+          meta_system_token_validate: {
+            description: "Re-check the stored system user token with Meta and refresh its status/scopes/ad-account access.",
+            fields: { client_id: "Required. The client UUID" },
+          },
         },
       });
+    }
+
+    // ========================
+    // COMPOSITE: Meta system user token (metadata only, never the token)
+    // ========================
+    const SYSTEM_TOKEN_ACTIONS: Record<string, SystemTokenAction> = {
+      meta_system_token_status: "status",
+      meta_system_token_set: "set",
+      meta_system_token_delete: "delete",
+      meta_system_token_validate: "revalidate",
+    };
+    if (typeof action === "string" && Object.prototype.hasOwnProperty.call(SYSTEM_TOKEN_ACTIONS, action)) {
+      const op = SYSTEM_TOKEN_ACTIONS[action];
+      const res = await runSystemTokenAction(supabase, {
+        action: op,
+        clientId: String(body.client_id || ""),
+        token: op === "set" ? body.token : undefined,
+        actor: { label: "agent:external-data-api" },
+        source: "agent_api",
+      });
+      if (res.httpStatus >= 400) {
+        return jsonResp({ error: res.errorCode, message: res.errorMessage, data: res.data }, res.httpStatus);
+      }
+      return jsonResp({ data: res.data, ...(res.saved !== undefined ? { saved: res.saved } : {}) });
     }
 
     // ========================
@@ -567,6 +608,10 @@ Deno.serve(async (req) => {
     if (!table || !ALLOWED_TABLES.includes(table)) {
       return jsonResp({ error: `Invalid table. Allowed: ${ALLOWED_TABLES.join(", ")}` }, 400);
     }
+    // Token storage is never reachable through generic select embedding.
+    if (typeof select_columns === "string" && /client_meta_system_tokens|meta_token_usage_log/i.test(select_columns)) {
+      return jsonResp({ error: "select_columns may not reference token storage" }, 400);
+    }
 
     // Build select string with optional relations
     const buildSelectStr = () => {
@@ -681,7 +726,7 @@ Deno.serve(async (req) => {
       return jsonResp({ data: rows, table });
     }
 
-    return jsonResp({ error: "Invalid action. Use: list_tables, select, count, insert, upsert, update, delete, create_task, get_ads_overview, get_client_funnel, get_all_client_funnels, list_storage, get_file_url, delete_file, upload_file_base64" }, 400);
+    return jsonResp({ error: "Invalid action. Use: list_tables, select, count, insert, upsert, update, delete, create_task, get_ads_overview, get_client_funnel, get_all_client_funnels, list_storage, get_file_url, delete_file, upload_file_base64, meta_system_token_status, meta_system_token_set, meta_system_token_delete, meta_system_token_validate" }, 400);
 
   } catch (err: unknown) {
     return jsonResp({ error: err instanceof Error ? err.message : String(err) }, 500);

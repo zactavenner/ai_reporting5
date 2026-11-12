@@ -2,6 +2,7 @@
 // Used by the launch wizard's "Activate now" button, since freshly-created ads
 // aren't in meta_ads yet.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { legacyChain, resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,16 +25,19 @@ Deno.serve(async (req) => {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: client } = await supabase.from("clients")
       .select("meta_access_token").eq("id", clientId).single();
-    const token = client?.meta_access_token || Deno.env.get("META_SHARED_ACCESS_TOKEN");
+    const tk = await resolveClientMetaToken(supabase, clientId, "meta-set-status-by-nodes", {
+      legacy: legacyChain([["client", client?.meta_access_token], ["master", Deno.env.get("META_SHARED_ACCESS_TOKEN")]]),
+    });
+    const token = tk.token;
     if (!token) throw new Error("No Meta access token");
 
     const results: any[] = [];
     for (const id of nodeIds) {
-      const r = await fetch(`${G}/${id}`, {
+      const r = await tk.fetch(() => `${G}/${id}`, (t) => ({
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ status, access_token: token }),
-      });
+        body: new URLSearchParams({ status, access_token: t }),
+      }));
       const j = await r.json().catch(() => ({}));
       results.push({ id, ok: r.ok, response: j });
       if (!r.ok) throw new Error(`Meta ${id} ${r.status}: ${JSON.stringify(j).slice(0, 300)}`);

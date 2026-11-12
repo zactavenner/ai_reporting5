@@ -1,6 +1,7 @@
 // Phase 3: Create a Meta campaign + ad set (full builder).
 // Requires ads_management scope (verified Meta app).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { legacyChain, resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,7 +56,10 @@ Deno.serve(async (req) => {
       .eq("id", clientId).single();
     if (!client?.meta_ad_account_id) throw new Error("Client missing Meta ad account");
 
-    const accessToken = client.meta_access_token || Deno.env.get("META_SHARED_ACCESS_TOKEN");
+    const tk = await resolveClientMetaToken(supabase, clientId, "create-meta-campaign", {
+      legacy: legacyChain([["client", client.meta_access_token], ["master", Deno.env.get("META_SHARED_ACCESS_TOKEN")]]),
+    });
+    const accessToken = tk.token;
     if (!accessToken) throw new Error("No Meta access token");
 
     const adAccountId = client.meta_ad_account_id.startsWith("act_")
@@ -70,10 +74,10 @@ Deno.serve(async (req) => {
       special_ad_categories: JSON.stringify(specialAdCategories),
       access_token: accessToken,
     });
-    const campRes = await fetch(`${META_GRAPH_API_URL}/${adAccountId}/campaigns`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: campaignPayload,
+    const campRes = await tk.fetch(() => `${META_GRAPH_API_URL}/${adAccountId}/campaigns`, (t) => {
+      const body = new URLSearchParams(campaignPayload);
+      body.set("access_token", t);
+      return { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body };
     });
     const campData = await campRes.json();
     if (!campRes.ok) throw new Error(`Create campaign failed: ${JSON.stringify(campData)}`);
@@ -106,16 +110,15 @@ Deno.serve(async (req) => {
       adSetPayloadObj.promoted_object = JSON.stringify(promotedObject);
     }
 
-    const adSetPayload = new URLSearchParams(adSetPayloadObj);
-    const asRes = await fetch(`${META_GRAPH_API_URL}/${adAccountId}/adsets`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: adSetPayload,
+    const asRes = await tk.fetch(() => `${META_GRAPH_API_URL}/${adAccountId}/adsets`, (t) => {
+      const body = new URLSearchParams(adSetPayloadObj);
+      body.set("access_token", t);
+      return { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body };
     });
     const asData = await asRes.json();
     if (!asRes.ok) {
       // Roll back campaign on adset failure
-      await fetch(`${META_GRAPH_API_URL}/${campaignId}?access_token=${accessToken}`, { method: "DELETE" }).catch(() => {});
+      await fetch(`${META_GRAPH_API_URL}/${campaignId}?access_token=${tk.token}`, { method: "DELETE" }).catch(() => {});
       throw new Error(`Create ad set failed: ${JSON.stringify(asData)}`);
     }
 

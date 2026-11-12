@@ -1,6 +1,7 @@
 // Meta Ads MCP server (mcp-lite) — exposes Meta Graph API tools to AI agents.
 // Token resolution: per-client `meta_access_token` → META_SHARED_ACCESS_TOKEN (Blue Capital global default).
 import { Hono } from "npm:hono@4";
+import { legacyChain, resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 import { McpServer, StreamableHttpTransport } from "npm:mcp-lite@^0.10.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -19,6 +20,17 @@ async function resolveToken(clientId?: string): Promise<{ token: string; adAccou
       .select("meta_access_token, meta_ad_account_id, name")
       .eq("id", clientId)
       .maybeSingle();
+    // Per-client system user token (when set + active) wins; otherwise unchanged precedence below.
+    const tk = await resolveClientMetaToken(sb, clientId, "meta-mcp", {
+      legacy: legacyChain([["client", data?.meta_access_token], ["master", Deno.env.get("META_SHARED_ACCESS_TOKEN")]]),
+    });
+    if (tk.source === "system_user_vault" && data?.meta_ad_account_id) {
+      const acct = String(data.meta_ad_account_id).startsWith("act_") ? String(data.meta_ad_account_id) : `act_${data.meta_ad_account_id}`;
+      await tk.preflight((t) => `${GRAPH}/${acct}?fields=id&access_token=${encodeURIComponent(t)}`);
+    }
+    if (tk.source === "system_user_vault" && tk.token) {
+      return { token: tk.token, adAccountId: data?.meta_ad_account_id ?? undefined, source: `system_user:${data?.name ?? clientId}` };
+    }
     if (data?.meta_access_token) {
       return { token: data.meta_access_token, adAccountId: data.meta_ad_account_id ?? undefined, source: `client:${data.name}` };
     }

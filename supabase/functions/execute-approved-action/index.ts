@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { META_GRAPH_BASE, metaFetch, resolveMetaToken } from "../_shared/meta.ts";
 
@@ -51,28 +52,28 @@ async function executeBudget(supabase: any, clientId: string | null, payload: an
     return { executed: false, reason: `new_daily_budget exceeds client max_daily_budget` };
   }
 
-  const { token } = resolveMetaToken(client ?? {});
-  if (!token) return fallbackToTask(supabase, clientId, "budget change", `No Meta token available.\n\nPayload:\n${JSON.stringify(payload, null, 2)}`);
+  const tk = await resolveClientMetaToken(supabase, { ...(client ?? {}), id: clientId }, "execute-approved-action");
+  if (!tk.token) return fallbackToTask(supabase, clientId, "budget change", `No Meta token available.\n\nPayload:\n${JSON.stringify(payload, null, 2)}`);
 
   try {
     if (newDailyBudget && targetAdsetId) {
       // Meta expects daily_budget in minor units (cents). Assume USD if not otherwise stated.
       const cents = Math.round(newDailyBudget * 100);
-      const r = await metaFetch(`${META_GRAPH_BASE}/${targetAdsetId}?access_token=${encodeURIComponent(token)}`, {
+      const r = await tk.fetch((t) => `${META_GRAPH_BASE}/${targetAdsetId}?access_token=${encodeURIComponent(t)}`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: `daily_budget=${cents}`,
-      });
+      }, metaFetch);
       const txt = await r.text();
       if (!r.ok) return fallbackToTask(supabase, clientId, `set daily_budget=$${newDailyBudget} on adset ${targetAdsetId}`, `Meta ${r.status}: ${txt}\n\nPayload:\n${JSON.stringify(payload, null, 2)}`);
       return { executed: true, target_adset_id: targetAdsetId, new_daily_budget: newDailyBudget };
     }
     if (newStatus && targetAdId) {
-      const r = await metaFetch(`${META_GRAPH_BASE}/${targetAdId}?access_token=${encodeURIComponent(token)}`, {
+      const r = await tk.fetch((t) => `${META_GRAPH_BASE}/${targetAdId}?access_token=${encodeURIComponent(t)}`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: `status=${encodeURIComponent(newStatus)}`,
-      });
+      }, metaFetch);
       const txt = await r.text();
       if (!r.ok) return fallbackToTask(supabase, clientId, `set status=${newStatus} on ad ${targetAdId}`, `Meta ${r.status}: ${txt}\n\nPayload:\n${JSON.stringify(payload, null, 2)}`);
       return { executed: true, target_ad_id: targetAdId, new_status: newStatus };

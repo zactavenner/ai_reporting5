@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { legacyChain, resolveClientMetaToken, type MetaTokenHandle } from "../_shared/metaSystemToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,11 +9,11 @@ const corsHeaders = {
 const META_GRAPH_API_VERSION = "v21.0";
 const META_GRAPH_API_URL = `https://graph.facebook.com/${META_GRAPH_API_VERSION}`;
 
-async function fetchMetaApi(url: string, accessToken: string): Promise<any> {
+async function fetchMetaApi(url: string, tk: MetaTokenHandle): Promise<any> {
   const separator = url.includes("?") ? "&" : "?";
-  const res = await fetch(`${url}${separator}access_token=${accessToken}`, {
+  const res = await tk.fetch((t) => `${url}${separator}access_token=${t}`, () => ({
     signal: AbortSignal.timeout(30000),
-  });
+  }));
   if (!res.ok) {
     const errBody = await res.text();
     throw new Error(`Meta API ${res.status}: ${errBody.substring(0, 300)}`);
@@ -51,7 +52,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const accessToken = client.meta_access_token || Deno.env.get("META_SHARED_ACCESS_TOKEN");
+    const tk = await resolveClientMetaToken(supabase, clientId, "fetch-ad-media-hd", {
+      legacy: legacyChain([["client", client.meta_access_token], ["master", Deno.env.get("META_SHARED_ACCESS_TOKEN")]]),
+    });
+    const accessToken = tk.token;
     if (!accessToken) {
       return new Response(JSON.stringify({ success: false, error: "No Meta access token" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -88,7 +92,7 @@ Deno.serve(async (req) => {
         // Fetch creative details
         const creative = await fetchMetaApi(
           `${META_GRAPH_API_URL}/${ad.creative_id}?fields=object_story_spec,image_url,thumbnail_url`,
-          accessToken
+          tk
         );
 
         const storySpec = creative.object_story_spec || {};
@@ -100,7 +104,7 @@ Deno.serve(async (req) => {
           try {
             const video = await fetchMetaApi(
               `${META_GRAPH_API_URL}/${videoData.video_id}?fields=source,picture`,
-              accessToken
+              tk
             );
             if (video.source) updates.video_source_url = video.source;
             if (video.picture && !ad.full_image_url) updates.full_image_url = video.picture;

@@ -1,6 +1,7 @@
 // Toggle ACTIVE/PAUSED status for a Meta campaign, ad set, or ad.
 // Requires ads_management scope.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { legacyChain, resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,7 +47,10 @@ Deno.serve(async (req) => {
       .single();
     if (clientErr || !client) throw new Error(`Client not found: ${clientErr?.message || "unknown"}`);
 
-    const accessToken = client.meta_access_token || Deno.env.get("META_SHARED_ACCESS_TOKEN");
+    const tk = await resolveClientMetaToken(supabase, clientId, "toggle-meta-status", {
+      legacy: legacyChain([["client", client.meta_access_token], ["master", Deno.env.get("META_SHARED_ACCESS_TOKEN")]]),
+    });
+    const accessToken = tk.token;
     if (!accessToken) throw new Error("No Meta access token configured for this client");
 
     // Map level → DB table + Meta node id column
@@ -67,12 +71,11 @@ Deno.serve(async (req) => {
     if (!metaNodeId) throw new Error(`Row missing ${metaIdCol} — cannot push to Meta`);
 
     // Push to Meta
-    const body = new URLSearchParams({ status, access_token: accessToken });
-    const metaRes = await fetch(`${META_GRAPH_API_URL}/${metaNodeId}`, {
+    const metaRes = await tk.fetch(() => `${META_GRAPH_API_URL}/${metaNodeId}`, (t) => ({
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-    });
+      body: new URLSearchParams({ status, access_token: t }),
+    }));
     const metaData = await metaRes.json();
     if (!metaRes.ok) {
       throw new Error(`Meta API error (${metaRes.status}): ${JSON.stringify(metaData)}`);

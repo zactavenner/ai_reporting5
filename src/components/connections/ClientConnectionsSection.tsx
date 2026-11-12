@@ -25,6 +25,9 @@ import {
 } from './ClientConnectionsPanels';
 import { useConnectionsSummary, type SettingsSource } from '@/hooks/useClientConnections';
 import { AgentApiPanel } from './AgentApiPanel';
+import { MetaSystemTokenRow } from './MetaSystemTokenRow';
+import { useMetaSystemTokenStatus } from '@/hooks/useMetaSystemToken';
+import { tokenNeedsAttention } from '@/lib/metaSystemTokenDisplay';
 
 const ClientOffersSection = lazy(() =>
   import('@/components/offers/ClientOffersSection').then((m) => ({ default: m.ClientOffersSection })),
@@ -46,6 +49,7 @@ export interface ConnectionsClientInfo {
 
 function SummaryChips({ clientId }: { clientId: string }) {
   const { offersActive, rollup, accounts } = useConnectionsSummary(clientId);
+  const { data: systemToken } = useMetaSystemTokenStatus(clientId);
   const ghlish = accounts.length > 0;
   const lastSync = rollup.last_successful_sync
     ? formatDistanceToNow(new Date(rollup.last_successful_sync), { addSuffix: true })
@@ -58,6 +62,11 @@ function SummaryChips({ clientId }: { clientId: string }) {
         Active ads {typeof rollup.ads_active === 'number' ? rollup.ads_active.toLocaleString() : '—'}
       </Badge>
       <HealthBadge health={rollup.health} />
+      {tokenNeedsAttention(systemToken?.status) && (
+        <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
+          1 need attention · system user token
+        </Badge>
+      )}
       <span className="text-[11px] text-muted-foreground">
         {ghlish ? `Last sync ${lastSync}` : 'No ad accounts linked'}
       </span>
@@ -141,6 +150,7 @@ export function ClientConnectionsPanelGroup({
         </div>
       )}
       <MetaPanel clientId={clientId} source={source} />
+      <MetaSystemTokenRow clientId={clientId} />
       {showAudit && <ConnectionAuditPanel clientId={clientId} />}
       {showApiCopy && <AgentApiPanel />}
     </div>

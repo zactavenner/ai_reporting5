@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { legacyChain, resolveClientMetaToken } from '../_shared/metaSystemToken.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -386,10 +387,15 @@ serve(async (req) => {
         if (connectors.includes('meta_ads') && (client.meta_system_user_token || client.meta_access_token) && client.meta_ad_account_id) {
           try {
             // System User token preferred (no expiry); falls back to long-lived per-client token.
-            const metaToken = client.meta_system_user_token || client.meta_access_token;
-            const metaUrl = `https://graph.facebook.com/v21.0/act_${client.meta_ad_account_id}/insights?fields=spend,impressions,clicks,ctr,cpc,cpm,actions&time_range={"since":"${yesterdayStr}","until":"${yesterdayStr}"}&access_token=${metaToken}`;
+            const tk = await resolveClientMetaToken(prodDb, client.id, 'run-agent', {
+              legacy: legacyChain([
+                ['system_user_legacy_column', client.meta_system_user_token],
+                ['client', client.meta_access_token],
+              ]),
+            });
+            const metaUrl = (metaToken: string) => `https://graph.facebook.com/v21.0/act_${client.meta_ad_account_id}/insights?fields=spend,impressions,clicks,ctr,cpc,cpm,actions&time_range={"since":"${yesterdayStr}","until":"${yesterdayStr}"}&access_token=${metaToken}`;
             const { metaFetch } = await import('../_shared/meta.ts');
-            const metaRes = await metaFetch(metaUrl);
+            const metaRes = await tk.fetch(metaUrl, undefined, metaFetch);
             const metaData = await metaRes.json();
             dataContext.meta_ads = metaData.data?.[0] || { note: 'No Meta data for this date' };
           } catch (e) {

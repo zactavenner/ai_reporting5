@@ -2,6 +2,7 @@
 // Nothing here runs without an explicit operator click plus a valid signed
 // dashboard session. Uses an atomic claim so double-clicks cannot double-write.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { legacyChain, resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 import { verifyDashboardToken, readDashboardToken } from "../_shared/dashboardToken.ts";
 import { GRAPH, META_VERSION } from "../_shared/metaLaunchValidation.ts";
 
@@ -57,10 +58,14 @@ Deno.serve(async (req) => {
       .select("meta_access_token, meta_system_user_token")
       .eq("id", claimed.client_id)
       .maybeSingle();
-    const token =
-      (client?.meta_system_user_token || "").trim() ||
-      (client?.meta_access_token || "").trim() ||
-      (Deno.env.get("META_SHARED_ACCESS_TOKEN") || "").trim();
+    const tk = await resolveClientMetaToken(supabase, claimed.client_id, "meta-apply-recommendation", {
+      legacy: legacyChain([
+        ["system_user_legacy_column", (client?.meta_system_user_token || "").trim()],
+        ["client", (client?.meta_access_token || "").trim()],
+        ["master", (Deno.env.get("META_SHARED_ACCESS_TOKEN") || "").trim()],
+      ]),
+    });
+    const token = tk.token;
     if (!token) throw new Error("No Meta access token available for this client");
 
     const params: Record<string, string> = { access_token: token };
@@ -75,11 +80,11 @@ Deno.serve(async (req) => {
       throw new Error(`Unsupported action: ${claimed.action}`);
     }
 
-    const res = await fetch(`${GRAPH}/${claimed.meta_entity_id}`, {
+    const res = await tk.fetch(() => `${GRAPH}/${claimed.meta_entity_id}`, (t) => ({
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams(params),
-    });
+      body: new URLSearchParams({ ...params, access_token: t }),
+    }));
     const metaBody = await res.json().catch(() => ({}));
     if (!res.ok) {
       const detail = metaBody?.error?.error_user_msg || metaBody?.error?.message || JSON.stringify(metaBody).slice(0, 300);
