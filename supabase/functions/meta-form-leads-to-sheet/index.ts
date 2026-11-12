@@ -3,6 +3,7 @@
 // client's KPI sheet "Leads" tab. Dedupes on email and phone. Responses never
 // include contact details — only counts and masked first names.
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { legacyChain, resolveClientMetaToken } from '../_shared/metaSystemToken.ts';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { authorizeOperator } from '../_shared/operatorAuth.ts';
 import { authorizeDailyReportRun } from '../_shared/dailyReportSecret.ts';
@@ -75,9 +76,17 @@ Deno.serve(async (req) => {
     const { data: s } = await sb.from('client_settings').select('kpi_google_sheet_url').eq('client_id', client_id).maybeSingle();
     const sheetId = (s?.kpi_google_sheet_url ?? '').match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)?.[1];
     if (!c?.meta_ad_account_id || !sheetId) return json({ error: 'client missing ad account or KPI sheet' }, 400);
-    const token = (c as any).meta_system_user_token || c.meta_access_token || Deno.env.get('META_SHARED_ACCESS_TOKEN');
-    if (!token) return json({ error: 'no Meta token' }, 400);
+    const tk = await resolveClientMetaToken(sb, c.id, 'meta-form-leads-to-sheet', {
+      legacy: legacyChain([
+        ['system_user_legacy_column', (c as any).meta_system_user_token],
+        ['client', c.meta_access_token],
+        ['master', Deno.env.get('META_SHARED_ACCESS_TOKEN')],
+      ]),
+    });
+    if (!tk.token) return json({ error: 'no Meta token' }, 400);
     const acct = String(c.meta_ad_account_id).startsWith('act_') ? c.meta_ad_account_id : `act_${c.meta_ad_account_id}`;
+    const token = await tk.preflight((t) => `${GRAPH}/${acct}?fields=id&access_token=${t}`);
+    if (!token) return json({ error: 'no Meta token' }, 400);
 
     // Window with a day of padding; exact LA-day filter applied below.
     const since = Math.floor(new Date(`${start_date}T00:00:00Z`).getTime() / 1000) - 86400;
