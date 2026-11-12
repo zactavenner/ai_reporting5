@@ -3,6 +3,7 @@
 // - If multiple distinct -> queue an approval via agent-gatekeeper
 // - Also caches pixel list into meta_ad_accounts.pixels jsonb
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 import { META_GRAPH_BASE, resolveMetaToken } from "../_shared/meta.ts";
 
 const corsHeaders = {
@@ -39,8 +40,8 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    const { token } = resolveMetaToken(c as any);
-    if (!token) {
+    const tk = await resolveClientMetaToken(sb, c as any, "derive-client-pixels");
+    if (!tk.token) {
       summary.errors++;
       summary.details.push({ client: c.name, client_id: c.id, action: "no_token" });
       continue;
@@ -59,8 +60,7 @@ Deno.serve(async (req) => {
     const hits: PixelHit[] = [];
     const errs: string[] = [];
     for (const accId of uniqueAccts) {
-      const url = `${META_GRAPH_BASE}/act_${accId}/adspixels?fields=id,name,last_fired_time&limit=50&access_token=${encodeURIComponent(token)}`;
-      const res = await fetch(url);
+      const res = await tk.fetch((t) => `${META_GRAPH_BASE}/act_${accId}/adspixels?fields=id,name,last_fired_time&limit=50&access_token=${encodeURIComponent(t)}`);
       const j = await safeJson(res);
       if (!res.ok || j?.error) {
         errs.push(`act_${accId}: ${j?.error?.message || res.status}`);
