@@ -2,6 +2,7 @@
 // all PAUSED. Optionally creates a lead form. Rolls back the campaign on hard
 // failure so we don't leave orphans.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { legacyChain, resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -163,9 +164,13 @@ Deno.serve(async (req) => {
       .select("meta_access_token, meta_ad_account_id, name")
       .eq("id", clientId).single();
     if (!client?.meta_ad_account_id) throw new Error("Client missing Meta ad account");
-    accessToken = client.meta_access_token || Deno.env.get("META_SHARED_ACCESS_TOKEN") || "";
-    if (!accessToken) throw new Error("No Meta access token");
     const actId = client.meta_ad_account_id.startsWith("act_") ? client.meta_ad_account_id : `act_${client.meta_ad_account_id}`;
+    const tk = await resolveClientMetaToken(supabase, clientId, "meta-launch-campaign", {
+      legacy: legacyChain([["client", client.meta_access_token], ["master", Deno.env.get("META_SHARED_ACCESS_TOKEN")]]),
+    });
+    // If the system user token can't reach this account, the whole launch uses the user token.
+    accessToken = (await tk.preflight((t) => `${G}/${actId}?fields=id&access_token=${t}`)) || "";
+    if (!accessToken) throw new Error("No Meta access token");
 
     // 1. Optionally create lead form on the page
     let resolvedLeadFormId: string | undefined = leadFormId;
