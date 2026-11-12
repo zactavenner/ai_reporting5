@@ -8404,6 +8404,98 @@ export type Database = {
           },
         ]
       }
+      client_meta_system_tokens: {
+        Row: {
+          ad_account_access: Json
+          client_id: string
+          created_at: string
+          data_access_expires_at: string | null
+          expires_at: string | null
+          key_version: number
+          last_error: string | null
+          last_used_at: string | null
+          last_validated_at: string | null
+          saved_at: string
+          saved_by: string | null
+          scopes: string[] | null
+          status: string
+          system_user_id: string | null
+          system_user_name: string | null
+          token_ciphertext: string
+          token_last4: string | null
+          updated_at: string
+        }
+        Insert: {
+          ad_account_access?: Json
+          client_id: string
+          created_at?: string
+          data_access_expires_at?: string | null
+          expires_at?: string | null
+          key_version?: number
+          last_error?: string | null
+          last_used_at?: string | null
+          last_validated_at?: string | null
+          saved_at?: string
+          saved_by?: string | null
+          scopes?: string[] | null
+          status?: string
+          system_user_id?: string | null
+          system_user_name?: string | null
+          token_ciphertext: string
+          token_last4?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ad_account_access?: Json
+          client_id?: string
+          created_at?: string
+          data_access_expires_at?: string | null
+          expires_at?: string | null
+          key_version?: number
+          last_error?: string | null
+          last_used_at?: string | null
+          last_validated_at?: string | null
+          saved_at?: string
+          saved_by?: string | null
+          scopes?: string[] | null
+          status?: string
+          system_user_id?: string | null
+          system_user_name?: string | null
+          token_ciphertext?: string
+          token_last4?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_meta_system_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_meta_system_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_meta_system_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_meta_system_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       client_offer_files: {
         Row: {
           client_id: string
@@ -21030,6 +21122,33 @@ export type Database = {
           last_refreshed_at?: string
           last_status?: string | null
           last_validated_at?: string | null
+        }
+        Relationships: []
+      }
+      meta_token_usage_log: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          fallback_reason: string | null
+          function_name: string
+          id: number
+          source: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          fallback_reason?: string | null
+          function_name: string
+          id?: number
+          source: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          fallback_reason?: string | null
+          function_name?: string
+          id?: number
+          source?: string
         }
         Relationships: []
       }
