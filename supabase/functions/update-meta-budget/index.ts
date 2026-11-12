@@ -1,5 +1,6 @@
 // Updates the daily or lifetime budget of a Meta campaign or ad set.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { legacyChain, resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,7 +27,10 @@ Deno.serve(async (req) => {
       .from("clients")
       .select("meta_access_token")
       .eq("id", clientId).single();
-    const accessToken = client?.meta_access_token || Deno.env.get("META_SHARED_ACCESS_TOKEN");
+    const tk = await resolveClientMetaToken(supabase, clientId, "update-meta-budget", {
+      legacy: legacyChain([["client", client?.meta_access_token], ["master", Deno.env.get("META_SHARED_ACCESS_TOKEN")]]),
+    });
+    const accessToken = tk.token;
     if (!accessToken) throw new Error("No Meta access token");
 
     const table = level === "campaign" ? "meta_campaigns" : "meta_ad_sets";
@@ -45,10 +49,10 @@ Deno.serve(async (req) => {
     if (dailyBudgetCents) params.set("daily_budget", String(dailyBudgetCents));
     if (lifetimeBudgetCents) params.set("lifetime_budget", String(lifetimeBudgetCents));
 
-    const res = await fetch(`${META}/${metaId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: params,
+    const res = await tk.fetch(() => `${META}/${metaId}`, (t) => {
+      const body = new URLSearchParams(params);
+      body.set("access_token", t);
+      return { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body };
     });
     const data = await res.json();
     if (!res.ok || data.error) {

@@ -1,5 +1,6 @@
 // Duplicates a Meta campaign, ad set, or ad using Meta's /copies endpoint.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { legacyChain, resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,7 +26,10 @@ Deno.serve(async (req) => {
       .from("clients")
       .select("meta_access_token")
       .eq("id", clientId).single();
-    const accessToken = client?.meta_access_token || Deno.env.get("META_SHARED_ACCESS_TOKEN");
+    const tk = await resolveClientMetaToken(supabase, clientId, "duplicate-meta-object", {
+      legacy: legacyChain([["client", client?.meta_access_token], ["master", Deno.env.get("META_SHARED_ACCESS_TOKEN")]]),
+    });
+    const accessToken = tk.token;
     if (!accessToken) throw new Error("No Meta access token");
 
     const tableMap: Record<string, { table: string; id: string }> = {
@@ -49,10 +53,10 @@ Deno.serve(async (req) => {
     // Meta deep_copy is supported on campaign+adset
     if (level !== "ad") params.set("deep_copy", "true");
 
-    const res = await fetch(`${META}/${metaId}/copies`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: params,
+    const res = await tk.fetch(() => `${META}/${metaId}/copies`, (t) => {
+      const body = new URLSearchParams(params);
+      body.set("access_token", t);
+      return { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body };
     });
     const data = await res.json();
     if (!res.ok || data.error) {
