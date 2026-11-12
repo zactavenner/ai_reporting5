@@ -21,6 +21,7 @@ import {
   FileSpreadsheet,
   FileText,
   GitBranch,
+  KeyRound,
   Link2,
   Loader2,
   Pencil,
@@ -39,6 +40,9 @@ import type { Client } from '@/hooks/useClients';
 import { useConnectionsSummary } from '@/hooks/useClientConnections';
 import { GhlPanel, MetaPanel } from '@/components/connections/ClientConnectionsPanels';
 import type { ConnectionsClientInfo } from '@/components/connections/ClientConnectionsSection';
+import { MetaSystemTokenControls, MetaSystemTokenDetail } from '@/components/connections/MetaSystemTokenRow';
+import { useMetaSystemTokenStatus } from '@/hooks/useMetaSystemToken';
+import { TOKEN_PILL, tokenRowState } from '@/lib/metaSystemTokenDisplay';
 import { CLIENT_DOCS, docState, type ClientDocDef, type ClientDocKey } from '@/lib/huddle/clientDocs';
 import {
   crmState,
@@ -330,6 +334,8 @@ export function HuddleConnectionsChecklist({
   const linkedAccounts = accounts.filter((a) => a.status !== 'disconnected');
   const metaLastSync = newest(data?.metaSettingsSync, data?.spendUpdatedAt, ...linkedAccounts.map((a) => a.last_sync_at));
   const metaRow = metaState(linkedAccounts, metaLastSync, now);
+  const { data: systemToken, isLoading: tokenLoading } = useMetaSystemTokenStatus(clientId);
+  const tokenRow = tokenRowState(systemToken?.status);
 
   const crmKind = data?.crm.kind ?? null;
   const crmName = crmKind === 'hubspot' ? 'HubSpot' : 'GoHighLevel';
@@ -342,7 +348,8 @@ export function HuddleConnectionsChecklist({
   const docRows = CLIENT_DOCS.map((d) => (docState(d.kind, data?.docs[d.key]) === 'linked' ? 'ok' : 'missing') as RowState);
   const states = [...docRows, offerRow, metaRow, crmRow, pipeRow];
   const missing = loading ? 0 : states.filter((s) => s === 'missing').length;
-  const warn = loading ? 0 : states.filter((s) => s === 'warn').length;
+  // An Invalid / Needs-attention system user token counts toward "need attention".
+  const warn = loading ? 0 : states.filter((s) => s === 'warn').length + (tokenRow === 'warn' ? 1 : 0);
 
   useEffect(() => {
     if (!loading && missing > 0) setOpen(true);
@@ -496,6 +503,16 @@ export function HuddleConnectionsChecklist({
               </Expand>
             )}
           </ChecklistRow>
+
+          {/* Meta system user token */}
+          <ChecklistRow
+            icon={KeyRound}
+            title="Meta System User Token"
+            state={tokenRow}
+            statusLabel={TOKEN_PILL[systemToken?.status ?? 'not_set'].label}
+            detail={tokenLoading ? 'Checking…' : <MetaSystemTokenDetail status={systemToken} />}
+            actions={<MetaSystemTokenControls clientId={clientId} status={systemToken} />}
+          />
 
           {/* CRM */}
           <ChecklistRow
