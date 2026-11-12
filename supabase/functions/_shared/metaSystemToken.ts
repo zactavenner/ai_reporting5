@@ -572,7 +572,9 @@ export async function runSystemTokenAction(
           errorCode: 'meta_token_invalid',
           errorMessage: v.error || 'Meta says this token is invalid',
           saved: false,
-          data: { ...current, status: 'invalid', last_error: v.error, using: current.using },
+          // First upload rejected → show Invalid. Replacement rejected → the saved
+          // token's real status is kept (it is still what pulls use).
+          data: current.status === 'not_set' ? { ...current, status: 'invalid', last_error: v.error } : current,
         };
       }
       let ciphertext: string;
