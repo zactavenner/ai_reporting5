@@ -1,7 +1,11 @@
-// Per-client Meta SYSTEM USER token (encrypted in Supabase Vault).
+// Per-client Meta SYSTEM USER token (encrypted at rest).
 //
-// - The raw token lives ONLY in Vault. `client_meta_system_tokens` holds
-//   metadata (last four, scopes, expiry, per-ad-account access, status).
+// - The raw token is stored ONLY as AES-256-GCM ciphertext in the service-role
+//   table `client_meta_system_tokens` (bound to the client id). The key comes
+//   from the auto-generated runtime secret META_SYSTEM_TOKEN_ENC_KEY, which is
+//   never in the database. (Supabase Vault is not available to this project's
+//   build tooling, so this replaces it with the same "no manual key" property.)
+//   The usage-log source label stays 'system_user_vault' for compatibility.
 // - `resolveClientMetaToken` is the one server-side reader. When a client has
 //   an `active`, unexpired system token it is used; otherwise the caller's
 //   EXISTING token choice is returned unchanged (byte-for-byte), so clients
@@ -71,6 +75,50 @@ export function legacyChain(
     if (value) return { token: value, source };
   }
   return { token: null, source: 'none' };
+}
+
+/* ─────────────────────────── Encryption ─────────────────────────── */
+
+const ENC_VERSION = 'v1';
+
+function envKey(): string | undefined {
+  try { return (globalThis as any).Deno?.env?.get('META_SYSTEM_TOKEN_ENC_KEY'); } catch { return undefined; }
+}
+
+async function aesKey(material?: string): Promise<CryptoKey> {
+  const raw = material ?? envKey();
+  if (!raw || raw.length < 32) throw new Error('encryption_key_missing');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`meta-system-token:${ENC_VERSION}:${raw}`));
+  return crypto.subtle.importKey('raw', digest, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+
+const toB64 = (b: Uint8Array) => btoa(String.fromCharCode(...b));
+const fromB64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+/** AES-256-GCM, client id as additional data so a ciphertext can't be moved to another client. */
+export async function encryptSystemToken(token: string, clientId: string, material?: string): Promise<string> {
+  const key = await aesKey(material);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(clientId) },
+      key,
+      new TextEncoder().encode(token),
+    ),
+  );
+  return `${ENC_VERSION}.${toB64(iv)}.${toB64(ct)}`;
+}
+
+export async function decryptSystemToken(ciphertext: string, clientId: string, material?: string): Promise<string> {
+  const [ver, ivB64, ctB64] = String(ciphertext || '').split('.');
+  if (ver !== ENC_VERSION || !ivB64 || !ctB64) throw new Error('bad_ciphertext');
+  const key = await aesKey(material);
+  const pt = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: fromB64(ivB64), additionalData: new TextEncoder().encode(clientId) },
+    key,
+    fromB64(ctB64),
+  );
+  return new TextDecoder().decode(pt);
 }
 
 /* ─────────────────────────── Validation ─────────────────────────── */
@@ -198,7 +246,6 @@ export async function validateSystemToken(
 
 export interface SystemTokenRow {
   client_id: string;
-  vault_secret_id?: string;
   system_user_id: string | null;
   system_user_name: string | null;
   token_last4: string | null;
@@ -317,6 +364,8 @@ export interface ResolveOptions {
   /** The function's existing token choice. Defaults to resolveMetaToken(client). */
   legacy?: LegacyTokenChoice;
   now?: number;
+  /** Test hook; production reads META_SYSTEM_TOKEN_ENC_KEY. */
+  keyMaterial?: string;
 }
 
 /**
@@ -344,7 +393,7 @@ export async function resolveClientMetaToken(
     try {
       const { data: row, error } = await sb
         .from('client_meta_system_tokens')
-        .select('status, expires_at')
+        .select('status, expires_at, token_ciphertext')
         .eq('client_id', clientId)
         .maybeSingle();
       if (error) reason = 'system_token_lookup_failed';
@@ -352,8 +401,8 @@ export async function resolveClientMetaToken(
       else if (row.status !== 'active') reason = row.status === 'invalid' ? 'system_token_invalid' : 'system_token_needs_attention';
       else if (row.expires_at && Date.parse(row.expires_at) <= now) reason = 'system_token_expired';
       else {
-        const { data: secret, error: rpcErr } = await sb.rpc('get_client_meta_system_token_secret', { p_client_id: clientId });
-        if (rpcErr || typeof secret !== 'string' || !secret.trim()) reason = 'system_token_read_failed';
+        const secret = await decryptSystemToken(row.token_ciphertext, clientId, opts.keyMaterial).catch(() => null);
+        if (!secret || !secret.trim()) reason = 'system_token_read_failed';
         else {
           token = secret.trim();
           source = 'system_user_vault';
@@ -481,6 +530,7 @@ export async function runSystemTokenAction(
   sb: any,
   input: SystemTokenActionInput,
   fetcher?: Fetcher,
+  keyMaterial?: string,
 ): Promise<SystemTokenActionResult> {
   const { clientId } = input;
   if (!UUID_RE.test(clientId || '')) {
@@ -510,18 +560,18 @@ export async function runSystemTokenAction(
           data: { ...current, status: 'invalid', last_error: v.error, using: current.using },
         };
       }
-      const { data: secretId, error: rpcErr } = await sb.rpc('set_client_meta_system_token_secret', {
-        p_client_id: clientId,
-        p_token: checked.token,
-      });
-      if (rpcErr || !secretId) {
-        return { httpStatus: 500, errorCode: 'vault_write_failed', errorMessage: 'Could not store the token securely', data: current };
+      let ciphertext: string;
+      try {
+        ciphertext = await encryptSystemToken(checked.token, clientId, keyMaterial);
+      } catch {
+        return { httpStatus: 500, errorCode: 'encryption_unavailable', errorMessage: 'Could not store the token securely', data: current };
       }
       const nowIso = new Date().toISOString();
       const { error: upErr } = await sb.from('client_meta_system_tokens').upsert(
         {
           client_id: clientId,
-          vault_secret_id: secretId,
+          token_ciphertext: ciphertext,
+          key_version: 1,
           token_last4: checked.token.slice(-4),
           ...validationRow(v),
           saved_at: nowIso,
@@ -543,7 +593,7 @@ export async function runSystemTokenAction(
 
     case 'delete': {
       if (current.status === 'not_set') return { httpStatus: 200, data: current };
-      const { error } = await sb.rpc('delete_client_meta_system_token_secret', { p_client_id: clientId });
+      const { error } = await sb.from('client_meta_system_tokens').delete().eq('client_id', clientId);
       if (error) return { httpStatus: 500, errorCode: 'delete_failed', errorMessage: 'Could not remove the token', data: current };
       await audit(sb, input, 'delete', { previous_status: current.status, system_user_id: current.system_user_id, last4: current.token_last4 });
       return { httpStatus: 200, data: toStatusPayload(clientId, null) };
@@ -553,9 +603,10 @@ export async function runSystemTokenAction(
       if (current.status === 'not_set') {
         return { httpStatus: 404, errorCode: 'not_set', errorMessage: 'No system user token saved for this client', data: current };
       }
-      const { data: secret, error } = await sb.rpc('get_client_meta_system_token_secret', { p_client_id: clientId });
-      if (error || typeof secret !== 'string' || !secret) {
-        return { httpStatus: 500, errorCode: 'vault_read_failed', errorMessage: 'Could not read the stored token', data: current };
+      const { data: enc } = await sb.from('client_meta_system_tokens').select('token_ciphertext').eq('client_id', clientId).maybeSingle();
+      const secret = enc?.token_ciphertext ? await decryptSystemToken(enc.token_ciphertext, clientId, keyMaterial).catch(() => null) : null;
+      if (!secret) {
+        return { httpStatus: 500, errorCode: 'token_read_failed', errorMessage: 'Could not read the stored token', data: current };
       }
       const v = await validateSystemToken(secret, adIds, fetcher);
       await sb.from('client_meta_system_tokens').update({ ...validationRow(v), updated_at: new Date().toISOString() }).eq('client_id', clientId);
