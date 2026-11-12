@@ -238,8 +238,9 @@ async function fetchGHLContacts(
   try {
     const body: Record<string, any> = {
       locationId,
+      // GHL v2 /contacts/search now rejects `limit` with 422
+      // ("property limit should not exist"); only pageLimit is accepted.
       pageLimit: limit,
-      limit,  // GHL v2 accepts both; send both for compatibility
       page: page || 1,
     };
     if (requireDateAddedDesc) {
