@@ -34,6 +34,7 @@ import {
   type Page,
   type RouteError,
 } from '../_shared/connectionsApi.ts';
+import { runSystemTokenAction, type SystemTokenAction } from '../_shared/metaSystemToken.ts';
 
 const json = (body: unknown, status = 200, extraHeaders: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
@@ -345,6 +346,32 @@ Deno.serve(async (req) => {
         if (res.status !== 200 || res.body?.error) return json(res.body, res.status === 200 ? 400 : res.status);
         // Echo presence + last four only.
         return json({ data: { integration: res.body.integration, secret_present: res.body.secret_present, last4: res.body.last4, status: res.body.status } });
+      }
+
+      /* ─────────────────── Meta system user token (metadata only) ─────────────────── */
+      case 'meta_system_token_status':
+      case 'meta_system_token_set':
+      case 'meta_system_token_delete':
+      case 'meta_system_token_validate': {
+        const action: SystemTokenAction =
+          route.name === 'meta_system_token_set'
+            ? 'set'
+            : route.name === 'meta_system_token_delete'
+              ? 'delete'
+              : route.name === 'meta_system_token_validate'
+                ? 'revalidate'
+                : 'status';
+        const res = await runSystemTokenAction(supabase, {
+          action,
+          clientId: route.clientId,
+          token: action === 'set' ? body?.token : undefined,
+          actor: { label: actorLabel, userId: auth.userId },
+          source: 'agent_api',
+        });
+        if (res.httpStatus >= 400) {
+          return json({ error: { code: res.errorCode, message: res.errorMessage }, data: res.data }, res.httpStatus);
+        }
+        return json({ data: res.data, ...(res.saved !== undefined ? { saved: res.saved } : {}) });
       }
 
       default:

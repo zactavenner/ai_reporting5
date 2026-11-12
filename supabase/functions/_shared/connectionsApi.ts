@@ -22,7 +22,11 @@ export type Route =
   | { name: 'sync_ad_account'; clientId: string; adAccountId: string }
   | { name: 'list_integrations'; clientId: string }
   | { name: 'test_integration'; clientId: string; integration: string }
-  | { name: 'replace_credential'; clientId: string; integration: string };
+  | { name: 'replace_credential'; clientId: string; integration: string }
+  | { name: 'meta_system_token_status'; clientId: string }
+  | { name: 'meta_system_token_set'; clientId: string }
+  | { name: 'meta_system_token_delete'; clientId: string }
+  | { name: 'meta_system_token_validate'; clientId: string };
 
 export interface RouteError {
   status: number;
@@ -100,6 +104,20 @@ export function resolveRoute(method: string, pathname: string): { route: Route }
     if (rest.length === 3 && rest[2] === 'sync') {
       if (m !== 'POST') return wrongMethod('POST');
       return { route: { name: 'sync_ad_account', clientId, adAccountId: rest[1] } };
+    }
+    return { error: notFound };
+  }
+
+  if (rest[0] === 'meta-system-token') {
+    if (rest.length === 1) {
+      if (m === 'GET') return { route: { name: 'meta_system_token_status', clientId } };
+      if (m === 'PUT') return { route: { name: 'meta_system_token_set', clientId } };
+      if (m === 'DELETE') return { route: { name: 'meta_system_token_delete', clientId } };
+      return wrongMethod('GET, PUT or DELETE');
+    }
+    if (rest.length === 2 && rest[1] === 'validate') {
+      if (m !== 'POST') return wrongMethod('POST');
+      return { route: { name: 'meta_system_token_validate', clientId } };
     }
     return { error: notFound };
   }
