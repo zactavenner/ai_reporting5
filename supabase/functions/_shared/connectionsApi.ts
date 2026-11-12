@@ -300,5 +300,10 @@ export const ERROR_CODES = [
   'client_not_found',
   'ad_account_owned_by_other_client',
   'idempotency_key_reused_with_different_body',
+  'invalid_token_input',
+  'meta_token_invalid',
+  'not_set',
+  'encryption_unavailable',
+  'token_read_failed',
   'internal_error',
 ] as const;
