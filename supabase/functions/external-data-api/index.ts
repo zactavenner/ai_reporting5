@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
       meta_system_token_delete: "delete",
       meta_system_token_validate: "revalidate",
     };
-    if (SYSTEM_TOKEN_ACTIONS[action]) {
+    if (typeof action === "string" && Object.prototype.hasOwnProperty.call(SYSTEM_TOKEN_ACTIONS, action)) {
       const op = SYSTEM_TOKEN_ACTIONS[action];
       const res = await runSystemTokenAction(supabase, {
         action: op,
