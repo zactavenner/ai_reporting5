@@ -1,6 +1,7 @@
 // Create a Meta ad inside an existing ad set using a previously uploaded creative.
 // Phase 2: ads_management scope required.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { legacyChain, resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,7 +51,10 @@ Deno.serve(async (req) => {
       .single();
     if (!client?.meta_ad_account_id) throw new Error("Client missing Meta ad account");
 
-    const accessToken = client.meta_access_token || Deno.env.get("META_SHARED_ACCESS_TOKEN");
+    const tk = await resolveClientMetaToken(supabase, clientId, "create-meta-ad", {
+      legacy: legacyChain([["client", client.meta_access_token], ["master", Deno.env.get("META_SHARED_ACCESS_TOKEN")]]),
+    });
+    const accessToken = tk.token;
     if (!accessToken) throw new Error("No Meta access token");
 
     const adAccountId = client.meta_ad_account_id.startsWith("act_")
@@ -91,36 +95,32 @@ Deno.serve(async (req) => {
     }
 
     // Step 1: Create the ad creative
-    const creativePayload = new URLSearchParams({
-      name: `${name} creative`,
-      object_story_spec: JSON.stringify(objectStorySpec),
-      access_token: accessToken,
-    });
-
-    const creativeRes = await fetch(`${META_GRAPH_API_URL}/${adAccountId}/adcreatives`, {
+    const creativeRes = await tk.fetch(() => `${META_GRAPH_API_URL}/${adAccountId}/adcreatives`, (t) => ({
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: creativePayload,
-    });
+      body: new URLSearchParams({
+        name: `${name} creative`,
+        object_story_spec: JSON.stringify(objectStorySpec),
+        access_token: t,
+      }),
+    }));
     const creativeData = await creativeRes.json();
     if (!creativeRes.ok) throw new Error(`Create creative failed: ${JSON.stringify(creativeData)}`);
 
     const creativeId = creativeData.id;
 
     // Step 2: Create the ad
-    const adPayload = new URLSearchParams({
-      name,
-      adset_id: adSet.meta_adset_id,
-      creative: JSON.stringify({ creative_id: creativeId }),
-      status,
-      access_token: accessToken,
-    });
-
-    const adRes = await fetch(`${META_GRAPH_API_URL}/${adAccountId}/ads`, {
+    const adRes = await tk.fetch(() => `${META_GRAPH_API_URL}/${adAccountId}/ads`, (t) => ({
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: adPayload,
-    });
+      body: new URLSearchParams({
+        name,
+        adset_id: adSet.meta_adset_id,
+        creative: JSON.stringify({ creative_id: creativeId }),
+        status,
+        access_token: t,
+      }),
+    }));
     const adData = await adRes.json();
     if (!adRes.ok) throw new Error(`Create ad failed: ${JSON.stringify(adData)}`);
 

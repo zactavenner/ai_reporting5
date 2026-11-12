@@ -1,6 +1,7 @@
 // Upload an image or video creative asset to a client's Meta ad account.
 // Phase 2 building block. Returns image_hash (for images) or video_id (for videos).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { legacyChain, resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,7 +37,10 @@ Deno.serve(async (req) => {
       throw new Error("Client missing Meta ad account");
     }
 
-    const accessToken = client.meta_access_token || Deno.env.get("META_SHARED_ACCESS_TOKEN");
+    const tk = await resolveClientMetaToken(supabase, clientId, "upload-meta-creative", {
+      legacy: legacyChain([["client", client.meta_access_token], ["master", Deno.env.get("META_SHARED_ACCESS_TOKEN")]]),
+    });
+    const accessToken = tk.token;
     if (!accessToken) throw new Error("No Meta access token available");
 
     const adAccountId = client.meta_ad_account_id.startsWith("act_")
@@ -50,12 +54,11 @@ Deno.serve(async (req) => {
     const safeName = fileName || `upload-${Date.now()}`;
 
     if (fileType === "image") {
-      const fd = new FormData();
-      fd.append("filename", new File([blob], safeName, { type: blob.type || "image/jpeg" }));
-      fd.append("access_token", accessToken);
-
-      const uploadRes = await fetch(`${META_GRAPH_API_URL}/${adAccountId}/adimages`, {
-        method: "POST", body: fd,
+      const uploadRes = await tk.fetch(() => `${META_GRAPH_API_URL}/${adAccountId}/adimages`, (t) => {
+        const fd = new FormData();
+        fd.append("filename", new File([blob], safeName, { type: blob.type || "image/jpeg" }));
+        fd.append("access_token", t);
+        return { method: "POST", body: fd };
       });
       const data = await uploadRes.json();
       if (!uploadRes.ok) throw new Error(`Meta image upload failed: ${JSON.stringify(data)}`);
@@ -71,13 +74,12 @@ Deno.serve(async (req) => {
     }
 
     if (fileType === "video") {
-      const fd = new FormData();
-      fd.append("source", new File([blob], safeName, { type: blob.type || "video/mp4" }));
-      fd.append("access_token", accessToken);
-      if (fileName) fd.append("name", fileName);
-
-      const uploadRes = await fetch(`${META_GRAPH_API_URL}/${adAccountId}/advideos`, {
-        method: "POST", body: fd,
+      const uploadRes = await tk.fetch(() => `${META_GRAPH_API_URL}/${adAccountId}/advideos`, (t) => {
+        const fd = new FormData();
+        fd.append("source", new File([blob], safeName, { type: blob.type || "video/mp4" }));
+        fd.append("access_token", t);
+        if (fileName) fd.append("name", fileName);
+        return { method: "POST", body: fd };
       });
       const data = await uploadRes.json();
       if (!uploadRes.ok) throw new Error(`Meta video upload failed: ${JSON.stringify(data)}`);
