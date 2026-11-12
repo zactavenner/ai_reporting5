@@ -15,6 +15,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callOpenRouter } from "../_shared/openrouter.ts";
 import { transcribeRecording } from "../_shared/transcription.ts";
 import { getMappedGhl } from "../_shared/ghlMapping.ts";
+import {
+  callSummaryTimestamp,
+  isBlankSummary,
+  lookupCallPartyNames,
+  summaryUserPreamble,
+  transcriptionNamePrompt,
+} from "../_shared/callSummary.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -132,11 +139,11 @@ async function fetchAudio(url: string, authHeader?: Record<string, string>) {
   return { chunks, ext };
 }
 
-async function transcribeFull(url: string, authHeader?: Record<string, string>) {
+async function transcribeFull(url: string, authHeader?: Record<string, string>, prompt?: string) {
   const { chunks, ext } = await fetchAudio(url, authHeader);
   const parts: string[] = [];
   for (const [i, chunk] of chunks.entries()) {
-    const text = await transcribeRecording(chunk, { fileName: `call-part${i + 1}.${ext}` });
+    const text = await transcribeRecording(chunk, { fileName: `call-part${i + 1}.${ext}`, prompt });
     if (text) parts.push(text);
   }
   return parts.join("\n").trim();
@@ -173,8 +180,7 @@ async function analyze(transcript: string, contactName: string | null, assignedU
       {
         role: "user",
         content:
-          `Analyze this phone call transcript. Salesperson${assignedUser ? ` = ${assignedUser}` : ""} is "User". ` +
-          `Prospect${contactName ? ` = ${contactName}` : ""} is "Contact".\n\n` +
+          `${summaryUserPreamble(assignedUser, contactName)}\n\n` +
           `Return JSON with keys:\n` +
           `speaker_segments: array of {speaker:"User"|"Contact", text} covering the whole call in order,\n` +
           `summary: concise paragraph of what was discussed,\n` +
@@ -238,11 +244,12 @@ async function analyze(transcript: string, contactName: string | null, assignedU
 /** Push the AI summary back into GHL as a contact note (best effort). */
 async function pushToGhl(sb: any, record: any, analysis: Analysis) {
   if (!record.client_id || !record.contact_id) return { pushed: false, reason: "no_contact" };
+  if (isBlankSummary(analysis.summary)) return { pushed: false, reason: "empty_summary" };
   try {
     const { apiKey, locationId } = await getMappedGhl(sb, record.client_id);
     if (!apiKey || !locationId) return { pushed: false, reason: "no_credentials" };
     const note =
-      `AI Call Summary (${new Date(record.started_at || Date.now()).toLocaleString()})\n` +
+      `AI Call Summary (${callSummaryTimestamp(record.started_at)})\n` +
       `Outcome: ${analysis.outcome || "n/a"} | Sentiment: ${analysis.sentiment} | Intent: ${analysis.intent_score ?? "n/a"}/100\n` +
       (analysis.investment_range ? `Investment: ${analysis.investment_range}\n` : "") +
       (analysis.objections.length ? `Objections: ${analysis.objections.join(", ")}\n` : "") +
@@ -275,6 +282,27 @@ async function resolveClientId(sb: any, mapped: any): Promise<string | null> {
   return null;
 }
 
+/** CRM spellings for the prospect and the rep. Payload names are the fallback. */
+async function partyNamesFor(sb: any, record: any) {
+  const fallbackContactName = record?.contact_name ?? null;
+  const fallbackUserName = record?.assigned_user ?? null;
+  if (!record?.client_id) return { contactName: fallbackContactName, userName: fallbackUserName };
+  try {
+    const { apiKey, locationId } = await getMappedGhl(sb, record.client_id);
+    return await lookupCallPartyNames({
+      apiKey,
+      locationId,
+      contactId: record.contact_id ?? null,
+      userId: record.assigned_user_id ?? null,
+      fallbackContactName,
+      fallbackUserName,
+    });
+  } catch (e) {
+    console.warn("[call-transcription] name lookup failed", (e as Error).message);
+    return { contactName: fallbackContactName, userName: fallbackUserName };
+  }
+}
+
 async function processRecord(sb: any, record: any, opts: { pushGhl?: boolean } = {}) {
   const out: any = { record_id: record.id, call_id: record.call_id };
   if (!record.recording_url) {
@@ -291,10 +319,15 @@ async function processRecord(sb: any, record: any, opts: { pushGhl?: boolean } =
       const { apiKey } = await getMappedGhl(sb, record.client_id);
       if (apiKey) auth = { Authorization: `Bearer ${apiKey}`, Version: "2021-07-28" };
     }
-    const transcript = await transcribeFull(record.recording_url, auth);
+    const names = await partyNamesFor(sb, record);
+    const transcript = await transcribeFull(
+      record.recording_url,
+      auth,
+      transcriptionNamePrompt(names.userName, names.contactName),
+    );
     if (!transcript) throw new Error("empty transcript");
 
-    const analysis = await analyze(transcript, record.contact_name, record.assigned_user);
+    const analysis = await analyze(transcript, names.contactName, names.userName);
     const update: any = {
       transcript: analysis?.transcript_labeled || transcript,
       speaker_segments: analysis?.speaker_segments || [],
@@ -402,7 +435,8 @@ serve(async (req) => {
 
       if (action === "analyze_only") {
         if (!record.transcript) return json({ error: "no transcript stored" }, 400);
-        const analysis = await analyze(record.transcript, record.contact_name, record.assigned_user);
+        const names = await partyNamesFor(sb, record);
+        const analysis = await analyze(record.transcript, names.contactName, names.userName);
         if (!analysis) return json({ error: "analysis failed" }, 502);
         await sb
           .from("phone_call_records")
