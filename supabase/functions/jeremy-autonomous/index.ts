@@ -8,6 +8,7 @@
 // explicit dry_run:false from an authorized operator on an account whose policy
 // permits it. Shadow mode (the default) records decisions only.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 import { authorizeOperator } from "../_shared/operatorAuth.ts";
 import { authorizeJeremyCron, readJeremyCronSecret } from "../_shared/jeremyCronSecret.ts";
 import { META_GRAPH_BASE, metaFetch, resolveMetaToken } from "../_shared/meta.ts";
@@ -217,7 +218,11 @@ Deno.serve(async (req) => {
             .select("id, meta_system_user_token, meta_access_token, meta_token_type")
             .eq("id", clientId)
             .maybeSingle();
-          const { token } = resolveMetaToken(client);
+          const tk = await resolveClientMetaToken(supabase, { ...(client ?? {}), id: clientId }, "jeremy-autonomous");
+          const entity = String(body.meta_entity_id ?? "").replace(/[^0-9A-Za-z_]/g, "");
+          const token = entity
+            ? await tk.preflight((t) => `${META_GRAPH_BASE}/${entity}?fields=id&access_token=${encodeURIComponent(t)}`)
+            : tk.token;
           if (!token) return json({ success: false, error: "No Meta access token available for this client." }, 400);
           provider = liveProvider(token);
         }
