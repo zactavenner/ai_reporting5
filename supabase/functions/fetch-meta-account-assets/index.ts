@@ -2,6 +2,7 @@
 // and caches them in meta_ad_accounts so create-campaign / create-ad dialogs
 // can populate dropdowns instead of asking users to paste IDs.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { legacyChain, resolveClientMetaToken } from "../_shared/metaSystemToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,7 +34,10 @@ Deno.serve(async (req) => {
       .eq("id", clientId).single();
 
     if (!client) throw new Error("Client not found");
-    const accessToken = client.meta_access_token || Deno.env.get("META_SHARED_ACCESS_TOKEN");
+    const tk = await resolveClientMetaToken(supabase, clientId, "fetch-meta-account-assets", {
+      legacy: legacyChain([["client", client.meta_access_token], ["master", Deno.env.get("META_SHARED_ACCESS_TOKEN")]]),
+    });
+    const accessToken = tk.token;
     if (!accessToken) throw new Error("No Meta access token");
 
     const accounts: string[] = [];
@@ -50,8 +54,8 @@ Deno.serve(async (req) => {
       const actId = `act_${accId}`;
 
       // Pages: promote_pages (account-level page access)
-      const pagesRes = await fetch(
-        `${META}/${actId}/promote_pages?fields=id,name,access_token,picture&access_token=${accessToken}`
+      const pagesRes = await tk.fetch(
+        (t) => `${META}/${actId}/promote_pages?fields=id,name,access_token,picture&access_token=${t}`
       );
       const pagesData = await safeJson(pagesRes);
       const pages = (pagesData?.data || []).map((p: any) => ({
@@ -59,8 +63,8 @@ Deno.serve(async (req) => {
       }));
 
       // Pixels
-      const pixelsRes = await fetch(
-        `${META}/${actId}/adspixels?fields=id,name,last_fired_time&access_token=${accessToken}`
+      const pixelsRes = await tk.fetch(
+        (t) => `${META}/${actId}/adspixels?fields=id,name,last_fired_time&access_token=${t}`
       );
       const pixelsData = await safeJson(pixelsRes);
       const pixels = (pixelsData?.data || []).map((p: any) => ({
@@ -68,8 +72,8 @@ Deno.serve(async (req) => {
       }));
 
       // Instagram actors
-      const igRes = await fetch(
-        `${META}/${actId}/instagram_accounts?fields=id,username&access_token=${accessToken}`
+      const igRes = await tk.fetch(
+        (t) => `${META}/${actId}/instagram_accounts?fields=id,username&access_token=${t}`
       );
       const igData = await safeJson(igRes);
       const instagram_actors = (igData?.data || []).map((a: any) => ({
@@ -78,7 +82,7 @@ Deno.serve(async (req) => {
 
       // Get account name if missing
       let account_name: string | null = null;
-      const accRes = await fetch(`${META}/${actId}?fields=name&access_token=${accessToken}`);
+      const accRes = await tk.fetch((t) => `${META}/${actId}?fields=name&access_token=${t}`);
       const accData = await safeJson(accRes);
       account_name = accData?.name || null;
 
