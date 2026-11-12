@@ -241,3 +241,6 @@ verify_jwt = false
 
 [functions.linq-bridge]
 verify_jwt = false
+
+[functions.agent-tasks-api]
+verify_jwt = false

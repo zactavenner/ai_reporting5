@@ -56,13 +56,8 @@ export function useAddTaskAssignee() {
         .single();
       
       if (error) throw error;
-      if (memberId) {
-        supabase.functions
-          .invoke('notify-task-assignee', {
-            body: { task_id: taskId, member_id: memberId, kind: 'assigned' },
-          })
-          .catch((e) => console.warn('notify-task-assignee failed', e));
-      }
+      // Assignee ping is sent server-side by trg_task_assignees_notify
+      // (migration 20261019160000), so every writer (UI, APIs, agents) notifies once.
       return data;
     },
     onSuccess: (_, { taskId }) => {
@@ -114,17 +109,7 @@ export function useSetTaskAssignees() {
       memberIds?: string[]; 
       podIds?: string[]; 
     }) => {
-      // Snapshot existing members so we only notify *newly added* ones
-      const { data: existing } = await supabase
-        .from('task_assignees')
-        .select('member_id')
-        .eq('task_id', taskId)
-        .not('member_id', 'is', null);
-      const previousMemberIds = new Set(
-        (existing ?? []).map((r: { member_id: string | null }) => r.member_id).filter(Boolean) as string[],
-      );
-
-      // Atomic delete + insert via DB function — no partial-state window
+      // Atomic diff-based update via DB function — no partial-state window
       // Cast: types.ts is regenerated after migration apply
       const { error } = await (supabase.rpc as any)('set_task_assignees', {
         _task_id: taskId,
@@ -133,15 +118,8 @@ export function useSetTaskAssignees() {
       });
       if (error) throw error;
 
-      // Notify only members added in this change
-      const newlyAdded = memberIds.filter((id) => !previousMemberIds.has(id));
-      for (const memberId of newlyAdded) {
-        supabase.functions
-          .invoke('notify-task-assignee', {
-            body: { task_id: taskId, member_id: memberId, kind: 'assigned' },
-          })
-          .catch((e) => console.warn('notify-task-assignee failed', e));
-      }
+      // set_task_assignees is diff-based (migration 20261019160000): only newly
+      // added members are INSERTed, and trg_task_assignees_notify pings them.
 
       return { taskId, memberIds, podIds };
     },

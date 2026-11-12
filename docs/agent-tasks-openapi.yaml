@@ -1,0 +1,63 @@
+openapi: 3.1.0
+info:
+  title: HPA board (agent-tasks-api)
+  version: 0.1.0
+  description: Tasks and task comments only. Read/create/update; no deletes.
+servers:
+  - url: https://jgwwmtuvjlmzapwqiabu.supabase.co/functions/v1/agent-tasks-api
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer }
+  schemas:
+    TaskInput:
+      type: object
+      properties:
+        title: { type: string }
+        description: { type: string }
+        stage: { type: string, enum: [todo, in_progress, needs_qa, needs_zac_approval, done] }
+        priority: { type: string, enum: [low, medium, high, urgent] }
+        due_date: { type: string, description: YYYY-MM-DD }
+        client_id: { type: string }
+        project_id: { type: string }
+        parent_task_id: { type: string }
+        assignee_ids: { type: array, items: { type: string } }
+security: [ { bearer: [] } ]
+paths:
+  /tasks:
+    get:
+      operationId: listTasks
+      parameters:
+        - { name: client_id, in: query, schema: { type: string } }
+        - { name: stage, in: query, schema: { type: string } }
+        - { name: assignee_id, in: query, schema: { type: string } }
+        - { name: updated_since, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 200 } }
+      responses: { "200": { description: OK } }
+    post:
+      operationId: createTask
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TaskInput" } } } }
+      responses: { "201": { description: Created } }
+  /tasks/{id}:
+    get:
+      operationId: getTask
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      responses: { "200": { description: OK } }
+    patch:
+      operationId: updateTask
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TaskInput" } } } }
+      responses: { "200": { description: OK } }
+  /tasks/{id}/comments:
+    get:
+      operationId: listComments
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      responses: { "200": { description: OK } }
+    post:
+      operationId: addComment
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [content], properties: { content: { type: string } } } } } }
+      responses: { "201": { description: Created } }
+  /stages:
+    get:
+      operationId: listStages
+      responses: { "200": { description: OK } }
