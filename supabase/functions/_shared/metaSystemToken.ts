@@ -334,6 +334,13 @@ export interface MetaTokenHandle {
   ): Promise<Response>;
   /** Mark the vault token failed and switch this handle to the fallback token. */
   fallBack(error: unknown): Promise<string | null>;
+  /**
+   * For functions that make many Meta calls with one token variable: when the
+   * vault token is in use, make one cheap read (e.g. /act_<id>?fields=id) and
+   * fall back if Meta rejects it. Returns the token to use for the rest of the
+   * run. No-op (no network) when the vault token isn't in use.
+   */
+  preflight(url: (token: string) => string, fetcher?: Fetcher): Promise<string | null>;
 }
 
 async function logUsage(sb: any, clientId: string | null, functionName: string, source: MetaTokenSource, reason: string | null) {
@@ -432,6 +439,14 @@ export async function resolveClientMetaToken(
       handle.source = legacy.source;
       handle.fallbackReason = 'system_token_rejected_by_meta';
       await logUsage(sb, clientId, functionName, legacy.source, 'system_token_rejected_by_meta');
+      return handle.token;
+    },
+    async preflight(url, fetcher = fetch) {
+      if (handle.source !== 'system_user_vault') return handle.token;
+      try {
+        const r = await handle.fetch(url, undefined, fetcher);
+        await r.body?.cancel().catch(() => {});
+      } catch { /* network trouble isn't a token verdict */ }
       return handle.token;
     },
     async fetch(url, init, fetcher = fetch) {
