@@ -5,6 +5,7 @@
 // every attempt is logged to public.ad_spend_sync_runs so the Data Health
 // dashboard can surface stale or failing accounts.
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { legacyChain, resolveClientMetaToken, type MetaTokenHandle } from '../_shared/metaSystemToken.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 type Body = {
@@ -54,7 +55,7 @@ function extractSpreadsheetId(url: string | null | undefined): string | null {
   return m ? m[1] : null;
 }
 
-type AccountRow = { client_id: string; client_name: string; ad_account_id: string; token: string };
+type AccountRow = { client_id: string; client_name: string; ad_account_id: string; token: string; handle?: MetaTokenHandle };
 
 async function loadAccounts(sb: any, clientId?: string): Promise<AccountRow[]> {
   const q = sb.from('clients')
@@ -91,7 +92,14 @@ async function loadAccounts(sb: any, clientId?: string): Promise<AccountRow[]> {
   const shared = Deno.env.get('META_SHARED_ACCESS_TOKEN') ?? '';
   const out: AccountRow[] = [];
   for (const c of data ?? []) {
-    const token = c.meta_system_user_token || c.meta_access_token || shared;
+    const handle = await resolveClientMetaToken(sb, c.id, 'sync-meta-ad-spend', {
+      legacy: legacyChain([
+        ['system_user_legacy_column', c.meta_system_user_token],
+        ['client', c.meta_access_token],
+        ['master', shared],
+      ]),
+    });
+    const token = handle.token;
     if (!token) continue;
     const seen = new Set<string>();
     const push = (aid?: string | null) => {
@@ -99,13 +107,24 @@ async function loadAccounts(sb: any, clientId?: string): Promise<AccountRow[]> {
       const norm = String(aid).startsWith('act_') ? String(aid) : `act_${aid}`;
       if (seen.has(norm)) return;
       seen.add(norm);
-      out.push({ client_id: c.id, client_name: c.name, ad_account_id: norm, token });
+      out.push({ client_id: c.id, client_name: c.name, ad_account_id: norm, token, handle });
     };
     push(c.meta_ad_account_id);
     for (const a of c.meta_ad_account_ids ?? []) push(a);
     for (const a of rosterByClient.get(c.id) ?? []) push(a);
   }
   return out;
+}
+
+/** Uses the client's token handle (system user token with one user-token retry) when present. */
+function metaAcctFetch(acct: AccountRow, url: URL): Promise<Response> {
+  const build = (t: string) => {
+    const u = new URL(url.toString());
+    u.searchParams.set('access_token', t);
+    return u.toString();
+  };
+  if (!acct.handle) return fetch(build(acct.token));
+  return acct.handle.fetch(build);
 }
 
 type CampaignRow = {
@@ -120,8 +139,7 @@ async function fetchMetaInsights(acct: AccountRow, date: string): Promise<Campai
   url.searchParams.set('time_range', JSON.stringify({ since: date, until: date }));
   url.searchParams.set('fields', 'campaign_id,campaign_name,spend,impressions,clicks,reach,frequency,ctr,cpm,cpc,actions');
   url.searchParams.set('limit', '500');
-  url.searchParams.set('access_token', acct.token);
-  const res = await fetch(url.toString());
+  const res = await metaAcctFetch(acct, url);
   const text = await res.text();
   if (!res.ok) throw new Error(`meta ${res.status}: ${text.slice(0, 400)}`);
   const body = JSON.parse(text);
@@ -171,8 +189,7 @@ async function fetchAccountHealth(acct: AccountRow, cache: Map<string, AccountHe
   try {
     const url = new URL(`https://graph.facebook.com/v21.0/${acct.ad_account_id}`);
     url.searchParams.set('fields', 'account_status,disable_reason');
-    url.searchParams.set('access_token', acct.token);
-    const res = await fetch(url.toString());
+    const res = await metaAcctFetch(acct, url);
     if (!res.ok) return null;
     const b = await res.json();
     const status = Number(b.account_status ?? 0);
