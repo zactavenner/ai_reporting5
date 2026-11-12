@@ -21,6 +21,7 @@
  *  - No Meta campaign/ad writes and no GHL contact/workflow writes happen here.
  */
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0';
+import { resolveClientMetaToken } from '../_shared/metaSystemToken.ts';
 import { corsHeaders as sdkCors } from 'npm:@supabase/supabase-js@2.115.0/cors';
 import { authorizeOperator } from '../_shared/operatorAuth.ts';
 import { META_GRAPH_BASE, metaFetch, resolveMetaToken } from '../_shared/meta.ts';
@@ -204,7 +205,17 @@ Deno.serve(async (req) => {
   if (clientErr) return json({ error: 'client_lookup_failed' }, 500);
   if (!client) return json({ error: 'client_not_found' }, 404);
 
-  const meta = resolveMetaToken(client);
+  let meta: { token: string | null; source: string } = resolveMetaToken(client);
+  // Meta calls below prefer the client's system user token (when set + active);
+  // a rejected system token is flagged and the call falls back to the user token.
+  const useMetaTokenFor = async (accountIds: string[]) => {
+    const tk = await resolveClientMetaToken(supabase, client, 'client-connections');
+    for (const id of accountIds) {
+      if (tk.source !== 'system_user_vault') break;
+      await tk.preflight((t) => `${META_GRAPH_BASE}/${withActPrefix(id)}?fields=id&access_token=${encodeURIComponent(t)}`);
+    }
+    meta = { token: tk.token, source: tk.source };
+  };
 
   try {
     switch (action) {
@@ -316,6 +327,7 @@ Deno.serve(async (req) => {
 
         // 1. Verify against Meta before claiming anything is connected.
         let probe: Awaited<ReturnType<typeof metaAccountProbe>> | null = null;
+        if (provider === 'meta') await useMetaTokenFor([accountId]);
         if (provider === 'meta' && meta.token) probe = await metaAccountProbe(meta.token, accountId);
 
         const insert: any = {
@@ -487,7 +499,6 @@ Deno.serve(async (req) => {
           return json({ integration: 'ghl', ok: probe.ok, status: probe.status, label: probe.ok ? probe.label : null, error: probe.ok ? null : probe.error, last_verified_at: new Date().toISOString() });
         }
 
-        if (!meta.token) return json({ integration: 'meta', ok: false, status: 'disconnected', error: 'No Meta token configured for this client' });
         const id = String(body.ad_account_id || '');
         const { data: rows } = await supabase
           .from('client_ad_accounts')
@@ -496,6 +507,8 @@ Deno.serve(async (req) => {
           .eq('provider', 'meta')
           .neq('status', 'disconnected');
         const targets = (rows || []).filter((r: any) => !id || r.id === id);
+        await useMetaTokenFor(targets.map((t: any) => String(t.provider_account_id)));
+        if (!meta.token) return json({ integration: 'meta', ok: false, status: 'disconnected', error: 'No Meta token configured for this client' });
         const results: any[] = [];
         for (const t of targets) {
           const probe = await metaAccountProbe(meta.token, t.provider_account_id);
