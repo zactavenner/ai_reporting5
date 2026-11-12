@@ -562,7 +562,7 @@ export async function runSystemTokenAction(
 
     case 'set': {
       const checked = checkTokenInput(input.token);
-      if (!checked.ok) return { httpStatus: 400, errorCode: 'invalid_token_input', errorMessage: checked.error, data: current };
+      if (checked.ok === false) return { httpStatus: 400, errorCode: 'invalid_token_input', errorMessage: checked.error, data: current };
       const v = await validateSystemToken(checked.token, adIds, fetcher);
       if (!v.valid) {
         await audit(sb, input, 'set_rejected', { status: 'invalid', reason: v.error, system_user_id: v.system_user_id });
