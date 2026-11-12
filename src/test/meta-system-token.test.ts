@@ -270,3 +270,16 @@ describe('set / status / delete actions', () => {
     expect(p.status).toBe('not_set');
   });
 });
+
+describe('connections-api routes', async () => {
+  const { resolveRoute } = await import('../../supabase/functions/_shared/connectionsApi.ts');
+  const c = '11111111-2222-4333-8444-555555555555';
+  it('maps the four system-token routes', () => {
+    const name = (m: string, p: string) => (resolveRoute(m, p) as any).route?.name;
+    expect(name('GET', `/connections-api/clients/${c}/meta-system-token`)).toBe('meta_system_token_status');
+    expect(name('PUT', `/connections-api/clients/${c}/meta-system-token`)).toBe('meta_system_token_set');
+    expect(name('DELETE', `/connections-api/clients/${c}/meta-system-token`)).toBe('meta_system_token_delete');
+    expect(name('POST', `/connections-api/clients/${c}/meta-system-token/validate`)).toBe('meta_system_token_validate');
+    expect((resolveRoute('POST', `/connections-api/clients/${c}/meta-system-token`) as any).error).toBeDefined();
+  });
+});
