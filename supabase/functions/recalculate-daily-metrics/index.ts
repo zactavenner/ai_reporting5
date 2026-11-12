@@ -63,6 +63,7 @@ Deno.serve(async (req) => {
 
   const doRecalc = async () => {
     const summary: Array<{ clientId: string; name: string; daysUpdated: number; errors: string[] }> = [];
+    const zeroSpendFlags: Array<{ client_id: string; name: string; date: string; leads: number; spend_rows: number }> = [];
 
     for (const client of clients) {
       const result = { clientId: client.id, name: client.name, daysUpdated: 0, errors: [] as string[] };
@@ -97,6 +98,17 @@ Deno.serve(async (req) => {
         const fundedCount = Number(r.funded_count || 0);
         const fundedDollars = Number(r.funded_dollars || 0);
         const spend = Number(r.spend || 0);
+        // ad_spend_daily has no row yet for this day (spend is pulled only
+        // after the day ends in the ad account's timezone). Don't overwrite
+        // what sync-meta-ads already wrote with $0.
+        const hasSpendRows = Number(r.spend_rows || 0) > 0;
+        const spendFields = hasSpendRows
+          ? { ad_spend: spend, impressions: Number(r.impressions || 0), clicks: Number(r.clicks || 0), ctr: Number(r.ctr || 0) }
+          : {};
+        // Flag: leads came in but no spend recorded for a finished day.
+        if (leadsTotal > 0 && (!hasSpendRows || spend === 0) && d < laToday()) {
+          zeroSpendFlags.push({ client_id: client.id, name: client.name, date: d, leads: leadsTotal, spend_rows: Number(r.spend_rows || 0) });
+        }
 
         const { error: upsertError } = await supabase
           .from("daily_metrics")
@@ -107,10 +119,7 @@ Deno.serve(async (req) => {
             leads: leadsTotal,
             spam_leads: leadsBad,
             leads_created: leadsTotal,
-            ad_spend: spend,
-            impressions: Number(r.impressions || 0),
-            clicks: Number(r.clicks || 0),
-            ctr: Number(r.ctr || 0),
+            ...spendFields,
             // calls
             calls: discoveryBooked,
             calls_scheduled: discoveryEligible,
@@ -138,7 +147,27 @@ Deno.serve(async (req) => {
 
     const totalUpdated = summary.reduce((s, c) => s + c.daysUpdated, 0);
     const totalErrors = summary.reduce((s, c) => s + c.errors.length, 0);
-    return { success: true, summary, totalUpdated, totalErrors, startDate, endDate };
+    // Leads-but-$0-spend check: surface on Data Health instead of silently
+    // reporting $0 (usually a spend sync that has not run or failed).
+    for (const f of zeroSpendFlags) {
+      console.warn(`[recalculate-daily-metrics] FLAG leads_without_spend ${f.name} ${f.date}: ${f.leads} leads, $0 spend (spend_rows=${f.spend_rows})`);
+      try {
+        const { count } = await supabase.from("data_discrepancies")
+          .select("id", { count: "exact", head: true })
+          .eq("client_id", f.client_id).eq("discrepancy_type", "leads_without_spend")
+          .eq("date_range_start", f.date).eq("status", "open");
+        if ((count ?? 0) === 0) {
+          await supabase.from("data_discrepancies").insert({
+            client_id: f.client_id, discrepancy_type: "leads_without_spend",
+            date_range_start: f.date, date_range_end: f.date,
+            api_count: f.leads, db_count: 0, difference: f.leads,
+            severity: "high", status: "open",
+            resolution_notes: `${f.leads} leads on ${f.date} but no Meta spend recorded (ad_spend_daily rows: ${f.spend_rows}). Re-run sync-meta-ad-spend for this date.`,
+          });
+        }
+      } catch (e) { console.error("flag insert failed (non-fatal)", e); }
+    }
+    return { success: true, summary, totalUpdated, totalErrors, startDate, endDate, leadsWithoutSpend: zeroSpendFlags };
   };
 
   const dayCount = Math.round(
