@@ -35,17 +35,29 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get the stored password hash from agency_settings
-    const { data: settings, error: settingsError } = await supabase
-      .from('agency_settings')
-      .select('password_hash')
-      .single();
+    // Get the stored password hash from agency_settings. Retry briefly so a
+    // short backend restart doesn't fail sign-in outright.
+    let settings: { password_hash: string | null } | null = null;
+    let settingsError: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const res = await supabase
+        .from('agency_settings')
+        .select('password_hash')
+        .limit(1)
+        .maybeSingle();
+      settings = res.data;
+      settingsError = res.error;
+      if (!settingsError) break;
+      await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+    }
 
     if (settingsError) {
       console.error('Error fetching settings:', settingsError);
+      // Transient/backend issue: return 200 so the browser shows a message
+      // instead of a non-2xx error that can blank the page.
       return new Response(
-        JSON.stringify({ error: "Failed to verify password" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, retryable: true, error: "Sign-in is temporarily unavailable. Please try again in a moment." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -75,8 +87,8 @@ Deno.serve(async (req) => {
     if (memberError) {
       console.error('Error fetching member:', memberError);
       return new Response(
-        JSON.stringify({ error: "Failed to verify member" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, retryable: true, error: "Sign-in is temporarily unavailable. Please try again in a moment." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -128,8 +140,8 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Error in verify-password:', error);
     return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ success: false, retryable: true, error: "Sign-in is temporarily unavailable. Please try again in a moment." }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

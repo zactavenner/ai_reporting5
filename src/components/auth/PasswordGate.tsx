@@ -66,15 +66,15 @@ function PasswordGateContent({ children }: PasswordGateProps) {
       });
 
       if (fnError) {
-        console.error('Login error:', fnError);
+        console.warn('Login error:', fnError);
         setError('Failed to sign in. Please try again.');
         setIsLoggingIn(false);
         return;
       }
 
-      if (!data.success) {
-        setError(data.error || 'Incorrect password or member not found');
-        if (data.error === 'Incorrect password') {
+      if (!data?.success) {
+        setError(data?.error || 'Incorrect password or member not found');
+        if (data?.error === 'Incorrect password') {
           setPassword('');
         }
         setIsLoggingIn(false);
@@ -97,7 +97,7 @@ function PasswordGateContent({ children }: PasswordGateProps) {
       setIsAuthenticated(true);
       toast.success(`Welcome back, ${data.member.name}!`);
     } catch (err) {
-      console.error('Login error:', err);
+      console.warn('Login error:', err);
       setError('Failed to sign in. Please try again.');
     } finally {
       setIsLoggingIn(false);
