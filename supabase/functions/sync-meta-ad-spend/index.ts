@@ -7,6 +7,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { legacyChain, resolveClientMetaToken, type MetaTokenHandle } from '../_shared/metaSystemToken.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { pickSpendSheetId } from '../_shared/spendSheetTarget.ts';
 
 type Body = {
   mode?: 'daily' | 'manual';
@@ -49,11 +50,6 @@ async function sheetsThrottle() {
   sheetsLastCallAt = Date.now();
 }
 
-function extractSpreadsheetId(url: string | null | undefined): string | null {
-  if (!url) return null;
-  const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  return m ? m[1] : null;
-}
 
 type AccountRow = { client_id: string; client_name: string; ad_account_id: string; token: string; handle?: MetaTokenHandle };
 
@@ -475,13 +471,16 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Per-client KPI sheet map (kpi_google_sheet_url → spreadsheetId)
+    // Per-client reporting sheet map. The scorecard (metrics_sheet_id) is the
+    // sheet clients and the dashboard read, so spend goes there when set; the
+    // KPI sheet link is only the fallback (it can point at a different sheet,
+    // e.g. a call-disposition sheet).
     const { data: cs } = await sb
       .from('client_settings')
-      .select('client_id, kpi_google_sheet_url');
+      .select('client_id, kpi_google_sheet_url, metrics_sheet_id');
     const sheetIdByClient = new Map<string, string>();
     for (const row of cs ?? []) {
-      const id = extractSpreadsheetId((row as any).kpi_google_sheet_url);
+      const id = pickSpendSheetId((row as any).metrics_sheet_id, (row as any).kpi_google_sheet_url);
       if (id) sheetIdByClient.set((row as any).client_id, id);
     }
     const readySheets = new Set<string>();
