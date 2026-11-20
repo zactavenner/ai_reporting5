@@ -234,12 +234,12 @@ async function fetchGHLContacts(
     'Version': '2021-07-28',
   };
 
+  let searchFailure = '';
   // Try POST /contacts/search first (recommended v2 endpoint)
   try {
     const body: Record<string, any> = {
       locationId,
       pageLimit: limit,
-      limit,  // GHL v2 accepts both; send both for compatibility
       page: page || 1,
     };
     if (requireDateAddedDesc) {
@@ -272,13 +272,14 @@ async function fetchGHLContacts(
     // If POST /contacts/search returns 400, fall back to GET /contacts/
     const errorText = await response.text();
     console.warn(`POST /contacts/search failed (${response.status}), falling back to GET /contacts/: ${errorText.substring(0, 200)}`);
+    searchFailure = `${response.status}: ${errorText.substring(0, 300)}`;
   } catch (err) {
     if (requireDateAddedDesc) throw err;
     console.warn(`POST /contacts/search threw error, falling back to GET /contacts/:`, err);
   }
 
   if (requireDateAddedDesc) {
-    throw new Error('GHL advanced contact search failed; refusing an unbounded daily fallback');
+    throw new Error(`GHL advanced contact search failed; refusing an unbounded daily fallback${searchFailure ? ` (GHL ${searchFailure})` : ''}`);
   }
 
   // Fallback: deprecated GET /contacts/ endpoint (still works for some locations)
