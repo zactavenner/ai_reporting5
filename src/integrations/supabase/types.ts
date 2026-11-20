@@ -6740,6 +6740,69 @@ export type Database = {
           },
         ]
       }
+      calls_time_backup_20261120: {
+        Row: {
+          appointment_status: string | null
+          backed_up_at: string | null
+          booked_at: string | null
+          booked_at_missing: boolean | null
+          client_id: string | null
+          created_at: string | null
+          external_id: string | null
+          ghl_appointment_id: string | null
+          ghl_calendar_id: string | null
+          ghl_synced_at: string | null
+          id: string | null
+          is_reconnect: boolean | null
+          lead_id: string | null
+          outcome: string | null
+          scheduled_at: string | null
+          showed: boolean | null
+          showed_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          appointment_status?: string | null
+          backed_up_at?: string | null
+          booked_at?: string | null
+          booked_at_missing?: boolean | null
+          client_id?: string | null
+          created_at?: string | null
+          external_id?: string | null
+          ghl_appointment_id?: string | null
+          ghl_calendar_id?: string | null
+          ghl_synced_at?: string | null
+          id?: string | null
+          is_reconnect?: boolean | null
+          lead_id?: string | null
+          outcome?: string | null
+          scheduled_at?: string | null
+          showed?: boolean | null
+          showed_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          appointment_status?: string | null
+          backed_up_at?: string | null
+          booked_at?: string | null
+          booked_at_missing?: boolean | null
+          client_id?: string | null
+          created_at?: string | null
+          external_id?: string | null
+          ghl_appointment_id?: string | null
+          ghl_calendar_id?: string | null
+          ghl_synced_at?: string | null
+          id?: string | null
+          is_reconnect?: boolean | null
+          lead_id?: string | null
+          outcome?: string | null
+          scheduled_at?: string | null
+          showed?: boolean | null
+          showed_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       campaign_launch_events: {
         Row: {
           created_at: string
@@ -12605,6 +12668,96 @@ export type Database = {
           },
         ]
       }
+      daily_metrics_fund_backup_20261120: {
+        Row: {
+          ad_spend: number | null
+          backed_up_at: string | null
+          calls: number | null
+          calls_scheduled: number | null
+          calls_showed: number | null
+          clicks: number | null
+          client_id: string | null
+          commitment_dollars: number | null
+          commitments: number | null
+          commitments_on_day: number | null
+          created_at: string | null
+          ctr: number | null
+          date: string | null
+          date_account_tz: string | null
+          funded_dollars: number | null
+          funded_investors: number | null
+          funded_on_day: number | null
+          id: string | null
+          impressions: number | null
+          leads: number | null
+          leads_created: number | null
+          reconnect_calls: number | null
+          reconnect_showed: number | null
+          showed_calls: number | null
+          spam_leads: number | null
+          unattributed_leads: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          ad_spend?: number | null
+          backed_up_at?: string | null
+          calls?: number | null
+          calls_scheduled?: number | null
+          calls_showed?: number | null
+          clicks?: number | null
+          client_id?: string | null
+          commitment_dollars?: number | null
+          commitments?: number | null
+          commitments_on_day?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date?: string | null
+          date_account_tz?: string | null
+          funded_dollars?: number | null
+          funded_investors?: number | null
+          funded_on_day?: number | null
+          id?: string | null
+          impressions?: number | null
+          leads?: number | null
+          leads_created?: number | null
+          reconnect_calls?: number | null
+          reconnect_showed?: number | null
+          showed_calls?: number | null
+          spam_leads?: number | null
+          unattributed_leads?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          ad_spend?: number | null
+          backed_up_at?: string | null
+          calls?: number | null
+          calls_scheduled?: number | null
+          calls_showed?: number | null
+          clicks?: number | null
+          client_id?: string | null
+          commitment_dollars?: number | null
+          commitments?: number | null
+          commitments_on_day?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date?: string | null
+          date_account_tz?: string | null
+          funded_dollars?: number | null
+          funded_investors?: number | null
+          funded_on_day?: number | null
+          id?: string | null
+          impressions?: number | null
+          leads?: number | null
+          leads_created?: number | null
+          reconnect_calls?: number | null
+          reconnect_showed?: number | null
+          showed_calls?: number | null
+          spam_leads?: number | null
+          unattributed_leads?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       daily_metrics_show_backup_20261119: {
         Row: {
           backed_up_at: string | null
@@ -14604,6 +14757,72 @@ export type Database = {
           },
         ]
       }
+      funded_investors_backup_20261120: {
+        Row: {
+          approval_status: string | null
+          backed_up_at: string | null
+          calls_to_fund: number | null
+          client_id: string | null
+          commitment_amount: number | null
+          committed_at: string | null
+          created_at: string | null
+          external_id: string | null
+          first_contact_at: string | null
+          flags: Json | null
+          funded_amount: number | null
+          funded_at: string | null
+          id: string | null
+          is_verified_funded: boolean | null
+          lead_id: string | null
+          name: string | null
+          source: string | null
+          time_to_fund_days: number | null
+          verification_source: string | null
+        }
+        Insert: {
+          approval_status?: string | null
+          backed_up_at?: string | null
+          calls_to_fund?: number | null
+          client_id?: string | null
+          commitment_amount?: number | null
+          committed_at?: string | null
+          created_at?: string | null
+          external_id?: string | null
+          first_contact_at?: string | null
+          flags?: Json | null
+          funded_amount?: number | null
+          funded_at?: string | null
+          id?: string | null
+          is_verified_funded?: boolean | null
+          lead_id?: string | null
+          name?: string | null
+          source?: string | null
+          time_to_fund_days?: number | null
+          verification_source?: string | null
+        }
+        Update: {
+          approval_status?: string | null
+          backed_up_at?: string | null
+          calls_to_fund?: number | null
+          client_id?: string | null
+          commitment_amount?: number | null
+          committed_at?: string | null
+          created_at?: string | null
+          external_id?: string | null
+          first_contact_at?: string | null
+          flags?: Json | null
+          funded_amount?: number | null
+          funded_at?: string | null
+          id?: string | null
+          is_verified_funded?: boolean | null
+          lead_id?: string | null
+          name?: string | null
+          source?: string | null
+          time_to_fund_days?: number | null
+          verification_source?: string | null
+        }
+        Relationships: []
+      }
       funnel_analytics: {
         Row: {
           completions: number | null
@@ -15198,6 +15417,81 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
         ]
+      }
+      ghl_calls_audit_20261120: {
+        Row: {
+          appointment_id: string | null
+          calendar_id: string | null
+          client_id: string | null
+          ghl_added: string | null
+          ghl_start: string | null
+          ghl_status: string | null
+        }
+        Insert: {
+          appointment_id?: string | null
+          calendar_id?: string | null
+          client_id?: string | null
+          ghl_added?: string | null
+          ghl_start?: string | null
+          ghl_status?: string | null
+        }
+        Update: {
+          appointment_id?: string | null
+          calendar_id?: string | null
+          client_id?: string | null
+          ghl_added?: string | null
+          ghl_start?: string | null
+          ghl_status?: string | null
+        }
+        Relationships: []
+      }
+      ghl_calls_audit_req_20261120: {
+        Row: {
+          calendar_id: string | null
+          client_id: string | null
+          created_at: string | null
+          n: number
+          req_id: number | null
+          status_code: number | null
+        }
+        Insert: {
+          calendar_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          n?: number
+          req_id?: number | null
+          status_code?: number | null
+        }
+        Update: {
+          calendar_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          n?: number
+          req_id?: number | null
+          status_code?: number | null
+        }
+        Relationships: []
+      }
+      ghl_loc_tz_probe_20261120: {
+        Row: {
+          client_id: string
+          req_id: number | null
+          status: number | null
+          tz: string | null
+        }
+        Insert: {
+          client_id: string
+          req_id?: number | null
+          status?: number | null
+          tz?: string | null
+        }
+        Update: {
+          client_id?: string
+          req_id?: number | null
+          status?: number | null
+          tz?: string | null
+        }
+        Relationships: []
       }
       ghl_outbound_log: {
         Row: {
@@ -19517,6 +19811,42 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
         ]
+      }
+      leads_opp_backup_20261120: {
+        Row: {
+          backed_up_at: string | null
+          client_id: string | null
+          external_id: string | null
+          ghl_synced_at: string | null
+          id: string | null
+          opportunity_stage: string | null
+          opportunity_stage_id: string | null
+          opportunity_status: string | null
+          opportunity_value: number | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          client_id?: string | null
+          external_id?: string | null
+          ghl_synced_at?: string | null
+          id?: string | null
+          opportunity_stage?: string | null
+          opportunity_stage_id?: string | null
+          opportunity_status?: string | null
+          opportunity_value?: number | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          client_id?: string | null
+          external_id?: string | null
+          ghl_synced_at?: string | null
+          id?: string | null
+          opportunity_stage?: string | null
+          opportunity_stage_id?: string | null
+          opportunity_status?: string | null
+          opportunity_value?: number | null
+        }
+        Relationships: []
       }
       linq_bridge_config: {
         Row: {
