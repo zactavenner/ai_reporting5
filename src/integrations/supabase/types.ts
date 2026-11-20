@@ -75,6 +75,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "ad_classifications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "ad_classifications_run_id_fkey"
             columns: ["run_id"]
             isOneToOne: false
@@ -174,6 +181,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "ad_iterations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "ad_iterations_creative_id_fkey"
             columns: ["creative_id"]
             isOneToOne: false
@@ -262,6 +276,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ad_lead_quality_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -477,6 +498,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "ad_spend_daily_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       ad_spend_reports: {
@@ -554,6 +582,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "ad_spend_reports_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       ad_spend_sync_runs: {
@@ -629,6 +664,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ad_spend_sync_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -709,6 +751,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ad_styles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -817,6 +866,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "agency_agent_files_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -1038,6 +1094,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "agency_daily_report_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -1282,6 +1345,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "agency_meetings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -1796,6 +1866,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "agent_api_idempotency_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       agent_assignment_outbox: {
@@ -1955,6 +2032,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "agent_channels_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       agent_connectors: {
@@ -2046,6 +2130,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "agent_connectors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -2190,6 +2281,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "agent_mcp_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -2378,6 +2476,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "agent_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       agent_schedules: {
@@ -2457,6 +2562,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "agent_schedules_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -2544,6 +2656,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "agent_task_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -2735,6 +2854,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "agents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "agents_parent_agent_id_fkey"
             columns: ["parent_agent_id"]
             isOneToOne: false
@@ -2876,6 +3002,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "ai_insights_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       ai_meeting_briefs: {
@@ -2933,6 +3066,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_meeting_briefs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -3002,6 +3142,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_attempt_claims_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -3108,6 +3255,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "ai_setter_bookings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "ai_setter_bookings_hold_id_fkey"
             columns: ["hold_id"]
             isOneToOne: true
@@ -3206,6 +3360,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "ai_setter_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       ai_setter_events: {
@@ -3266,6 +3427,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -3341,6 +3509,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_holds_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -3459,6 +3634,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "ai_setter_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       ai_setter_sessions: {
@@ -3568,6 +3750,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_sessions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -3681,6 +3870,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "ai_setter_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       ai_setter_slots: {
@@ -3741,6 +3937,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_slots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -3818,6 +4021,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_setter_tool_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -4082,6 +4292,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "ai_studio_reference_images_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       ai_studio_reference_videos: {
@@ -4169,6 +4386,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ai_studio_reference_videos_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -4326,6 +4550,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "ai_studio_video_model_decision_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "ai_studio_video_model_decision_logs_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
@@ -4433,6 +4664,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "alert_configs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       api_keys: {
@@ -4537,6 +4775,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "api_usage_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       apify_settings: {
@@ -4609,6 +4854,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "apify_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -4768,6 +5020,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "appointment_call_bridges_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       approval_queue: {
@@ -4861,6 +5120,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "approval_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       approved_claims: {
@@ -4933,6 +5199,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "approved_claims_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -5064,6 +5337,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "autonomous_audit_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -5205,6 +5485,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "avatars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       batch_jobs: {
@@ -5282,6 +5569,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "batch_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       billing_actions: {
@@ -5357,6 +5651,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_actions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -5466,6 +5767,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_agreements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -5591,6 +5899,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -5724,6 +6039,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "billing_notifications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "billing_notifications_payment_id_fkey"
             columns: ["payment_id"]
             isOneToOne: false
@@ -5808,6 +6130,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "billing_payments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -5949,6 +6278,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "browser_tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "browser_tasks_fulfillment_run_id_fkey"
             columns: ["fulfillment_run_id"]
             isOneToOne: false
@@ -6019,6 +6355,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "calendar_mappings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -6124,6 +6467,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "call_analysis_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -6243,6 +6593,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: true
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "call_recording_capture_state_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -6365,6 +6722,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -6545,6 +6909,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "campaign_launches_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       campaign_templates: {
@@ -6644,6 +7015,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "capi_events_sent_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "capi_events_sent_lead_disposition_id_fkey"
             columns: ["lead_disposition_id"]
             isOneToOne: true
@@ -6704,6 +7082,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "chat_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -6857,6 +7242,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_ad_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_ad_assignments: {
@@ -6911,6 +7303,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_ad_assignments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -7001,6 +7400,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_agent_journal_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_agent_overrides: {
@@ -7067,6 +7473,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_agent_overrides_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_agent_profiles: {
@@ -7121,6 +7534,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: true
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_agent_profiles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -7203,6 +7623,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_agents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_assets: {
@@ -7266,6 +7693,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -7380,6 +7814,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "client_audit_findings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "client_audit_findings_report_id_fkey"
             columns: ["report_id"]
             isOneToOne: false
@@ -7463,6 +7904,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_audit_reports_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_brain: {
@@ -7523,6 +7971,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: true
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_brain_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -7591,6 +8046,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_call_notes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -7689,6 +8151,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_custom_tabs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -7798,6 +8267,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_drive_folders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_file_uploads: {
@@ -7867,6 +8343,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_file_uploads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -8017,6 +8500,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "client_funnel_steps_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "client_funnel_steps_parent_step_id_fkey"
             columns: ["parent_step_id"]
             isOneToOne: false
@@ -8092,6 +8582,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: true
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_kpi_targets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -8211,6 +8708,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_live_ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_meetgeek_guest_configs: {
@@ -8302,6 +8806,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: true
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_meetgeek_guest_configs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -8402,6 +8913,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_meetgeek_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_meta_system_tokens: {
@@ -8494,6 +9012,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_meta_system_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_offer_files: {
@@ -8566,6 +9091,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_offer_files_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -8647,6 +9179,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_offer_training_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -8844,6 +9383,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_offers_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_onboarding_tasks: {
@@ -8909,6 +9455,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_onboarding_tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_pipelines: {
@@ -8968,6 +9521,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_pipelines_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_pod_assignments: {
@@ -9019,6 +9579,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_pod_assignments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -9076,6 +9643,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_portal_access_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -9192,6 +9766,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_references_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_report_recipients: {
@@ -9269,6 +9850,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_report_recipients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_report_reviews: {
@@ -9338,6 +9926,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_report_reviews_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -9421,6 +10016,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_report_sends_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -9816,6 +10418,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_settings_audit_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_team_members: {
@@ -9888,6 +10497,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_team_members_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -9995,6 +10611,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "client_videos_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "client_videos_parent_video_id_fkey"
             columns: ["parent_video_id"]
             isOneToOne: false
@@ -10070,6 +10693,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_voice_notes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -10176,6 +10806,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_weekly_call_items_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_weekly_call_ratings: {
@@ -10262,6 +10899,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: true
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_weekly_call_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -10394,6 +11038,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "client_weekly_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       client_weekly_report_notes: {
@@ -10454,6 +11105,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_weekly_report_notes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -10617,6 +11275,75 @@ export type Database = {
         }
         Relationships: []
       }
+      clients_titan_backup_20261120: {
+        Row: {
+          account_manager: string | null
+          backed_up_at: string | null
+          consecutive_ghl_failures: number | null
+          consecutive_meta_failures: number | null
+          created_at: string | null
+          ghl_location_id: string | null
+          ghl_sync_error: string | null
+          ghl_sync_status: string | null
+          id: string | null
+          industry: string | null
+          last_ghl_sync_at: string | null
+          last_timeline_sync_at: string | null
+          media_buyer: string | null
+          meta_ad_account_id: string | null
+          meta_ad_account_ids: string[] | null
+          name: string | null
+          slug: string | null
+          sort_order: number | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_manager?: string | null
+          backed_up_at?: string | null
+          consecutive_ghl_failures?: number | null
+          consecutive_meta_failures?: number | null
+          created_at?: string | null
+          ghl_location_id?: string | null
+          ghl_sync_error?: string | null
+          ghl_sync_status?: string | null
+          id?: string | null
+          industry?: string | null
+          last_ghl_sync_at?: string | null
+          last_timeline_sync_at?: string | null
+          media_buyer?: string | null
+          meta_ad_account_id?: string | null
+          meta_ad_account_ids?: string[] | null
+          name?: string | null
+          slug?: string | null
+          sort_order?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_manager?: string | null
+          backed_up_at?: string | null
+          consecutive_ghl_failures?: number | null
+          consecutive_meta_failures?: number | null
+          created_at?: string | null
+          ghl_location_id?: string | null
+          ghl_sync_error?: string | null
+          ghl_sync_status?: string | null
+          id?: string | null
+          industry?: string | null
+          last_ghl_sync_at?: string | null
+          last_timeline_sync_at?: string | null
+          media_buyer?: string | null
+          meta_ad_account_id?: string | null
+          meta_ad_account_ids?: string[] | null
+          name?: string | null
+          slug?: string | null
+          sort_order?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       compliance_approvals: {
         Row: {
           approver_email: string | null
@@ -10681,6 +11408,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "compliance_approvals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -10759,6 +11493,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "contact_timeline_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -10857,6 +11598,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "content_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       copy_library: {
@@ -10920,6 +11668,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "copy_library_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -11095,6 +11850,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "creative_drive_uploads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "creative_drive_uploads_creative_id_fkey"
             columns: ["creative_id"]
             isOneToOne: false
@@ -11167,6 +11929,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_intel_findings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -11434,6 +12203,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "creatives_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       cron_run_log: {
@@ -11529,6 +12305,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "csv_import_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       custom_ads: {
@@ -11613,6 +12396,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "custom_ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -11806,7 +12596,200 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "daily_metrics_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
+      }
+      daily_metrics_show_backup_20261119: {
+        Row: {
+          backed_up_at: string | null
+          calls_scheduled: number | null
+          calls_showed: number | null
+          client_id: string | null
+          date: string | null
+          original_updated_at: string | null
+          reconnect_showed: number | null
+          showed_calls: number | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          calls_scheduled?: number | null
+          calls_showed?: number | null
+          client_id?: string | null
+          date?: string | null
+          original_updated_at?: string | null
+          reconnect_showed?: number | null
+          showed_calls?: number | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          calls_scheduled?: number | null
+          calls_showed?: number | null
+          client_id?: string | null
+          date?: string | null
+          original_updated_at?: string | null
+          reconnect_showed?: number | null
+          showed_calls?: number | null
+        }
+        Relationships: []
+      }
+      daily_metrics_show_backup_20261119b: {
+        Row: {
+          backed_up_at: string | null
+          calls_scheduled: number | null
+          calls_showed: number | null
+          client_id: string | null
+          date: string | null
+          original_updated_at: string | null
+          reconnect_showed: number | null
+          showed_calls: number | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          calls_scheduled?: number | null
+          calls_showed?: number | null
+          client_id?: string | null
+          date?: string | null
+          original_updated_at?: string | null
+          reconnect_showed?: number | null
+          showed_calls?: number | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          calls_scheduled?: number | null
+          calls_showed?: number | null
+          client_id?: string | null
+          date?: string | null
+          original_updated_at?: string | null
+          reconnect_showed?: number | null
+          showed_calls?: number | null
+        }
+        Relationships: []
+      }
+      daily_metrics_show_backup_20261119c: {
+        Row: {
+          backed_up_at: string | null
+          calls_scheduled: number | null
+          calls_showed: number | null
+          client_id: string | null
+          date: string | null
+          original_updated_at: string | null
+          reconnect_showed: number | null
+          showed_calls: number | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          calls_scheduled?: number | null
+          calls_showed?: number | null
+          client_id?: string | null
+          date?: string | null
+          original_updated_at?: string | null
+          reconnect_showed?: number | null
+          showed_calls?: number | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          calls_scheduled?: number | null
+          calls_showed?: number | null
+          client_id?: string | null
+          date?: string | null
+          original_updated_at?: string | null
+          reconnect_showed?: number | null
+          showed_calls?: number | null
+        }
+        Relationships: []
+      }
+      daily_metrics_show_backup_20261120: {
+        Row: {
+          ad_spend: number | null
+          calls: number | null
+          calls_scheduled: number | null
+          calls_showed: number | null
+          clicks: number | null
+          client_id: string | null
+          commitment_dollars: number | null
+          commitments: number | null
+          commitments_on_day: number | null
+          created_at: string | null
+          ctr: number | null
+          date: string | null
+          date_account_tz: string | null
+          funded_dollars: number | null
+          funded_investors: number | null
+          funded_on_day: number | null
+          id: string | null
+          impressions: number | null
+          leads: number | null
+          leads_created: number | null
+          reconnect_calls: number | null
+          reconnect_showed: number | null
+          showed_calls: number | null
+          spam_leads: number | null
+          unattributed_leads: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          ad_spend?: number | null
+          calls?: number | null
+          calls_scheduled?: number | null
+          calls_showed?: number | null
+          clicks?: number | null
+          client_id?: string | null
+          commitment_dollars?: number | null
+          commitments?: number | null
+          commitments_on_day?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date?: string | null
+          date_account_tz?: string | null
+          funded_dollars?: number | null
+          funded_investors?: number | null
+          funded_on_day?: number | null
+          id?: string | null
+          impressions?: number | null
+          leads?: number | null
+          leads_created?: number | null
+          reconnect_calls?: number | null
+          reconnect_showed?: number | null
+          showed_calls?: number | null
+          spam_leads?: number | null
+          unattributed_leads?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          ad_spend?: number | null
+          calls?: number | null
+          calls_scheduled?: number | null
+          calls_showed?: number | null
+          clicks?: number | null
+          client_id?: string | null
+          commitment_dollars?: number | null
+          commitments?: number | null
+          commitments_on_day?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date?: string | null
+          date_account_tz?: string | null
+          funded_dollars?: number | null
+          funded_investors?: number | null
+          funded_on_day?: number | null
+          id?: string | null
+          impressions?: number | null
+          leads?: number | null
+          leads_created?: number | null
+          reconnect_calls?: number | null
+          reconnect_showed?: number | null
+          showed_calls?: number | null
+          spam_leads?: number | null
+          unattributed_leads?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       daily_report_runs: {
         Row: {
@@ -11908,6 +12891,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "daily_report_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -12017,6 +13007,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "dashboard_preferences_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       data_discrepancies: {
@@ -12098,6 +13095,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "data_discrepancies_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -12228,6 +13232,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "deals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       disposition_mappings: {
@@ -12288,6 +13299,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "disposition_mappings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -12572,6 +13590,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "email_parsed_investors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "email_parsed_investors_funded_investor_id_fkey"
             columns: ["funded_investor_id"]
             isOneToOne: false
@@ -12796,6 +13821,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "enrichment_alerts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       enrichment_jobs: {
@@ -12873,6 +13905,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "enrichment_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       enrichment_run_log: {
@@ -12936,6 +13975,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "enrichment_run_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -13182,6 +14228,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "flowboards_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       fulfillment_runs: {
@@ -13263,6 +14316,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "fulfillment_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -13529,6 +14589,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "funded_investors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "funded_investors_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -13680,6 +14747,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "funnel_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -13839,6 +14913,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "funnel_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "funnel_snapshots_stage_id_fkey"
             columns: ["stage_id"]
             isOneToOne: false
@@ -13905,6 +14986,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "funnel_stages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -14102,6 +15190,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "funnels_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       ghl_outbound_log: {
@@ -14195,6 +15290,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "ghl_outbound_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "ghl_outbound_log_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -14272,6 +15374,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "ghl_reconciliation_results_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       ghl_workflow_history: {
@@ -14329,6 +15438,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ghl_workflow_history_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -14391,6 +15507,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ghl_workflow_sync_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -14468,6 +15591,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ghl_workflows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -14887,6 +16017,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "h3_creatives_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "h3_creatives_run_id_fkey"
             columns: ["run_id"]
             isOneToOne: false
@@ -14956,6 +16093,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "h3_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -15129,6 +16273,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "hermes_tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -15310,6 +16461,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "huddle_client_reviews_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "huddle_client_reviews_huddle_id_fkey"
             columns: ["huddle_id"]
             isOneToOne: false
@@ -15388,6 +16546,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "huddle_commitments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "huddle_commitments_huddle_id_fkey"
             columns: ["huddle_id"]
             isOneToOne: false
@@ -15448,6 +16613,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "huddle_flags_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -15720,6 +16892,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "hyperframes_render_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "hyperframes_render_jobs_creative_id_fkey"
             columns: ["creative_id"]
             isOneToOne: false
@@ -15922,6 +17101,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "influencer_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "influencer_projects_creative_id_fkey"
             columns: ["creative_id"]
             isOneToOne: false
@@ -16036,6 +17222,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "instagram_creatives_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       instagram_scrape_jobs: {
@@ -16111,6 +17304,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "instagram_scrape_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -16206,6 +17406,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "integration_status_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -16395,6 +17602,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "jarvis_goals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       jarvis_messages: {
@@ -16550,6 +17764,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "jeremy_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "jeremy_action_executions_cycle_id_fkey"
             columns: ["cycle_id"]
             isOneToOne: false
@@ -16681,6 +17902,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "jeremy_action_plans_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -16817,6 +18045,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "jeremy_autonomy_policies_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       jeremy_creative_candidates: {
@@ -16913,6 +18148,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "jeremy_creative_candidates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "jeremy_creative_candidates_cycle_id_fkey"
             columns: ["cycle_id"]
             isOneToOne: false
@@ -16997,6 +18239,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "jeremy_cycles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -17173,6 +18422,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "jeremy_kpi_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "jeremy_kpi_snapshots_cycle_id_fkey"
             columns: ["cycle_id"]
             isOneToOne: false
@@ -17289,6 +18545,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "jeremy_review_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       knowledge_base_documents: {
@@ -17403,6 +18666,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "lead_change_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "lead_change_log_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
@@ -17482,6 +18752,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_dispositions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -17833,6 +19110,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "lead_enrichment_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "lead_enrichment_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -17896,6 +19180,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_enrichment_history_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -17976,6 +19267,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "lead_meeting_context_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "lead_meeting_context_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -18049,6 +19347,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_memory_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -18202,6 +19507,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -18413,6 +19725,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "media_buyer_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       meetgeek_guest_invite_jobs: {
@@ -18593,6 +19912,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "meetgeek_guest_invite_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "meetgeek_guest_invite_jobs_guest_config_id_fkey"
             columns: ["guest_config_id"]
             isOneToOne: false
@@ -18768,6 +20094,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "meeting_call_activity_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "meeting_call_activity_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -18862,6 +20195,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meeting_ingest_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -19062,6 +20402,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "meeting_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "meeting_records_guest_invite_job_id_fkey"
             columns: ["guest_invite_job_id"]
             isOneToOne: false
@@ -19140,6 +20487,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meeting_sheet_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -19318,6 +20672,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "meta_ad_daily_insights_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       meta_ad_recommendations: {
@@ -19417,6 +20778,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_ad_recommendations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -19585,6 +20953,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_ad_sets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -19788,6 +21163,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "meta_ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       meta_ai_creative_insights: {
@@ -19860,6 +21242,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_ai_creative_insights_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -19939,6 +21328,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "meta_alerts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       meta_api_calls: {
@@ -20005,6 +21401,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_api_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -20145,6 +21548,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "meta_campaign_launches_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "meta_campaign_launches_creative_id_fkey"
             columns: ["creative_id"]
             isOneToOne: false
@@ -20250,6 +21660,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_campaign_templates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -20398,6 +21815,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "meta_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       meta_creative_comments: {
@@ -20467,6 +21891,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_creative_comments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -20554,6 +21985,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "meta_creative_tags_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       meta_lead_form_mappings: {
@@ -20617,6 +22055,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_lead_form_mappings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -20691,6 +22136,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_lead_form_templates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -20794,6 +22246,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "meta_lead_forms_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       meta_mcp_tool_calls: {
@@ -20863,6 +22322,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_mcp_tool_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -21004,6 +22470,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "meta_rules_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       meta_swipe_files: {
@@ -21088,6 +22561,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_swipe_files_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -21236,6 +22716,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "meta_weekly_briefs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       monitoring_status: {
@@ -21340,6 +22827,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "monitoring_targets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -21471,6 +22965,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "notetaker_coverage_call_record_id_fkey"
+            columns: ["call_record_id"]
+            isOneToOne: false
+            referencedRelation: "v_call_show_evidence"
+            referencedColumns: ["call_id"]
+          },
+          {
             foreignKeyName: "notetaker_coverage_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -21496,6 +22997,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "notetaker_coverage_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -21582,6 +23090,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "onboarding_notifications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -21692,6 +23207,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "onboarding_stage_progress_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -21829,6 +23351,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "pending_meeting_tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -22088,6 +23617,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "phone_call_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       pipeline_opportunities: {
@@ -22290,6 +23826,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "pixel_verifications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "pixel_verifications_step_id_fkey"
             columns: ["step_id"]
             isOneToOne: false
@@ -22359,6 +23902,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -22686,6 +24236,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "quality_feedback_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       quality_feedback_global: {
@@ -22767,6 +24324,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "quality_rule_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -22933,6 +24497,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "reconciliation_items_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -23167,6 +24738,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "scraped_ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "scraped_ads_monitoring_target_id_fkey"
             columns: ["monitoring_target_id"]
             isOneToOne: false
@@ -23251,6 +24829,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "scraping_schedule_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -23404,6 +24989,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "sendblue_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       sendblue_conversations: {
@@ -23479,6 +25071,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -23569,6 +25168,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_ghl_mirrors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -23683,6 +25289,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "sendblue_lines_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       sendblue_messages: {
@@ -23779,6 +25392,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sendblue_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -23937,6 +25557,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "setter_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "setter_calls_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -24012,6 +25639,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "setter_scripts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -24097,7 +25731,74 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "sheet_audit_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
+      }
+      show_verification_exclusions: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          ghl_contact_id: string
+          reason: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          ghl_contact_id: string
+          reason?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          ghl_contact_id?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
+      show_verification_settings: {
+        Row: {
+          client_id: string
+          effective_from: string | null
+          min_call_seconds: number
+          min_note_chars: number
+          mode: string
+          note: string | null
+          pre_start_grace_minutes: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          client_id: string
+          effective_from?: string | null
+          min_call_seconds?: number
+          min_note_chars?: number
+          mode?: string
+          note?: string | null
+          pre_start_grace_minutes?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          client_id?: string
+          effective_from?: string | null
+          min_call_seconds?: number
+          min_note_chars?: number
+          mode?: string
+          note?: string | null
+          pre_start_grace_minutes?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       slack_activity_log: {
         Row: {
@@ -24171,6 +25872,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "slack_activity_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       slack_channel_mappings: {
@@ -24234,6 +25942,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "slack_channel_mappings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -24371,6 +26086,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "swipe_file_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "swipe_file_scraped_ad_id_fkey"
             columns: ["scraped_ad_id"]
             isOneToOne: false
@@ -24442,6 +26164,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "sync_accuracy_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       sync_errors: {
@@ -24502,6 +26231,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sync_errors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -24587,6 +26323,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "sync_health_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       sync_logs: {
@@ -24647,6 +26390,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sync_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -24727,6 +26477,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sync_outbound_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -24839,6 +26596,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "sync_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       sync_runs: {
@@ -24907,6 +26671,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "sync_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       sync_warnings: {
@@ -24961,6 +26732,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "sync_warnings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -25402,6 +27180,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "tasks_huddle_id_fkey"
             columns: ["huddle_id"]
             isOneToOne: false
@@ -25521,6 +27306,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "top_performer_uploads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -25759,6 +27551,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "video_edit_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "video_edit_messages_result_video_id_fkey"
             columns: ["result_video_id"]
             isOneToOne: false
@@ -25853,6 +27652,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -25969,6 +27775,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "viral_tracking_targets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       viral_videos: {
@@ -26053,6 +27866,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "viral_videos_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -26160,6 +27980,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "webhook_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "webhook_events_enqueued_job_id_fkey"
             columns: ["enqueued_job_id"]
             isOneToOne: false
@@ -26223,6 +28050,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "webhook_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -26318,6 +28152,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "weekly_syncs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "weekly_syncs_meeting_id_fkey"
             columns: ["meeting_id"]
             isOneToOne: false
@@ -26405,6 +28246,13 @@ export type Database = {
             columns: ["linked_client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_contacts_linked_client_id_fkey"
+            columns: ["linked_client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
           {
@@ -26820,6 +28668,61 @@ export type Database = {
         }
         Relationships: []
       }
+      v_call_show_evidence: {
+        Row: {
+          appointment_status: string | null
+          call_id: string | null
+          client_id: string | null
+          ev_call_min_seconds: boolean | null
+          ev_notetaker_summary: boolean | null
+          ev_rep_note: boolean | null
+          evidence_mode: string | null
+          excluded_test_contact: boolean | null
+          ghl_showed: boolean | null
+          is_eligible: boolean | null
+          is_reconnect: boolean | null
+          scheduled_at: string | null
+          show_basis: string | null
+          show_verified: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       v_client_call_recording_coverage: {
         Row: {
           calls: number | null
@@ -26863,6 +28766,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "phone_call_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -26938,6 +28848,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "daily_metrics_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       v_client_performance_monthly: {
@@ -26993,6 +28910,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "daily_metrics_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
             referencedColumns: ["client_id"]
           },
         ]
@@ -27052,6 +28976,13 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "daily_metrics_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       v_daily_funnel_day: {
@@ -27071,6 +29002,7 @@ export type Database = {
           discovery_noshow: number | null
           discovery_show_rate: number | null
           discovery_showed: number | null
+          discovery_showed_unverified: number | null
           discovery_unclassified: number | null
           funded_count: number | null
           funded_dollars: number | null
@@ -27085,6 +29017,7 @@ export type Database = {
           reconnect_noshow: number | null
           reconnect_show_rate: number | null
           reconnect_showed: number | null
+          reconnect_showed_unverified: number | null
           spend: number | null
           spend_rows: number | null
           spend_synced_at: string | null
@@ -27220,7 +29153,29 @@ export type Database = {
             referencedRelation: "v_daily_funnel_freshness"
             referencedColumns: ["client_id"]
           },
+          {
+            foreignKeyName: "meeting_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
         ]
+      }
+      v_paused_client_activity_flags: {
+        Row: {
+          client_id: string | null
+          client_name: string | null
+          flag_reasons: string | null
+          last_spend_date: string | null
+          last_webhook_lead_at: string | null
+          meta_spend: number | null
+          status: string | null
+          stored_leads_in_r5: number | null
+          webhook_lead_hits: number | null
+          window_days: number | null
+        }
+        Relationships: []
       }
       v_unified_call_transcripts: {
         Row: {
@@ -27445,6 +29400,7 @@ export type Database = {
           phone: string
         }[]
       }
+      flag_paused_client_activity: { Args: never; Returns: number }
       generate_client_slug: { Args: { client_name: string }; Returns: string }
       get_api_usage_counts: {
         Args: { p_key_index: number; p_service: string }
@@ -27504,6 +29460,7 @@ export type Database = {
           discovery_noshow: number | null
           discovery_show_rate: number | null
           discovery_showed: number | null
+          discovery_showed_unverified: number | null
           discovery_unclassified: number | null
           funded_count: number | null
           funded_dollars: number | null
@@ -27518,6 +29475,7 @@ export type Database = {
           reconnect_noshow: number | null
           reconnect_show_rate: number | null
           reconnect_showed: number | null
+          reconnect_showed_unverified: number | null
           spend: number | null
           spend_rows: number | null
           spend_synced_at: string | null
@@ -27854,6 +29812,8 @@ export type Database = {
         Args: { _member_ids: string[]; _pod_ids: string[]; _task_id: string }
         Returns: undefined
       }
+      show_note_is_negative: { Args: { p: string }; Returns: boolean }
+      show_note_plain: { Args: { p: string }; Returns: string }
     }
     Enums: {
       email_classification:
