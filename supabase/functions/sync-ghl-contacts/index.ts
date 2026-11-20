@@ -60,6 +60,92 @@ async function fetchGHL(
   return fetch(url, options);
 }
 
+// ── GHL appointment time normalisation ──
+// GHL's /contacts/{id}/appointments returns startTime/dateAdded as NAIVE local time ("YYYY-MM-DD HH:mm:ss" in the
+// LOCATION's timezone). Writing that string to a timestamptz column reads it as UTC, which shifts every appointment by
+// the location's UTC offset. Calendar-events endpoints return ISO strings with an offset/Z, which are already correct.
+const DEFAULT_GHL_TIMEZONE = 'America/New_York';
+const locationTimezoneCache = new Map<string, string>();
+
+function isValidTimeZone(tz: string): boolean {
+  try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return true; } catch { return false; }
+}
+
+// Location timezone from GHL (GET /locations/{id}); falls back to America/New_York if unavailable. Cached per invocation.
+async function getLocationTimezone(apiKey: string, locationId: string | null | undefined): Promise<string> {
+  if (!locationId) return DEFAULT_GHL_TIMEZONE;
+  const cached = locationTimezoneCache.get(locationId);
+  if (cached) return cached;
+  let tz = DEFAULT_GHL_TIMEZONE;
+  try {
+    const res = await fetchGHL(
+      `${GHL_BASE_URL}/locations/${locationId}`,
+      { method: 'GET', headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'Version': '2021-07-28' } },
+      `location timezone ${locationId}`,
+    );
+    if (res.ok) {
+      const json = await res.json();
+      const candidate = json?.location?.timezone || json?.timezone;
+      if (typeof candidate === 'string' && isValidTimeZone(candidate)) tz = candidate;
+    } else {
+      console.warn(`Location timezone lookup returned ${res.status} for ${locationId}; using ${DEFAULT_GHL_TIMEZONE}`);
+    }
+  } catch (err) {
+    console.warn(`Location timezone lookup failed for ${locationId}; using ${DEFAULT_GHL_TIMEZONE}:`, err);
+  }
+  locationTimezoneCache.set(locationId, tz);
+  return tz;
+}
+
+function cachedLocationTimezone(locationId: string | null | undefined): string {
+  return (locationId && locationTimezoneCache.get(locationId)) || DEFAULT_GHL_TIMEZONE;
+}
+
+// Offset (ms) of `tz` from UTC at the UTC instant `utcMs` (DST-aware).
+function zoneOffsetMs(utcMs: number, tz: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(new Date(utcMs));
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const wallAsUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
+  return wallAsUtc - Math.floor(utcMs / 1000) * 1000;
+}
+
+// Converts a GHL timestamp to an unambiguous UTC ISO string.
+// - Strings that already carry an offset/Z are kept (just normalised to UTC).
+// - Naive "YYYY-MM-DD HH:mm[:ss]" strings are interpreted in `tz` (DST-aware).
+function ghlTimeToIso(value: string | null | undefined, tz: string): string | null {
+  if (!value) return null;
+  const s = String(value).trim();
+  if (/(?:Z|[+-]\d{2}:?\d{2})$/i.test(s)) {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/);
+  if (!m) {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  const wallAsUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] ?? 0));
+  let utc = wallAsUtc - zoneOffsetMs(wallAsUtc, tz);
+  utc = wallAsUtc - zoneOffsetMs(utc, tz); // second pass settles DST boundaries
+  return new Date(utc).toISOString();
+}
+
+// ── GHL opportunities cursor ──
+// /opportunities/search pages by createdAt DESC. The next page needs meta.startAfter (a ms TIMESTAMP) AND
+// meta.startAfterId (the opportunity id); sending an id as startAfter returns 422 "startAfter must be a valid timestamp".
+// Pipelines too large for the page cap are bounded to opportunities created on/after this date instead of failing.
+const OPPORTUNITY_LARGE_PIPELINE_SINCE_MS = Date.UTC(2026, 0, 1);
+
+function nextOpportunityCursor(meta: any): { startAfter: number; startAfterId: string } | null {
+  const ts = Number(meta?.startAfter);
+  const id = meta?.startAfterId;
+  if (!Number.isFinite(ts) || ts <= 0 || typeof id !== 'string' || !id) return null;
+  return { startAfter: ts, startAfterId: id };
+}
+
 // --- SOURCE NORMALIZATION FUNCTION ---
 // Normalize raw UTM source to standardized platform names
 function normalizeSourceValue(rawSource: string | null | undefined, campaignName: string | null | undefined): string {
@@ -321,15 +407,16 @@ async function fetchGHLOpportunities(
 
   const allOpportunities: GHLOpportunity[] = [];
   let hasMore = true;
-  let startAfterId: string | null = null;
-  const MAX_PAGES = 50; // Support up to 5000 opportunities
+  let cursor: { startAfter: number; startAfterId: string } | null = null;
+  // Bounded per call: this runs on every contact sync (see OPPORTUNITY_LARGE_PIPELINE_SINCE_MS for the date floor).
+  const MAX_PAGES = 5; // newest 500 opportunities
   let pageCount = 0;
 
   try {
     while (hasMore && pageCount < MAX_PAGES) {
       let url = `${GHL_BASE_URL}/opportunities/search?location_id=${locationId}&limit=100`;
-      if (startAfterId) {
-        url += `&startAfterId=${startAfterId}`;
+      if (cursor) {
+        url += `&startAfter=${cursor.startAfter}&startAfterId=${cursor.startAfterId}`;
       }
 
       const response = await fetchGHL(url, { method: 'GET', headers }, `opportunities page ${pageCount + 1}`);
@@ -343,23 +430,9 @@ async function fetchGHLOpportunities(
       const opportunities = data.opportunities || [];
       allOpportunities.push(...opportunities);
 
-      // Handle pagination
-      if (data.meta?.startAfterId) {
-        startAfterId = data.meta.startAfterId;
-      } else if (data.meta?.nextPageUrl) {
-        // Extract startAfterId from nextPageUrl if available
-        const nextUrl = new URL(data.meta.nextPageUrl, GHL_BASE_URL);
-        startAfterId = nextUrl.searchParams.get('startAfterId') || nextUrl.searchParams.get('startAfter') || null;
-        if (!startAfterId && opportunities.length === 100) {
-          startAfterId = opportunities[opportunities.length - 1]?.id;
-        }
-      } else if (opportunities.length === 100) {
-        startAfterId = opportunities[opportunities.length - 1]?.id;
-      } else {
-        hasMore = false;
-      }
-
-      if (!startAfterId) hasMore = false;
+      // Pagination: next page needs BOTH meta.startAfter (timestamp) and meta.startAfterId
+      cursor = nextOpportunityCursor(data.meta);
+      if (!cursor || opportunities.length < 100 || cursor.startAfter < OPPORTUNITY_LARGE_PIPELINE_SINCE_MS) hasMore = false;
 
       pageCount++;
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -1227,7 +1300,8 @@ async function syncPipelineOpportunitiesIncremental(
     // Fetch opportunities from the configured pipeline (up to 500 for incremental sync)
     const allOpportunities: any[] = [];
     let hasMore = true;
-    let startAfterId: string | null = null;
+    let cursor: { startAfter: number; startAfterId: string } | null = null;
+    let sinceMs: number | null = null; // set only for pipelines larger than the page cap (date-bounded sync)
     const MAX_PAGES = maxPages;
     let pageCount = 0;
     const seenOppIds = new Set<string>();
@@ -1235,8 +1309,8 @@ async function syncPipelineOpportunitiesIncremental(
     while (hasMore && pageCount < MAX_PAGES) {
       // Use /opportunities/search endpoint with snake_case params (not /opportunities/)
       let url = `${GHL_BASE_URL}/opportunities/search?location_id=${client.ghl_location_id}&pipeline_id=${fundedPipelineId}&limit=100`;
-      if (startAfterId) {
-        url += `&startAfter=${startAfterId}&startAfterId=${startAfterId}`;
+      if (cursor) {
+        url += `&startAfter=${cursor.startAfter}&startAfterId=${cursor.startAfterId}`;
       }
       
       const response = await fetch(url, { method: 'GET', headers });
@@ -1261,13 +1335,19 @@ async function syncPipelineOpportunitiesIncremental(
       for (const o of opportunities) seenOppIds.add(o.id);
       allOpportunities.push(...newOpps);
       
-      // Pagination
+      // Pagination: next page needs BOTH meta.startAfter (ms timestamp of the last createdAt) and meta.startAfterId
       const meta = data.meta || {};
-      startAfterId = meta.startAfterId || meta.startAfter || null;
-      if (!startAfterId && opportunities.length >= 100) {
-        startAfterId = opportunities[opportunities.length - 1]?.id;
+      // Pipelines larger than the page cap are date-bounded (createdAt >= Jan 1, 2026) instead of failing.
+      if (pageCount === 0 && Number(meta.total) > MAX_PAGES * 100) {
+        sinceMs = OPPORTUNITY_LARGE_PIPELINE_SINCE_MS;
+        console.log(`Pipeline has ${meta.total} opportunities (> ${MAX_PAGES * 100}); date-bounding to createdAt >= ${new Date(sinceMs).toISOString()}`);
       }
-      if (!startAfterId || opportunities.length < 100) hasMore = false;
+      cursor = nextOpportunityCursor(meta);
+      if (opportunities.length >= 100 && !cursor) {
+        result.errors.push('GHL opportunities pagination cursor missing; results may be incomplete');
+      }
+      if (!cursor || opportunities.length < 100) hasMore = false;
+      else if (sinceMs !== null && cursor.startAfter < sinceMs) hasMore = false;
       
       pageCount++;
       await new Promise(resolve => setTimeout(resolve, 150));
@@ -2029,6 +2109,10 @@ async function syncAppointmentsAsCalls(
     const calendarId = appt.calendarId;
     const status = (appt.status || appt.appointmentStatus || '').toLowerCase();
     
+    // GHL returns NAIVE location-local times on this endpoint; convert using the location timezone (DST-aware)
+    const apptTz = await getLocationTimezone(apiKey, appt.locationId);
+    const startIso = ghlTimeToIso(appt.startTime, apptTz);
+    
     // Map GHL appointment status to our call outcome
     let outcome = 'booked';
     let showed = false;
@@ -2047,11 +2131,11 @@ async function syncAppointmentsAsCalls(
       showed = false;
     }
     // Only showed/completed counts, and never for a future start time.
-    showed = resolveShowed(status, appt.startTime);
+    showed = resolveShowed(status, startIso);
     if (!showed && outcome === 'showed') outcome = 'booked';
     
     // Use GHL dateAdded as the creation date for proper chronological ordering
-    const ghlCreatedAt = appt.dateAdded || appt.createdAt || new Date().toISOString();
+    const ghlCreatedAt = ghlTimeToIso(appt.dateAdded || appt.createdAt, apptTz) || new Date().toISOString();
     
     const callData = {
       client_id: clientId,
@@ -2059,7 +2143,7 @@ async function syncAppointmentsAsCalls(
       external_id: contactId,
       ghl_appointment_id: appointmentId,
       ghl_calendar_id: calendarId,
-      scheduled_at: appt.startTime || appt.dateAdded,
+      scheduled_at: startIso || ghlCreatedAt,
       appointment_status: status,
       showed,
       outcome,
@@ -2658,13 +2742,16 @@ async function syncPipelineOpportunitiesAndFunded(
   // Fetch all opportunities from the pipeline with pagination
   const allOpportunities: any[] = [];
   let hasMore = true;
-  let startAfterId: string | null = null;
+  let cursor: { startAfter: number; startAfterId: string } | null = null;
+  let sinceMs: number | null = null; // set only for pipelines larger than the page cap (date-bounded sync)
+  const MAX_PAGES = 50;
+  let pageCount = 0;
   
   try {
-    while (hasMore) {
+    while (hasMore && pageCount < MAX_PAGES) {
       let url = `${GHL_BASE_URL}/opportunities/search?location_id=${client.ghl_location_id}&pipeline_id=${pipelineId}&limit=100`;
-      if (startAfterId) {
-        url += `&startAfter=${startAfterId}&startAfterId=${startAfterId}`;
+      if (cursor) {
+        url += `&startAfter=${cursor.startAfter}&startAfterId=${cursor.startAfterId}`;
       }
       
       const response = await fetch(url, { method: 'GET', headers });
@@ -2678,12 +2765,17 @@ async function syncPipelineOpportunitiesAndFunded(
       const opportunities = data.opportunities || [];
       allOpportunities.push(...opportunities);
       
-      if (opportunities.length < 100) {
-        hasMore = false;
-      } else {
-        startAfterId = opportunities[opportunities.length - 1]?.id;
+      // Pagination: next page needs BOTH meta.startAfter (ms timestamp) and meta.startAfterId
+      const meta = data.meta || {};
+      if (pageCount === 0 && Number(meta.total) > MAX_PAGES * 100) {
+        sinceMs = OPPORTUNITY_LARGE_PIPELINE_SINCE_MS;
+        console.log(`Pipeline has ${meta.total} opportunities (> ${MAX_PAGES * 100}); date-bounding to createdAt >= ${new Date(sinceMs).toISOString()}`);
       }
+      cursor = nextOpportunityCursor(meta);
+      if (!cursor || opportunities.length < 100) hasMore = false;
+      else if (sinceMs !== null && cursor.startAfter < sinceMs) hasMore = false;
       
+      pageCount++;
       await new Promise(resolve => setTimeout(resolve, 200));
     }
     
@@ -2807,6 +2899,9 @@ async function syncAllCalendarAppointments(
   
   console.log(`Syncing calendars: tracked=${trackedCalendarIds.length}, reconnect=${reconnectCalendarIds.length}`);
   
+  // Resolve (and cache) the location timezone once so naive appointment times convert correctly
+  await getLocationTimezone(client.ghl_api_key, client.ghl_location_id);
+  
   // Build lead lookup map
   const { data: leads } = await supabase
     .from('leads')
@@ -2882,6 +2977,10 @@ async function syncAppointmentToCall(
   const contactId = appt.contactId;
   const status = (appt.status || appt.appointmentStatus || '').toLowerCase();
   
+  // Same conversion as the contact-appointments path: naive times are location-local; ISO with offset/Z is kept
+  const apptTz = cachedLocationTimezone(appt.locationId);
+  const startIso = ghlTimeToIso(appt.startTime, apptTz);
+  
   // Map GHL appointment status to our call outcome
   let outcome = 'booked';
   let showed = false;
@@ -2900,7 +2999,7 @@ async function syncAppointmentToCall(
     showed = false;
   }
   // Only showed/completed counts, and never for a future start time.
-  showed = resolveShowed(status, appt.startTime);
+  showed = resolveShowed(status, startIso);
   if (!showed && outcome === 'showed') outcome = 'booked';
   
   // Find lead by contact ID
@@ -2945,7 +3044,7 @@ async function syncAppointmentToCall(
   
   // Use GHL dateAdded/createdAt as the original creation date for the call record
   // This ensures historical records appear in the correct chronological order
-  const ghlCreatedAt = appt.dateAdded || appt.createdAt || new Date().toISOString();
+  const ghlCreatedAt = ghlTimeToIso(appt.dateAdded || appt.createdAt, apptTz) || new Date().toISOString();
   
   const callData = {
     client_id: clientId,
@@ -2953,7 +3052,7 @@ async function syncAppointmentToCall(
     external_id: contactId || appointmentId,
     ghl_appointment_id: appointmentId,
     ghl_calendar_id: calendarId,
-    scheduled_at: appt.startTime || appt.dateAdded,
+    scheduled_at: startIso || ghlCreatedAt,
     appointment_status: status,
     showed,
     outcome,
