@@ -104,6 +104,139 @@ async function fetchGHLOpportunityPage(url: string, options: RequestInit, label:
   }
 }
 
+
+// ── Resumable, batched pipeline-opportunity sync ──
+// Large pipelines used to be fetched in full and then written one lead UPDATE per opportunity, which exhausted the edge
+// worker (HTTP 546 WORKER_RESOURCE_LIMIT). Now each run fetches at most OPP_SYNC_PAGES_PER_RUN pages, writes lead
+// opportunity fields in batches (only rows whose values changed), and saves a per-client page cursor so the next run
+// resumes where this one stopped. The cursor lives in sync_logs (sync_type 'ghl_opps_cursor', status 'in_progress';
+// error_message holds the cursor JSON) and is marked 'success' when the pipeline has been fully walked.
+const OPP_SYNC_PAGES_PER_RUN = 10;
+const OPP_CURSOR_SYNC_TYPE = 'ghl_opps_cursor';
+const OPP_CURSOR_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const OPP_LEADS_CHUNK = 100;
+
+type OppCheckpoint = {
+  id: string;
+  pipelineId: string;
+  startAfter: number;
+  startAfterId: string;
+  sinceMs: number | null;
+  pagesDone: number;
+};
+
+async function loadOpportunityCheckpoint(supabase: any, clientId: string, pipelineId: string): Promise<OppCheckpoint | null> {
+  const { data } = await supabase
+    .from('sync_logs')
+    .select('id, error_message, started_at')
+    .eq('client_id', clientId)
+    .eq('sync_type', OPP_CURSOR_SYNC_TYPE)
+    .eq('status', 'in_progress')
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data?.error_message) return null;
+  try {
+    const c = JSON.parse(data.error_message);
+    const fresh = Date.now() - new Date(data.started_at).getTime() < OPP_CURSOR_MAX_AGE_MS;
+    if (!fresh || c.pipelineId !== pipelineId || !Number.isFinite(Number(c.startAfter)) || !c.startAfterId) {
+      await supabase.from('sync_logs').update({ status: 'success', completed_at: new Date().toISOString() }).eq('id', data.id);
+      return null;
+    }
+    return {
+      id: data.id,
+      pipelineId: c.pipelineId,
+      startAfter: Number(c.startAfter),
+      startAfterId: String(c.startAfterId),
+      sinceMs: c.sinceMs == null ? null : Number(c.sinceMs),
+      pagesDone: Number(c.pagesDone) || 0,
+    };
+  } catch (_e) {
+    return null;
+  }
+}
+
+async function saveOpportunityCheckpoint(
+  supabase: any,
+  clientId: string,
+  existingId: string | null,
+  state: Omit<OppCheckpoint, 'id'>,
+): Promise<void> {
+  const payload = { error_message: JSON.stringify(state), records_synced: state.pagesDone };
+  if (existingId) {
+    await supabase.from('sync_logs').update(payload).eq('id', existingId);
+  } else {
+    await supabase.from('sync_logs').insert({
+      client_id: clientId,
+      sync_type: OPP_CURSOR_SYNC_TYPE,
+      status: 'in_progress',
+      started_at: new Date().toISOString(),
+      ...payload,
+    });
+  }
+}
+
+async function finishOpportunityCheckpoint(supabase: any, id: string | null | undefined, status: 'success' | 'failed'): Promise<void> {
+  if (!id) return;
+  await supabase.from('sync_logs').update({ status, completed_at: new Date().toISOString() }).eq('id', id);
+}
+
+// Batched lead opportunity-field writes: one SELECT per 100 contacts, then one UPDATE per (status, stage, stageId, value)
+// group per 100 contacts, only for leads whose values actually changed. Update-only (never inserts leads).
+async function bulkUpdateLeadOpportunityFields(supabase: any, clientId: string, opportunities: any[], errors: string[]): Promise<number> {
+  const desired = new Map<string, { opportunity_status: string; opportunity_stage: string; opportunity_stage_id: string | null; opportunity_value: number }>();
+  for (const opp of opportunities) {
+    const contactId = opp.contactId || opp.contact?.id;
+    if (!contactId) continue;
+    desired.set(contactId, {
+      opportunity_status: opp.status || 'open',
+      opportunity_stage: opp.pipelineStageName || opp.stageName || '',
+      opportunity_stage_id: opp.pipelineStageId || null,
+      opportunity_value: opp.monetaryValue || opp.monetary_value || 0,
+    });
+  }
+  const ids = [...desired.keys()];
+  const groups = new Map<string, string[]>();
+  for (let i = 0; i < ids.length; i += OPP_LEADS_CHUNK) {
+    const chunk = ids.slice(i, i + OPP_LEADS_CHUNK);
+    const { data: rows, error } = await supabase
+      .from('leads')
+      .select('external_id, opportunity_status, opportunity_stage, opportunity_stage_id, opportunity_value')
+      .eq('client_id', clientId)
+      .in('external_id', chunk);
+    if (error) { errors.push(`leads prefetch failed: ${error.message}`); continue; }
+    for (const row of rows || []) {
+      const d = desired.get(row.external_id);
+      if (!d) continue;
+      const same = (row.opportunity_status ?? null) === d.opportunity_status
+        && (row.opportunity_stage ?? '') === d.opportunity_stage
+        && (row.opportunity_stage_id ?? null) === d.opportunity_stage_id
+        && Number(row.opportunity_value ?? 0) === Number(d.opportunity_value ?? 0);
+      if (same) continue;
+      const key = JSON.stringify(d);
+      const list = groups.get(key) || [];
+      list.push(row.external_id);
+      groups.set(key, list);
+    }
+  }
+  let updated = 0;
+  const syncedAt = new Date().toISOString();
+  for (const [key, externalIds] of groups) {
+    const fields = JSON.parse(key);
+    for (let i = 0; i < externalIds.length; i += OPP_LEADS_CHUNK) {
+      const chunk = externalIds.slice(i, i + OPP_LEADS_CHUNK);
+      const { error } = await supabase
+        .from('leads')
+        .update({ ...fields, ghl_synced_at: syncedAt })
+        .eq('client_id', clientId)
+        .in('external_id', chunk);
+      if (error) errors.push(`leads batch update failed: ${error.message}`);
+      else updated += chunk.length;
+    }
+  }
+  return updated;
+}
+
 // ── GHL appointment time normalisation ──
 // GHL's /contacts/{id}/appointments returns startTime/dateAdded as NAIVE local time ("YYYY-MM-DD HH:mm:ss" in the
 // LOCATION's timezone). Writing that string to a timestamptz column reads it as UTC, which shifts every appointment by
@@ -1325,8 +1458,8 @@ async function syncPipelineOpportunitiesIncremental(
   fundedStageIds: string[],
   committedStageIds: string[],
   maxPages: number = 50,
-): Promise<{ funded: number; committed: number; opportunitiesProcessed: number; errors: string[] }> {
-  const result = { funded: 0, committed: 0, opportunitiesProcessed: 0, errors: [] as string[] };
+): Promise<{ funded: number; committed: number; opportunitiesProcessed: number; errors: string[]; pagesFetched: number; leadsUpdated: number; cursorPending: boolean; resumedFromCursor: boolean }> {
+  const result = { funded: 0, committed: 0, opportunitiesProcessed: 0, errors: [] as string[], pagesFetched: 0, leadsUpdated: 0, cursorPending: false, resumedFromCursor: false };
   
   if (!fundedPipelineId || (fundedStageIds.length === 0 && committedStageIds.length === 0)) {
     return result;
@@ -1346,11 +1479,21 @@ async function syncPipelineOpportunitiesIncremental(
     let hasMore = true;
     let cursor: { startAfter: number; startAfterId: string } | null = null;
     let sinceMs: number | null = null; // set only for pipelines larger than the page cap (date-bounded sync)
-    const MAX_PAGES = maxPages;
+    const MAX_PAGES = maxPages; // total pages per full walk of the pipeline (across resumed runs)
     let pageCount = 0;
     const seenOppIds = new Set<string>();
+    // Bounded work per run; resume from the saved per-client cursor if a previous run stopped mid-pipeline.
+    const runPageLimit = Math.min(MAX_PAGES, OPP_SYNC_PAGES_PER_RUN);
+    const checkpoint = await loadOpportunityCheckpoint(supabase, client.id, fundedPipelineId);
+    const pagesDoneBefore = checkpoint?.pagesDone || 0;
+    if (checkpoint) {
+      cursor = { startAfter: checkpoint.startAfter, startAfterId: checkpoint.startAfterId };
+      sinceMs = checkpoint.sinceMs;
+      result.resumedFromCursor = true;
+      console.log(`Resuming pipeline sync for ${client.name} after ${pagesDoneBefore} page(s) (startAfter=${checkpoint.startAfter})`);
+    }
     
-    while (hasMore && pageCount < MAX_PAGES) {
+    while (hasMore && pageCount < runPageLimit) {
       // Use /opportunities/search endpoint with snake_case params (not /opportunities/)
       let url = `${GHL_BASE_URL}/opportunities/search?location_id=${client.ghl_location_id}&pipeline_id=${fundedPipelineId}&limit=100`;
       if (cursor) {
@@ -1382,7 +1525,7 @@ async function syncPipelineOpportunitiesIncremental(
       // Pagination: next page needs BOTH meta.startAfter (ms timestamp of the last createdAt) and meta.startAfterId
       const meta = data.meta || {};
       // Pipelines larger than the page cap are date-bounded (createdAt >= Jan 1, 2026) instead of failing.
-      if (pageCount === 0 && Number(meta.total) > MAX_PAGES * 100) {
+      if (pageCount === 0 && !checkpoint && Number(meta.total) > MAX_PAGES * 100) {
         sinceMs = OPPORTUNITY_LARGE_PIPELINE_SINCE_MS;
         console.log(`Pipeline has ${meta.total} opportunities (> ${MAX_PAGES * 100}); date-bounding to createdAt >= ${new Date(sinceMs).toISOString()}`);
       }
@@ -1396,11 +1539,17 @@ async function syncPipelineOpportunitiesIncremental(
       pageCount++;
       await new Promise(resolve => setTimeout(resolve, OPP_PAGE_PACING_MS));
     }
-    if (hasMore && pageCount >= MAX_PAGES) {
+    result.pagesFetched = pageCount;
+    const totalPagesDone = pagesDoneBefore + pageCount;
+    if (hasMore && totalPagesDone >= MAX_PAGES) {
+      await finishOpportunityCheckpoint(supabase, checkpoint?.id, 'failed');
       throw new Error(`configured pipeline exceeded the verified ${MAX_PAGES * 100}-opportunity safety bound`);
     }
     
-    console.log(`Fetched ${allOpportunities.length} opportunities from pipeline for ${client.name}`);
+    console.log(`Fetched ${allOpportunities.length} opportunities from pipeline for ${client.name} (${pageCount} page(s) this run, ${totalPagesDone} total)`);
+    
+    // Batched lead writes (replaces one UPDATE per opportunity)
+    result.leadsUpdated = await bulkUpdateLeadOpportunityFields(supabase, client.id, allOpportunities, result.errors);
     
     for (const opp of allOpportunities) {
       result.opportunitiesProcessed++;
@@ -1412,20 +1561,7 @@ async function syncPipelineOpportunitiesIncremental(
       const status = opp.status || 'open';
       const stageChangedAt = opp.lastStageChangeAt || opp.dateUpdated || opp.dateAdded || new Date().toISOString();
       
-      // Update the lead with opportunity data if contact exists
-      if (contactId) {
-        await supabase
-          .from('leads')
-          .update({
-            opportunity_status: status,
-            opportunity_stage: stageName,
-            opportunity_stage_id: stageId,
-            opportunity_value: monetaryValue,
-            ghl_synced_at: new Date().toISOString(),
-          })
-          .eq('client_id', client.id)
-          .eq('external_id', contactId);
-      }
+      // Lead opportunity fields are written in batches above (bulkUpdateLeadOpportunityFields).
       
       // Check if this is a funded stage
       if (stageId && fundedStageIds.includes(stageId)) {
@@ -1565,6 +1701,21 @@ async function syncPipelineOpportunitiesIncremental(
           if (!updateError) result.committed++;
         }
       }
+    }
+    
+    // Save / clear the per-client cursor only after this run's pages were written.
+    if (hasMore && cursor) {
+      await saveOpportunityCheckpoint(supabase, client.id, checkpoint?.id || null, {
+        pipelineId: fundedPipelineId,
+        startAfter: cursor.startAfter,
+        startAfterId: cursor.startAfterId,
+        sinceMs,
+        pagesDone: totalPagesDone,
+      });
+      result.cursorPending = true;
+      console.log(`Pipeline sync for ${client.name} paused after ${totalPagesDone} page(s); next run resumes from the saved cursor`);
+    } else if (!hasMore) {
+      await finishOpportunityCheckpoint(supabase, checkpoint?.id, 'success');
     }
   } catch (err) {
     result.errors.push(`Pipeline sync failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
