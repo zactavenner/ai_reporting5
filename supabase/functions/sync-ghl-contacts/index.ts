@@ -60,6 +60,50 @@ async function fetchGHL(
   return fetch(url, options);
 }
 
+
+// ── 429-aware fetch for /opportunities/search paging ──
+// Honors Retry-After (seconds or HTTP-date), otherwise exponential backoff (2s, 4s, 8s, ...) with jitter, each wait capped
+// at OPP_PAGE_MAX_DELAY_MS, at most OPP_PAGE_MAX_RETRIES retries per page and OPP_PAGE_MAX_TOTAL_WAIT_MS of waiting per
+// invocation. A Retry-After longer than the cap is not slept through (the 429 is returned so the caller records it and stops).
+// Every attempt counts against GHL_API_CALL_LIMIT. Pages are paced OPP_PAGE_PACING_MS apart by the callers.
+const OPP_PAGE_MAX_RETRIES = 5;
+const OPP_PAGE_BASE_DELAY_MS = 2000;
+const OPP_PAGE_MAX_DELAY_MS = 30000;
+const OPP_PAGE_MAX_TOTAL_WAIT_MS = 90000;
+const OPP_PAGE_PACING_MS = 750;
+let oppBackoffWaitedMs = 0;
+
+function parseRetryAfterMs(header: string | null): number | null {
+  if (!header) return null;
+  const v = header.trim();
+  if (/^\d+(\.\d+)?$/.test(v)) return Math.round(parseFloat(v) * 1000);
+  const t = Date.parse(v);
+  return Number.isNaN(t) ? null : Math.max(0, t - Date.now());
+}
+
+async function fetchGHLOpportunityPage(url: string, options: RequestInit, label: string): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    ghlApiCallCount++;
+    if (ghlApiCallCount > GHL_API_CALL_LIMIT) {
+      throw new Error(`GHL API call budget exhausted (${GHL_API_CALL_LIMIT} calls). Stopped at: ${label}`);
+    }
+    const res = await fetch(url, options);
+    if (res.status !== 429 || attempt >= OPP_PAGE_MAX_RETRIES) return res;
+
+    const retryAfterMs = parseRetryAfterMs(res.headers.get("Retry-After"));
+    if (retryAfterMs !== null && retryAfterMs > OPP_PAGE_MAX_DELAY_MS) return res;
+    const delay = Math.min(
+      OPP_PAGE_MAX_DELAY_MS,
+      retryAfterMs ?? OPP_PAGE_BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 500,
+    );
+    if (oppBackoffWaitedMs + delay > OPP_PAGE_MAX_TOTAL_WAIT_MS) return res;
+    console.warn(`[sync-ghl-contacts] ${label}: Rate limited (429), retry ${attempt + 1}/${OPP_PAGE_MAX_RETRIES} in ${Math.round(delay / 1000)}s`);
+    try { await res.body?.cancel(); } catch (_e) { /* ignore */ }
+    oppBackoffWaitedMs += delay;
+    await new Promise((r) => setTimeout(r, delay));
+  }
+}
+
 // ── GHL appointment time normalisation ──
 // GHL's /contacts/{id}/appointments returns startTime/dateAdded as NAIVE local time ("YYYY-MM-DD HH:mm:ss" in the
 // LOCATION's timezone). Writing that string to a timestamptz column reads it as UTC, which shifts every appointment by
@@ -419,7 +463,7 @@ async function fetchGHLOpportunities(
         url += `&startAfter=${cursor.startAfter}&startAfterId=${cursor.startAfterId}`;
       }
 
-      const response = await fetchGHL(url, { method: 'GET', headers }, `opportunities page ${pageCount + 1}`);
+      const response = await fetchGHLOpportunityPage(url, { method: 'GET', headers }, `opportunities page ${pageCount + 1}`);
 
       if (!response.ok) {
         console.error(`GHL Opportunities API error: ${response.status}`);
@@ -435,7 +479,7 @@ async function fetchGHLOpportunities(
       if (!cursor || opportunities.length < 100 || cursor.startAfter < OPPORTUNITY_LARGE_PIPELINE_SINCE_MS) hasMore = false;
 
       pageCount++;
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, OPP_PAGE_PACING_MS));
     }
 
     console.log(`Fetched total ${allOpportunities.length} opportunities across ${pageCount} pages`);
@@ -1313,7 +1357,7 @@ async function syncPipelineOpportunitiesIncremental(
         url += `&startAfter=${cursor.startAfter}&startAfterId=${cursor.startAfterId}`;
       }
       
-      const response = await fetch(url, { method: 'GET', headers });
+      const response = await fetchGHLOpportunityPage(url, { method: 'GET', headers }, `pipeline opportunities page ${pageCount + 1}`);
       
       if (!response.ok) {
         console.error(`GHL opportunities fetch error: ${response.status}`);
@@ -1350,7 +1394,7 @@ async function syncPipelineOpportunitiesIncremental(
       else if (sinceMs !== null && cursor.startAfter < sinceMs) hasMore = false;
       
       pageCount++;
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise(resolve => setTimeout(resolve, OPP_PAGE_PACING_MS));
     }
     if (hasMore && pageCount >= MAX_PAGES) {
       throw new Error(`configured pipeline exceeded the verified ${MAX_PAGES * 100}-opportunity safety bound`);
@@ -2754,7 +2798,7 @@ async function syncPipelineOpportunitiesAndFunded(
         url += `&startAfter=${cursor.startAfter}&startAfterId=${cursor.startAfterId}`;
       }
       
-      const response = await fetch(url, { method: 'GET', headers });
+      const response = await fetchGHLOpportunityPage(url, { method: 'GET', headers }, `pipeline opportunities page ${pageCount + 1}`);
       
       if (!response.ok) {
         console.error(`GHL opportunities fetch error: ${response.status}`);
@@ -2776,7 +2820,7 @@ async function syncPipelineOpportunitiesAndFunded(
       else if (sinceMs !== null && cursor.startAfter < sinceMs) hasMore = false;
       
       pageCount++;
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, OPP_PAGE_PACING_MS));
     }
     
     console.log(`Fetched ${allOpportunities.length} opportunities from pipeline`);
