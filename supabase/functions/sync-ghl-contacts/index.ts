@@ -314,7 +314,7 @@ function ghlTimeToIso(value: string | null | undefined, tz: string): string | nu
 // /opportunities/search pages by createdAt DESC. The next page needs meta.startAfter (a ms TIMESTAMP) AND
 // meta.startAfterId (the opportunity id); sending an id as startAfter returns 422 "startAfter must be a valid timestamp".
 // Pipelines too large for the page cap are bounded to opportunities created on/after this date instead of failing.
-const OPPORTUNITY_LARGE_PIPELINE_SINCE_MS = Date.UTC(2026, 0, 1);
+const OPPORTUNITY_LARGE_PIPELINE_SINCE_MS = Date.UTC(2026, 5, 1); // large pipelines (>5000 opps, i.e. Paradyme) date-bounded to createdAt >= Jun 1, 2026
 
 function nextOpportunityCursor(meta: any): { startAfter: number; startAfterId: string } | null {
   const ts = Number(meta?.startAfter);
@@ -1524,7 +1524,7 @@ async function syncPipelineOpportunitiesIncremental(
       
       // Pagination: next page needs BOTH meta.startAfter (ms timestamp of the last createdAt) and meta.startAfterId
       const meta = data.meta || {};
-      // Pipelines larger than the page cap are date-bounded (createdAt >= Jan 1, 2026) instead of failing.
+      // Pipelines larger than the page cap are date-bounded (createdAt >= Jun 1, 2026) instead of failing.
       if (pageCount === 0 && !checkpoint && Number(meta.total) > MAX_PAGES * 100) {
         sinceMs = OPPORTUNITY_LARGE_PIPELINE_SINCE_MS;
         console.log(`Pipeline has ${meta.total} opportunities (> ${MAX_PAGES * 100}); date-bounding to createdAt >= ${new Date(sinceMs).toISOString()}`);
