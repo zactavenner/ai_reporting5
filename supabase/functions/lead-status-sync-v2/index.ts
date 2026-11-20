@@ -48,6 +48,65 @@ function makeGhl(clientToken: string | null | undefined) {
   };
 }
 
+
+// ── GHL appointment time normalisation (same logic as sync-ghl-contacts) ──
+// GHL's /contacts/{id}/appointments returns startTime/dateAdded as NAIVE location-local time
+// ("YYYY-MM-DD HH:mm:ss"). Writing that string to a timestamptz column reads it as UTC and shifts every appointment by
+// the location's UTC offset. Strings that already carry an offset/Z are kept (normalised to UTC).
+const DEFAULT_GHL_TIMEZONE = "America/New_York";
+const locationTimezoneCache = new Map<string, string>();
+
+function isValidTimeZone(tz: string): boolean {
+  try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); return true; } catch { return false; }
+}
+
+// Location timezone from GHL (GET /locations/{id}); falls back to America/New_York. Cached per invocation.
+async function getLocationTimezone(ghl: (url: string, init?: RequestInit) => Promise<Response>, locationId: string | null | undefined): Promise<string> {
+  if (!locationId) return DEFAULT_GHL_TIMEZONE;
+  const cached = locationTimezoneCache.get(locationId);
+  if (cached) return cached;
+  let tz = DEFAULT_GHL_TIMEZONE;
+  try {
+    const res = await ghl(`${GHL_BASE}/locations/${locationId}`);
+    if (res.ok) {
+      const json = await res.json();
+      const candidate = json?.location?.timezone || json?.timezone;
+      if (typeof candidate === "string" && isValidTimeZone(candidate)) tz = candidate;
+    }
+  } catch (_e) { /* keep fallback */ }
+  locationTimezoneCache.set(locationId, tz);
+  return tz;
+}
+
+// Offset (ms) of `tz` from UTC at the UTC instant `utcMs` (DST-aware).
+function zoneOffsetMs(utcMs: number, tz: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(new Date(utcMs));
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const wallAsUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  return wallAsUtc - Math.floor(utcMs / 1000) * 1000;
+}
+
+function ghlTimeToIso(value: string | null | undefined, tz: string): string | null {
+  if (!value) return null;
+  const s = String(value).trim();
+  if (/(?:Z|[+-]\d{2}:?\d{2})$/i.test(s)) {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/);
+  if (!m) {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  const wallAsUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] ?? 0));
+  let utc = wallAsUtc - zoneOffsetMs(wallAsUtc, tz);
+  utc = wallAsUtc - zoneOffsetMs(utc, tz); // second pass settles DST boundaries
+  return new Date(utc).toISOString();
+}
+
 // ── Normalization helpers
 function parseMoney(v: unknown): number {
   if (v == null) return 0;
@@ -162,8 +221,10 @@ async function syncOneContact(
 
   // Upsert appointments → calls
   const callRows: any[] = [];
+  const apptTz = await getLocationTimezone(ghl, client.ghl_location_id);
   for (const a of appts) {
-    const started = a.startTime || a.startedAt || a.selectedTimezone && a.time;
+    const startedRaw = a.startTime || a.startedAt || a.selectedTimezone && a.time;
+    const started = ghlTimeToIso(startedRaw ? String(startedRaw) : null, apptTz);
     if (!started) continue;
     const status = String(a.appointmentStatus || a.status || "").toLowerCase();
     const showed = resolveShowed(status, started);
@@ -175,7 +236,7 @@ async function syncOneContact(
       ghl_calendar_id: a.calendarId || null,
       appointment_status: status || null,
       scheduled_at: started,
-      booked_at: a.createdAt || started,
+      booked_at: ghlTimeToIso(a.dateAdded || a.createdAt, apptTz) || started,
       showed,
       showed_at: showed ? started : null,
       outcome: status || null,
