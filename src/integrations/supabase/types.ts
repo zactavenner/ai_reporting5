@@ -13891,6 +13891,13 @@ export type Database = {
             referencedRelation: "funded_investors"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "email_parsed_investors_funded_investor_id_fkey"
+            columns: ["funded_investor_id"]
+            isOneToOne: false
+            referencedRelation: "v_funded_investors_reporting"
+            referencedColumns: ["id"]
+          },
         ]
       }
       email_sync_log: {
@@ -14783,6 +14790,90 @@ export type Database = {
           video_status_alt?: string | null
           video_url?: string | null
           video_url_alt?: string | null
+        }
+        Relationships: []
+      }
+      funded_investor_report_hold_clients: {
+        Row: {
+          added_at: string
+          client_id: string
+          note: string | null
+        }
+        Insert: {
+          added_at?: string
+          client_id: string
+          note?: string | null
+        }
+        Update: {
+          added_at?: string
+          client_id?: string
+          note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funded_investor_report_hold_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "funded_investor_report_hold_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funded_investor_report_hold_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "funded_investor_report_hold_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "funded_investor_report_hold_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      funded_investor_report_holds: {
+        Row: {
+          client_id: string
+          funded_investor_id: string
+          held_at: string
+          kind: string
+          note: string | null
+          released_at: string | null
+          released_by: string | null
+        }
+        Insert: {
+          client_id: string
+          funded_investor_id: string
+          held_at?: string
+          kind: string
+          note?: string | null
+          released_at?: string | null
+          released_by?: string | null
+        }
+        Update: {
+          client_id?: string
+          funded_investor_id?: string
+          held_at?: string
+          kind?: string
+          note?: string | null
+          released_at?: string | null
+          released_by?: string | null
         }
         Relationships: []
       }
@@ -29533,6 +29624,54 @@ export type Database = {
           meta_rows_yesterday?: never
         }
         Relationships: []
+      }
+      v_funded_investors_reporting: {
+        Row: {
+          client_id: string | null
+          commitment_amount: number | null
+          committed_at: string | null
+          funded_amount: number | null
+          funded_at: string | null
+          id: string | null
+          is_verified_funded: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funded_investors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_sync_health"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "funded_investors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funded_investors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_enrichment_coverage"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "funded_investors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_daily_funnel_freshness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "funded_investors_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_paused_client_activity_flags"
+            referencedColumns: ["client_id"]
+          },
+        ]
       }
       v_gmail_accounts: {
         Row: {
