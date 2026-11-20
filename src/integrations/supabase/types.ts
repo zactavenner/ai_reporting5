@@ -12992,6 +12992,93 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_metrics_showfix_before_20261120: {
+        Row: {
+          ad_spend: number | null
+          calls: number | null
+          calls_scheduled: number | null
+          calls_showed: number | null
+          clicks: number | null
+          client_id: string | null
+          commitment_dollars: number | null
+          commitments: number | null
+          commitments_on_day: number | null
+          created_at: string | null
+          ctr: number | null
+          date: string | null
+          date_account_tz: string | null
+          funded_dollars: number | null
+          funded_investors: number | null
+          funded_on_day: number | null
+          id: string | null
+          impressions: number | null
+          leads: number | null
+          leads_created: number | null
+          reconnect_calls: number | null
+          reconnect_showed: number | null
+          showed_calls: number | null
+          spam_leads: number | null
+          unattributed_leads: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          ad_spend?: number | null
+          calls?: number | null
+          calls_scheduled?: number | null
+          calls_showed?: number | null
+          clicks?: number | null
+          client_id?: string | null
+          commitment_dollars?: number | null
+          commitments?: number | null
+          commitments_on_day?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date?: string | null
+          date_account_tz?: string | null
+          funded_dollars?: number | null
+          funded_investors?: number | null
+          funded_on_day?: number | null
+          id?: string | null
+          impressions?: number | null
+          leads?: number | null
+          leads_created?: number | null
+          reconnect_calls?: number | null
+          reconnect_showed?: number | null
+          showed_calls?: number | null
+          spam_leads?: number | null
+          unattributed_leads?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          ad_spend?: number | null
+          calls?: number | null
+          calls_scheduled?: number | null
+          calls_showed?: number | null
+          clicks?: number | null
+          client_id?: string | null
+          commitment_dollars?: number | null
+          commitments?: number | null
+          commitments_on_day?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date?: string | null
+          date_account_tz?: string | null
+          funded_dollars?: number | null
+          funded_investors?: number | null
+          funded_on_day?: number | null
+          id?: string | null
+          impressions?: number | null
+          leads?: number | null
+          leads_created?: number | null
+          reconnect_calls?: number | null
+          reconnect_showed?: number | null
+          showed_calls?: number | null
+          spam_leads?: number | null
+          unattributed_leads?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       daily_report_runs: {
         Row: {
           anomalies: Json
