@@ -4170,7 +4170,7 @@ serve(async (req) => {
         fundedPipelineId,
         fundedStageIds,
         committedStageIds,
-        10,
+        50,
       );
       const errors = [...contacts.errors, ...pipeline.errors];
       const recordsSynced = contacts.created + contacts.updated + pipeline.opportunitiesProcessed;
