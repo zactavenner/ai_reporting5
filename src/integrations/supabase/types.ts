@@ -6803,6 +6803,54 @@ export type Database = {
         }
         Relationships: []
       }
+      calls_tz_fix_20261120: {
+        Row: {
+          applied: boolean | null
+          built_at: string | null
+          call_id: string | null
+          client_id: string | null
+          new_booked_at: string | null
+          new_created_at: string | null
+          new_scheduled_at: string | null
+          new_showed_at: string | null
+          old_booked_at: string | null
+          old_created_at: string | null
+          old_scheduled_at: string | null
+          old_showed_at: string | null
+          tz: string | null
+        }
+        Insert: {
+          applied?: boolean | null
+          built_at?: string | null
+          call_id?: string | null
+          client_id?: string | null
+          new_booked_at?: string | null
+          new_created_at?: string | null
+          new_scheduled_at?: string | null
+          new_showed_at?: string | null
+          old_booked_at?: string | null
+          old_created_at?: string | null
+          old_scheduled_at?: string | null
+          old_showed_at?: string | null
+          tz?: string | null
+        }
+        Update: {
+          applied?: boolean | null
+          built_at?: string | null
+          call_id?: string | null
+          client_id?: string | null
+          new_booked_at?: string | null
+          new_created_at?: string | null
+          new_scheduled_at?: string | null
+          new_showed_at?: string | null
+          old_booked_at?: string | null
+          old_created_at?: string | null
+          old_scheduled_at?: string | null
+          old_showed_at?: string | null
+          tz?: string | null
+        }
+        Relationships: []
+      }
       campaign_launch_events: {
         Row: {
           created_at: string
