@@ -27,6 +27,7 @@ import { CashBagLoader } from '@/components/ui/CashBagLoader';
 import { PlatformAdPreview } from './PlatformAdPreview';
 import { CreativeHorizontalPreview } from './CreativeHorizontalPreview';
 import { CreativeAIActions } from './CreativeAIActions';
+import { CreativeNameEditor } from './CreativeNameEditor';
 import { supabase } from '@/integrations/supabase/client';
 import { Json } from '@/integrations/supabase/types';
 import { SendToClientDialog } from '@/components/client/SendToClientDialog';
@@ -849,7 +850,7 @@ export function CreativeApproval({ clientId, clientName, isPublicView = false, d
           <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto sm:max-w-[95vw]">
             {selectedCreative && (
               <CreativeDetailModal
-                creative={selectedCreative}
+                creative={allCreatives.find(creative => creative.id === selectedCreative.id) || selectedCreative}
                 clientName={clientName}
                 clientId={clientId}
                 isPublicView={isPublicView}
@@ -1177,7 +1178,9 @@ function CreativeDetailModal({
     <>
       <DialogHeader>
         <div className="flex items-center justify-between">
-          <DialogTitle>{creative.title}</DialogTitle>
+          <DialogTitle className="min-w-0 flex-1">
+            <CreativeNameEditor creative={creative} readOnly={isPublicView} />
+          </DialogTitle>
           <Badge className={getStatusColor(creative.status)}>
             {creative.status}
           </Badge>
@@ -1801,7 +1804,9 @@ function CreativeCard({
                     </svg>
                   </span>
                 )}
-                <h4 className="font-medium text-xs truncate">{creative.title}</h4>
+                <div className="min-w-0 flex-1 font-medium text-xs">
+                  <CreativeNameEditor creative={creative} readOnly={isPublicView} />
+                </div>
               </div>
               <p className="text-[10px] text-muted-foreground mt-0.5">{clientName}</p>
             </div>

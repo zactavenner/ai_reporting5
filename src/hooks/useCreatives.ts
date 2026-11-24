@@ -243,6 +243,37 @@ export function useCreateCreative() {
   });
 }
 
+export function useRenameCreative() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, clientId, title }: { id: string; clientId: string; title: string }) => {
+      const name = title.trim();
+      if (!name) throw new Error('Please enter a creative name');
+      if (!id || !clientId) throw new Error('Missing creative or client');
+
+      const { data, error } = await supabase
+        .from('creatives')
+        .update({ title: name })
+        .eq('id', id)
+        .eq('client_id', clientId)
+        .select('id, client_id, title')
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.setQueryData<Creative[]>(['creatives', variables.clientId], current =>
+        current?.map(creative => creative.id === data.id ? { ...creative, title: data.title } : creative)
+      );
+      queryClient.invalidateQueries({ queryKey: ['creatives', variables.clientId] });
+      queryClient.invalidateQueries({ queryKey: ['all-creatives'] });
+      toast.success('Creative renamed');
+    },
+    onError: (error: Error) => toast.error('Failed to rename creative: ' + error.message),
+  });
+}
+
 export function useUpdateCreativeStatus() {
   const queryClient = useQueryClient();
   
