@@ -53,7 +53,12 @@ export function CalendarTrackingSection({
       });
 
       if (fnError) {
-        throw new Error(fnError.message || 'Failed to fetch calendars');
+        let details = fnError.message || 'Failed to fetch calendars';
+        try {
+          const body = await (fnError as any).context?.json?.();
+          if (body?.error) details = body.error;
+        } catch { /* keep generic message */ }
+        throw new Error(details);
       }
 
       if (data?.error) {
